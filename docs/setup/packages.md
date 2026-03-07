@@ -1,65 +1,23 @@
 # Packages
 
-Package management is split by platform and purpose. Each layer is declared in a text file and applied by a script in `install/`.
+Each layer has a declarative text file and an idempotent install script.
 
-## Overview
+| Layer | File | Platform |
+|---|---|---|
+| System packages | `packages/Brewfile` | macOS |
+| System packages | `packages/nix/home.nix` | Linux |
+| Language runtimes | `packages/mise.toml` | All |
+| Rust tools | `packages/cargo.txt` | All |
+| Python packages | `packages/pip.txt` | All |
+| Claude plugins | `packages/claude-plugins.txt` | All |
 
-| Layer | File | Script | Platform |
-|---|---|---|---|
-| System packages | `packages/Brewfile` | `install/homebrew.sh` | macOS |
-| System packages | `packages/nix/home.nix` | `install/nix.sh` | Linux |
-| Language runtimes | `packages/mise.toml` | `install/mise.sh` | All |
-| Rust tools | `packages/cargo.txt` | `install/rust.sh` | All |
-| Python packages | `packages/pip.txt` | `install/python.sh` | All |
-| Claude plugins | `packages/claude-plugins.txt` | `install/claude.sh` | All |
+## Why this split
 
-## Homebrew (macOS)
+- **Homebrew vs Nix** — Homebrew on macOS (familiar, cask support for GUI apps); Nix on Linux (no sudo, multi-arch, reproducible).
+- **mise for runtimes** — one tool replacing nvm/pyenv/rbenv. Versions pinned globally, overridable per-project with a local `.mise.toml`.
+- **Rust via rustup, not mise** — rustup handles toolchain components, cross-compilation targets, and `rust-analyzer` better than mise does.
+- **`~/.venv` for Python** — a single activated venv for interactive/scripting use. Project-specific envs are handled by uv separately.
 
-`packages/Brewfile` declares all macOS packages declaratively. To apply:
+## Adding packages
 
-```sh
-brew bundle --file=~/dotfiles/packages/Brewfile
-# or
-~/dotfiles/install/homebrew.sh
-```
-
-## Nix (Linux)
-
-`packages/nix/home.nix` declares Linux packages via home-manager. No sudo required — Nix installs entirely into `~/.nix-profile`.
-
-```sh
-~/dotfiles/install/nix.sh
-```
-
-## mise (language runtimes)
-
-[mise](https://mise.jdx.dev) manages language runtime versions (Node, Python, etc.) without sudo. Versions are pinned in `packages/mise.toml`.
-
-```sh
-mise install        # install all declared versions
-mise use node@lts   # set a version locally
-```
-
-## Rust tools
-
-`packages/cargo.txt` lists tools installed via `cargo install`. The install script skips already-installed tools to avoid redundant recompiles.
-
-```sh
-~/dotfiles/install/rust.sh
-```
-
-To add a tool: append its crate name to `cargo.txt` and re-run the script.
-
-## Python
-
-All Python work happens inside `~/.venv`, activated automatically by `.zprofile`. The venv is created by uv and packages come from `packages/pip.txt`.
-
-```sh
-~/dotfiles/install/python.sh
-
-# Install something new
-uv pip install <pkg>
-
-# Add it permanently
-echo "<pkg>" >> ~/dotfiles/packages/pip.txt
-```
+Append to the relevant file and re-run the corresponding script — all scripts skip already-installed items.

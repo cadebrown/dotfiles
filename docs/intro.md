@@ -1,20 +1,20 @@
 # Introduction
 
-This is the documentation for my personal machine setup. It covers how everything is structured, why certain tools were chosen, and how to reproduce the setup on a new machine.
+Personal dotfiles for macOS and Linux, managed with [chezmoi](https://chezmoi.io). Designed for shared home directories across machines with different architectures, and Linux systems without sudo.
 
-The dotfiles repo lives at `~/dotfiles` and is managed with [chezmoi](https://chezmoi.io). Configuration files are templates — they adapt to the current OS, architecture, and the name/email entered on first bootstrap.
+## Design constraints
 
-## Philosophy
+- **Shared home directories** — the same `$HOME` may be mounted across machines with different OS/arch. Text configs are shared freely; compiled binaries are isolated to `~/.local/bin/<arch>-<os>/`.
+- **No sudo on Linux** — Nix user mode, mise, rustup, and uv all install to user-local paths.
+- **Idempotent** — every script and `chezmoi apply` is safe to re-run.
 
-- **No sudo on Linux.** All tools install to user-local paths.
-- **Shared home directories work.** Arch-specific binaries go to `~/.local/bin/<arch>-<os>/`; text configs are fully shared.
-- **Idempotent bootstrap.** Running `bootstrap.sh` twice changes nothing if everything is already in place.
-- **One source of truth.** Packages, plugins, and tools are declared in text files (`Brewfile`, `cargo.txt`, `pip.txt`, etc.) and applied by scripts.
+## Layout
 
-## Quick start
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
-```
-
-See [Bootstrap](setup/bootstrap.md) for a full walkthrough.
+| Path | Purpose |
+|---|---|
+| `bootstrap.sh` | Entry point for new machines |
+| `.chezmoi.toml.tmpl` | Per-machine prompts (name, email) |
+| `home/` | Dotfiles source — applied to `~/` by chezmoi |
+| `packages/` | Declarative package lists |
+| `install/` | Idempotent install scripts |
+| `docs/` | This documentation (built with mdBook) |
