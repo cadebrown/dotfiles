@@ -1,0 +1,96 @@
+# Brewfile - declarative macOS package list
+# Usage: brew bundle --file=~/dotfiles/packages/Brewfile
+
+### Terminal & Shell ###
+cask "ghostty"
+cask "iterm2"
+
+### Editors & IDEs ###
+cask "visual-studio-code"
+cask "cursor"
+brew "neovim"
+
+### Window Management ###
+cask "nikitabobko/tap/aerospace"
+cask "linearmouse"
+
+### Productivity ###
+cask "alfred"
+cask "the-unarchiver"
+
+### Browsers ###
+cask "firefox"
+
+### Media ###
+brew "mpv"
+cask "vlc"
+cask "gimp"
+cask "inkscape"
+cask "spotify"
+cask "obs"
+cask "blender"
+
+### Documents ###
+cask "mactex"
+cask "libreoffice"
+
+### Games ###
+cask "openemu"
+cask "retroarch"
+cask "nestopia"
+
+### Dev Tools - VMs & Containers ###
+brew "docker"
+brew "qemu"
+cask "utm"
+
+### Dev Tools - Git ###
+brew "git"
+brew "git-delta"
+brew "difftastic"
+brew "ast-grep"
+brew "git-lfs"
+
+### Dev Tools - Search & Files ###
+brew "ripgrep"
+brew "fd"
+brew "fzf"
+brew "tree"
+brew "ncdu"
+brew "sd"
+brew "bat"
+brew "bat-extras"
+
+### Dev Tools - JSON & Data ###
+brew "jq"
+
+### Dev Tools - CLI Utilities ###
+brew "wget"
+brew "curl"
+brew "fetch"
+brew "less"
+brew "rlwrap"
+brew "cloc"
+brew "imagemagick"
+brew "fastfetch"
+
+### Dev Tools - Monitoring ###
+brew "htop"
+brew "btop"
+brew "bottom"
+brew "glances"
+
+### Dev Tools - Networking ###
+brew "openssh"
+brew "lynx"
+
+### Dev Tools - Build ###
+brew "fftw"
+brew "openjdk"
+
+### Fonts ###
+cask "font-jetbrains-mono"
+cask "font-powerline-symbols"
+
+### Utilities ###
+cask "balenaetcher"

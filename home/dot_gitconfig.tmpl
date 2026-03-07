@@ -1,0 +1,80 @@
+[user]
+    name = {{ .name }}
+    email = {{ .email }}
+
+[init]
+    defaultBranch = main
+
+[status]
+    submoduleSummary = true
+
+[pull]
+    rebase = true
+    ff = only
+
+[push]
+    autoSetupRemote = true
+
+[core]
+    pager = delta
+    editor = nvim
+
+[interactive]
+    diffFilter = delta --color-only
+
+[delta]
+    navigate = true
+    dark = true
+    side-by-side = true
+    line-numbers = true
+
+[merge]
+    conflictStyle = zdiff3
+
+[rebase]
+    autoSquash = true
+    autoStash = true
+
+[rerere]
+    enabled = true
+
+[diff]
+    algorithm = histogram
+    submodule = log
+    colorMoved = default
+
+[submodule]
+    recurse = true
+
+[branch]
+    sort = -committerdate
+
+[fetch]
+    prune = true
+
+# prefer SSH for GitHub
+[url "git@github.com:"]
+    insteadOf = https://github.com/
+
+[alias]
+    lg = log --graph --abbrev-commit --decorate --date=relative --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(bold yellow)%d%C(reset)' --all -n 15
+    zip = archive -o latest.zip HEAD
+    praise = blame
+
+[filter "lfs"]
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true
+
+{{ if .work -}}
+# Work machine: override user in work directories
+[includeIf "gitdir:~/work/"]
+    path = ~/.gitconfig-work
+{{ if .work_username -}}
+[includeIf "gitdir:~/{{ .work_username }}/"]
+    path = ~/.gitconfig-work
+[includeIf "gitdir:/home/{{ .work_username }}/"]
+    path = ~/.gitconfig-work
+{{ end -}}
+{{ end -}}

@@ -1,0 +1,123 @@
+# .zprofile - ZSH login shell configuration
+
+### GENERAL ###
+
+export LANG=en_US.UTF-8
+export BROWSER='lynx'
+
+export CMAKE_EXPORT_COMPILE_COMMANDS=1
+export CMAKE_COLOR_DIAGNOSTICS=ON
+export CLICOLOR_FORCE=1
+export USE_CCACHE=ON
+
+### ARCH-SPECIFIC BIN ###
+
+# Binaries installed per-arch go here (compiled tools, chezmoi, etc.)
+export PATH="$HOME/.local/bin/$(uname -m)-$(uname -s):$HOME/.local/bin:$PATH"
+
+### MISE ###
+
+if command -v mise &>/dev/null; then
+    eval "$(mise activate zsh)"
+elif [ -e "$HOME/.local/bin/mise" ]; then
+    eval "$($HOME/.local/bin/mise activate zsh)"
+fi
+
+### NIX ###
+{{ if .nix_available -}}
+if [ -e "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+    . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+fi
+{{ end -}}
+
+### PLATFORM-SPECIFIC ###
+{{ if eq .chezmoi.os "darwin" -}}
+
+# Homebrew
+if [ -e "$HOME/.homebrew" ]; then
+    eval "$(~/.homebrew/bin/brew shellenv)"
+    export PATH="$(brew --prefix rustup)/bin:$PATH"
+elif [ -e "/opt/homebrew" ]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+    export PATH="$(brew --prefix rustup)/bin:$PATH"
+fi
+
+{{ else -}}
+
+# Linux: private credential files
+if [ -e "$HOME/.nvidia.env" ]; then
+    . "$HOME/.nvidia.env"
+fi
+
+export SSL_CERT_DIR=/usr/lib/ssl/certs
+
+{{ end -}}
+
+### RUST ###
+
+export PATH="$HOME/.cargo/bin:$PATH"
+
+### PYTHON ###
+
+export VIRTUAL_ENV_DISABLE_PROMPT=1
+if [ -e "$HOME/.venv/bin/activate" ]; then
+    source "$HOME/.venv/bin/activate"
+fi
+if [ -e "$HOME/.pythonrc" ]; then
+    export PYTHONSTARTUP="$HOME/.pythonrc"
+fi
+
+### CUDA (Linux) ###
+{{ if eq .chezmoi.os "linux" -}}
+
+function cuda_use() {
+    export CUDA_HOME="$1"
+    if [ -e "$CUDA_HOME" ]; then
+        export PATH="$CUDA_HOME/bin:$PATH"
+        export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib:$LD_LIBRARY_PATH"
+        export C_INCLUDE_PATH="$CUDA_HOME/include:$C_INCLUDE_PATH"
+        export CPLUS_INCLUDE_PATH="$CUDA_HOME/include:$CPLUS_INCLUDE_PATH"
+    else
+        echo "ERROR: CUDA not found at $CUDA_HOME" >&2
+    fi
+}
+
+if [ -e "$HOME/.cuda" ]; then
+    cuda_use "$HOME/.cuda"
+fi
+
+if [ -e "$HOME/scratch" ]; then
+    export SCRATCH=$(realpath "$HOME/scratch")
+fi
+
+# NSYS
+export NSYS_HOME="$HOME/nsys"
+if [ -d "$NSYS_HOME" ]; then
+    export PATH="$NSYS_HOME/bin:$PATH"
+    export LD_LIBRARY_PATH="$NSYS_HOME/lib64:$NSYS_HOME/lib:$LD_LIBRARY_PATH"
+fi
+
+# NCU
+export NCU_HOME="$HOME/ncu"
+if [ -d "$NCU_HOME" ]; then
+    export PATH="$NCU_HOME/bin:$PATH"
+    export LD_LIBRARY_PATH="$NCU_HOME/lib64:$NCU_HOME/lib:$LD_LIBRARY_PATH"
+fi
+
+# Docker: always use system docker on Linux
+function docker() {
+    /usr/bin/docker "$@"
+}
+
+{{ end -}}
+
+### SSH AGENT ###
+
+if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
+    : # remote session — agent forwarding handles it
+else
+    if [ -z "$SSH_AUTH_SOCK" ]; then
+        eval "$(ssh-agent -s)"
+        ssh-add ~/.ssh/id_* 2>/dev/null
+    fi
+fi

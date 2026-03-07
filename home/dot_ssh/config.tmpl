@@ -1,0 +1,18 @@
+Host *
+    # SSH multiplexing for faster repeated connections
+    ControlPath ~/.ssh/controls-%r@%h:%p
+    ControlMaster auto
+    ControlPersist 600
+
+    IgnoreUnknown UseKeychain
+    AddKeysToAgent yes
+{{ if eq .chezmoi.os "darwin" -}}
+    UseKeychain yes
+{{ end -}}
+
+    # Keepalive to survive VPN drops
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+
+    # Forward agent so hops work without copying keys
+    ForwardAgent yes

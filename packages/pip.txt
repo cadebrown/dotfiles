@@ -1,0 +1,20 @@
+# pip.txt - Python packages to install into ~/.venv via uv
+# Usage: install/python.sh reads this file
+
+# IPython for interactive Python
+ipython
+
+# Jupyter for notebooks
+jupyter
+
+# NumPy/SciPy stack
+numpy
+scipy
+matplotlib
+
+# Data tools
+pandas
+
+# Code formatting
+black
+ruff

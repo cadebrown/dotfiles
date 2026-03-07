@@ -1,0 +1,23 @@
+# cargo.txt - Rust tools to install via `cargo install`
+# Usage: install/rust.sh reads this file
+
+# CSV utilities
+xan
+
+# Better file finder
+fd-find
+
+# Better sed
+sd
+
+# Benchmarking
+hyperfine
+
+# Process monitor
+procs
+
+# Better rm (rip)
+rm-improved
+
+# Smarter cd
+zoxide
