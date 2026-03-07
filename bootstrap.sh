@@ -10,6 +10,7 @@
 #
 # Environment variables:
 #   GITHUB_REPO      — override the source repo (default: cadebrown/dotfiles)
+#   INSTALL_NODE     — set to 0 to skip Node (nvm) install
 #   INSTALL_RUST     — set to 0 to skip Rust install
 #   INSTALL_PYTHON   — set to 0 to skip Python install
 #   INSTALL_CLAUDE   — set to 0 to skip Claude plugin install
@@ -92,14 +93,15 @@ case "$OS" in
         ;;
 esac
 
-### 4. mise (language runtimes) ###
+### 4. language runtimes ###
 
-log_section "4 — mise"
-bash "$INSTALL_DIR/mise.sh"
+log_section "4 — language runtimes"
 
-### 5. optional tools ###
-
-log_section "5 — optional tools"
+if [[ "${INSTALL_NODE:-1}" != "0" ]]; then
+    bash "$INSTALL_DIR/node.sh"
+else
+    log_info "Skipping Node (INSTALL_NODE=0)"
+fi
 
 if [[ "${INSTALL_RUST:-1}" != "0" ]]; then
     bash "$INSTALL_DIR/rust.sh"

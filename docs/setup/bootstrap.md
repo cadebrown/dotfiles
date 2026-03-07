@@ -11,7 +11,7 @@ Or from a clone: `~/dotfiles/bootstrap.sh`
 1. Install chezmoi to `~/.local/bin/<arch>-<os>/`
 2. Apply dotfiles via chezmoi (prompts for name + email on first run)
 3. Install system packages — Homebrew on macOS, Nix on Linux
-4. Install language runtimes via mise
+4. Install Node LTS via nvm
 5. Install Rust toolchain + `cargo.txt` tools
 6. Create `~/.venv` via uv, install `pip.txt` packages
 7. Install Claude Code plugins
@@ -19,7 +19,7 @@ Or from a clone: `~/dotfiles/bootstrap.sh`
 ## Skipping steps
 
 ```sh
-INSTALL_RUST=0 INSTALL_PYTHON=0 INSTALL_CLAUDE=0 ~/dotfiles/bootstrap.sh
+INSTALL_NODE=0 INSTALL_RUST=0 INSTALL_PYTHON=0 INSTALL_CLAUDE=0 ~/dotfiles/bootstrap.sh
 ```
 
 ## First-run prompts
