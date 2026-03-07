@@ -23,6 +23,24 @@ The `.tmpl` suffix marks files that contain Go template directives.
 {{ .chezmoi.homeDir }}   home directory path
 ```
 
+## Shared home directories and template safety
+
+On a shared NFS home, all machines run `chezmoi apply` against the same target files. This is safe as long as templates render identically on every machine that shares the home.
+
+**The rule: never use `{{ .chezmoi.arch }}` (or any per-machine variable) in a template.** Doing so would cause machines to overwrite each other's rendered output on every apply.
+
+Arch-specific logic belongs in shell runtime instead:
+
+```sh
+# Good — evaluated at shell startup on each machine
+export PATH="$HOME/.local/bin/$(uname -m)-$(uname -s):$PATH"
+
+# Bad — baked into the file at chezmoi apply time, machines fight
+export PATH="$HOME/.local/bin/{{ .chezmoi.arch }}-{{ .chezmoi.os }}:$PATH"
+```
+
+The current templates only branch on `{{ .chezmoi.os }}` (darwin vs linux), which is the same for all machines sharing a home directory.
+
 ## Files that tools also write
 
 Some tracked files are mutated by other programs (e.g. `~/.claude/settings.json` is updated by Claude Code on plugin install). chezmoi doesn't auto-apply — drift is safe until you decide what to do:
