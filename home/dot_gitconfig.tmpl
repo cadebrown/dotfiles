@@ -1,5 +1,5 @@
 [user]
-    name = {{ .name }}
+    name  = {{ .name }}
     email = {{ .email }}
 
 [init]
@@ -17,7 +17,8 @@
 
 [core]
     pager = delta
-    editor = nvim
+    editor = vim
+    excludesFile = ~/.config/git/ignore
 
 [interactive]
     diffFilter = delta --color-only
@@ -66,15 +67,3 @@
     smudge = git-lfs smudge -- %f
     process = git-lfs filter-process
     required = true
-
-{{ if .work -}}
-# Work machine: override user in work directories
-[includeIf "gitdir:~/work/"]
-    path = ~/.gitconfig-work
-{{ if .work_username -}}
-[includeIf "gitdir:~/{{ .work_username }}/"]
-    path = ~/.gitconfig-work
-[includeIf "gitdir:/home/{{ .work_username }}/"]
-    path = ~/.gitconfig-work
-{{ end -}}
-{{ end -}}

@@ -1,6 +1,6 @@
+{{- $name  := promptStringOnce . "name"  "Display name" -}}
+{{- $email := promptStringOnce . "email" "Email" -}}
+
 [data]
-  name = "{{ promptStringOnce . "name" "Full name" }}"
-  email = "{{ promptStringOnce . "email" "Email" }}"
-  work = {{ promptBoolOnce . "work" "Is this a work machine?" }}
-  nix_available = {{ promptBoolOnce . "nix_available" "Is Nix installed?" }}
-  work_username = "{{ promptStringOnce . "work_username" "Work username (leave blank if personal)" }}"
+  name  = {{ $name  | quote }}
+  email = {{ $email | quote }}

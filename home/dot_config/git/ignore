@@ -1,0 +1,39 @@
+# Global gitignore — applies to all repos
+
+### macOS ###
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+### Editors ###
+# Vim
+*.swp
+*.swo
+*~
+
+# JetBrains
+.idea/
+
+# VSCode
+.vscode/
+
+# Emacs
+\#*\#
+.#*
+
+### Build artifacts ###
+*.o
+*.a
+*.so
+*.dylib
+
+### Logs & temp ###
+*.log
+*.tmp
+*.bak
+
+### Secrets (last line of defence — don't rely on this) ###
+.env
+.env.local
+*.pem

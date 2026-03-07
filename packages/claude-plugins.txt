@@ -1,0 +1,12 @@
+# claude-plugins.txt - Claude Code plugins to install
+# Usage: install/claude.sh reads this file
+# Install manually: claude plugin install <name>
+
+# LSP integrations
+rust-analyzer-lsp
+clangd-lsp
+pyright-lsp
+typescript-lsp
+
+# Meta / workflow
+claude-md-management
