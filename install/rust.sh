@@ -6,6 +6,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 log_section "Rust"
 
+_PLAT="$(uname -m)-$(uname -s)"
+export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup-$_PLAT}"
+export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo-$_PLAT}"
+
 ### rustup ###
 
 if has rustup; then
@@ -20,7 +24,7 @@ else
 fi
 
 # Ensure cargo is on PATH for this session
-export PATH="$HOME/.cargo/bin:$PATH"
+export PATH="$CARGO_HOME/bin:$PATH"
 
 ### cargo tools ###
 

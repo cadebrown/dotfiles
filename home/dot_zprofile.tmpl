@@ -10,16 +10,36 @@ export CMAKE_COLOR_DIAGNOSTICS=ON
 export CLICOLOR_FORCE=1
 export USE_CCACHE=ON
 
-### ARCH-SPECIFIC BIN ###
+### PLATFORM ###
 
-# Binaries installed per-arch go here (compiled tools, chezmoi, etc.)
-export PATH="$HOME/.local/bin/$(uname -m)-$(uname -s):$HOME/.local/bin:$PATH"
+# _PLAT identifies the current arch+OS combination.
+# Used to isolate compiled binaries in shared home directories (e.g. NFS mounts
+# shared across x86_64 and aarch64 machines — each gets its own binary paths).
+export _PLAT="$(uname -m)-$(uname -s)"
+
+export PATH="$HOME/.local/bin/$_PLAT:$HOME/.local/bin:$PATH"
 
 ### NODE (nvm) ###
 
-export NVM_DIR="$HOME/.nvm"
+export NVM_DIR="$HOME/.nvm-$_PLAT"
 if [ -s "$NVM_DIR/nvm.sh" ]; then
     . "$NVM_DIR/nvm.sh"
+fi
+
+### RUST ###
+
+export RUSTUP_HOME="$HOME/.rustup-$_PLAT"
+export CARGO_HOME="$HOME/.cargo-$_PLAT"
+export PATH="$CARGO_HOME/bin:$PATH"
+
+### PYTHON ###
+
+export VIRTUAL_ENV_DISABLE_PROMPT=1
+if [ -e "$HOME/.venv-$_PLAT/bin/activate" ]; then
+    source "$HOME/.venv-$_PLAT/bin/activate"
+fi
+if [ -e "$HOME/.pythonrc" ]; then
+    export PYTHONSTARTUP="$HOME/.pythonrc"
 fi
 
 ### NIX ###
@@ -34,10 +54,8 @@ fi
 # Homebrew
 if [ -e "$HOME/.homebrew" ]; then
     eval "$(~/.homebrew/bin/brew shellenv)"
-    export PATH="$(brew --prefix rustup)/bin:$PATH"
 elif [ -e "/opt/homebrew" ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
-    export PATH="$(brew --prefix rustup)/bin:$PATH"
 fi
 
 {{ else -}}
@@ -83,20 +101,6 @@ done
 function docker() { /usr/bin/docker "$@"; }
 
 {{ end -}}
-
-### RUST ###
-
-export PATH="$HOME/.cargo/bin:$PATH"
-
-### PYTHON ###
-
-export VIRTUAL_ENV_DISABLE_PROMPT=1
-if [ -e "$HOME/.venv/bin/activate" ]; then
-    source "$HOME/.venv/bin/activate"
-fi
-if [ -e "$HOME/.pythonrc" ]; then
-    export PYTHONSTARTUP="$HOME/.pythonrc"
-fi
 
 ### SSH AGENT ###
 

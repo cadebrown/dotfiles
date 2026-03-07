@@ -20,7 +20,8 @@ fi
 
 ### ~/.venv ###
 
-VENV="$HOME/.venv"
+_PLAT="$(uname -m)-$(uname -s)"
+VENV="${VENV:-$HOME/.venv-$_PLAT}"
 
 if [[ -d "$VENV" ]]; then
     log_ok "~/.venv already exists"
