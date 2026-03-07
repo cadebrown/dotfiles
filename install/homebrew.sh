@@ -1,37 +1,38 @@
 #!/usr/bin/env bash
 # install/homebrew.sh - install Homebrew and apply Brewfile (macOS only)
-set -e
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-. "$SCRIPT_DIR/_lib.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 log_section "Homebrew"
 
-if [ "$OS" != "darwin" ]; then
-    log_warn "Skipping Homebrew — not on macOS (OS=$OS)"
-    exit 0
-fi
+[[ "$OS" == "darwin" ]] || { log_warn "Not on macOS — skipping"; exit 0; }
 
-if ! has brew; then
-    log_info "Installing Homebrew"
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+### Install Homebrew ###
+
+if has brew; then
+    log_ok "Already installed: $(brew --version | head -1)"
 else
-    log_ok "Homebrew already installed ($(brew --version | head -1))"
+    log_info "Installing Homebrew"
+    run_logged bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
 
-# Reload brew into PATH (needed when we just installed it)
-if [ -e "/opt/homebrew/bin/brew" ]; then
+# Ensure brew is on PATH for this session (needed right after install)
+if [[ -x "/opt/homebrew/bin/brew" ]]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
-elif [ -e "/usr/local/bin/brew" ]; then
+elif [[ -x "/usr/local/bin/brew" ]]; then
     eval "$(/usr/local/bin/brew shellenv)"
 fi
 
-BREWFILE="$(dirname "$SCRIPT_DIR")/packages/Brewfile"
-if [ ! -f "$BREWFILE" ]; then
-    log_error "Brewfile not found at $BREWFILE"
-    exit 1
-fi
+### Apply Brewfile ###
 
-log_info "Running brew bundle (this may take a while)"
-brew bundle install --file="$BREWFILE" --no-lock
-log_ok "Homebrew packages installed"
+BREWFILE="$PACKAGES_DIR/Brewfile"
+[[ -f "$BREWFILE" ]] || die "Brewfile not found at $BREWFILE"
+
+log_info "Updating Homebrew"
+run_logged brew update
+
+log_info "Applying Brewfile (this may take a while)"
+run_logged brew bundle install --file="$BREWFILE" --no-lock
+
+log_ok "Homebrew packages up to date"

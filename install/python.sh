@@ -1,42 +1,40 @@
 #!/usr/bin/env bash
-# install/python.sh - install uv and create ~/.venv with packages from pip.txt
-set -e
+# install/python.sh - install uv and create ~/.venv with pip.txt packages
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-. "$SCRIPT_DIR/_lib.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 log_section "Python (uv)"
 
 ### uv ###
 
 if has uv; then
-    log_ok "uv already installed ($(uv --version))"
+    log_ok "uv already installed: $(uv --version)"
 else
     log_info "Installing uv"
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+    run_logged bash <(curl -LsSf https://astral.sh/uv/install.sh)
+    # uv installs to ~/.local/bin
     export PATH="$HOME/.local/bin:$PATH"
-    log_ok "uv installed: $(uv --version)"
+    log_ok "Installed: $(uv --version)"
 fi
 
 ### ~/.venv ###
 
 VENV="$HOME/.venv"
-if [ -d "$VENV" ]; then
+
+if [[ -d "$VENV" ]]; then
     log_ok "~/.venv already exists"
 else
     log_info "Creating ~/.venv"
-    uv venv "$VENV"
+    run_logged uv venv "$VENV"
     log_ok "~/.venv created"
 fi
 
-### pip packages ###
+### packages ###
 
-PIP_TXT="$(dirname "$SCRIPT_DIR")/packages/pip.txt"
-if [ ! -f "$PIP_TXT" ]; then
-    log_warn "No pip.txt found at $PIP_TXT"
-    exit 0
-fi
+PIP_TXT="$PACKAGES_DIR/pip.txt"
+[[ -f "$PIP_TXT" ]] || { log_warn "No pip.txt at $PIP_TXT — skipping"; exit 0; }
 
-log_info "Installing Python packages from pip.txt"
-uv pip install --python "$VENV/bin/python" -r "$PIP_TXT"
-log_ok "Python packages installed"
+log_info "Syncing packages from pip.txt"
+run_logged uv pip install --python "$VENV/bin/python" -r "$PIP_TXT"
+log_ok "Python packages up to date"

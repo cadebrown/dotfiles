@@ -1,30 +1,35 @@
 #!/usr/bin/env bash
 # install/claude.sh - install Claude Code plugins from claude-plugins.txt
-set -e
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-. "$SCRIPT_DIR/_lib.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 log_section "Claude Code plugins"
 
-if ! has claude; then
-    log_warn "claude CLI not found — skipping plugin install"
-    exit 0
-fi
+has claude || { log_warn "claude CLI not found — skipping"; exit 0; }
 
-PLUGINS_TXT="$(dirname "$SCRIPT_DIR")/packages/claude-plugins.txt"
-if [ ! -f "$PLUGINS_TXT" ]; then
-    log_warn "No claude-plugins.txt found at $PLUGINS_TXT"
-    exit 0
-fi
+PLUGINS_TXT="$PACKAGES_DIR/claude-plugins.txt"
+[[ -f "$PLUGINS_TXT" ]] || { log_warn "No claude-plugins.txt at $PLUGINS_TXT — skipping"; exit 0; }
+
+_ok=0 _skip=0 _fail=0
 
 while IFS= read -r line; do
-    case "$line" in
-        ''|\#*) continue ;;
-    esac
+    [[ -z "$line" || "$line" == \#* ]] && continue
     plugin="${line%% *}"
-    log_info "  claude plugin install $plugin"
-    claude plugin install "$plugin" 2>&1 || log_warn "  failed (may already be installed)"
+
+    log_info "  $plugin"
+    output=$(claude plugin install "$plugin" 2>&1) && status=0 || status=$?
+
+    if [[ $status -eq 0 ]]; then
+        log_ok "  installed $plugin"
+        (( _ok++ )) || true
+    elif echo "$output" | grep -qi "already installed\|already enabled"; then
+        log_info "  skip  $plugin (already installed)"
+        (( _skip++ )) || true
+    else
+        log_warn "  fail  $plugin: $output"
+        (( _fail++ )) || true
+    fi
 done < "$PLUGINS_TXT"
 
-log_ok "Claude Code plugins installed"
+log_ok "Claude plugins: ${_ok} installed, ${_skip} already present, ${_fail} failed"

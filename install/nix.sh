@@ -1,60 +1,61 @@
 #!/usr/bin/env bash
-# install/nix.sh - install Nix in user mode and apply home-manager config (Linux)
-set -e
+# install/nix.sh - install Nix (user mode) and apply home-manager config (Linux)
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-. "$SCRIPT_DIR/_lib.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 log_section "Nix"
 
-if [ "$OS" != "linux" ]; then
-    log_warn "Skipping Nix — not on Linux (OS=$OS)"
-    exit 0
-fi
+[[ "$OS" == "linux" ]] || { log_warn "Not on Linux — skipping"; exit 0; }
 
-### Install Nix (user mode, no sudo) ###
+NIX_DIR="$PACKAGES_DIR/nix"
+
+### Install Nix ###
 
 if has nix; then
-    log_ok "Nix already installed ($(nix --version))"
+    log_ok "Nix already installed: $(nix --version)"
 else
-    log_info "Installing Nix in user mode (Determinate Systems installer)"
-    curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix \
-        | sh -s -- install --no-confirm
+    log_info "Installing Nix (Determinate Systems installer)"
+    run_logged bash <(curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix) \
+        install --no-confirm
 
-    # Source Nix into current shell
-    if [ -e "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
-        . "$HOME/.nix-profile/etc/profile.d/nix.sh"
-    elif [ -e "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh" ]; then
-        . "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
+    # Source Nix into the current session
+    if [[ -e "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh" ]]; then
+        # shellcheck disable=SC1091
+        source "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
+    elif [[ -e "$HOME/.nix-profile/etc/profile.d/nix.sh" ]]; then
+        # shellcheck disable=SC1091
+        source "$HOME/.nix-profile/etc/profile.d/nix.sh"
     fi
+
     log_ok "Nix installed: $(nix --version)"
 fi
 
 ### Install home-manager ###
 
-NIX_DIR="$(dirname "$SCRIPT_DIR")/packages/nix"
-
-if ! has home-manager; then
+if has home-manager; then
+    log_ok "home-manager already installed: $(home-manager --version)"
+else
     log_info "Installing home-manager"
-    nix run nixpkgs#home-manager -- init
-    # Add home-manager channel
-    nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
-    nix-channel --update
-    nix-shell '<home-manager>' -A install
+    # Standalone installation via flake (no channels needed)
+    run_logged nix run home-manager/master -- init
     log_ok "home-manager installed"
-else
-    log_ok "home-manager already installed"
 fi
 
-### Apply home.nix ###
+### Apply configuration ###
 
-if [ -f "$NIX_DIR/flake.nix" ]; then
-    log_info "Applying home-manager configuration via flake"
-    home-manager switch --flake "$NIX_DIR#$(uname -m)-linux"
+log_info "Applying home-manager configuration"
+
+if [[ -f "$NIX_DIR/flake.nix" ]]; then
+    ensure_dir "$HOME/.config/home-manager"
+    # Link our flake into the home-manager config location
+    ln -sf "$NIX_DIR/flake.nix" "$HOME/.config/home-manager/flake.nix"
+    ln -sf "$NIX_DIR/home.nix"  "$HOME/.config/home-manager/home.nix"
+    run_logged home-manager switch --flake "$HOME/.config/home-manager"
 else
-    log_info "Applying home-manager configuration"
-    cp "$NIX_DIR/home.nix" ~/.config/home-manager/home.nix
-    home-manager switch
+    ensure_dir "$HOME/.config/home-manager"
+    cp "$NIX_DIR/home.nix" "$HOME/.config/home-manager/home.nix"
+    run_logged home-manager switch
 fi
 
-log_ok "Nix home-manager applied"
+log_ok "home-manager configuration applied"

@@ -1,44 +1,62 @@
 #!/usr/bin/env bash
 # install/rust.sh - install rustup + cargo tools from cargo.txt
-set -e
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-. "$SCRIPT_DIR/_lib.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 log_section "Rust"
 
 ### rustup ###
 
 if has rustup; then
-    log_ok "rustup already installed ($(rustup --version 2>&1 | head -1))"
-    rustup update stable --no-self-update
+    log_ok "rustup already installed: $(rustup --version 2>&1)"
+    log_info "Updating stable toolchain"
+    run_logged rustup update stable --no-self-update
 else
     log_info "Installing rustup"
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
+    run_logged bash <(curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs) \
+        -y --no-modify-path
     log_ok "rustup installed"
 fi
 
-# Ensure cargo is in PATH for this session
+# Ensure cargo is on PATH for this session
 export PATH="$HOME/.cargo/bin:$PATH"
 
 ### cargo tools ###
 
-CARGO_TXT="$(dirname "$SCRIPT_DIR")/packages/cargo.txt"
-if [ ! -f "$CARGO_TXT" ]; then
-    log_warn "No cargo.txt found at $CARGO_TXT"
-    exit 0
-fi
+CARGO_TXT="$PACKAGES_DIR/cargo.txt"
+[[ -f "$CARGO_TXT" ]] || { log_warn "No cargo.txt at $CARGO_TXT — skipping"; exit 0; }
+
+# Build a set of already-installed tools to avoid redundant recompiles
+declare -A _installed
+while IFS= read -r line; do
+    pkg="${line%% *}"
+    _installed["$pkg"]=1
+done < <(cargo install --list 2>/dev/null | grep -E '^[a-z]' | awk '{print $1}')
 
 log_info "Installing cargo tools from cargo.txt"
 
+_ok=0 _skip=0 _fail=0
+
 while IFS= read -r line; do
     # Skip blank lines and comments
-    case "$line" in
-        ''|\#*) continue ;;
-    esac
-    pkg="${line%% *}"  # first word only
-    log_info "  cargo install $pkg"
-    cargo install "$pkg" 2>&1 | tail -1
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    pkg="${line%% *}"
+
+    if [[ -n "${_installed[$pkg]:-}" ]]; then
+        log_info "  skip  $pkg (already installed)"
+        (( _skip++ )) || true
+        continue
+    fi
+
+    log_info "  install $pkg"
+    if cargo install "$pkg" 2>&1 | run_logged; then
+        log_ok "  ok    $pkg"
+        (( _ok++ )) || true
+    else
+        log_warn "  fail  $pkg"
+        (( _fail++ )) || true
+    fi
 done < "$CARGO_TXT"
 
-log_ok "Rust tools installed"
+log_ok "cargo tools: ${_ok} installed, ${_skip} already up to date, ${_fail} failed"
