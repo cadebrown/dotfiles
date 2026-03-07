@@ -11,16 +11,17 @@ log_section "Python (uv)"
 if has uv; then
     log_ok "uv already installed: $(uv --version)"
 else
-    log_info "Installing uv"
-    run_logged bash <(curl -LsSf https://astral.sh/uv/install.sh)
-    # uv installs to ~/.local/bin
-    export PATH="$HOME/.local/bin:$PATH"
+    log_info "Installing uv → $ARCH_BIN"
+    ensure_dir "$ARCH_BIN"
+    # UV_INSTALL_DIR redirects the compiled uv+uvx binaries to our PLAT-specific bin
+    UV_INSTALL_DIR="$ARCH_BIN" run_logged bash <(curl -LsSf https://astral.sh/uv/install.sh)
+    export PATH="$ARCH_BIN:$PATH"
     log_ok "Installed: $(uv --version)"
 fi
 
-### ~/.venv ###
+### venv ###
 
-# VENV is set by _lib.sh to ~/.venv-$PLAT
+# VENV is set by _lib.sh to ~/.local/$PLAT/venv
 
 if [[ -d "$VENV" ]]; then
     log_ok "~/.venv already exists"

@@ -10,6 +10,11 @@
 #
 # Environment variables:
 #   GITHUB_REPO      — override the source repo (default: cadebrown/dotfiles)
+#   CHEZMOI_NAME     — pre-seed display name (skips interactive prompt)
+#   CHEZMOI_EMAIL    — pre-seed email (skips interactive prompt)
+#   INSTALL_PACKAGES — set to 0 to skip OS package install (Homebrew / Nix)
+#   INSTALL_SERVICES — set to 0 to skip auto-start service registration
+#   INSTALL_ZSH      — set to 0 to skip oh-my-zsh + plugins install
 #   INSTALL_NODE     — set to 0 to skip Node (nvm) install
 #   INSTALL_RUST     — set to 0 to skip Rust install
 #   INSTALL_PYTHON   — set to 0 to skip Python install
@@ -58,11 +63,37 @@ fi
 
 log_section "2 — dotfiles (chezmoi apply)"
 
+# Pre-seed name/email from env so chezmoi doesn't prompt — useful for CI and
+# unattended installs. promptStringOnce checks the config file first, so if
+# chezmoi.toml already exists (re-run on same machine), this is a no-op.
+if [[ -n "${CHEZMOI_NAME:-}" || -n "${CHEZMOI_EMAIL:-}" ]]; then
+    _CFG="$HOME/.config/chezmoi/chezmoi.toml"
+    if [[ ! -f "$_CFG" ]]; then
+        ensure_dir "$(dirname "$_CFG")"
+        printf '[data]\n  name  = "%s"\n  email = "%s"\n' \
+            "${CHEZMOI_NAME:-}" "${CHEZMOI_EMAIL:-}" > "$_CFG"
+        log_info "Pre-seeded chezmoi config from CHEZMOI_NAME / CHEZMOI_EMAIL"
+    fi
+fi
+
 # If we're running from inside the repo, use it as the source directly
 _REPO_HOME="$(dirname "${BASH_SOURCE[0]}")/home"
 if [[ -d "$_REPO_HOME" ]]; then
     log_info "Using local repo at $_REPO_HOME"
     "$CHEZMOI_BIN" init --apply --source "$_REPO_HOME"
+    # Persist sourceDir so subsequent chezmoi commands (diff, apply, update)
+    # work without needing --source each time. Not needed for GitHub-based init
+    # since chezmoi clones to ~/.local/share/chezmoi/ automatically.
+    _CFG="$HOME/.config/chezmoi/chezmoi.toml"
+    if ! grep -q "sourceDir" "$_CFG" 2>/dev/null; then
+        # sourceDir must be a top-level TOML key — prepend it before [data]
+        # so it isn't parsed as data.sourceDir
+        _tmp="$(mktemp)"
+        printf 'sourceDir = "%s"\n\n' "$_REPO_HOME" > "$_tmp"
+        cat "$_CFG" >> "$_tmp"
+        mv "$_tmp" "$_CFG"
+        log_info "Set chezmoi sourceDir to $_REPO_HOME"
+    fi
 else
     log_info "Initialising from GitHub ($GITHUB_REPO)"
     "$CHEZMOI_BIN" init --apply "https://github.com/${GITHUB_REPO}.git"
@@ -75,27 +106,51 @@ if [[ ! -d "$INSTALL_DIR" ]]; then
     INSTALL_DIR="$("$CHEZMOI_BIN" source-path)/install"
 fi
 
-### 3. packages ###
+### 3. ZSH ###
 
-log_section "3 — packages"
+log_section "3 — ZSH (oh-my-zsh + plugins)"
 
-case "$OS" in
-    darwin)
-        log_info "macOS — installing Homebrew packages"
-        bash "$INSTALL_DIR/homebrew.sh"
-        ;;
-    linux)
-        log_info "Linux — installing Nix packages"
-        bash "$INSTALL_DIR/nix.sh"
-        ;;
-    *)
-        log_warn "Unknown OS '$OS' — skipping package install"
-        ;;
-esac
+if [[ "${INSTALL_ZSH:-1}" != "0" ]]; then
+    bash "$INSTALL_DIR/zsh.sh"
+else
+    log_info "Skipping ZSH plugins (INSTALL_ZSH=0)"
+fi
 
-### 4. language runtimes ###
+### 4. packages ###
 
-log_section "4 — language runtimes"
+log_section "4 — packages"
+
+if [[ "${INSTALL_PACKAGES:-1}" != "0" ]]; then
+    case "$OS" in
+        darwin)
+            log_info "macOS — installing Homebrew packages"
+            bash "$INSTALL_DIR/homebrew.sh"
+            ;;
+        linux)
+            log_info "Linux — installing Nix packages"
+            bash "$INSTALL_DIR/nix.sh"
+            ;;
+        *)
+            log_warn "Unknown OS '$OS' — skipping package install"
+            ;;
+    esac
+else
+    log_info "Skipping packages (INSTALL_PACKAGES=0)"
+fi
+
+### 5. services ###
+
+log_section "5 — services"
+
+if [[ "${INSTALL_SERVICES:-1}" != "0" ]]; then
+    bash "$INSTALL_DIR/services.sh"
+else
+    log_info "Skipping services (INSTALL_SERVICES=0)"
+fi
+
+### 6. language runtimes ###
+
+log_section "6 — language runtimes"
 
 if [[ "${INSTALL_NODE:-1}" != "0" ]]; then
     bash "$INSTALL_DIR/node.sh"

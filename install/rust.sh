@@ -6,7 +6,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 log_section "Rust"
 
-# RUSTUP_HOME and CARGO_HOME are set by _lib.sh to ~/.rustup-$PLAT and ~/.cargo-$PLAT
+# RUSTUP_HOME and CARGO_HOME are set by _lib.sh to ~/.local/$PLAT/rustup and ~/.local/$PLAT/cargo
 
 ### rustup ###
 

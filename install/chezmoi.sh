@@ -17,6 +17,6 @@ ensure_dir "$ARCH_BIN"
 log_info "Installing chezmoi → $ARCH_BIN"
 
 # Use the official installer — handles version, OS, arch, and checksum verification
-run_logged bash <(curl -fsSL https://get.chezmoi.io) -- -b "$ARCH_BIN"
+run_logged bash <(curl -fsSL https://get.chezmoi.io) -b "$ARCH_BIN"
 
 log_ok "Installed: $("$CHEZMOI_BIN" --version)"

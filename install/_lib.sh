@@ -14,12 +14,14 @@ PACKAGES_DIR="$DOTFILES_ROOT/packages"
 
 # PLAT identifies the current arch+OS, used to isolate compiled binaries
 # in shared home directories (e.g. NFS mounts across x86_64 and aarch64).
-# All per-machine tool paths are suffixed with PLAT:
-#   ~/.local/bin/$PLAT    chezmoi and other compiled tools
-#   ~/.nvm-$PLAT          Node (nvm)
-#   ~/.rustup-$PLAT       Rust toolchain (rustup)
-#   ~/.cargo-$PLAT        Rust binaries (cargo)
-#   ~/.venv-$PLAT         Python virtualenv
+# All per-machine tool paths live under ~/.local/$PLAT/:
+#   ~/.local/$PLAT/bin/       chezmoi, uv, uvx, and other compiled tools
+#   ~/.local/$PLAT/nvm/       Node (nvm) — NVM_DIR
+#   ~/.local/$PLAT/rustup/    Rust toolchain — RUSTUP_HOME
+#   ~/.local/$PLAT/cargo/     Cargo home — CARGO_HOME (bins at cargo/bin/)
+#   ~/.local/$PLAT/venv/      Python virtualenv — VENV
+#
+# ~/.local/bin/ stays on PATH for arch-neutral shell scripts only.
 #
 # On a new machine sharing a home directory, simply re-run bootstrap.sh.
 # chezmoi finds the cached config (no prompts), dotfiles are already applied,
@@ -32,15 +34,30 @@ OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
 [[ "$ARCH" == "arm64" ]] && ARCH="aarch64"  # normalize macOS arm64
 
-ARCH_BIN="$HOME/.local/bin/$PLAT"
+LOCAL_PLAT="$HOME/.local/$PLAT"
+ARCH_BIN="$LOCAL_PLAT/bin"
 
 # Standard per-machine tool paths — install scripts and shell both use these
-NVM_DIR="${NVM_DIR:-$HOME/.nvm-$PLAT}"
-RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup-$PLAT}"
-CARGO_HOME="${CARGO_HOME:-$HOME/.cargo-$PLAT}"
-VENV="${VENV:-$HOME/.venv-$PLAT}"
+NVM_DIR="${NVM_DIR:-$LOCAL_PLAT/nvm}"
+RUSTUP_HOME="${RUSTUP_HOME:-$LOCAL_PLAT/rustup}"
+CARGO_HOME="${CARGO_HOME:-$LOCAL_PLAT/cargo}"
+VENV="${VENV:-$LOCAL_PLAT/venv}"
 
-export PLAT NVM_DIR RUSTUP_HOME CARGO_HOME VENV
+# uv: keep all arch-specific uv state under LOCAL_PLAT
+# UV_TOOL_BIN_DIR: where `uv tool install` places binaries (default ~/.local/bin — wrong for shared homes)
+# UV_TOOL_DIR:     tool metadata (venvs etc.)
+# UV_PYTHON_INSTALL_DIR: managed Python downloads (compiled binaries, must be PLAT-specific)
+UV_TOOL_BIN_DIR="${UV_TOOL_BIN_DIR:-$ARCH_BIN}"
+UV_TOOL_DIR="${UV_TOOL_DIR:-$LOCAL_PLAT/uv/tools}"
+UV_PYTHON_INSTALL_DIR="${UV_PYTHON_INSTALL_DIR:-$LOCAL_PLAT/uv/python}"
+
+export PLAT LOCAL_PLAT NVM_DIR RUSTUP_HOME CARGO_HOME VENV \
+       UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR
+
+# Install scripts clone public repos and must not be affected by the user's
+# gitconfig (which may have url.insteadOf SSH rewrites, breaking clones on
+# machines without SSH keys — Docker, CI, fresh Linux boxes).
+export GIT_CONFIG_GLOBAL=/dev/null
 
 ### COLORS ###
 

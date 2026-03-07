@@ -17,26 +17,32 @@ export USE_CCACHE=ON
 # shared across x86_64 and aarch64 machines — each gets its own binary paths).
 export _PLAT="$(uname -m)-$(uname -s)"
 
-export PATH="$HOME/.local/bin/$_PLAT:$HOME/.local/bin:$PATH"
+export _LOCAL_PLAT="$HOME/.local/$_PLAT"
+export PATH="$_LOCAL_PLAT/bin:$HOME/.local/bin:$PATH"
 
 ### NODE (nvm) ###
 
-export NVM_DIR="$HOME/.nvm-$_PLAT"
+export NVM_DIR="$_LOCAL_PLAT/nvm"
 if [ -s "$NVM_DIR/nvm.sh" ]; then
     . "$NVM_DIR/nvm.sh"
 fi
 
 ### RUST ###
 
-export RUSTUP_HOME="$HOME/.rustup-$_PLAT"
-export CARGO_HOME="$HOME/.cargo-$_PLAT"
+export RUSTUP_HOME="$_LOCAL_PLAT/rustup"
+export CARGO_HOME="$_LOCAL_PLAT/cargo"
 export PATH="$CARGO_HOME/bin:$PATH"
 
-### PYTHON ###
+### PYTHON (uv) ###
+
+# Keep all arch-specific uv state under _LOCAL_PLAT so shared homes stay clean
+export UV_TOOL_BIN_DIR="$_LOCAL_PLAT/bin"
+export UV_TOOL_DIR="$_LOCAL_PLAT/uv/tools"
+export UV_PYTHON_INSTALL_DIR="$_LOCAL_PLAT/uv/python"
 
 export VIRTUAL_ENV_DISABLE_PROMPT=1
-if [ -e "$HOME/.venv-$_PLAT/bin/activate" ]; then
-    source "$HOME/.venv-$_PLAT/bin/activate"
+if [ -e "$_LOCAL_PLAT/venv/bin/activate" ]; then
+    source "$_LOCAL_PLAT/venv/bin/activate"
 fi
 if [ -e "$HOME/.pythonrc" ]; then
     export PYTHONSTARTUP="$HOME/.pythonrc"
@@ -56,6 +62,11 @@ if [ -e "$HOME/.homebrew" ]; then
     eval "$(~/.homebrew/bin/brew shellenv)"
 elif [ -e "/opt/homebrew" ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
+# Colima: point Docker CLI at colima's socket (avoids needing Docker Desktop)
+if [ -S "$HOME/.colima/default/docker.sock" ]; then
+    export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"
 fi
 
 {{ else -}}
@@ -93,8 +104,9 @@ if [ -d "$HOME/ncu" ]; then
 fi
 
 # Private credential files (e.g. ~/.nvidia.env)
-for f in "$HOME"/.*.env; do
-    [ -e "$f" ] && . "$f"
+# (N): zsh null glob — expands to empty instead of erroring if no files match
+for f in "$HOME"/.*.env(N); do
+    . "$f"
 done
 
 # Docker: always use system docker on Linux
@@ -109,6 +121,7 @@ if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
 else
     if [ -z "$SSH_AUTH_SOCK" ]; then
         eval "$(ssh-agent -s)"
-        ssh-add ~/.ssh/id_* 2>/dev/null
+        # (N): zsh null glob — expands to empty instead of erroring if no keys exist
+        ssh-add ~/.ssh/id_*(N) 2>/dev/null || :
     fi
 fi

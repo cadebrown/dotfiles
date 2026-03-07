@@ -8,7 +8,6 @@ cask "iterm2"
 ### Editors & IDEs ###
 cask "visual-studio-code"
 cask "cursor"
-brew "neovim"
 
 ### Window Management ###
 cask "nikitabobko/tap/aerospace"
@@ -41,28 +40,28 @@ cask "nestopia"
 
 ### Dev Tools - VMs & Containers ###
 brew "docker"
+brew "colima"
+brew "podman"
 brew "qemu"
 cask "utm"
 
 ### Dev Tools - Git ###
 brew "git"
+brew "git-lfs"
 brew "git-delta"
 brew "difftastic"
-brew "ast-grep"
-brew "git-lfs"
 
 ### Dev Tools - Search & Files ###
-brew "ripgrep"
 brew "fd"
+brew "sd"
+brew "jq"
+brew "ripgrep"
 brew "fzf"
 brew "tree"
 brew "ncdu"
-brew "sd"
 brew "bat"
 brew "bat-extras"
-
-### Dev Tools - JSON & Data ###
-brew "jq"
+brew "ast-grep"
 
 ### Dev Tools - CLI Utilities ###
 brew "wget"
