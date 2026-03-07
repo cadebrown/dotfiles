@@ -2,7 +2,7 @@
 title = "cade's setup"
 authors = ["Cade Brown"]
 language = "en"
-src = "src"
+src = "."
 
 [output.html]
 default-theme = "navy"
