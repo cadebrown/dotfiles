@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # install/mise.sh - install mise and apply language runtime versions
 set -e
 

@@ -6,7 +6,7 @@ Personal dotfiles managed with [chezmoi](https://chezmoi.io). Works on macOS (ar
 
 ```sh
 # One-liner on a new machine
-curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | sh
+curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
 
 # Or from a cloned repo
 git clone https://github.com/cadebrown/dotfiles ~/dotfiles

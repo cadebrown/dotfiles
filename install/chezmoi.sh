@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # install/chezmoi.sh - install chezmoi to arch-specific bin dir (no sudo)
 set -e
 

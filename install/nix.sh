@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # install/nix.sh - install Nix in user mode and apply home-manager config (Linux)
 set -e
 

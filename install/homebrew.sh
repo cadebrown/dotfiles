@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # install/homebrew.sh - install Homebrew and apply Brewfile (macOS only)
 set -e
 

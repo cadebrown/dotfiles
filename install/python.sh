@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # install/python.sh - install uv and create ~/.venv with packages from pip.txt
 set -e
 

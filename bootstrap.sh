@@ -1,8 +1,8 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # bootstrap.sh - set up a new machine from scratch
 #
 # Usage (one-liner):
-#   curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
 #
 # Usage (from cloned repo):
 #   git clone https://github.com/cadebrown/dotfiles && cd dotfiles && ./bootstrap.sh

@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # install/claude.sh - install Claude Code plugins from claude-plugins.txt
 set -e
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # install/_lib.sh - shared helpers for install scripts
 # Source this file: . "$(dirname "$0")/_lib.sh"
 

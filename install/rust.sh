@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # install/rust.sh - install rustup + cargo tools from cargo.txt
 set -e
 
