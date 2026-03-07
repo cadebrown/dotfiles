@@ -21,3 +21,6 @@ rm-improved
 
 # Smarter cd
 zoxide
+
+# Docs site builder
+mdbook

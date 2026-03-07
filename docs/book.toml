@@ -1,0 +1,14 @@
+[book]
+title = "cade's setup"
+authors = ["Cade Brown"]
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/cadebrown/dotfiles"
+edit-url-template = "https://github.com/cadebrown/dotfiles/edit/main/docs/src/{path}"
+
+[output.html.search]
+enable = true
