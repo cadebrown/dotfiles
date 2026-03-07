@@ -20,8 +20,7 @@ fi
 
 ### ~/.venv ###
 
-_PLAT="$(uname -m)-$(uname -s)"
-VENV="${VENV:-$HOME/.venv-$_PLAT}"
+# VENV is set by _lib.sh to ~/.venv-$PLAT
 
 if [[ -d "$VENV" ]]; then
     log_ok "~/.venv already exists"

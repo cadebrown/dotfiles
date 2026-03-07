@@ -10,33 +10,37 @@ set -euo pipefail
 DOTFILES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PACKAGES_DIR="$DOTFILES_ROOT/packages"
 
-### DETECTION ###
+### PLATFORM ###
 
-detect_os() {
-    case "$(uname -s)" in
-        Darwin) echo "darwin" ;;
-        Linux)  echo "linux"  ;;
-        *)      echo "unknown" ;;
-    esac
-}
+# PLAT identifies the current arch+OS, used to isolate compiled binaries
+# in shared home directories (e.g. NFS mounts across x86_64 and aarch64).
+# All per-machine tool paths are suffixed with PLAT:
+#   ~/.local/bin/$PLAT    chezmoi and other compiled tools
+#   ~/.nvm-$PLAT          Node (nvm)
+#   ~/.rustup-$PLAT       Rust toolchain (rustup)
+#   ~/.cargo-$PLAT        Rust binaries (cargo)
+#   ~/.venv-$PLAT         Python virtualenv
+#
+# On a new machine sharing a home directory, simply re-run bootstrap.sh.
+# chezmoi finds the cached config (no prompts), dotfiles are already applied,
+# and only the PLAT-specific tool installs run.
+PLAT="$(uname -m)-$(uname -s)"
 
-detect_arch() {
-    case "$(uname -m)" in
-        x86_64)        echo "x86_64"  ;;
-        aarch64|arm64) echo "aarch64" ;;
-        *)             echo "$(uname -m)" ;;
-    esac
-}
+OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+[[ "$OS" == "darwin" ]] && OS="darwin" || OS="linux"
 
-# Arch+OS-specific bin directory — compiled binaries live here so shared
-# home directories work across machines with different architectures.
-arch_bin_dir() {
-    echo "$HOME/.local/bin/$(uname -m)-$(uname -s)"
-}
+ARCH="$(uname -m)"
+[[ "$ARCH" == "arm64" ]] && ARCH="aarch64"  # normalize macOS arm64
 
-OS=$(detect_os)
-ARCH=$(detect_arch)
-ARCH_BIN="$(arch_bin_dir)"
+ARCH_BIN="$HOME/.local/bin/$PLAT"
+
+# Standard per-machine tool paths — install scripts and shell both use these
+NVM_DIR="${NVM_DIR:-$HOME/.nvm-$PLAT}"
+RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup-$PLAT}"
+CARGO_HOME="${CARGO_HOME:-$HOME/.cargo-$PLAT}"
+VENV="${VENV:-$HOME/.venv-$PLAT}"
+
+export PLAT NVM_DIR RUSTUP_HOME CARGO_HOME VENV
 
 ### COLORS ###
 
@@ -54,11 +58,11 @@ fi
 
 ### LOGGING ###
 
-log_info()    { printf "${_BLUE}[info]${_RESET}  %s\n"       "$*"; }
-log_ok()      { printf "${_GREEN}[ ok ]${_RESET}  %s\n"      "$*"; }
-log_warn()    { printf "${_YELLOW}[warn]${_RESET}  %s\n"     "$*"; }
-log_error()   { printf "${_RED}[err ]${_RESET}  %s\n"        "$*" >&2; }
-log_section() { printf "\n${_BOLD}=== %s ===${_RESET}\n"     "$*"; }
+log_info()    { printf "${_BLUE}[info]${_RESET}  %s\n"    "$*"; }
+log_ok()      { printf "${_GREEN}[ ok ]${_RESET}  %s\n"   "$*"; }
+log_warn()    { printf "${_YELLOW}[warn]${_RESET}  %s\n"  "$*"; }
+log_error()   { printf "${_RED}[err ]${_RESET}  %s\n"     "$*" >&2; }
+log_section() { printf "\n${_BOLD}=== %s ===${_RESET}\n"  "$*"; }
 
 die() {
     log_error "$*"
@@ -77,7 +81,6 @@ trap '_on_error $LINENO' ERR
 
 ### UTILITIES ###
 
-# Check if a command exists
 has() {
     command -v "$1" >/dev/null 2>&1
 }
@@ -86,7 +89,6 @@ ensure_dir() {
     [[ -d "$1" ]] || mkdir -p "$1"
 }
 
-# Download a URL to a destination file
 download() {
     local url="$1" dest="$2"
     if has curl; then
@@ -98,7 +100,6 @@ download() {
     fi
 }
 
-# Run a command, prefixing each output line with a marker
 run_logged() {
     "$@" 2>&1 | sed 's/^/    /'
 }

@@ -6,9 +6,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 log_section "Rust"
 
-_PLAT="$(uname -m)-$(uname -s)"
-export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup-$_PLAT}"
-export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo-$_PLAT}"
+# RUSTUP_HOME and CARGO_HOME are set by _lib.sh to ~/.rustup-$PLAT and ~/.cargo-$PLAT
 
 ### rustup ###
 

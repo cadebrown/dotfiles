@@ -12,7 +12,7 @@ curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.s
 git clone https://github.com/cadebrown/dotfiles ~/dotfiles && ~/dotfiles/bootstrap.sh
 ```
 
-Prompts for name and email on first run, then installs chezmoi, applies dotfiles, and sets up packages. All steps are idempotent.
+Prompts for name and email on first run, then installs chezmoi, applies dotfiles, and sets up packages. All steps are idempotent — run it on each machine that shares a home directory to get PLAT-specific tool installs (`x86_64-Linux`, `aarch64-Linux`, etc.).
 
 ## Usage
 

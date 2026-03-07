@@ -6,8 +6,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 log_section "Node (nvm)"
 
-_PLAT="$(uname -m)-$(uname -s)"
-export NVM_DIR="${NVM_DIR:-$HOME/.nvm-$_PLAT}"
+# NVM_DIR is set by _lib.sh to ~/.nvm-$PLAT
 
 ### Install nvm ###
 
