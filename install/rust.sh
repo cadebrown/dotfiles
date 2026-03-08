@@ -10,14 +10,19 @@ log_section "Rust"
 
 ### rustup ###
 
-if has rustup; then
-    log_ok "rustup already installed: $(rustup --version 2>&1)"
+# Check for rustup proxies in PLAT cargo/bin — not just any rustup on PATH.
+# Homebrew's rustup won't create proxies in $CARGO_HOME/bin, so we need our own.
+if [[ -x "$CARGO_HOME/bin/rustup" ]]; then
+    log_ok "rustup already installed: $("$CARGO_HOME/bin/rustup" --version 2>&1)"
     log_info "Updating stable toolchain"
-    run_logged rustup update stable --no-self-update
+    run_logged "$CARGO_HOME/bin/rustup" update stable --no-self-update
 else
-    log_info "Installing rustup"
-    run_logged bash <(curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs) \
-        -y --no-modify-path
+    log_info "Installing rustup → $CARGO_HOME/bin"
+    ensure_dir "$CARGO_HOME/bin"
+    _rustup_script="$(mktemp)"
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o "$_rustup_script"
+    run_logged bash "$_rustup_script" -y --no-modify-path --default-toolchain stable
+    rm -f "$_rustup_script"
     log_ok "rustup installed"
 fi
 

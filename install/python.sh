@@ -27,7 +27,7 @@ if [[ -d "$VENV" ]]; then
     log_ok "~/.venv already exists"
 else
     log_info "Creating ~/.venv"
-    run_logged uv venv "$VENV"
+    run_logged uv venv "$VENV" --seed
     log_ok "~/.venv created"
 fi
 
