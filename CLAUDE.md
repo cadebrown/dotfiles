@@ -73,12 +73,21 @@ dotfiles/
 │   ├── claude.sh              # Claude Code: Linux native binary + plugins (macOS: Homebrew cask)
 │   └── nix.sh                 # Optional: Nix + home-manager (NOT called by bootstrap.sh — run manually)
 │
-├── docs/                      # mdBook documentation
+├── docs/                      # mdBook documentation (served at dotfiles.cade.io)
+│   ├── book.toml              # mdBook config: theme, repo URL, search
+│   ├── SUMMARY.md             # Table of contents / nav structure
 │   ├── intro.md
 │   └── setup/
 │       ├── bootstrap.md       # System requirements + install instructions per platform
 │       ├── chezmoi.md
 │       └── packages.md
+│
+├── infra/
+│   └── cloudflare/            # OpenTofu config for Cloudflare Pages
+│       ├── main.tf            # Pages project + custom domain + DNS record
+│       ├── build.sh           # Build script: installs mdbook, runs `mdbook build docs`
+│       ├── terraform.tfvars.example
+│       └── .terraform.lock.hcl
 │
 └── tests/
     ├── Dockerfile             # Ubuntu 24.04 + bats-core test image
@@ -259,6 +268,31 @@ can reference the same path.
 2. Guard with `has my-thing && { log_ok ...; exit 0; }` for idempotency
 3. Add a step to `bootstrap.sh` with an `INSTALL_MY_THING` flag
 4. Add tests to `tests/paths.bats` or `tests/bootstrap.bats`
+
+### Work on docs
+
+```sh
+# Serve locally with live reload (opens browser automatically)
+cd docs && mdbook serve --open
+
+# Build static output only
+cd docs && mdbook build        # output → docs/book/
+```
+
+Docs are hosted at https://dotfiles.cade.io via Cloudflare Pages.
+Every push to `main` triggers a rebuild automatically.
+
+### Deploy infrastructure changes
+
+```sh
+cd infra/cloudflare
+export CLOUDFLARE_API_TOKEN=...
+tofu plan    # preview
+tofu apply   # create/update Pages project + DNS
+```
+
+`terraform.tfvars` (contains account_id) is gitignored — copy from
+`terraform.tfvars.example` and fill in on each machine.
 
 ### Run tests
 
