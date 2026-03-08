@@ -1,48 +1,57 @@
-# Introduction
+# cade's dotfiles
 
-Personal dotfiles for macOS and Linux, managed with [chezmoi](https://chezmoi.io). Designed for shared home directories across machines with different architectures, and Linux systems without sudo.
+Personal dotfiles for macOS and Linux — one command sets up a complete, reproducible dev environment on any machine.
 
-## Design constraints
+```sh
+curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
+```
 
-- **Shared home directories** — the same `$HOME` may be NFS-mounted across machines with different arch (e.g. x86_64 and aarch64). Text configs are shared freely; compiled binaries are isolated by `$PLAT = $(uname -m)-$(uname -s)`.
-- **No sudo on Linux** — Homebrew compiles inside a rootless container; rustup, uv, and Node install to user-local paths.
-- **Idempotent** — every script and `chezmoi apply` is safe to re-run. Running bootstrap on a second machine that shares a home just installs that machine's PLAT-specific tools.
-- **glibc portability** — Linux packages install inside a `manylinux_2_28` container (AlmaLinux 8, glibc 2.28). Most pour as precompiled bottles; Homebrew bundles its own glibc so binaries are self-contained.
+---
 
-## PLAT isolation
+## What this gives you
 
-Every compiled binary lives under `~/.local/$PLAT/`:
+- **One bootstrap command** — installs every tool, dotfile, and language runtime from scratch
+- **PLAT isolation** — compiled binaries live under `~/.local/$(uname -m)-$(uname -s)/`, so two machines sharing an NFS home directory never conflict
+- **No sudo on Linux** — Homebrew runs inside a rootless container; everything installs to user paths
+- **Idempotent** — every script is safe to re-run; running bootstrap on a second machine just installs that machine's arch-specific tools
+- **Single source of truth** — one `Brewfile` for both macOS and Linux; `if OS.mac?` blocks handle the differences automatically
+- **Fast shell startup** — lazy nvm loading, single `compinit`, ~140ms warm startup
 
-| Path | Contents |
+---
+
+## How it works
+
+[chezmoi](https://chezmoi.io) manages dotfiles as templates in `home/` and applies them to `~/`. The bootstrap script wires everything together:
+
+```
+bootstrap.sh
+  ↓ chezmoi apply        dotfiles → ~/
+  ↓ install/zsh.sh       oh-my-zsh + plugins
+  ↓ homebrew.sh          packages from Brewfile (macOS)
+    linux-packages.sh    packages from Brewfile (Linux, via container)
+  ↓ install/node.sh      nvm → Node.js
+  ↓ install/rust.sh      rustup → cargo tools
+  ↓ install/python.sh    uv → Python venv
+  ↓ install/claude.sh    Claude Code + plugins + MCP servers
+```
+
+Compiled tools land under `~/.local/$PLAT/` — a different directory per arch+OS, so a shared home has no conflicts. Text configs (dotfiles) are shared freely; they're arch-neutral by design.
+
+---
+
+## Sections
+
+### Setup — getting started on a new machine
+
+| Page | What it covers |
 |---|---|
-| `~/.local/$PLAT/bin/` | chezmoi, uv, uvx |
-| `~/.local/$PLAT/brew/` | Homebrew prefix (Linux only) |
-| `~/.local/$PLAT/nvm/` | nvm + Node.js versions |
-| `~/.local/$PLAT/nix-profile/` | Nix user profile (if Nix installed) |
-| `~/.local/$PLAT/rustup/` | Rust toolchain |
-| `~/.local/$PLAT/cargo/` | Cargo home (binaries at `cargo/bin/`) |
-| `~/.local/$PLAT/venv/` | Python virtualenv |
+| [Bootstrap](setup/bootstrap.md) | System requirements, what gets installed, platform-specific steps |
+| [Managing dotfiles](setup/chezmoi.md) | How chezmoi works, editing dotfiles, template variables |
+| [Package management](setup/packages.md) | Adding tools (Homebrew, cargo, npm, pip), why each layer exists |
 
-`~/.local/bin/` stays on PATH for arch-neutral shell scripts only.
+### Usage — ongoing updates and maintenance
 
-The shell profile computes `_PLAT` at login and sets all tool paths from it — so SSH-ing into either machine automatically activates the correct binaries.
-
-## Layout
-
-| Path | Purpose |
+| Page | What it covers |
 |---|---|
-| `bootstrap.sh` | Entry point for new machines |
-| `.chezmoi.toml.tmpl` | Per-machine prompts (name, email) |
-| `home/` | Dotfiles source — applied to `~/` by chezmoi |
-| `packages/Brewfile` | Packages for macOS (bottles) and Linux (compiled in container) |
-| `install/` | Idempotent install scripts |
-| `docs/` | This documentation (built with mdBook) |
-
-## Package management
-
-| Platform | Tool | Notes |
-|---|---|---|
-| macOS | Homebrew | Native bottles; casks for GUI apps |
-| Linux | Homebrew in manylinux_2_28 container | Precompiled bottles; casks skipped |
-
-Same `Brewfile` on both platforms — `if OS.mac?` blocks handle the differences automatically.
+| [Day-to-day workflow](usage/updates.md) | Adding packages, editing dotfiles, deploying docs, updating tools |
+| [Troubleshooting](usage/troubleshooting.md) | Quick reference — when tools aren't found, builds fail, etc. |

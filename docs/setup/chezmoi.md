@@ -1,18 +1,37 @@
-# Dotfile Management
+# Managing dotfiles
 
-[chezmoi](https://chezmoi.io) applies `home/` to `~/`, resolving templates along the way.
+[chezmoi](https://chezmoi.io) manages the files in `home/` and applies them to `~/`, resolving templates along the way.
 
-## Naming convention
+## The quick version
+
+```sh
+chezmoi edit ~/.zshrc          # edit a dotfile (opens in $EDITOR, applies on save)
+chezmoi apply                  # apply all pending changes
+chezmoi diff                   # preview what would change before applying
+chezmoi update                 # git pull + apply (sync from repo)
+```
+
+---
+
+## How files map
 
 Files in `home/` map to `~/` by chezmoi's naming rules:
 
-- `dot_zshrc` → `~/.zshrc`
-- `dot_config/git/ignore` → `~/.config/git/ignore`
-- `dot_ssh/config.tmpl` → `~/.ssh/config` (rendered as a template)
+| Source | Target |
+|---|---|
+| `home/dot_zshrc.tmpl` | `~/.zshrc` |
+| `home/dot_config/git/ignore` | `~/.config/git/ignore` |
+| `home/dot_ssh/config.tmpl` | `~/.ssh/config` |
+| `home/dot_claude/CLAUDE.md` | `~/.claude/CLAUDE.md` |
 
-The `.tmpl` suffix marks files that contain Go template directives.
+- `dot_` prefix → `.` in target
+- `.tmpl` suffix → rendered as a Go template before writing
+
+---
 
 ## Template variables
+
+Use these in any `.tmpl` file:
 
 ```
 {{ .name }}              display name (prompted on first run)
@@ -23,34 +42,61 @@ The `.tmpl` suffix marks files that contain Go template directives.
 {{ .chezmoi.homeDir }}   home directory path
 ```
 
-## Shared home directories and template safety
+Example — Linux-only alias:
 
-On a shared NFS home, all machines run `chezmoi apply` against the same target files. This is safe as long as templates render identically on every machine that shares the home.
-
-**The rule: never use `{{ .chezmoi.arch }}` (or any per-machine variable) in a template.** Doing so would cause machines to overwrite each other's rendered output on every apply.
-
-Arch-specific logic belongs in shell runtime instead:
-
-```sh
-# Good — evaluated at shell startup on each machine
-export PATH="$HOME/.local/bin/$(uname -m)-$(uname -s):$PATH"
-
-# Bad — baked into the file at chezmoi apply time, machines fight
-export PATH="$HOME/.local/bin/{{ .chezmoi.arch }}-{{ .chezmoi.os }}:$PATH"
+```
+{{ if eq .chezmoi.os "linux" -}}
+alias open='xdg-open'
+{{ end -}}
 ```
 
-The current templates only branch on `{{ .chezmoi.os }}` (darwin vs linux), which is the same for all machines sharing a home directory.
+---
 
-## Files that tools also write
+## Editing dotfiles
 
-Some tracked files are mutated by other programs. chezmoi doesn't auto-apply — drift is safe until you decide what to do:
+**Via chezmoi** (recommended — auto-applies on save):
+```sh
+chezmoi edit ~/.zshrc
+chezmoi edit ~/.zprofile
+```
+
+**Directly in the repo** (then apply manually):
+```sh
+$EDITOR ~/dotfiles/home/dot_zshrc.tmpl
+chezmoi apply
+```
+
+Never edit `~/.zshrc` directly — chezmoi will overwrite it on the next apply.
+
+---
+
+## Shared home directory safety
+
+On a shared NFS home, all machines run `chezmoi apply` against the same target files. **Templates must render identically on every machine that shares the home** — otherwise machines overwrite each other on every apply.
+
+**Rule: never use `{{ .chezmoi.arch }}` or any per-machine value in a template.** Arch-specific logic belongs in shell runtime code instead:
+
+```sh
+# Good — evaluated at shell startup on each machine independently
+export PATH="$HOME/.local/$(uname -m)-$(uname -s)/bin:$PATH"
+
+# Bad — baked into the file at chezmoi apply time; machines fight each other
+export PATH="$HOME/.local/{{ .chezmoi.arch }}-{{ .chezmoi.os }}/bin:$PATH"
+```
+
+The existing templates only branch on `{{ .chezmoi.os }}` (darwin vs linux), which is stable for all machines sharing a home.
+
+---
+
+## Files that other tools also write
+
+Some tracked files are mutated at runtime. chezmoi won't auto-apply — drift is intentional until you decide what to do:
 
 ```sh
 chezmoi diff                          # see what changed
-chezmoi add ~/.claude/settings.json   # pull live version into source
+chezmoi add ~/.claude/settings.json   # pull the live version back into the repo
 ```
 
 Notable examples:
-- `~/.claude/settings.json` — updated by Claude Code on plugin install
-- `~/.codex/config.toml` — codex appends project trust levels at runtime;
-  managed with chezmoi's `create_` prefix so it's written once and never overwritten
+- `~/.claude/settings.json` — updated by Claude Code when plugins are installed
+- `~/.codex/config.toml` — Codex appends project trust levels at runtime; managed with `create_` prefix so chezmoi writes it once and never overwrites

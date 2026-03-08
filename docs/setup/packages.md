@@ -1,74 +1,108 @@
-# Packages
+# Package management
 
-Each package layer has a declarative text file and an idempotent install script.
-All scripts skip already-installed items and are safe to re-run.
+Every package layer has a declarative text file and an idempotent install script. All scripts skip already-installed items — safe to re-run at any time.
 
-| Layer | File | Script | Platform |
+## The layers
+
+| Layer | File | Install script | Platform |
 |---|---|---|---|
-| System packages | `packages/Brewfile` | `install/homebrew.sh` / `install/linux-packages.sh` | macOS (bottles) / Linux (compiled in manylinux container) |
-| Global npm | `packages/npm.txt` | `install/npm.sh` | All |
+| System packages | `packages/Brewfile` | `install/homebrew.sh` / `install/linux-packages.sh` | macOS (bottles) / Linux (manylinux container) |
 | Rust tools | `packages/cargo.txt` | `install/rust.sh` | All |
 | Python packages | `packages/pip.txt` | `install/python.sh` | All |
+| Global npm | `packages/npm.txt` | `install/npm.sh` | All |
 | Claude plugins | `packages/claude-plugins.txt` | `install/claude.sh` | All |
+| Claude MCP servers | `packages/claude-mcp.txt` | `install/claude.sh` | All |
 
-## Adding a package
+---
 
-Follow this priority order:
+## Adding a package — priority order
 
-1. **npm** — if the program is an npm package, add it to `packages/npm.txt`:
-   ```
-   @scope/package-name
-   ```
+Choose the first layer that applies:
 
-2. **cargo** — if it's a Rust crate, add it to `packages/cargo.txt`:
-   ```
-   crate-name
-   ```
-
-3. **Homebrew** — if it's in Homebrew (works on macOS natively, compiled from source on Linux), add it to `packages/Brewfile`:
-   ```ruby
-   brew "tool-name"
-   ```
-   Wrap in `if OS.mac?` if it's macOS-only (casks, GUI apps, macOS services).
-
-4. **Special script** — if it requires custom install steps, look at an existing script in `install/` for patterns and follow them. Add an `INSTALL_*` flag to `bootstrap.sh`.
-
-5. **Ask** — if none of the above fits cleanly, ask before inventing a new mechanism.
-
-## Why this split
-
-- **Homebrew** — handles the bulk of CLI tools on both platforms. macOS gets precompiled bottles; Linux installs inside a `manylinux_2_28` container (most packages also pour as bottles, Homebrew bundles its own glibc).
-- **npm / cargo** — language-ecosystem tools that publish to npm/crates.io install faster and more reliably via their native registries than through Homebrew.
-- **pip.txt in a venv** — a single activated venv for interactive/scripting use. Project-specific envs are handled by `uv` separately.
-- **Claude plugins** — `claude plugin install` has its own registry; these aren't npm or Homebrew packages.
-
-## cargo vs Homebrew for the same tool
-
-Some tools exist in both Homebrew and crates.io. Prefer `cargo.txt` when:
-
-- The tool is a Rust crate (faster to install from source than to pour a bottle on Linux)
-- PLAT isolation matters — `$CARGO_HOME/bin` is already under `$LOCAL_PLAT`, so cargo tools are automatically arch-specific without extra configuration
-- The Homebrew formula is a wrapper that just calls `cargo install` anyway
-
-Current tools intentionally kept in `cargo.txt` instead of Brewfile: `fd`, `sd`, `zoxide`.
-
-**Do not install the same tool in both places** — PLAT paths win on PATH, so you'd waste disk and install time on the Homebrew copy without it ever being used.
-
-## Updating packages
-
-Re-run the relevant script after editing the file:
+### 1. cargo — Rust crates
 
 ```sh
-# System packages
-brew bundle --file=~/dotfiles/packages/Brewfile   # macOS
-# (Linux: re-run bootstrap or linux-packages.sh)
+# packages/cargo.txt
+ripgrep
+fd-find
+```
 
-# npm globals
-bash ~/dotfiles/install/npm.sh
+Re-run: `bash ~/dotfiles/install/rust.sh`
+
+### 2. Homebrew — everything else
+
+```ruby
+# packages/Brewfile
+brew "tool-name"
+
+# macOS-only (casks, GUI apps, macOS services)
+if OS.mac?
+  cask "some-app"
+end
+```
+
+Re-run: `brew bundle --file=~/dotfiles/packages/Brewfile`
+
+### 3. pip — Python packages
+
+```sh
+# packages/pip.txt
+requests
+black
+```
+
+Re-run: `bash ~/dotfiles/install/python.sh`
+
+### 4. npm — npm-specific tools
+
+```sh
+# packages/npm.txt
+@scope/package-name
+```
+
+Re-run: `bash ~/dotfiles/install/npm.sh`
+
+### 5. Custom install script
+
+Look at an existing `install/` script for patterns, follow them, and add an `INSTALL_*` flag to `bootstrap.sh`.
+
+---
+
+## Why cargo over Homebrew for some tools
+
+`fd`, `sd`, and `zoxide` are in `cargo.txt` instead of `Brewfile` because:
+
+- `$CARGO_HOME/bin` is already under `$LOCAL_PLAT/` — PLAT isolation is automatic
+- Rust crates compile cleanly from source on any platform
+- The Homebrew formula for these often just calls `cargo install` anyway
+
+**Do not install the same tool in both places.** PLAT paths win on PATH — the Homebrew copy would install but never be used.
+
+---
+
+## Why Homebrew for Linux
+
+Homebrew on Linux installs inside a `manylinux_2_28` container (AlmaLinux 8, glibc 2.28) so the compiled binaries work on any Linux host since ~2018. Most packages pour as precompiled bottles — no compilation needed. Homebrew bundles its own glibc 2.35, so the binaries are self-contained regardless of the host's glibc version.
+
+The same `Brewfile` works on macOS and Linux. `if OS.mac?` blocks (casks, GUI apps) are silently skipped on Linux.
+
+---
+
+## Updating all packages
+
+```sh
+# Homebrew (macOS)
+brew bundle --file=~/dotfiles/packages/Brewfile
+
+# Homebrew (Linux) — re-run in container
+bash ~/dotfiles/install/linux-packages.sh
 
 # Cargo tools
 bash ~/dotfiles/install/rust.sh
 
 # Python venv
 bash ~/dotfiles/install/python.sh
+
+# Claude plugins + MCP servers
+bash ~/dotfiles/install/claude.sh
 ```

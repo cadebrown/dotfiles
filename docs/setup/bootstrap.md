@@ -1,4 +1,6 @@
-# Bootstrap
+# Bootstrap a new machine
+
+## One-liner
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
@@ -11,136 +13,129 @@ git clone https://github.com/cadebrown/dotfiles ~/dotfiles
 ~/dotfiles/bootstrap.sh
 ```
 
-No sudo is required on either platform.
+No sudo required on either platform. The script detects the OS and runs the right steps.
 
 ---
 
 ## macOS
 
-### System requirements
+### Requirements
 
 | Requirement | How to get it |
 |---|---|
-| macOS 13+ (Ventura) | — |
-| Xcode Command Line Tools | Homebrew installer prompts automatically, or: `xcode-select --install` |
+| macOS 13+ | — |
+| Xcode Command Line Tools | Homebrew prompts automatically, or: `xcode-select --install` |
 | Internet access | — |
-
-That's it. The bootstrap script installs everything else (Homebrew, tools, language runtimes) to user-local paths without sudo.
 
 ### What gets installed
 
 1. **chezmoi** → `~/.local/$PLAT/bin/chezmoi`
-2. **Dotfiles** applied via `chezmoi apply`
-3. **oh-my-zsh + plugins** (pure, autosuggestions, fast-syntax-highlighting, completions)
+2. **Dotfiles** applied via `chezmoi apply` — prompts for name + email on first run
+3. **oh-my-zsh** + plugins (pure prompt, autosuggestions, fast-syntax-highlighting, completions)
 4. **Homebrew** → `/opt/homebrew` (Apple Silicon) or `/usr/local` (Intel)
-   — pulls precompiled bottles; installs all CLI tools and casks from `packages/Brewfile`
-5. **colima** started as a login service (Docker-compatible container runtime)
-6. **Node.js** (nvm) → `~/.local/$PLAT/nvm/`
-7. **Rust toolchain** → `~/.local/$PLAT/rustup/`, `~/.local/$PLAT/cargo/`
-8. **Python** (uv + venv) → `~/.local/$PLAT/venv/`
-9. **Claude Code** — CLI via Homebrew cask (`cask "claude-code"`); plugins via `install/claude.sh`
+5. **Packages** from `packages/Brewfile` — CLI tools, casks, macOS services
+6. **colima** registered as a login service (rootless Docker runtime)
+7. **Node.js** via nvm → `~/.local/$PLAT/nvm/`
+8. **Rust** via rustup → `~/.local/$PLAT/rustup/`, cargo tools → `~/.local/$PLAT/cargo/`
+9. **Python** via uv → `~/.local/$PLAT/venv/`
+10. **Claude Code** via Homebrew cask + plugins + MCP servers
 
 ---
 
 ## Linux
 
-### System requirements
+### Requirements
 
 | Requirement | Notes |
 |---|---|
-| Linux x86\_64 or aarch64 | — |
-| **Docker (rootless)** or **Podman** | No sudo. See below. |
-| `git` and `curl` | For the initial `curl \| bash` bootstrap |
+| x86\_64 or aarch64 | — |
+| **Docker (rootless)** or **Podman** | Required for the package install step. See below. |
+| `git` and `curl` | Pre-installed on most systems |
 | Internet access | — |
-| C compiler (`gcc`, `make`) | Usually pre-installed; needed by Homebrew for source builds |
 
-No sudo is required. Docker/Podman are used to compile packages inside a
-`manylinux_2_28` container (AlmaLinux 8, glibc 2.28). Most packages pour as
-precompiled bottles; Homebrew bundles its own glibc so binaries are self-contained.
+No sudo is needed after the initial Docker/Podman setup. Packages install inside a `manylinux_2_28` container (AlmaLinux 8, glibc 2.28) — most pour as precompiled bottles; Homebrew bundles its own glibc so the binaries are self-contained on any host.
 
-### Installing Docker (rootless)
+### Docker (rootless)
 
-Rootless Docker runs entirely as your user — no daemon running as root, no
-sudo required after setup.
+Rootless Docker runs entirely as your user — no root daemon.
 
 ```sh
-# Install the rootless setup tool (may need one-time sudo for the tool itself)
 curl -fsSL https://get.docker.com/rootless | sh
-
-# Add to your shell profile (bootstrap handles this automatically afterwards)
 export PATH="$HOME/bin:$PATH"
 export DOCKER_HOST="unix://$XDG_RUNTIME_DIR/docker.sock"
-
-# Start the daemon
-systemctl --user start docker
-systemctl --user enable docker   # auto-start at login
+systemctl --user enable --now docker
 ```
 
-Full docs: https://docs.docker.com/engine/security/rootless/
+Full docs: [docs.docker.com/engine/security/rootless](https://docs.docker.com/engine/security/rootless/)
 
-### Installing Podman (rootless)
+### Podman (rootless)
 
 Podman is rootless by design — no daemon, no sudo.
 
 ```sh
-# Debian/Ubuntu
-apt install podman       # may need sudo for this one-time install
-
-# RHEL/Fedora/Rocky
-dnf install podman
-
-# On HPC clusters: check if Podman is already available
-which podman
+apt install podman    # Debian/Ubuntu (may need sudo once)
+dnf install podman    # RHEL/Fedora
+which podman          # HPC clusters: often already available
 ```
 
-Podman is a drop-in Docker replacement; the bootstrap script detects and
-uses whichever is available (`docker` checked first, then `podman`).
+The bootstrap script checks for `docker` first, then `podman`. Either works.
 
 ### What gets installed
 
 1. **chezmoi** → `~/.local/$PLAT/bin/chezmoi`
 2. **Dotfiles** applied via `chezmoi apply`
-3. **oh-my-zsh + plugins**
-4. **Homebrew** → `~/.local/$PLAT/brew/`
-   — installed inside a `manylinux_2_28` container (most packages pour as bottles);
-     casks and macOS-specific tools are skipped automatically via `if OS.mac?` blocks
-5. **Node.js** (nvm) → `~/.local/$PLAT/nvm/`
-6. **Rust toolchain** → `~/.local/$PLAT/rustup/`, `~/.local/$PLAT/cargo/`
-7. **Python** (uv + venv) → `~/.local/$PLAT/venv/`
-8. **Claude Code** — native binary → `~/.local/$PLAT/bin/claude`; plugins via `install/claude.sh`
+3. **oh-my-zsh** + plugins
+4. **Homebrew** → `~/.local/$PLAT/brew/` (inside manylinux container; casks skipped)
+5. **Node.js** via nvm → `~/.local/$PLAT/nvm/`
+6. **Rust** via rustup → `~/.local/$PLAT/rustup/`, `~/.local/$PLAT/cargo/`
+7. **Python** via uv → `~/.local/$PLAT/venv/`
+8. **Claude Code** native binary → `~/.local/$PLAT/bin/claude` + plugins + MCP servers
 
-First bootstrap takes ~10 minutes — most packages pour as precompiled bottles,
-but glibc and a few others compile from source. Subsequent runs skip already-installed packages.
+First run takes ~10 minutes (glibc and a few others compile from source). Subsequent runs skip already-installed packages.
 
 ---
 
 ## Skipping steps
 
+Any step can be skipped with an environment variable:
+
 ```sh
-INSTALL_ZSH=0 INSTALL_PACKAGES=0 INSTALL_NODE=0 \
+INSTALL_PACKAGES=0   # skip Homebrew + brew bundle
+INSTALL_ZSH=0        # skip oh-my-zsh
+INSTALL_NODE=0       # skip nvm + Node.js
+INSTALL_RUST=0       # skip rustup + cargo tools
+INSTALL_PYTHON=0     # skip uv + venv
+INSTALL_CLAUDE=0     # skip Claude Code plugins + MCP servers
+```
+
+Example — skip everything except dotfiles:
+
+```sh
+INSTALL_PACKAGES=0 INSTALL_ZSH=0 INSTALL_NODE=0 \
 INSTALL_RUST=0 INSTALL_PYTHON=0 INSTALL_CLAUDE=0 \
 ~/dotfiles/bootstrap.sh
 ```
 
+---
+
 ## First-run prompts
 
-chezmoi asks for **display name** and **email** once, caches them in
-`~/.config/chezmoi/chezmoi.toml`. To re-prompt: `chezmoi init --data=false`.
+chezmoi asks for **display name** and **email** once. Values are cached in `~/.config/chezmoi/chezmoi.toml`. To skip the prompts, pre-seed them:
+
+```sh
+CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" ~/dotfiles/bootstrap.sh
+```
+
+To re-prompt (e.g. after changing email): `chezmoi init --data=false`
+
+---
 
 ## Shared home directories
 
-If two machines share a home directory (e.g. NFS), run `bootstrap.sh` on each
-machine independently:
+If two machines share a home directory (NFS), run `bootstrap.sh` independently on each:
 
-- chezmoi finds the cached config — no prompts
-- Dotfiles are already applied — no changes
-- All tool installs are PLAT-specific (`~/.local/$PLAT/`), so each machine
-  compiles and installs its own binaries independently
+- chezmoi finds the cached config — no prompts the second time
+- Dotfiles are already applied — no changes needed
+- All tool installs use `~/.local/$PLAT/`, so each machine gets its own arch-specific binaries without conflict
 
-On Linux, if two machines share a home but have **different glibc versions**,
-they need different PLAT identifiers. By default `$PLAT = $(uname -m)-$(uname -s)`
-which only distinguishes arch and OS. If needed, override before running bootstrap:
-
-```sh
-PLAT="x86_64-Linux-glibc2.17" ~/dotfiles/bootstrap.sh
-```
+All tools installed here (Homebrew bottles, rustup, uv, nvm) ship self-contained binaries — they don't link against the host glibc — so different glibc versions on the same arch are not a problem.

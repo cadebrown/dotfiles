@@ -1,7 +1,12 @@
-# Summary
+[Home](intro.md)
 
-[Introduction](intro.md)
+# Setup
 
-- [Bootstrap](setup/bootstrap.md)
-- [Dotfile Management](setup/chezmoi.md)
-- [Packages](setup/packages.md)
+- [Bootstrap a new machine](setup/bootstrap.md)
+- [Managing dotfiles](setup/chezmoi.md)
+- [Package management](setup/packages.md)
+
+# Usage
+
+- [Day-to-day workflow](usage/updates.md)
+- [Troubleshooting](usage/troubleshooting.md)
