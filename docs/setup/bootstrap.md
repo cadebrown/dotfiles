@@ -38,7 +38,7 @@ That's it. The bootstrap script installs everything else (Homebrew, tools, langu
 6. **Node.js** (nvm) → `~/.local/$PLAT/nvm/`
 7. **Rust toolchain** → `~/.local/$PLAT/rustup/`, `~/.local/$PLAT/cargo/`
 8. **Python** (uv + venv) → `~/.local/$PLAT/venv/`
-9. **Claude Code plugins**
+9. **Claude Code** — CLI via Homebrew cask (`cask "claude-code"`); plugins via `install/claude.sh`
 
 ---
 
@@ -107,7 +107,7 @@ uses whichever is available (`docker` checked first, then `podman`).
 5. **Node.js** (nvm) → `~/.local/$PLAT/nvm/`
 6. **Rust toolchain** → `~/.local/$PLAT/rustup/`, `~/.local/$PLAT/cargo/`
 7. **Python** (uv + venv) → `~/.local/$PLAT/venv/`
-8. **Claude Code plugins**
+8. **Claude Code** — native binary → `~/.local/$PLAT/bin/claude`; plugins via `install/claude.sh`
 
 First bootstrap takes ~10 minutes — most packages pour as precompiled bottles,
 but glibc and a few others compile from source. Subsequent runs skip already-installed packages.

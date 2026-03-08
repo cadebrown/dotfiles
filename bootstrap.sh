@@ -16,7 +16,7 @@
 #   INSTALL_SERVICES — set to 0 to skip auto-start service registration
 #   INSTALL_ZSH      — set to 0 to skip oh-my-zsh + plugins install
 #   INSTALL_NODE     — set to 0 to skip Node install
-#   INSTALL_NPM      — set to 0 to skip global npm packages (claude-code, codex, etc.)
+#   INSTALL_NPM      — set to 0 to skip global npm packages
 #   INSTALL_RUST     — set to 0 to skip Rust install
 #   INSTALL_PYTHON   — set to 0 to skip Python install
 #   INSTALL_CLAUDE   — set to 0 to skip Claude Code plugins install

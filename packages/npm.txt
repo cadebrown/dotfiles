@@ -2,6 +2,6 @@
 # Usage: install/npm.sh reads this file
 # Install manually: npm install -g <package>
 
-# AI coding agents
-@anthropic-ai/claude-code
-@openai/codex
+# (currently empty — add npm-specific packages here)
+# claude-code: installed via Homebrew cask (macOS) or install/claude.sh (Linux)
+# codex: installed via native binary — not tracked here
