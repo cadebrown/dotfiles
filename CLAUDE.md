@@ -24,8 +24,8 @@ These must never be broken:
    (glibc 2.17, CentOS 7). Resulting binaries run on any Linux since ~2014.
 
 5. **Same Brewfile everywhere.** `packages/Brewfile` is the single source of truth for packages
-   on both macOS and Linux. `on_macos` blocks handle casks and macOS-specific services.
-   Homebrew's DSL skips those blocks on Linux automatically.
+   on both macOS and Linux. `if OS.mac?` blocks handle casks and macOS-specific tools.
+   Homebrew skips those blocks on Linux automatically.
 
 ---
 
@@ -149,10 +149,10 @@ Follow this priority order:
    add an `INSTALL_*` flag to `bootstrap.sh`
 5. **Ask** — if none of the above fits, ask before inventing a new mechanism
 
-For macOS-only things (casks, GUI apps, macOS services), wrap in `on_macos do`:
+For macOS-only things (casks, GUI apps, macOS services), wrap in `if OS.mac?`:
 
 ```ruby
-on_macos do
+if OS.mac?
   cask "some-app"
   brew "macos-only-tool"
 end

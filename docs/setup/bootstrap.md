@@ -103,7 +103,7 @@ uses whichever is available (`docker` checked first, then `podman`).
 3. **oh-my-zsh + plugins**
 4. **Homebrew** → `~/.local/$PLAT/brew/`
    — compiled from source inside a `manylinux_2_17` container (glibc 2.17);
-     casks and macOS-specific tools are skipped automatically via `on_macos` blocks
+     casks and macOS-specific tools are skipped automatically via `if OS.mac?` blocks
 5. **Node.js** → `~/.local/$PLAT/brew/bin/node` (installed by step 4)
 6. **Rust toolchain** → `~/.local/$PLAT/rustup/`, `~/.local/$PLAT/cargo/`
 7. **Python** (uv + venv) → `~/.local/$PLAT/venv/`

@@ -29,7 +29,7 @@ Follow this priority order:
    ```ruby
    brew "tool-name"
    ```
-   Wrap in `on_macos do` if it's macOS-only (casks, GUI apps, macOS services).
+   Wrap in `if OS.mac?` if it's macOS-only (casks, GUI apps, macOS services).
 
 4. **Special script** — if it requires custom install steps, look at an existing script in `install/` for patterns and follow them. Add an `INSTALL_*` flag to `bootstrap.sh`.
 

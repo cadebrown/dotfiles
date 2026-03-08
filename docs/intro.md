@@ -45,4 +45,4 @@ The shell profile computes `_PLAT` at login and sets all tool paths from it — 
 | macOS | Homebrew | Native bottles; casks for GUI apps |
 | Linux | Homebrew in manylinux_2_17 container | Compiled from source; casks skipped |
 
-Same `Brewfile` on both platforms — `on_macos` blocks handle the differences automatically.
+Same `Brewfile` on both platforms — `if OS.mac?` blocks handle the differences automatically.

@@ -52,7 +52,7 @@ while IFS= read -r line; do
     fi
 
     log_info "  install $pkg"
-    if cargo install "$pkg" 2>&1 | run_logged; then
+    if run_logged cargo install "$pkg"; then
         log_ok "  ok    $pkg"
         (( _ok++ )) || true
     else

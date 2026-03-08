@@ -33,6 +33,6 @@ log_info "Updating Homebrew"
 run_logged brew update
 
 log_info "Applying Brewfile (this may take a while)"
-run_logged brew bundle install --file="$BREWFILE" --no-lock
+run_logged brew bundle install --file="$BREWFILE"
 
 log_ok "Homebrew packages up to date"

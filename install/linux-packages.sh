@@ -52,7 +52,7 @@ log_info "Pulling $IMAGE"
 #   - /etc/passwd + /etc/group mounted read-only → `whoami` works (required by Homebrew)
 #   - --user $(id -u):$(id -g) → Homebrew refuses to run as root
 #   - BREW_PREFIX and BREWFILE passed via -e → inner script uses them
-#   - on_macos blocks in Brewfile are automatically skipped (Linux host)
+#   - if OS.mac? blocks in Brewfile are automatically skipped (Linux host)
 
 log_info "Running brew bundle in container (first run compiles from source — this takes a while)"
 
@@ -84,9 +84,9 @@ fi
 
 export PATH="$BREW_PREFIX/bin:$PATH"
 
-# on_macos blocks in Brewfile are skipped automatically on Linux
+# if OS.mac? blocks in Brewfile are skipped automatically on Linux
 echo "[info] Running brew bundle (--no-upgrade for idempotency)"
-brew bundle install --file="$BREWFILE" --no-lock --no-upgrade
+brew bundle install --file="$BREWFILE" --no-upgrade
 EOF
 
 log_ok "Linux packages installed at $BREW_PREFIX"
