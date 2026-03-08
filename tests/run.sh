@@ -26,10 +26,7 @@ fi
 if [[ "$SHELL_MODE" == "1" ]]; then
     echo "==> Dropping into dotfiles shell (via chezmoi docker run)"
     echo ""
-    _name="${CHEZMOI_NAME:-Test User}"
-    _email="${CHEZMOI_EMAIL:-test@example.com}"
-    chezmoi docker run dotfiles-test cadebrown \
-        --data "{\"name\":\"$_name\",\"email\":\"$_email\"}"
+    chezmoi docker run dotfiles-test cadebrown
 else
     echo "==> Running tests"
     docker run --rm \
