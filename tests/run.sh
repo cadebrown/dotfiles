@@ -24,16 +24,12 @@ if [[ "${DOCKER_BUILD:-1}" != "0" ]]; then
 fi
 
 if [[ "$SHELL_MODE" == "1" ]]; then
-    echo "==> Bootstrapping + dropping into interactive shell"
-    echo "    (Packages, Nix, and Claude skipped — no Docker-in-Docker)"
+    echo "==> Dropping into dotfiles shell (via chezmoi docker run)"
     echo ""
-    docker run --rm -it \
-        -v "$REPO_ROOT:/home/user/dotfiles" \
-        -e CHEZMOI_NAME="${CHEZMOI_NAME:-Test User}" \
-        -e CHEZMOI_EMAIL="${CHEZMOI_EMAIL:-test@example.com}" \
-        dotfiles-test \
-        bash -c 'INSTALL_NIX=0 INSTALL_PACKAGES=0 INSTALL_CLAUDE=0 \
-                 bash /home/user/dotfiles/bootstrap.sh && exec zsh -l'
+    _name="${CHEZMOI_NAME:-Test User}"
+    _email="${CHEZMOI_EMAIL:-test@example.com}"
+    chezmoi docker run dotfiles-test cadebrown \
+        --data "{\"name\":\"$_name\",\"email\":\"$_email\"}"
 else
     echo "==> Running tests"
     docker run --rm \
