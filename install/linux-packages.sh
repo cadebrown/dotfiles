@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # install/linux-packages.sh - install packages on Linux via Homebrew
 #
-# Runs Homebrew inside a manylinux_2_17 container (glibc 2.17, CentOS 7) so
-# compiled binaries work on any Linux since ~2014 — no glibc version conflicts.
+# Runs Homebrew inside a manylinux_2_28 container (AlmaLinux 8, glibc 2.28) so
+# compiled binaries work on any Linux since ~2018 — no glibc version conflicts.
+# Most packages pour as precompiled bottles; Homebrew bundles its own glibc 2.35.
 #
 # Requires Docker (rootless) or Podman. No sudo needed on the host.
 # See docs/setup/bootstrap.md for setup instructions.
@@ -30,11 +31,11 @@ log_info "Container runtime: $RUNTIME"
 
 ### Select image ###
 
-# manylinux_2_17 = CentOS 7 = glibc 2.17
-# Binaries compiled here run on any Linux with glibc >= 2.17 (~2014+)
+# manylinux_2_28 = AlmaLinux 8 = glibc 2.28
+# Bottles pour directly; Homebrew bundles glibc 2.35 so binaries are self-contained.
 case "$ARCH" in
-    aarch64) IMAGE="quay.io/pypa/manylinux_2_17_aarch64" ;;
-    x86_64)  IMAGE="quay.io/pypa/manylinux_2_17_x86_64"  ;;
+    aarch64) IMAGE="quay.io/pypa/manylinux_2_28_aarch64" ;;
+    x86_64)  IMAGE="quay.io/pypa/manylinux_2_28_x86_64"  ;;
     *)       log_error "No manylinux image for arch: $ARCH"; exit 1 ;;
 esac
 log_info "Build image:       $IMAGE"
@@ -54,7 +55,7 @@ log_info "Pulling $IMAGE"
 #   - BREW_PREFIX and BREWFILE passed via -e → inner script uses them
 #   - if OS.mac? blocks in Brewfile are automatically skipped (Linux host)
 
-log_info "Running brew bundle in container (first run compiles from source — this takes a while)"
+log_info "Running brew bundle in container (first run installs bottles + builds glibc — takes ~10 min)"
 
 "$RUNTIME" run --rm \
     --user "$(id -u):$(id -g)" \
@@ -72,17 +73,20 @@ log_info "Running brew bundle in container (first run compiles from source — t
     bash << 'EOF'
 set -euo pipefail
 
-# Install Homebrew to the PLAT-specific prefix if not already there
+# Install Homebrew via git clone to user-local prefix (no sudo).
+# The official installer forces /home/linuxbrew/.linuxbrew — git clone is the
+# supported alternative for custom prefixes.
 if [[ ! -x "$BREW_PREFIX/bin/brew" ]]; then
     echo "[info] Installing Homebrew → $BREW_PREFIX"
     mkdir -p "$BREW_PREFIX"
-    curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh \
-        | NONINTERACTIVE=1 HOMEBREW_PREFIX="$BREW_PREFIX" bash
+    git clone --depth=1 https://github.com/Homebrew/brew "$BREW_PREFIX/Homebrew"
+    mkdir -p "$BREW_PREFIX/bin"
+    ln -sf "$BREW_PREFIX/Homebrew/bin/brew" "$BREW_PREFIX/bin/brew"
 else
     echo "[ok]   Homebrew already installed at $BREW_PREFIX"
 fi
 
-export PATH="$BREW_PREFIX/bin:$PATH"
+eval "$($BREW_PREFIX/bin/brew shellenv)"
 
 # if OS.mac? blocks in Brewfile are skipped automatically on Linux
 echo "[info] Running brew bundle (--no-upgrade for idempotency)"

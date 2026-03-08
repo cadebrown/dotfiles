@@ -20,8 +20,9 @@ These must never be broken:
 
 3. **Idempotent.** Every script is safe to re-run. Check before installing; skip if already done.
 
-4. **glibc portability.** Linux packages are compiled inside a `manylinux_2_17` container
-   (glibc 2.17, CentOS 7). Resulting binaries run on any Linux since ~2014.
+4. **glibc portability.** Linux packages install inside a `manylinux_2_28` container
+   (AlmaLinux 8, glibc 2.28). Most packages pour as precompiled bottles; Homebrew
+   bundles its own glibc 2.35 so binaries are self-contained.
 
 5. **Same Brewfile everywhere.** `packages/Brewfile` is the single source of truth for packages
    on both macOS and Linux. `if OS.mac?` blocks handle casks and macOS-specific tools.
@@ -62,7 +63,7 @@ dotfiles/
 │   ├── _lib.sh                # SOURCE OF TRUTH for all PLAT paths and env vars
 │   ├── chezmoi.sh             # Install chezmoi binary → $ARCH_BIN
 │   ├── homebrew.sh            # macOS: install Homebrew + brew bundle
-│   ├── linux-packages.sh      # Linux: brew bundle inside manylinux_2_17 container
+│   ├── linux-packages.sh      # Linux: brew bundle inside manylinux_2_28 container
 │   ├── zsh.sh                 # oh-my-zsh + plugins (pure, autosuggestions, fsh, completions)
 │   ├── services.sh            # macOS: register colima as login service
 │   ├── node.sh                # nvm + Node.js → $LOCAL_PLAT/nvm/
@@ -170,8 +171,8 @@ Result: **~0.14s** shell startup (down from ~1.1s with eager nvm loading).
 ```
 
 Each step has an `INSTALL_*=0` env var to skip it. The Linux packages step
-starts a `manylinux_2_17` container and runs `brew bundle` inside it; this
-is the slow step on first bootstrap (~30–60 min).
+starts a `manylinux_2_28` container and runs `brew bundle` inside it; most
+packages pour as bottles so first bootstrap takes ~10 min.
 
 ---
 

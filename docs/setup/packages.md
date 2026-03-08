@@ -37,7 +37,7 @@ Follow this priority order:
 
 ## Why this split
 
-- **Homebrew** — handles the bulk of CLI tools on both platforms. macOS gets precompiled bottles; Linux compiles inside a `manylinux_2_17` container (glibc 2.17) for portability across distros.
+- **Homebrew** — handles the bulk of CLI tools on both platforms. macOS gets precompiled bottles; Linux installs inside a `manylinux_2_28` container (most packages also pour as bottles, Homebrew bundles its own glibc).
 - **npm / cargo** — language-ecosystem tools that publish to npm/crates.io install faster and more reliably via their native registries than through Homebrew.
 - **pip.txt in a venv** — a single activated venv for interactive/scripting use. Project-specific envs are handled by `uv` separately.
 - **Claude plugins** — `claude plugin install` has its own registry; these aren't npm or Homebrew packages.

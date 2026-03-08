@@ -55,8 +55,8 @@ That's it. The bootstrap script installs everything else (Homebrew, tools, langu
 | C compiler (`gcc`, `make`) | Usually pre-installed; needed by Homebrew for source builds |
 
 No sudo is required. Docker/Podman are used to compile packages inside a
-`manylinux_2_17` container (glibc 2.17, CentOS 7), so binaries work on any
-Linux since ~2014 regardless of distro.
+`manylinux_2_28` container (AlmaLinux 8, glibc 2.28). Most packages pour as
+precompiled bottles; Homebrew bundles its own glibc so binaries are self-contained.
 
 ### Installing Docker (rootless)
 
@@ -102,15 +102,15 @@ uses whichever is available (`docker` checked first, then `podman`).
 2. **Dotfiles** applied via `chezmoi apply`
 3. **oh-my-zsh + plugins**
 4. **Homebrew** → `~/.local/$PLAT/brew/`
-   — compiled from source inside a `manylinux_2_17` container (glibc 2.17);
+   — installed inside a `manylinux_2_28` container (most packages pour as bottles);
      casks and macOS-specific tools are skipped automatically via `if OS.mac?` blocks
 5. **Node.js** (nvm) → `~/.local/$PLAT/nvm/`
 6. **Rust toolchain** → `~/.local/$PLAT/rustup/`, `~/.local/$PLAT/cargo/`
 7. **Python** (uv + venv) → `~/.local/$PLAT/venv/`
 8. **Claude Code plugins**
 
-First bootstrap compiles packages from source — expect 30–60 minutes depending
-on machine speed and package count. Subsequent runs skip already-installed packages.
+First bootstrap takes ~10 minutes — most packages pour as precompiled bottles,
+but glibc and a few others compile from source. Subsequent runs skip already-installed packages.
 
 ---
 

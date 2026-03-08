@@ -7,7 +7,7 @@ Personal dotfiles for macOS and Linux, managed with [chezmoi](https://chezmoi.io
 - **Shared home directories** — the same `$HOME` may be NFS-mounted across machines with different arch (e.g. x86_64 and aarch64). Text configs are shared freely; compiled binaries are isolated by `$PLAT = $(uname -m)-$(uname -s)`.
 - **No sudo on Linux** — Homebrew compiles inside a rootless container; rustup, uv, and Node install to user-local paths.
 - **Idempotent** — every script and `chezmoi apply` is safe to re-run. Running bootstrap on a second machine that shares a home just installs that machine's PLAT-specific tools.
-- **glibc portability** — Linux packages are compiled inside a `manylinux_2_17` container (glibc 2.17, CentOS 7), so binaries run on any Linux since ~2014.
+- **glibc portability** — Linux packages install inside a `manylinux_2_28` container (AlmaLinux 8, glibc 2.28). Most pour as precompiled bottles; Homebrew bundles its own glibc so binaries are self-contained.
 
 ## PLAT isolation
 
@@ -43,6 +43,6 @@ The shell profile computes `_PLAT` at login and sets all tool paths from it — 
 | Platform | Tool | Notes |
 |---|---|---|
 | macOS | Homebrew | Native bottles; casks for GUI apps |
-| Linux | Homebrew in manylinux_2_17 container | Compiled from source; casks skipped |
+| Linux | Homebrew in manylinux_2_28 container | Precompiled bottles; casks skipped |
 
 Same `Brewfile` on both platforms — `if OS.mac?` blocks handle the differences automatically.
