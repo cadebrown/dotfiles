@@ -55,6 +55,7 @@ dotfiles/
 │   ├── cargo.txt              # `cargo install` list (read by install/rust.sh)
 │   ├── pip.txt                # Python packages for ~/.venv (read by install/python.sh)
 │   ├── claude-plugins.txt     # Claude Code plugins (read by install/claude.sh)
+│   ├── claude-mcp.txt         # Claude Code MCP servers (read by install/claude.sh)
 │   └── nix/                   # Nix home-manager config (optional, for Nix users)
 │       ├── flake.nix
 │       └── home.nix

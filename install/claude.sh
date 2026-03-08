@@ -88,3 +88,35 @@ while IFS= read -r line; do
 done < "$PLUGINS_TXT"
 
 log_ok "Claude plugins: ${_ok} installed, ${_skip} already present, ${_fail} failed"
+
+### MCP SERVERS (all platforms) ###
+
+log_section "Claude Code MCP servers"
+
+MCP_TXT="$PACKAGES_DIR/claude-mcp.txt"
+[[ -f "$MCP_TXT" ]] || { log_warn "No claude-mcp.txt at $MCP_TXT — skipping"; exit 0; }
+
+_ok=0 _skip=0 _fail=0
+
+while IFS= read -r line; do
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    # Format: <name> <transport> <url>
+    _name="${line%% *}"; _rest="${line#* }"
+    _transport="${_rest%% *}"; _url="${_rest#* }"
+
+    if claude mcp list 2>/dev/null | grep -qE "^$_name\b"; then
+        log_info "  skip  $_name (already registered)"
+        (( _skip++ )) || true
+    else
+        log_info "  $_name ($_transport) → $_url"
+        if claude mcp add --transport "$_transport" --scope user "$_name" "$_url" 2>/dev/null; then
+            log_ok "  registered $_name"
+            (( _ok++ )) || true
+        else
+            log_warn "  fail  $_name"
+            (( _fail++ )) || true
+        fi
+    fi
+done < "$MCP_TXT"
+
+log_ok "MCP servers: ${_ok} registered, ${_skip} already present, ${_fail} failed"

@@ -1,0 +1,7 @@
+# claude-mcp.txt - MCP servers for Claude Code
+# Usage: install/claude.sh reads this file
+# Format: <name> <transport> <url>
+# Install manually: claude mcp add --transport <transport> --scope user <name> <url>
+
+# Cloudflare: full API access (Pages, DNS, Workers, R2, Zero Trust, etc.)
+cloudflare http https://mcp.cloudflare.com/mcp
