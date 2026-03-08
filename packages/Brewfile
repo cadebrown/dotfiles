@@ -73,7 +73,6 @@ if OS.mac?
 
   ### Terminal ###
   cask "ghostty"
-  cask "iterm2"
 
   ### Editors & IDEs ###
   cask "visual-studio-code"

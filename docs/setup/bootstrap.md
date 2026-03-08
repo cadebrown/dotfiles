@@ -35,7 +35,7 @@ That's it. The bootstrap script installs everything else (Homebrew, tools, langu
 4. **Homebrew** → `/opt/homebrew` (Apple Silicon) or `/usr/local` (Intel)
    — pulls precompiled bottles; installs all CLI tools and casks from `packages/Brewfile`
 5. **colima** started as a login service (Docker-compatible container runtime)
-6. **Node.js** → `brew install node` (already done by step 4)
+6. **Node.js** (nvm) → `~/.local/$PLAT/nvm/`
 7. **Rust toolchain** → `~/.local/$PLAT/rustup/`, `~/.local/$PLAT/cargo/`
 8. **Python** (uv + venv) → `~/.local/$PLAT/venv/`
 9. **Claude Code plugins**
@@ -104,7 +104,7 @@ uses whichever is available (`docker` checked first, then `podman`).
 4. **Homebrew** → `~/.local/$PLAT/brew/`
    — compiled from source inside a `manylinux_2_17` container (glibc 2.17);
      casks and macOS-specific tools are skipped automatically via `if OS.mac?` blocks
-5. **Node.js** → `~/.local/$PLAT/brew/bin/node` (installed by step 4)
+5. **Node.js** (nvm) → `~/.local/$PLAT/nvm/`
 6. **Rust toolchain** → `~/.local/$PLAT/rustup/`, `~/.local/$PLAT/cargo/`
 7. **Python** (uv + venv) → `~/.local/$PLAT/venv/`
 8. **Claude Code plugins**

@@ -104,7 +104,8 @@ log_ok "Dotfiles applied"
 
 # Resolve install dir via chezmoi if we bootstrapped from GitHub
 if [[ ! -d "$INSTALL_DIR" ]]; then
-    INSTALL_DIR="$("$CHEZMOI_BIN" source-path)/install"
+    # source-path points to home/ (via .chezmoiroot), install/ is one level up
+    INSTALL_DIR="$(dirname "$("$CHEZMOI_BIN" source-path)")/install"
 fi
 
 ### 3. ZSH ###

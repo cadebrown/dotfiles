@@ -17,7 +17,7 @@ Every compiled binary lives under `~/.local/$PLAT/`:
 |---|---|
 | `~/.local/$PLAT/bin/` | chezmoi, uv, uvx |
 | `~/.local/$PLAT/brew/` | Homebrew prefix (Linux only) |
-| `~/.local/$PLAT/node/` | Node.js (Linux only; macOS via brew) |
+| `~/.local/$PLAT/nvm/` | nvm + Node.js versions |
 | `~/.local/$PLAT/nix-profile/` | Nix user profile (if Nix installed) |
 | `~/.local/$PLAT/rustup/` | Rust toolchain |
 | `~/.local/$PLAT/cargo/` | Cargo home (binaries at `cargo/bin/`) |

@@ -17,7 +17,7 @@ else
     # PROFILE=/dev/null: don't touch shell configs (chezmoi manages those)
     _nvm_script="$(mktemp)"
     curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/HEAD/install.sh -o "$_nvm_script"
-    NVM_DIR="$NVM_DIR" PROFILE=/dev/null bash "$_nvm_script" 2>&1 | sed 's/^/    /'
+    NVM_DIR="$NVM_DIR" PROFILE=/dev/null run_logged bash "$_nvm_script"
     rm -f "$_nvm_script"
 fi
 
@@ -28,7 +28,7 @@ if nvm ls 25 2>/dev/null | grep -qE 'v25\.'; then
     log_ok "Node v25 already installed"
 else
     log_info "Installing Node.js v25..."
-    nvm install 25 2>&1 | sed 's/^/    /'
+    run_logged nvm install 25
 fi
 
 nvm alias default 25
