@@ -4,7 +4,7 @@ font-family = JetBrains Mono
 font-size = 13
 
 # Use system theme
-theme = dark:GruvboxDark,light:GruvboxLight
+theme = dark:Gruvbox Dark,light:Gruvbox Light
 
 # Window
 window-padding-x = 8
@@ -22,11 +22,20 @@ scrollback-limit = 100000
 cursor-style = bar
 cursor-style-blink = false
 
-# Bell
-bell-feature = false
+# Bell (disable everything)
+bell-features = no-system,no-audio,no-attention,no-title,no-border
 
 # Copy on select
 copy-on-select = false
+
+# Quick terminal (drop-down hotkey window)
+# Global hotkey: Option+` summons a slide-down terminal from the top
+keybind = global:alt+grave_accent=toggle_quick_terminal
+quick-terminal-position = top
+quick-terminal-screen = main
+quick-terminal-animation-duration = 0
+quick-terminal-space-behavior = move
+background-opacity = 0.9
 
 # macOS-specific
 macos-option-as-alt = true

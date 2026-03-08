@@ -10,6 +10,8 @@
 ### Shells ###
 brew "zsh"
 brew "bash"
+brew "fish"
+brew "nushell"
 
 ### Editors ###
 brew "vim"
@@ -33,6 +35,8 @@ brew "ncdu"
 brew "fzf"
 brew "jq"
 brew "direnv"
+brew "entr"
+brew "xdelta"
 
 ### CLI Utilities ###
 brew "wget"
@@ -42,9 +46,13 @@ brew "rlwrap"
 brew "cloc"
 brew "imagemagick"
 brew "fastfetch"
+brew "fetch"
 brew "lynx"
 brew "tmux"
 brew "moreutils"
+brew "pandoc"
+brew "graphviz"
+brew "texinfo"
 
 ### Media ###
 brew "ffmpeg"
@@ -61,8 +69,18 @@ brew "ninja"
 brew "meson"
 brew "llvm"
 brew "fftw"
+brew "glfw"
 brew "openjdk"
 brew "openssh"
+
+### Languages ###
+brew "zig"
+
+### DevOps ###
+brew "opentofu"
+
+### Retro / Embedded ###
+brew "cc65"
 
 if OS.mac?
   ### Dev Tools - VMs & Containers (macOS) ###
@@ -70,22 +88,31 @@ if OS.mac?
   brew "docker"
   brew "podman"
   brew "qemu"
+  brew "mas"
+
+  ### X11 ###
+  brew "xorg-server"
 
   ### Terminal ###
   cask "ghostty"
+  cask "warp"
+  cask "tabby"
 
   ### Editors & IDEs ###
   cask "visual-studio-code"
   cask "cursor"
+  cask "dotnet-sdk"
 
   ### Window Management ###
   cask "nikitabobko/tap/aerospace"
   cask "linearmouse"
   cask "jordanbaird-ice"
+  cask "enjoyable"
 
   ### Productivity ###
   cask "alfred"
   cask "the-unarchiver"
+  cask "notion"
 
   ### Browsers ###
   cask "firefox"
@@ -93,11 +120,13 @@ if OS.mac?
   ### Media ###
   brew "mpv"
   cask "vlc"
+  cask "elmedia-player"
   cask "gimp"
   cask "inkscape"
   cask "spotify"
   cask "obs"
   cask "blender"
+  cask "kdenlive"
 
   ### Documents ###
   cask "mactex"
@@ -120,5 +149,6 @@ if OS.mac?
 
   ### Utilities ###
   cask "balenaetcher"
+  cask "antigravity"
 end
 
