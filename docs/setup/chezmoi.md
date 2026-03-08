@@ -43,9 +43,14 @@ The current templates only branch on `{{ .chezmoi.os }}` (darwin vs linux), whic
 
 ## Files that tools also write
 
-Some tracked files are mutated by other programs (e.g. `~/.claude/settings.json` is updated by Claude Code on plugin install). chezmoi doesn't auto-apply — drift is safe until you decide what to do:
+Some tracked files are mutated by other programs. chezmoi doesn't auto-apply — drift is safe until you decide what to do:
 
 ```sh
-chezmoi diff                         # see what changed
-chezmoi add ~/.claude/settings.json  # pull live version into source
+chezmoi diff                          # see what changed
+chezmoi add ~/.claude/settings.json   # pull live version into source
 ```
+
+Notable examples:
+- `~/.claude/settings.json` — updated by Claude Code on plugin install
+- `~/.codex/config.toml` — codex appends project trust levels at runtime;
+  managed with chezmoi's `create_` prefix so it's written once and never overwritten

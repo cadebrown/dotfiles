@@ -15,11 +15,12 @@ PACKAGES_DIR="$DOTFILES_ROOT/packages"
 # PLAT identifies the current arch+OS, used to isolate compiled binaries
 # in shared home directories (e.g. NFS mounts across x86_64 and aarch64).
 # All per-machine tool paths live under ~/.local/$PLAT/:
-#   ~/.local/$PLAT/bin/       chezmoi, uv, uvx, and other compiled tools
-#   ~/.local/$PLAT/nvm/       Node (nvm) — NVM_DIR
-#   ~/.local/$PLAT/rustup/    Rust toolchain — RUSTUP_HOME
-#   ~/.local/$PLAT/cargo/     Cargo home — CARGO_HOME (bins at cargo/bin/)
-#   ~/.local/$PLAT/venv/      Python virtualenv — VENV
+#   ~/.local/$PLAT/bin/         chezmoi, uv, uvx, and other compiled tools
+#   ~/.local/$PLAT/nvm/         nvm install + node versions — NVM_DIR
+#   ~/.local/$PLAT/nix-profile/ Nix user profile (symlink into /nix/store) — NIX_PROFILE
+#   ~/.local/$PLAT/rustup/      Rust toolchain — RUSTUP_HOME
+#   ~/.local/$PLAT/cargo/       Cargo home — CARGO_HOME (bins at cargo/bin/)
+#   ~/.local/$PLAT/venv/        Python virtualenv — VENV
 #
 # ~/.local/bin/ stays on PATH for arch-neutral shell scripts only.
 #
@@ -38,7 +39,6 @@ LOCAL_PLAT="$HOME/.local/$PLAT"
 ARCH_BIN="$LOCAL_PLAT/bin"
 
 # Standard per-machine tool paths — install scripts and shell both use these
-NVM_DIR="${NVM_DIR:-$LOCAL_PLAT/nvm}"
 RUSTUP_HOME="${RUSTUP_HOME:-$LOCAL_PLAT/rustup}"
 CARGO_HOME="${CARGO_HOME:-$LOCAL_PLAT/cargo}"
 VENV="${VENV:-$LOCAL_PLAT/venv}"
@@ -51,8 +51,18 @@ UV_TOOL_BIN_DIR="${UV_TOOL_BIN_DIR:-$ARCH_BIN}"
 UV_TOOL_DIR="${UV_TOOL_DIR:-$LOCAL_PLAT/uv/tools}"
 UV_PYTHON_INSTALL_DIR="${UV_PYTHON_INSTALL_DIR:-$LOCAL_PLAT/uv/python}"
 
-export PLAT LOCAL_PLAT NVM_DIR RUSTUP_HOME CARGO_HOME VENV \
-       UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR
+# nvm: node version manager — installed per-PLAT so arch-specific node binaries
+# don't collide across machines sharing an NFS home directory.
+NVM_DIR="${NVM_DIR:-$LOCAL_PLAT/nvm}"
+
+# Nix: ~/.nix-profile is a symlink into /nix/store — it must be PLAT-specific
+# because /nix/store is machine-local and the symlink target doesn't exist on
+# the other arch's machine. NIX_PROFILE is respected by both nix and home-manager.
+NIX_PROFILE="${NIX_PROFILE:-$LOCAL_PLAT/nix-profile}"
+
+export PLAT LOCAL_PLAT RUSTUP_HOME CARGO_HOME VENV \
+       UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR \
+       NVM_DIR NIX_PROFILE
 
 # Install scripts clone public repos and must not be affected by the user's
 # gitconfig (which may have url.insteadOf SSH rewrites, breaking clones on

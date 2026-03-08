@@ -7,6 +7,7 @@
 setup() {
     PLAT="$(uname -m)-$(uname -s)"
     LOCAL_PLAT="$HOME/.local/$PLAT"
+    NVM_DIR="$LOCAL_PLAT/nvm"
 }
 
 # --- PLAT sanity ---
@@ -61,15 +62,22 @@ setup() {
     [[ "$NVM_DIR" == "$LOCAL_PLAT/nvm" ]]
 }
 
-@test "nvm.sh exists at NVM_DIR" {
+@test "nvm is installed under PLAT" {
     [[ -s "$NVM_DIR/nvm.sh" ]]
 }
 
-@test "node is installed under NVM_DIR" {
-    # node binary lives at NVM_DIR/versions/node/<ver>/bin/node
-    local found
-    found="$(find "$NVM_DIR/versions" -name "node" -type f 2>/dev/null | head -1)"
-    [[ -x "$found" ]]
+@test "nvm default is node v25" {
+    # shellcheck source=/dev/null
+    source "$NVM_DIR/nvm.sh"
+    nvm use default --silent
+    [[ "$(node --version)" =~ ^v25\. ]]
+}
+
+@test "npm is available via nvm" {
+    # shellcheck source=/dev/null
+    source "$NVM_DIR/nvm.sh"
+    nvm use default --silent
+    command -v npm >/dev/null
 }
 
 @test "nvm is NOT installed at legacy ~/.nvm path" {

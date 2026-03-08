@@ -11,7 +11,7 @@
 
   outputs = { nixpkgs, home-manager, ... }:
     let
-      systems = [ "x86_64-linux" "aarch64-linux" ];
+      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
     in {
       homeConfigurations = forAllSystems (system:

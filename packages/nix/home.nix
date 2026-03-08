@@ -1,9 +1,5 @@
 { config, pkgs, lib, ... }:
 
-let
-  # Detect architecture
-  isAarch64 = pkgs.stdenv.isAarch64;
-in
 {
   home.username = builtins.getEnv "USER";
   home.homeDirectory = builtins.getEnv "HOME";
@@ -28,12 +24,21 @@ in
     ripgrep
     fd
     bat
+    bat-extras.batdiff
+    bat-extras.batgrep
+    bat-extras.batman
+    bat-extras.batwatch
     tree
     sd
     ncdu
+    ast-grep
 
     # JSON & Data
     jq
+
+    # Media
+    mpv
+    imagemagick
 
     # CLI utilities
     wget
@@ -41,24 +46,28 @@ in
     less
     rlwrap
     cloc
-    imagemagick
     fastfetch
+    lynx
 
     # Monitoring
     htop
     btop
+    bottom
+    glances
 
     # Editors
     neovim
 
-    # Rust toolchain (via rustup, not nix)
-    # rustup
+    # Build
+    fftw
+    jdk
 
-    # Node (via mise, not nix)
-    # nodejs
-
-    # Python (via mise, not nix)
-    # python3
+    # Containers (CLI tools only — daemon/service managed separately)
+    docker-client
+    podman
+  ] ++ lib.optionals pkgs.stdenv.isLinux [
+    # Linux-only: qemu (macOS uses UTM/Homebrew)
+    qemu
   ];
 
   programs.zsh = {

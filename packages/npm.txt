@@ -1,0 +1,7 @@
+# npm.txt - global npm packages
+# Usage: install/npm.sh reads this file
+# Install manually: npm install -g <package>
+
+# AI coding agents
+@anthropic-ai/claude-code
+@openai/codex

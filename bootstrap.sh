@@ -12,13 +12,14 @@
 #   GITHUB_REPO      — override the source repo (default: cadebrown/dotfiles)
 #   CHEZMOI_NAME     — pre-seed display name (skips interactive prompt)
 #   CHEZMOI_EMAIL    — pre-seed email (skips interactive prompt)
-#   INSTALL_PACKAGES — set to 0 to skip OS package install (Homebrew / Nix)
+#   INSTALL_PACKAGES — set to 0 to skip package install (Homebrew on macOS/Linux)
 #   INSTALL_SERVICES — set to 0 to skip auto-start service registration
 #   INSTALL_ZSH      — set to 0 to skip oh-my-zsh + plugins install
-#   INSTALL_NODE     — set to 0 to skip Node (nvm) install
+#   INSTALL_NODE     — set to 0 to skip Node install
+#   INSTALL_NPM      — set to 0 to skip global npm packages (claude-code, codex, etc.)
 #   INSTALL_RUST     — set to 0 to skip Rust install
 #   INSTALL_PYTHON   — set to 0 to skip Python install
-#   INSTALL_CLAUDE   — set to 0 to skip Claude plugin install
+#   INSTALL_CLAUDE   — set to 0 to skip Claude Code plugins install
 
 set -euo pipefail
 
@@ -118,17 +119,22 @@ fi
 
 ### 4. packages ###
 
-log_section "4 — packages"
+log_section "4 — packages (Homebrew)"
 
 if [[ "${INSTALL_PACKAGES:-1}" != "0" ]]; then
     case "$OS" in
         darwin)
-            log_info "macOS — installing Homebrew packages"
+            log_info "macOS — Homebrew (native bottles)"
             bash "$INSTALL_DIR/homebrew.sh"
             ;;
         linux)
-            log_info "Linux — installing Nix packages"
-            bash "$INSTALL_DIR/nix.sh"
+            log_info "Linux — Homebrew in manylinux_2_17 container (glibc 2.17)"
+            bash "$INSTALL_DIR/linux-packages.sh"
+            # Activate brew for the rest of this bootstrap session
+            BREW_BIN="$LOCAL_PLAT/brew/bin/brew"
+            if [[ -x "$BREW_BIN" ]]; then
+                eval "$("$BREW_BIN" shellenv)"
+            fi
             ;;
         *)
             log_warn "Unknown OS '$OS' — skipping package install"
@@ -154,8 +160,17 @@ log_section "6 — language runtimes"
 
 if [[ "${INSTALL_NODE:-1}" != "0" ]]; then
     bash "$INSTALL_DIR/node.sh"
+    # Activate nvm for the rest of this bootstrap session so npm.sh can use it
+    # shellcheck source=/dev/null
+    [[ -s "$LOCAL_PLAT/nvm/nvm.sh" ]] && source "$LOCAL_PLAT/nvm/nvm.sh" && nvm use default --silent 2>/dev/null || true
 else
     log_info "Skipping Node (INSTALL_NODE=0)"
+fi
+
+if [[ "${INSTALL_NPM:-1}" != "0" ]]; then
+    bash "$INSTALL_DIR/npm.sh"
+else
+    log_info "Skipping npm packages (INSTALL_NPM=0)"
 fi
 
 if [[ "${INSTALL_RUST:-1}" != "0" ]]; then

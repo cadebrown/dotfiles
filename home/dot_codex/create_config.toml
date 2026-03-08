@@ -1,0 +1,15 @@
+model = "gpt-5.4"
+model_reasoning_effort = "medium"
+
+web_search = "live"
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"
+
+[sandbox_workspace_write]
+writable_roots = []
+network_access = true
+exclude_tmpdir_env_var = false
+exclude_slash_tmp = false
+
+# Project trust levels are added here by codex at runtime — not managed by chezmoi.
+# (chezmoi uses create_ prefix for this file: written once, never overwritten)

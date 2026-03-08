@@ -1,95 +1,113 @@
-# Brewfile - declarative macOS package list
-# Usage: brew bundle --file=~/dotfiles/packages/Brewfile
+# Brewfile - packages managed by Homebrew on macOS and Linux
+#
+# on_macos blocks: casks and macOS-specific services (skipped on Linux)
+# Everything else: cross-platform CLI tools compiled from source on Linux
+#
+# Usage:
+#   macOS: brew bundle --file=~/dotfiles/packages/Brewfile
+#   Linux: see install/linux-packages.sh (runs brew bundle inside a container)
 
-### Terminal & Shell ###
-cask "ghostty"
-cask "iterm2"
+### Runtime ###
+brew "node"
 
-### Editors & IDEs ###
-cask "visual-studio-code"
-cask "cursor"
-
-### Window Management ###
-cask "nikitabobko/tap/aerospace"
-cask "linearmouse"
-
-### Productivity ###
-cask "alfred"
-cask "the-unarchiver"
-
-### Browsers ###
-cask "firefox"
-
-### Media ###
-brew "mpv"
-cask "vlc"
-cask "gimp"
-cask "inkscape"
-cask "spotify"
-cask "obs"
-cask "blender"
-
-### Documents ###
-cask "mactex"
-cask "libreoffice"
-
-### Games ###
-cask "openemu"
-cask "retroarch"
-cask "nestopia"
-
-### Dev Tools - VMs & Containers ###
-brew "docker"
-brew "colima"
-brew "podman"
-brew "qemu"
-cask "utm"
-
-### Dev Tools - Git ###
+### Git ###
 brew "git"
 brew "git-lfs"
 brew "git-delta"
 brew "difftastic"
 
-### Dev Tools - Search & Files ###
+### Search & Files ###
+brew "ripgrep"
 brew "fd"
 brew "sd"
-brew "jq"
-brew "ripgrep"
-brew "fzf"
-brew "tree"
-brew "ncdu"
 brew "bat"
 brew "bat-extras"
 brew "ast-grep"
+brew "tree"
+brew "ncdu"
+brew "fzf"
+brew "jq"
+brew "zoxide"
+brew "direnv"
 
-### Dev Tools - CLI Utilities ###
+### CLI Utilities ###
 brew "wget"
 brew "curl"
-brew "fetch"
 brew "less"
 brew "rlwrap"
 brew "cloc"
 brew "imagemagick"
 brew "fastfetch"
+brew "lynx"
 
-### Dev Tools - Monitoring ###
+### Monitoring ###
 brew "htop"
 brew "btop"
 brew "bottom"
 brew "glances"
 
-### Dev Tools - Networking ###
-brew "openssh"
-brew "lynx"
-
-### Dev Tools - Build ###
+### Build ###
 brew "fftw"
 brew "openjdk"
+brew "openssh"
 
-### Fonts ###
-cask "font-jetbrains-mono"
-cask "font-powerline-symbols"
+### Editors ###
+brew "neovim"
 
-### Utilities ###
-cask "balenaetcher"
+on_macos do
+  ### Media (macOS) ###
+  brew "mpv"
+
+  ### Dev Tools - VMs & Containers (macOS) ###
+  # colima/docker/podman managed here for `brew services start colima`
+  brew "colima"
+  brew "docker"
+  brew "podman"
+  brew "qemu"
+
+  ### Terminal & Shell ###
+  cask "ghostty"
+  cask "iterm2"
+
+  ### Editors & IDEs ###
+  cask "visual-studio-code"
+  cask "cursor"
+
+  ### Window Management ###
+  cask "nikitabobko/tap/aerospace"
+  cask "linearmouse"
+
+  ### Productivity ###
+  cask "alfred"
+  cask "the-unarchiver"
+
+  ### Browsers ###
+  cask "firefox"
+
+  ### Media ###
+  cask "vlc"
+  cask "gimp"
+  cask "inkscape"
+  cask "spotify"
+  cask "obs"
+  cask "blender"
+
+  ### Documents ###
+  cask "mactex"
+  cask "libreoffice"
+
+  ### Games ###
+  cask "openemu"
+  cask "retroarch"
+  cask "nestopia"
+
+  ### VMs ###
+  cask "utm"
+
+  ### Fonts ###
+  cask "font-jetbrains-mono"
+  cask "font-powerline-symbols"
+
+  ### Utilities ###
+  cask "balenaetcher"
+end

@@ -50,19 +50,31 @@ fi
 
 ### NIX ###
 
-if [ -e "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
-    . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+# NIX_PROFILE is PLAT-specific so shared home directories work correctly across
+# architectures. ~/.nix-profile is a symlink into /nix/store, which is
+# machine-local — the target path doesn't exist on the other arch's machine.
+export NIX_PROFILE="$_LOCAL_PLAT/nix-profile"
+if [ -e "$NIX_PROFILE/etc/profile.d/nix.sh" ]; then
+    . "$NIX_PROFILE/etc/profile.d/nix.sh"
 fi
 
-### PLATFORM-SPECIFIC ###
-{{ if eq .chezmoi.os "darwin" -}}
+### HOMEBREW ###
 
-# Homebrew
+{{ if eq .chezmoi.os "darwin" -}}
 if [ -e "$HOME/.homebrew" ]; then
     eval "$(~/.homebrew/bin/brew shellenv)"
 elif [ -e "/opt/homebrew" ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
+{{ else -}}
+# Linux: Homebrew compiled against glibc 2.17 for portability, installed per-PLAT
+if [ -x "$_LOCAL_PLAT/brew/bin/brew" ]; then
+    eval "$($_LOCAL_PLAT/brew/bin/brew shellenv)"
+fi
+{{ end -}}
+
+### PLATFORM-SPECIFIC ###
+{{ if eq .chezmoi.os "darwin" -}}
 
 # Colima: point Docker CLI at colima's socket (avoids needing Docker Desktop)
 if [ -S "$HOME/.colima/default/docker.sock" ]; then

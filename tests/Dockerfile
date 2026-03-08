@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     git \
     zsh \
     ca-certificates \
+    libatomic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install bats-core from source (system package is often outdated)

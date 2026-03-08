@@ -16,7 +16,7 @@ REPO_ROOT="$(dirname "$TESTS_DIR")"
 
 if [[ "${DOCKER_BUILD:-1}" != "0" ]]; then
     echo "==> Building test image"
-    docker build -t dotfiles-test "$TESTS_DIR"
+    docker buildx build --load -t dotfiles-test "$TESTS_DIR"
 fi
 
 echo "==> Running tests"

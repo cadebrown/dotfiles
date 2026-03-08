@@ -103,7 +103,7 @@ setup() {
     [[ "$output" =~ ^cargo\ [0-9] ]]
 }
 
-@test "node is callable after sourcing zprofile (via nvm)" {
+@test "node is callable after sourcing zprofile" {
     run zsh --no-rcs -c "$ZSH_SOURCE; node --version"
     [ "$status" -eq 0 ]
     [[ "$output" =~ ^v[0-9] ]]
