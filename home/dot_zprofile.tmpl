@@ -16,15 +16,38 @@ export USE_CCACHE=ON
 # Used to isolate compiled binaries in shared home directories (e.g. NFS mounts
 # shared across x86_64 and aarch64 machines — each gets its own binary paths).
 export _PLAT="$(uname -m)-$(uname -s)"
-
 export _LOCAL_PLAT="$HOME/.local/$_PLAT"
+
+### HOMEBREW ###
+# Source Homebrew first so PLAT paths can prepend on top of it.
+
+{{ if eq .chezmoi.os "darwin" -}}
+if [ -e "$HOME/.homebrew" ]; then
+    eval "$(~/.homebrew/bin/brew shellenv)"
+elif [ -e "/opt/homebrew" ]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+{{ else -}}
+# Linux: Homebrew compiled against glibc 2.17 for portability, installed per-PLAT
+if [ -x "$_LOCAL_PLAT/brew/bin/brew" ]; then
+    eval "$($_LOCAL_PLAT/brew/bin/brew shellenv)"
+fi
+{{ end -}}
+
+### PLAT PATHS ###
+# These go after Homebrew so PLAT-installed tools take priority.
+
 export PATH="$_LOCAL_PLAT/bin:$HOME/.local/bin:$PATH"
 
-### NODE (nvm) ###
+### NODE (nvm — lazy loaded via oh-my-zsh plugin in .zshrc) ###
 
 export NVM_DIR="$_LOCAL_PLAT/nvm"
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-    . "$NVM_DIR/nvm.sh"
+# Add default node to PATH for non-interactive shells (scripts, CI).
+# The full nvm is lazy-loaded in .zshrc for interactive use.
+if [ -d "$NVM_DIR/versions/node" ]; then
+    _nvm_default_bin="$NVM_DIR/versions/node/$(ls "$NVM_DIR/versions/node/" | sort -V | tail -1)/bin"
+    [ -d "$_nvm_default_bin" ] && export PATH="$_nvm_default_bin:$PATH"
+    unset _nvm_default_bin
 fi
 
 ### RUST ###
@@ -57,21 +80,6 @@ export NIX_PROFILE="$_LOCAL_PLAT/nix-profile"
 if [ -e "$NIX_PROFILE/etc/profile.d/nix.sh" ]; then
     . "$NIX_PROFILE/etc/profile.d/nix.sh"
 fi
-
-### HOMEBREW ###
-
-{{ if eq .chezmoi.os "darwin" -}}
-if [ -e "$HOME/.homebrew" ]; then
-    eval "$(~/.homebrew/bin/brew shellenv)"
-elif [ -e "/opt/homebrew" ]; then
-    eval "$(/opt/homebrew/bin/brew shellenv)"
-fi
-{{ else -}}
-# Linux: Homebrew compiled against glibc 2.17 for portability, installed per-PLAT
-if [ -x "$_LOCAL_PLAT/brew/bin/brew" ]; then
-    eval "$($_LOCAL_PLAT/brew/bin/brew shellenv)"
-fi
-{{ end -}}
 
 ### PLATFORM-SPECIFIC ###
 {{ if eq .chezmoi.os "darwin" -}}

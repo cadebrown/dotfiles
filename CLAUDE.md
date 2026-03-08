@@ -65,7 +65,7 @@ dotfiles/
 │   ├── linux-packages.sh      # Linux: brew bundle inside manylinux_2_17 container
 │   ├── zsh.sh                 # oh-my-zsh + plugins (pure, autosuggestions, fsh, completions)
 │   ├── services.sh            # macOS: register colima as login service
-│   ├── node.sh                # Node.js binary install → $LOCAL_PLAT/node/ (Linux only)
+│   ├── node.sh                # nvm + Node.js → $LOCAL_PLAT/nvm/
 │   ├── rust.sh                # rustup + cargo installs from packages/cargo.txt
 │   ├── python.sh              # uv + venv + pip installs from packages/pip.txt
 │   ├── npm.sh                 # Global npm packages from packages/npm.txt
@@ -101,6 +101,7 @@ Every install script sources `_lib.sh` first. It defines all PLAT paths as varia
 | `ARCH_BIN` | `$LOCAL_PLAT/bin` | chezmoi, uv, uvx |
 | `RUSTUP_HOME` | `$LOCAL_PLAT/rustup` | Rust toolchain |
 | `CARGO_HOME` | `$LOCAL_PLAT/cargo` | Cargo (bins at `cargo/bin/`) |
+| `NVM_DIR` | `$LOCAL_PLAT/nvm` | nvm + Node.js versions |
 | `VENV` | `$LOCAL_PLAT/venv` | Python virtualenv |
 | `NIX_PROFILE` | `$LOCAL_PLAT/nix-profile` | Nix profile (if used) |
 | `UV_TOOL_BIN_DIR` | `$LOCAL_PLAT/bin` | uv tool binaries |
@@ -115,6 +116,45 @@ without SSH keys configured.
 
 **If you add a new tool with compiled binaries, its install path must be under
 `$LOCAL_PLAT/` and the variable must be defined in `_lib.sh`.**
+
+---
+
+## PATH priority
+
+`.zprofile` sources Homebrew first, then prepends PLAT paths on top. The resulting
+order ensures PLAT-installed tools always win over Homebrew equivalents:
+
+```
+$LOCAL_PLAT/venv/bin          ← Python venv (highest priority)
+$LOCAL_PLAT/cargo/bin         ← Rust cargo tools (fd, sd, zoxide, etc.)
+$LOCAL_PLAT/nvm/.../bin       ← Node.js via nvm
+$LOCAL_PLAT/bin               ← chezmoi, uv, uvx
+~/.local/bin                  ← arch-neutral scripts
+/opt/homebrew/bin             ← Homebrew (macOS)
+/usr/bin                      ← system
+```
+
+**Do not install the same tool via both Homebrew and cargo/npm.** If a tool is in
+`packages/cargo.txt`, remove it from `packages/Brewfile` (and vice versa). PLAT
+paths win on PATH, but duplicates waste install time and disk.
+
+---
+
+## nvm lazy loading
+
+nvm.sh is ~6000 lines of bash. Sourcing it at login adds ~400ms to shell startup.
+Instead, we use a two-layer approach:
+
+1. **`.zprofile`** — adds the latest installed node binary dir to PATH directly
+   (`ls $NVM_DIR/versions/node/ | sort -V | tail -1`). This makes `node`/`npm`
+   available in non-interactive shells (scripts, CI) with zero nvm overhead.
+
+2. **`.zshrc`** — enables the oh-my-zsh `nvm` plugin with `lazy yes`. This creates
+   stub functions for `nvm`/`node`/`npm`/`npx` that source the real `nvm.sh` on
+   first use. In interactive shells, the stub overrides the PATH-based node, so
+   `nvm use` works correctly.
+
+Result: **~0.14s** shell startup (down from ~1.1s with eager nvm loading).
 
 ---
 
@@ -259,6 +299,10 @@ The `.chezmoi.toml.tmpl` prompts for `name` and `email` on first init via
 
 - **Don't use `~/.nvm`, `~/.rustup`, `~/.cargo` paths** — all legacy paths.
   Everything is under `$LOCAL_PLAT/`.
+
+- **Don't install the same tool via both Homebrew and cargo/npm.** PLAT paths
+  win on PATH, but duplicates waste install time. If it's in `cargo.txt`,
+  remove it from `Brewfile`.
 
 - **Don't modify `.zshrc` or `.zprofile` directly** — chezmoi manages them.
   Run `chezmoi edit ~/.zshrc` or edit `home/dot_zshrc.tmpl`.

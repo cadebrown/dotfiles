@@ -25,13 +25,14 @@ export ZSH="$HOME/.oh-my-zsh"
 export ZSH_CUSTOM="$HOME/.oh-my-zsh-custom"
 export ZSH_THEME=""  # empty = use custom prompt (pure)
 
-# zsh-completions: extend fpath before compinit runs
+# zsh-completions: extend fpath before compinit runs (oh-my-zsh calls compinit)
 fpath+=("$ZSH_CUSTOM/plugins/zsh-completions/src")
 
-autoload -Uz compinit && compinit
-autoload -Uz bashcompinit && bashcompinit
+# nvm: lazy-load so sourcing the ~4000 line nvm.sh doesn't hit startup time.
+# Creates stub functions for nvm/node/npm/npx that source nvm on first use.
+zstyle ':omz:plugins:nvm' lazy yes
 
-plugins=(z git direnv colorize zsh-autosuggestions fast-syntax-highlighting)
+plugins=(z git nvm direnv colorize zsh-autosuggestions fast-syntax-highlighting)
 
 if [ -f "$ZSH/oh-my-zsh.sh" ]; then
     source "$ZSH/oh-my-zsh.sh"

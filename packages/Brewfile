@@ -24,8 +24,7 @@ brew "gh"
 
 ### Search & Files ###
 brew "ripgrep"
-brew "fd"
-brew "sd"
+# fd, sd, zoxide installed via cargo (packages/cargo.txt) — no Homebrew dupe
 brew "bat"
 brew "bat-extras"
 brew "ast-grep"
@@ -33,7 +32,6 @@ brew "tree"
 brew "ncdu"
 brew "fzf"
 brew "jq"
-brew "zoxide"
 brew "direnv"
 
 ### CLI Utilities ###
