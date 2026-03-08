@@ -7,14 +7,20 @@
 #   macOS: brew bundle --file=~/dotfiles/packages/Brewfile
 #   Linux: see install/linux-packages.sh (runs brew bundle inside a container)
 
-### Runtime ###
-brew "node"
+### Shells ###
+brew "zsh"
+brew "bash"
+
+### Editors ###
+brew "vim"
+brew "neovim"
 
 ### Git ###
 brew "git"
 brew "git-lfs"
 brew "git-delta"
 brew "difftastic"
+brew "gh"
 
 ### Search & Files ###
 brew "ripgrep"
@@ -39,6 +45,11 @@ brew "cloc"
 brew "imagemagick"
 brew "fastfetch"
 brew "lynx"
+brew "tmux"
+brew "moreutils"
+
+### Media ###
+brew "ffmpeg"
 
 ### Monitoring ###
 brew "htop"
@@ -46,26 +57,23 @@ brew "btop"
 brew "bottom"
 brew "glances"
 
-### Build ###
+### Build Tools ###
+brew "cmake"
+brew "ninja"
+brew "meson"
+brew "llvm"
 brew "fftw"
 brew "openjdk"
 brew "openssh"
 
-### Editors ###
-brew "neovim"
-
 on_macos do
-  ### Media (macOS) ###
-  brew "mpv"
-
   ### Dev Tools - VMs & Containers (macOS) ###
-  # colima/docker/podman managed here for `brew services start colima`
   brew "colima"
   brew "docker"
   brew "podman"
   brew "qemu"
 
-  ### Terminal & Shell ###
+  ### Terminal ###
   cask "ghostty"
   cask "iterm2"
 
@@ -76,6 +84,7 @@ on_macos do
   ### Window Management ###
   cask "nikitabobko/tap/aerospace"
   cask "linearmouse"
+  cask "jordanbaird-ice"
 
   ### Productivity ###
   cask "alfred"
@@ -85,6 +94,7 @@ on_macos do
   cask "firefox"
 
   ### Media ###
+  brew "mpv"
   cask "vlc"
   cask "gimp"
   cask "inkscape"
@@ -100,6 +110,9 @@ on_macos do
   cask "openemu"
   cask "retroarch"
   cask "nestopia"
+  cask "slippi-dolphin"
+  cask "steam"
+  cask "prismlauncher"
 
   ### VMs ###
   cask "utm"
