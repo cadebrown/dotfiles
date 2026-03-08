@@ -95,7 +95,6 @@ if OS.mac?
 
   ### Terminal ###
   cask "ghostty"
-  cask "warp"
   cask "tabby"
 
   ### Editors & IDEs ###
@@ -112,7 +111,6 @@ if OS.mac?
   ### Productivity ###
   cask "alfred"
   cask "the-unarchiver"
-  cask "notion"
 
   ### Browsers ###
   cask "firefox"
@@ -149,6 +147,5 @@ if OS.mac?
 
   ### Utilities ###
   cask "balenaetcher"
-  cask "antigravity"
 end
 
