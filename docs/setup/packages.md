@@ -42,6 +42,18 @@ Follow this priority order:
 - **pip.txt in a venv** — a single activated venv for interactive/scripting use. Project-specific envs are handled by `uv` separately.
 - **Claude plugins** — `claude plugin install` has its own registry; these aren't npm or Homebrew packages.
 
+## cargo vs Homebrew for the same tool
+
+Some tools exist in both Homebrew and crates.io. Prefer `cargo.txt` when:
+
+- The tool is a Rust crate (faster to install from source than to pour a bottle on Linux)
+- PLAT isolation matters — `$CARGO_HOME/bin` is already under `$LOCAL_PLAT`, so cargo tools are automatically arch-specific without extra configuration
+- The Homebrew formula is a wrapper that just calls `cargo install` anyway
+
+Current tools intentionally kept in `cargo.txt` instead of Brewfile: `fd`, `sd`, `zoxide`.
+
+**Do not install the same tool in both places** — PLAT paths win on PATH, so you'd waste disk and install time on the Homebrew copy without it ever being used.
+
 ## Updating packages
 
 Re-run the relevant script after editing the file:

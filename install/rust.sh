@@ -11,7 +11,10 @@ log_section "Rust"
 ### rustup ###
 
 # Check for rustup proxies in PLAT cargo/bin — not just any rustup on PATH.
-# Homebrew's rustup won't create proxies in $CARGO_HOME/bin, so we need our own.
+# rustup installs "proxy" binaries (cargo, rustc, rust-analyzer, etc.) into
+# $CARGO_HOME/bin that delegate to the active toolchain. Homebrew's rustup
+# formula puts these proxies in /opt/homebrew/bin instead of $CARGO_HOME/bin,
+# breaking PLAT isolation — so we always install rustup-init directly.
 if [[ -x "$CARGO_HOME/bin/rustup" ]]; then
     log_ok "rustup already installed: $("$CARGO_HOME/bin/rustup" --version 2>&1)"
     log_info "Updating stable toolchain"

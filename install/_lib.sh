@@ -33,7 +33,9 @@ OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 [[ "$OS" == "darwin" ]] && OS="darwin" || OS="linux"
 
 ARCH="$(uname -m)"
-[[ "$ARCH" == "arm64" ]] && ARCH="aarch64"  # normalize macOS arm64
+# Normalize to aarch64: macOS reports arm64, Linux reports aarch64 for the same ISA.
+# Using aarch64 everywhere avoids per-OS conditionals in install scripts.
+[[ "$ARCH" == "arm64" ]] && ARCH="aarch64"
 
 LOCAL_PLAT="$HOME/.local/$PLAT"
 ARCH_BIN="$LOCAL_PLAT/bin"

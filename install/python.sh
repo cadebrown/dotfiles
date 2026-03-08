@@ -27,6 +27,9 @@ if [[ -d "$VENV" ]]; then
     log_ok "~/.venv already exists"
 else
     log_info "Creating ~/.venv"
+    # --seed: pre-install pip + setuptools into the venv.
+    # Without it, uv creates a bare venv with no pip, which breaks `pip install`
+    # and tools that expect pip to exist (e.g. some build systems).
     run_logged uv venv "$VENV" --seed
     log_ok "~/.venv created"
 fi
@@ -37,5 +40,7 @@ PIP_TXT="$PACKAGES_DIR/pip.txt"
 [[ -f "$PIP_TXT" ]] || { log_warn "No pip.txt at $PIP_TXT — skipping"; exit 0; }
 
 log_info "Syncing packages from pip.txt"
+# --python $VENV/bin/python: explicit path so uv targets the PLAT venv even when
+# another Python is active (e.g. if the system python is higher on PATH).
 run_logged uv pip install --python "$VENV/bin/python" -r "$PIP_TXT"
 log_ok "Python packages up to date"

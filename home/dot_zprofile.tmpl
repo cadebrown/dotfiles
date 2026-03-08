@@ -5,10 +5,10 @@
 export LANG=en_US.UTF-8
 export BROWSER='lynx'
 
-export CMAKE_EXPORT_COMPILE_COMMANDS=1
-export CMAKE_COLOR_DIAGNOSTICS=ON
-export CLICOLOR_FORCE=1
-export USE_CCACHE=ON
+export CMAKE_EXPORT_COMPILE_COMMANDS=1  # write compile_commands.json for clangd/LSP
+export CMAKE_COLOR_DIAGNOSTICS=ON       # colored compiler output even when piped
+export CLICOLOR_FORCE=1                 # force color output in ls/grep/etc when piped
+export USE_CCACHE=ON                    # enable ccache in CMake projects that check this
 
 ### PLATFORM ###
 
@@ -45,6 +45,10 @@ export NVM_DIR="$_LOCAL_PLAT/nvm"
 # Add default node to PATH for non-interactive shells (scripts, CI).
 # The full nvm is lazy-loaded in .zshrc for interactive use.
 if [ -d "$NVM_DIR/versions/node" ]; then
+    # Pick the highest installed node version using version-sort (sort -V).
+    # This makes `node`/`npm` available in non-interactive shells (scripts, CI)
+    # without sourcing the full nvm.sh (~4000 lines). The omz nvm plugin in
+    # .zshrc overrides this in interactive shells so `nvm use` works correctly.
     _nvm_default_bin="$NVM_DIR/versions/node/$(ls "$NVM_DIR/versions/node/" | sort -V | tail -1)/bin"
     [ -d "$_nvm_default_bin" ] && export PATH="$_nvm_default_bin:$PATH"
     unset _nvm_default_bin
@@ -136,6 +140,9 @@ function docker() { /usr/bin/docker "$@"; }
 
 ### SSH AGENT ###
 
+# Start ssh-agent only for local sessions — remote sessions rely on agent forwarding.
+# SSH_CLIENT / SSH_TTY are set by sshd when connecting remotely.
+# SSH_AUTH_SOCK check prevents starting a second agent in a subshell or tmux.
 if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
     : # remote session — agent forwarding handles it
 else

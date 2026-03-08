@@ -2,22 +2,31 @@
 
 ### ZSH OPTIONS ###
 
-setopt MENU_COMPLETE
-setopt EXTENDED_HISTORY
-setopt HIST_IGNORE_DUPS
-setopt HIST_LEX_WORDS
-setopt HIST_REDUCE_BLANKS
-setopt SHARE_HISTORY
-setopt APPEND_HISTORY
-setopt HIST_EXPIRE_DUPS_FIRST
-setopt HIST_IGNORE_SPACE
-setopt EXTENDED_GLOB
-setopt NUMERIC_GLOB_SORT
-setopt GLOB_STAR_SHORT
-setopt C_BASES
-setopt C_PRECEDENCES
-setopt RM_STAR_SILENT
-setopt CHASE_LINKS
+# Completion
+setopt MENU_COMPLETE        # tab cycles through completion menu (no ambiguous list)
+
+# History: deduplication, formatting, cross-session sharing
+setopt EXTENDED_HISTORY     # record timestamp + duration in history file
+setopt HIST_IGNORE_DUPS     # don't record consecutive duplicate commands
+setopt HIST_LEX_WORDS       # use shell quoting when writing history entries
+setopt HIST_REDUCE_BLANKS   # strip redundant whitespace from history entries
+setopt SHARE_HISTORY        # share history across all open sessions in real time
+setopt APPEND_HISTORY       # append rather than overwrite history file on exit
+setopt HIST_EXPIRE_DUPS_FIRST  # evict duplicates first when history file is full
+setopt HIST_IGNORE_SPACE    # don't record commands prefixed with a space (private cmds)
+
+# Globbing
+setopt EXTENDED_GLOB        # enable #, ~, ^ glob operators
+setopt NUMERIC_GLOB_SORT    # sort file names with embedded numbers numerically
+setopt GLOB_STAR_SHORT      # ** expands without requiring trailing / (like bash globstar)
+
+# Arithmetic
+setopt C_BASES              # print hex/octal literals in C notation (0x1F, 017)
+setopt C_PRECEDENCES        # arithmetic uses C operator precedence rules
+
+# Misc
+setopt RM_STAR_SILENT       # skip "are you sure?" for rm * (deliberate: trust yourself)
+setopt CHASE_LINKS          # resolve symlinks in cd/pwd so $PWD shows the real path
 
 ### OH-MY-ZSH ###
 
@@ -32,6 +41,13 @@ fpath+=("$ZSH_CUSTOM/plugins/zsh-completions/src")
 # Creates stub functions for nvm/node/npm/npx that source nvm on first use.
 zstyle ':omz:plugins:nvm' lazy yes
 
+# z: jump to frecent directories (tracks usage, `z foo` → cd to best match)
+# git: git aliases and prompt helpers (used by pure theme)
+# nvm: lazy-load stub (configured above via zstyle)
+# direnv: hook into chpwd to load/unload .envrc per directory
+# colorize: syntax-highlight file output via `ccat` / `cless`
+# zsh-autosuggestions: ghost-text history suggestions as you type
+# fast-syntax-highlighting: real-time command-line syntax highlighting
 plugins=(z git nvm direnv colorize zsh-autosuggestions fast-syntax-highlighting)
 
 if [ -f "$ZSH/oh-my-zsh.sh" ]; then

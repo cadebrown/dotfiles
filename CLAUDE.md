@@ -70,8 +70,8 @@ dotfiles/
 │   ├── rust.sh                # rustup + cargo installs from packages/cargo.txt
 │   ├── python.sh              # uv + venv + pip installs from packages/pip.txt
 │   ├── npm.sh                 # Global npm packages from packages/npm.txt
-│   ├── claude.sh              # Claude Code plugins from packages/claude-plugins.txt
-│   └── nix.sh                 # Optional: Nix + home-manager (requires /nix on root FS)
+│   ├── claude.sh              # Claude Code: Linux native binary + plugins (macOS: Homebrew cask)
+│   └── nix.sh                 # Optional: Nix + home-manager (NOT called by bootstrap.sh — run manually)
 │
 ├── docs/                      # mdBook documentation
 │   ├── intro.md
@@ -322,3 +322,29 @@ The `.chezmoi.toml.tmpl` prompts for `name` and `email` on first init via
 - **`GIT_CONFIG_GLOBAL=/dev/null`** is set by `_lib.sh` for all install scripts.
   This is intentional — it prevents `url.insteadOf` SSH rewrites from breaking
   curl-based installers on machines without SSH keys.
+
+---
+
+## Troubleshooting
+
+**Tool not found after bootstrap**
+Check which PLAT the shell resolved:
+```sh
+echo "$_PLAT"                      # should match the machine's arch+OS
+ls ~/.local/$_PLAT/bin/            # chezmoi, uv, claude should be here
+ls ~/.local/$_PLAT/cargo/bin/      # fd, sd, zoxide, etc.
+which fd                           # should point into ~/.local/$_PLAT/
+```
+If PLAT is wrong, it means `~/.zprofile` wasn't sourced (e.g. non-login shell). Source it manually or re-open a login shell.
+
+**`nvm` not available in scripts or CI**
+`nvm.sh` is lazy-loaded in interactive shells only. Non-interactive shells get `node`/`npm` via the PATH entry `.zprofile` adds from the latest installed version dir. If `node` is missing in a script, make sure `~/.zprofile` is sourced or invoke node by its full path: `$NVM_DIR/versions/node/$(ls $NVM_DIR/versions/node | sort -V | tail -1)/bin/node`.
+
+**Homebrew on Linux: Docker/Podman not found**
+`linux-packages.sh` requires a container runtime. See [docs/setup/bootstrap.md](docs/setup/bootstrap.md) for rootless Docker and Podman setup instructions. Alternatively, skip with `INSTALL_PACKAGES=0` and install packages manually.
+
+**chezmoi keeps prompting for name/email**
+Values are cached in `~/.config/chezmoi/chezmoi.toml`. To reset: `chezmoi init --data=false`. To pre-seed without prompts: `CHEZMOI_NAME="..." CHEZMOI_EMAIL="..." bootstrap.sh`.
+
+**Two machines fighting over `~/.zshrc` on a shared home**
+chezmoi templates must not use per-machine values (hostname, arch) that would make one machine's `chezmoi apply` overwrite settings for the other. All arch-specific state goes under `$LOCAL_PLAT/`; dotfiles stay arch-neutral. See `docs/setup/chezmoi.md` for the safety rule.

@@ -18,7 +18,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 if [[ "$OS" == "linux" ]]; then
     log_section "Claude Code CLI (Linux native binary)"
 
-    # Map our normalized arch to Anthropic's platform naming
+    # Map our normalized arch (aarch64/x86_64) to Anthropic's platform naming (arm64/x64).
+    # _lib.sh normalizes arm64→aarch64; here we reverse for the GCS path.
     case "$ARCH" in
         aarch64) _plat_arch="arm64" ;;
         x86_64)  _plat_arch="x64" ;;
