@@ -4,6 +4,7 @@
 
 export LANG=en_US.UTF-8
 export BROWSER='lynx'
+export EDITOR=vim
 
 export CMAKE_EXPORT_COMPILE_COMMANDS=1  # write compile_commands.json for clangd/LSP
 export CMAKE_COLOR_DIAGNOSTICS=ON       # colored compiler output even when piped
@@ -127,16 +128,18 @@ if [ -d "$HOME/ncu" ]; then
     export LD_LIBRARY_PATH="$HOME/ncu/lib64:$HOME/ncu/lib:$LD_LIBRARY_PATH"
 fi
 
-# Private credential files (e.g. ~/.nvidia.env)
-# (N): zsh null glob — expands to empty instead of erroring if no files match
-for f in "$HOME"/.*.env(N); do
-    . "$f"
-done
-
 # Docker: always use system docker on Linux
 function docker() { /usr/bin/docker "$@"; }
 
 {{ end -}}
+
+### CREDENTIALS ###
+
+# Private credential files (e.g. ~/.nvidia.env, ~/.work.env)
+# (N): zsh null glob — expands to empty instead of erroring if no files match
+for f in "$HOME"/.*.env(N); do
+    . "$f"
+done
 
 ### SSH AGENT ###
 

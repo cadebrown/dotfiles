@@ -35,6 +35,14 @@ ruff
 requests
 bs4
 
+# Visualization
+wordcloud
+opencv-python
+
+# ML/Scientific
+voila
+aesara
+
 # Build tools (Python bindings)
 cmake
 ninja

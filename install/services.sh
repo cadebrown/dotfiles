@@ -26,3 +26,17 @@ if has colima; then
 else
     log_warn "colima not found — skipping (run install/homebrew.sh first)"
 fi
+
+### iTerm2 ###
+# Point iTerm2 at ~/.iterm2 for its preferences (managed by chezmoi).
+# These defaults are idempotent — safe to re-run.
+
+if [[ -d "/Applications/iTerm.app" ]]; then
+    log_info "Configuring iTerm2 to load prefs from ~/.iterm2"
+    defaults write com.googlecode.iterm2.plist PrefsCustomFolder -string "$HOME/.iterm2"
+    defaults write com.googlecode.iterm2.plist LoadPrefsFromCustomFolder -bool true
+    defaults write com.googlecode.iterm2.plist "NoSyncNeverRemindPrefsChangesLostForFile_selection" -int 2
+    log_ok "iTerm2 prefs configured"
+else
+    log_info "iTerm2 not installed — skipping prefs setup"
+fi
