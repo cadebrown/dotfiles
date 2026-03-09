@@ -28,8 +28,8 @@ echo ""
 
 # INSTALL_NIX=0:     Nix requires /nix on the root filesystem, not available in Docker
 # INSTALL_PACKAGES=0: Homebrew Linux needs Docker-in-Docker, not available here
-# INSTALL_NPM=0:     Skips claude-code/codex install (slow, needs network/auth)
-# INSTALL_CLAUDE=0:  Skips plugins (no claude CLI without npm step)
+# INSTALL_NPM=0:     Global npm packages not needed for core dotfile tests
+# INSTALL_CLAUDE=0:  Claude plugins require a running claude binary + auth
 INSTALL_NIX=0 INSTALL_PACKAGES=0 INSTALL_NPM=0 INSTALL_CLAUDE=0 \
     bash "$DOTFILES/bootstrap.sh"
 
