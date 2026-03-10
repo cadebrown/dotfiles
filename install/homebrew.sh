@@ -39,7 +39,7 @@ else
     log_info "Installing missing Brewfile packages"
     # Non-fatal: a single cask download failure (e.g. slow mirror) should not
     # abort the entire bootstrap. Re-run homebrew.sh to retry failed packages.
-    run_logged brew bundle install --file="$BREWFILE" || log_warn "Some Brewfile packages failed — re-run: brew bundle install --file=$BREWFILE"
+    run_logged brew bundle install --no-upgrade --file="$BREWFILE" || log_warn "Some Brewfile packages failed — re-run: brew bundle install --no-upgrade --file=$BREWFILE"
 fi
 
 log_ok "Homebrew packages up to date"

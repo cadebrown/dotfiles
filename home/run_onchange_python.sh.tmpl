@@ -1,0 +1,7 @@
+#!/bin/bash
+# Chezmoi re-runs this script whenever pip.txt changes.
+# pip.txt hash: {{ include "../packages/pip.txt" | sha256sum }}
+
+set -euo pipefail
+DOTFILES="$CHEZMOI_SOURCE_DIR/.."
+bash "$DOTFILES/install/python.sh"

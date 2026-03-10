@@ -1,0 +1,9 @@
+#!/bin/bash
+# Chezmoi re-runs this script whenever Brewfile changes.
+# Brewfile hash: {{ include "../packages/Brewfile" | sha256sum }}
+
+set -euo pipefail
+# $CHEZMOI_SOURCE_DIR is set by chezmoi when running scripts (avoids nested
+# chezmoi invocation which would deadlock on the persistent state lock).
+DOTFILES="$CHEZMOI_SOURCE_DIR/.."
+bash "$DOTFILES/install/homebrew.sh"
