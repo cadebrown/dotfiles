@@ -78,7 +78,7 @@ if [[ -n "${CHEZMOI_NAME:-}" || -n "${CHEZMOI_EMAIL:-}" ]]; then
 fi
 
 # If we're running from inside the repo, use it as the source directly
-_REPO_HOME="$(dirname "${BASH_SOURCE[0]}")/home"
+_REPO_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/home"
 if [[ -d "$_REPO_HOME" ]]; then
     log_info "Using local repo at $_REPO_HOME"
     "$CHEZMOI_BIN" init --apply --source "$_REPO_HOME"
