@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # install/rust.sh - install rustup + cargo tools from cargo.txt
+#
+# macOS: uses Homebrew's rustup (code-signed, avoids macOS linker sandbox restrictions)
+# Linux: downloads rustup-init directly from sh.rustup.rs (no Homebrew)
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
@@ -10,34 +13,68 @@ log_section "Rust"
 
 ### rustup ###
 
-# Check for rustup proxies in PLAT cargo/bin — not just any rustup on PATH.
-# rustup installs "proxy" binaries (cargo, rustc, rust-analyzer, etc.) into
-# $CARGO_HOME/bin that delegate to the active toolchain. Homebrew's rustup
-# formula puts these proxies in /opt/homebrew/bin instead of $CARGO_HOME/bin,
-# breaking PLAT isolation — so we always install rustup-init directly.
-if [[ -x "$CARGO_HOME/bin/rustup" ]]; then
-    log_ok "rustup already installed: $("$CARGO_HOME/bin/rustup" --version 2>&1)"
-    log_info "Updating stable toolchain"
-    run_logged "$CARGO_HOME/bin/rustup" update stable --no-self-update
+if [[ "$OS" == "darwin" ]]; then
+    # macOS: Homebrew's rustup is code-signed, which is required for the macOS
+    # linker to open compiled object files (com.apple.provenance enforcement).
+    RUSTUP_INIT="/opt/homebrew/bin/rustup-init"
+    RUSTUP_BIN="/opt/homebrew/bin/rustup"
+
+    if [[ ! -x "$RUSTUP_BIN" ]]; then
+        log_warn "Homebrew rustup not found — run install/homebrew.sh first"
+        exit 1
+    fi
+
+    if [[ -x "$CARGO_HOME/bin/rustc" ]]; then
+        log_ok "Rust toolchain already in PLAT dir: $("$CARGO_HOME/bin/rustc" --version 2>/dev/null)"
+        log_info "Updating stable toolchain"
+        run_logged "$RUSTUP_BIN" update stable --no-self-update
+    else
+        log_info "Initializing Rust toolchain (Homebrew rustup) → $RUSTUP_HOME"
+        run_logged "$RUSTUP_INIT" -y --no-modify-path --default-toolchain stable
+        log_ok "rustup initialized"
+    fi
 else
-    log_info "Installing rustup → $CARGO_HOME/bin"
-    ensure_dir "$CARGO_HOME/bin"
-    _rustup_script="$(mktemp)"
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o "$_rustup_script"
-    run_logged bash "$_rustup_script" -y --no-modify-path --default-toolchain stable
-    rm -f "$_rustup_script"
-    log_ok "rustup installed"
+    # Linux: install rustup-init directly — Homebrew not available or not needed
+    if [[ -x "$CARGO_HOME/bin/rustup" ]]; then
+        log_ok "rustup already installed: $("$CARGO_HOME/bin/rustup" --version 2>&1)"
+        log_info "Updating stable toolchain"
+        run_logged "$CARGO_HOME/bin/rustup" update stable --no-self-update
+    else
+        log_info "Installing rustup → $CARGO_HOME/bin"
+        ensure_dir "$CARGO_HOME/bin"
+        _rustup_script="$(mktemp)"
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o "$_rustup_script"
+        run_logged bash "$_rustup_script" -y --no-modify-path --default-toolchain stable
+        rm -f "$_rustup_script"
+        log_ok "rustup installed"
+    fi
 fi
 
 # Ensure cargo is on PATH for this session
 export PATH="$CARGO_HOME/bin:$PATH"
+
+### cargo-binstall ###
+# cargo-binstall downloads pre-compiled binaries from GitHub releases when available,
+# falling back to `cargo install` (source compilation) otherwise.
+# This avoids slow compilation for common tools and works around macOS linker
+# sandbox restrictions in restricted shell environments.
+
+if cargo binstall --version &>/dev/null 2>&1; then
+    log_ok "cargo-binstall already installed: $(cargo binstall --version 2>/dev/null)"
+else
+    log_info "Installing cargo-binstall (pre-built binary)"
+    # Official installer: downloads a pre-built binary, no compilation needed
+    run_logged bash <(curl -L --proto '=https' --tlsv1.2 -sSf \
+        https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh)
+    log_ok "cargo-binstall installed"
+fi
 
 ### cargo tools ###
 
 CARGO_TXT="$PACKAGES_DIR/cargo.txt"
 [[ -f "$CARGO_TXT" ]] || { log_warn "No cargo.txt at $CARGO_TXT — skipping"; exit 0; }
 
-# Build a set of already-installed tools to avoid redundant recompiles
+# Build a set of already-installed tools to avoid redundant reinstalls
 declare -A _installed
 while IFS= read -r line; do
     pkg="${line%% *}"
@@ -60,7 +97,9 @@ while IFS= read -r line; do
     fi
 
     log_info "  install $pkg"
-    if run_logged cargo install "$pkg"; then
+    # Try binstall first (pre-built binary); fall back to source if unavailable
+    if run_logged cargo binstall --no-confirm --log-level warn "$pkg" \
+        || run_logged cargo install "$pkg"; then
         log_ok "  ok    $pkg"
         (( _ok++ )) || true
     else

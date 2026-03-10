@@ -45,11 +45,6 @@ RUSTUP_HOME="${RUSTUP_HOME:-$LOCAL_PLAT/rustup}"
 CARGO_HOME="${CARGO_HOME:-$LOCAL_PLAT/cargo}"
 VENV="${VENV:-$LOCAL_PLAT/venv}"
 
-# macOS Sequoia+ (and sandboxed environments) restrict ar/ld from creating
-# code archives in system temp (/var/folders/.../T/). Redirect cargo's build
-# artifacts to a home-dir path to avoid "Operation not permitted" on .rlib files.
-CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$LOCAL_PLAT/cargo-build}"
-
 # uv: keep all arch-specific uv state under LOCAL_PLAT
 # UV_TOOL_BIN_DIR: where `uv tool install` places binaries (default ~/.local/bin — wrong for shared homes)
 # UV_TOOL_DIR:     tool metadata (venvs etc.)
@@ -67,7 +62,7 @@ NVM_DIR="${NVM_DIR:-$LOCAL_PLAT/nvm}"
 # the other arch's machine. NIX_PROFILE is respected by both nix and home-manager.
 NIX_PROFILE="${NIX_PROFILE:-$LOCAL_PLAT/nix-profile}"
 
-export PLAT LOCAL_PLAT RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR VENV \
+export PLAT LOCAL_PLAT RUSTUP_HOME CARGO_HOME VENV \
        UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR \
        NVM_DIR NIX_PROFILE
 
