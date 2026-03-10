@@ -107,8 +107,6 @@ if OS.mac?
   ### Editors & IDEs ###
   cask "visual-studio-code"
   cask "cursor"
-  cask "dotnet-sdk"
-
   ### Window Management ###
   cask "nikitabobko/tap/aerospace"
   cask "linearmouse"
@@ -134,7 +132,6 @@ if OS.mac?
   cask "kdenlive"
 
   ### Documents ###
-  # mactex omitted: ~4GB download, install manually if needed: brew install --cask mactex
   cask "libreoffice"
 
   ### Games ###
