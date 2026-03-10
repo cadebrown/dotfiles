@@ -1,52 +1,76 @@
 # dotfiles
 
-Personal dotfiles managed with [chezmoi](https://chezmoi.io). Works on macOS (arm64) and Linux (arm64 + x86_64), including shared home directories across machines. No sudo required on Linux.
+Personal dotfiles managed with [chezmoi](https://chezmoi.io). Works on macOS (arm64) and Linux (arm64 + x86_64), including shared home directories across machines with no sudo required on Linux.
 
-## Bootstrap
+## Install
+
+### Quick start — no repo needed
 
 ```sh
-# New machine — no repo needed
 curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
-
-# Or from a clone
-git clone https://github.com/cadebrown/dotfiles ~/dotfiles && ~/dotfiles/bootstrap.sh
 ```
 
-Prompts for name and email on first run, then installs chezmoi, applies dotfiles, and sets up packages. All steps are idempotent — run it on each machine that shares a home directory to get PLAT-specific tool installs (`x86_64-Linux`, `aarch64-Linux`, etc.). See [Dotfile Management](docs/setup/chezmoi.md) for notes on keeping templates safe across shared homes.
+Prompts for name and email on first run. Everything else is automatic.
+
+### With name/email pre-seeded (unattended)
+
+```sh
+CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" \
+  curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
+```
+
+### From a local clone
+
+```sh
+git clone https://github.com/cadebrown/dotfiles ~/dotfiles
+CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" ~/dotfiles/bootstrap.sh
+```
+
+All steps are idempotent — safe to re-run. On a machine sharing a home directory, re-running just installs that machine's arch-specific binaries under `~/.local/$PLAT/`.
+
+---
+
+## macOS vs Linux
+
+| | macOS | Linux |
+|---|---|---|
+| Package manager | Homebrew (native bottles) | Homebrew in `manylinux_2_28` container |
+| Rust toolchain | Homebrew `rustup` (code-signed) | `sh.rustup.rs` |
+| Docker/Podman | Colima (auto-started at login) | Required pre-requisite for packages |
+| Claude Code | Homebrew cask | Native binary |
+| First run time | ~5 min | ~10 min (some packages compile) |
+
+See [docs/setup/bootstrap.md](docs/setup/bootstrap.md) for full platform requirements.
+
+---
 
 ## Usage
 
 ```sh
-# Apply latest changes from the repo
+# Pull and apply latest dotfile changes
 chezmoi update
 
-# Edit a dotfile in $EDITOR, applies on save
+# Edit a dotfile in $EDITOR (applies on save)
 chezmoi edit ~/.zshrc
-
-# Add a new file under chezmoi management
-chezmoi add ~/.config/foo/bar
-
-# Make a file template (for OS-specific blocks)
-chezmoi chattr +template ~/.config/foo/bar
 
 # Preview what would change before applying
 chezmoi diff
 
-# Sync macOS packages
-brew bundle --file=~/dotfiles/packages/Brewfile
+# Re-run any install script — all are idempotent
+bash ~/dotfiles/install/rust.sh
+bash ~/dotfiles/install/python.sh
+bash ~/dotfiles/install/claude.sh
 
-# Re-run any install script (all are idempotent)
-~/dotfiles/install/rust.sh
-~/dotfiles/install/python.sh
-~/dotfiles/install/claude.sh
+# Sync packages
+brew bundle --file=~/dotfiles/packages/Brewfile
 ```
+
+---
 
 ## Docs
 
-Guides, setup notes, and walkthroughs live in [`docs/`](docs/).
+Full guides at [dotfiles.cade.io](https://dotfiles.cade.io) or locally:
 
 ```sh
-# Browse locally
-cargo install mdbook
 mdbook serve docs/
 ```

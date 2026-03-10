@@ -48,12 +48,14 @@ dotfiles/
 │   │   ├── AGENTS.md          # Global Codex instructions (mirrors dot_claude/CLAUDE.md)
 │   │   ├── create_config.toml # Base settings (create_ prefix: written once, never overwritten)
 │   │   └── rules/default.rules # Auto-allowed shell commands
+│   ├── dot_iterm2/            # iTerm2 preferences → ~/.iterm2/
+│   │   └── com.googlecode.iterm2.plist  # Binary plist — not a template
 │   └── dot_config/            # App configs: nvim, ghostty, git, linearmouse, etc.
 │
 ├── packages/
 │   ├── Brewfile               # Homebrew packages — macOS (bottles) + Linux (compiled)
-│   ├── cargo.txt              # `cargo install` list (read by install/rust.sh)
-│   ├── pip.txt                # Python packages for ~/.venv (read by install/python.sh)
+│   ├── cargo.txt              # Rust tools (read by install/rust.sh via cargo-binstall)
+│   ├── pip.txt                # Python packages for $LOCAL_PLAT/venv (read by install/python.sh)
 │   ├── claude-plugins.txt     # Claude Code plugins (read by install/claude.sh)
 │   ├── claude-mcp.txt         # Claude Code MCP servers (read by install/claude.sh)
 │   └── nix/                   # Nix home-manager config (optional, for Nix users)
@@ -66,13 +68,13 @@ dotfiles/
 │   ├── homebrew.sh            # macOS: install Homebrew + brew bundle
 │   ├── linux-packages.sh      # Linux: brew bundle inside manylinux_2_28 container
 │   ├── zsh.sh                 # oh-my-zsh + plugins (pure, autosuggestions, fsh, completions)
-│   ├── services.sh            # macOS: register colima as login service
+│   ├── services.sh            # macOS: colima login service + iTerm2 prefs
 │   ├── node.sh                # nvm + Node.js → $LOCAL_PLAT/nvm/
-│   ├── rust.sh                # rustup + cargo installs from packages/cargo.txt
+│   ├── rust.sh                # rustup + cargo-binstall + cargo tools from cargo.txt
 │   ├── python.sh              # uv + venv + pip installs from packages/pip.txt
 │   ├── npm.sh                 # Global npm packages from packages/npm.txt
 │   ├── claude.sh              # Claude Code: Linux native binary + plugins (macOS: Homebrew cask)
-│   └── nix.sh                 # Optional: Nix + home-manager (NOT called by bootstrap.sh — run manually)
+│   └── nix.sh                 # Optional: Nix + home-manager (NOT called by bootstrap.sh)
 │
 ├── docs/                      # mdBook documentation (served at dotfiles.cade.io)
 │   ├── book.toml              # mdBook config: theme, repo URL, search
@@ -151,6 +153,24 @@ paths win on PATH, but duplicates waste install time and disk.
 
 ---
 
+## macOS vs Linux — Rust toolchain
+
+`install/rust.sh` handles each platform differently:
+
+**macOS:** Uses Homebrew's `rustup` (`brew "rustup"` is in `Brewfile` under `if OS.mac?`).
+Homebrew's build is code-signed, which is required on macOS Sequoia+ where the linker
+enforces `com.apple.provenance` on object files. The upstream `sh.rustup.rs` binary is
+not code-signed and will fail with "Operation not permitted" when `ld` tries to open
+compiled `.o`/`.rlib` files in sandboxed contexts.
+
+**Linux:** Downloads `rustup-init` directly from `sh.rustup.rs`. No Homebrew needed or wanted.
+
+Both platforms install `cargo-binstall` first (via its own pre-built binary installer).
+For each tool in `cargo.txt`, binstall tries to download a pre-built binary from GitHub
+releases; if none is available, it falls back to `cargo install` (source compilation).
+
+---
+
 ## nvm lazy loading
 
 nvm.sh is ~6000 lines of bash. Sourcing it at login adds ~400ms to shell startup.
@@ -176,13 +196,18 @@ Result: **~0.14s** shell startup (down from ~1.1s with eager nvm loading).
 2. dotfiles     → chezmoi apply (prompts name/email on first run)
 3. ZSH          → oh-my-zsh + plugins via install/zsh.sh
 4. packages     → macOS: homebrew.sh | Linux: linux-packages.sh
-5. services     → macOS: colima autostart via brew services
+5. services     → macOS: colima autostart + iTerm2 prefs (install/services.sh)
 6. runtimes     → node.sh, rust.sh, python.sh, claude.sh
 ```
 
 Each step has an `INSTALL_*=0` env var to skip it. The Linux packages step
 starts a `manylinux_2_28` container and runs `brew bundle` inside it; most
 packages pour as precompiled bottles — first bootstrap takes ~10 min.
+
+Pre-seed name/email to avoid interactive prompts:
+```sh
+CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" ~/dotfiles/bootstrap.sh
+```
 
 ---
 
@@ -192,8 +217,9 @@ packages pour as precompiled bottles — first bootstrap takes ~10 min.
 
 Follow this priority order:
 
-1. **npm** — add to `packages/npm.txt` if it's an npm package
-2. **cargo** — add to `packages/cargo.txt` if it's a Rust crate
+1. **cargo** — add to `packages/cargo.txt` if it's a Rust crate.
+   `install/rust.sh` uses `cargo-binstall` to fetch pre-built binaries when available.
+2. **npm** — add to `packages/npm.txt` if it's an npm package
 3. **Homebrew** — add `brew "name"` to `packages/Brewfile` if it's in Homebrew
    (works on macOS via bottles, compiles from source on Linux)
 4. **Special script** — look at an existing `install/` script for patterns and follow them;
@@ -215,7 +241,13 @@ Add to `packages/pip.txt`. Installed into `$LOCAL_PLAT/venv` via uv.
 
 ### Add a Rust tool
 
-Add to `packages/cargo.txt`. Installed via `cargo install` into `$CARGO_HOME`.
+Add the crate name to `packages/cargo.txt`. `install/rust.sh` will:
+1. Try `cargo binstall` — downloads a pre-built binary from GitHub releases if available
+2. Fall back to `cargo install` — compiles from source otherwise
+
+Run `bash ~/dotfiles/install/rust.sh` to apply. On macOS, source compilation requires
+running from a normal terminal (the signed Homebrew rustup handles the Sequoia linker
+requirements automatically).
 
 ### Edit a dotfile
 
@@ -274,10 +306,10 @@ can reference the same path.
 
 ```sh
 # Serve locally with live reload (opens browser automatically)
-cd docs && mdbook serve --open
+mdbook serve docs/ --open
 
 # Build static output only
-cd docs && mdbook build        # output → docs/book/
+mdbook build docs/        # output → docs/book/
 ```
 
 Docs are hosted at https://dotfiles.cade.io via Cloudflare Pages.
@@ -357,3 +389,13 @@ The `.chezmoi.toml.tmpl` prompts for `name` and `email` on first init via
 - **`GIT_CONFIG_GLOBAL=/dev/null`** is set by `_lib.sh` for all install scripts.
   This is intentional — it prevents `url.insteadOf` SSH rewrites from breaking
   curl-based installers on machines without SSH keys.
+
+- **macOS Sequoia: use Homebrew's rustup, not sh.rustup.rs.** The Homebrew
+  `rustup` formula is code-signed. On macOS Sequoia+, the linker enforces
+  `com.apple.provenance` on object files and will reject unsigned builds.
+  `install/rust.sh` handles this automatically; `brew "rustup"` is in
+  `Brewfile` under `if OS.mac?`.
+
+- **`dot_iterm2/` is a binary plist, not a template.** Do not add `.tmpl`
+  extension. If you need to update it, copy the new `com.googlecode.iterm2.plist`
+  from `~/.iterm2/` into `home/dot_iterm2/` and run `chezmoi apply`.

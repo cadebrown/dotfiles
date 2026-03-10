@@ -3,8 +3,11 @@
 Personal dotfiles for macOS and Linux — one command sets up a complete, reproducible dev environment on any machine.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
+CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" \
+  curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
 ```
+
+The name and email are only asked once (or can be pre-seeded as above for unattended installs). Everything else is automatic.
 
 ---
 
@@ -19,6 +22,19 @@ curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.s
 
 ---
 
+## macOS vs Linux
+
+| | macOS | Linux |
+|---|---|---|
+| Packages | Homebrew (native bottles) | Homebrew in `manylinux_2_28` container |
+| Rust toolchain | Homebrew `rustup` (code-signed, required for Sequoia+) | `sh.rustup.rs` |
+| Rust tools | `cargo-binstall` (pre-built binaries first, source fallback) | same |
+| Services | colima auto-started; iTerm2 prefs configured | — |
+| Claude Code | Homebrew cask | Native binary |
+| First run | ~5 min | ~10 min |
+
+---
+
 ## How it works
 
 [chezmoi](https://chezmoi.io) manages dotfiles as templates in `home/` and applies them to `~/`. The bootstrap script wires everything together:
@@ -29,13 +45,14 @@ bootstrap.sh
   ↓ install/zsh.sh       oh-my-zsh + plugins
   ↓ homebrew.sh          packages from Brewfile (macOS)
     linux-packages.sh    packages from Brewfile (Linux, via container)
+  ↓ install/services.sh  colima login service + iTerm2 prefs (macOS)
   ↓ install/node.sh      nvm → Node.js
-  ↓ install/rust.sh      rustup → cargo tools
+  ↓ install/rust.sh      rustup → cargo-binstall → cargo tools
   ↓ install/python.sh    uv → Python venv
   ↓ install/claude.sh    Claude Code + plugins + MCP servers
 ```
 
-Compiled tools land under `~/.local/$PLAT/` — a different directory per arch+OS, so a shared home has no conflicts. Text configs (dotfiles) are shared freely; they're arch-neutral by design.
+Compiled tools land under `~/.local/$PLAT/` — a different directory per arch+OS. A shared home has no conflicts. Text configs (dotfiles) are shared freely; they're arch-neutral by design.
 
 ---
 
@@ -45,7 +62,7 @@ Compiled tools land under `~/.local/$PLAT/` — a different directory per arch+O
 
 | Page | What it covers |
 |---|---|
-| [Bootstrap](setup/bootstrap.md) | System requirements, what gets installed, platform-specific steps |
+| [Bootstrap](setup/bootstrap.md) | System requirements, what gets installed, platform-specific steps, skip flags |
 | [Managing dotfiles](setup/chezmoi.md) | How chezmoi works, editing dotfiles, template variables |
 | [Package management](setup/packages.md) | Adding tools (Homebrew, cargo, npm, pip), why each layer exists |
 
