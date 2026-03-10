@@ -2,6 +2,29 @@
 
 ---
 
+## Upgrade all packages
+
+```sh
+# Homebrew — upgrade installed packages, then reconcile with Brewfile
+brew upgrade && brew bundle --file=~/dotfiles/packages/Brewfile
+
+# Rust — updates stable toolchain + reinstalls cargo tools from cargo.txt
+bash ~/dotfiles/install/rust.sh
+
+# Python — syncs venv to packages/pip.txt
+bash ~/dotfiles/install/python.sh
+
+# npm globals
+bash ~/dotfiles/install/npm.sh
+
+# Claude Code plugins + MCP servers
+bash ~/dotfiles/install/claude.sh
+```
+
+Each install script is idempotent — it updates what's already there and skips what doesn't need changing.
+
+---
+
 ## Add a package
 
 See [Package management](../setup/packages.md) for the priority order. Quick reference:
