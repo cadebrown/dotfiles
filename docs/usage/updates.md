@@ -5,23 +5,10 @@
 ## Upgrade all packages
 
 ```sh
-# Homebrew — upgrade installed packages, then reconcile with Brewfile
-brew upgrade && brew bundle --file=~/dotfiles/packages/Brewfile
-
-# Rust — updates stable toolchain + reinstalls cargo tools from cargo.txt
-bash ~/dotfiles/install/rust.sh
-
-# Python — syncs venv to packages/pip.txt
-bash ~/dotfiles/install/python.sh
-
-# npm globals
-bash ~/dotfiles/install/npm.sh
-
-# Claude Code plugins + MCP servers
-bash ~/dotfiles/install/claude.sh
+~/dotfiles/bootstrap.sh
 ```
 
-Each install script is idempotent — it updates what's already there and skips what doesn't need changing.
+That's it. Every install script is idempotent — it upgrades what's installed, installs what's missing, and skips what's already current. Re-running bootstrap is safe at any time and is the same command whether you're on a fresh machine or updating an existing one.
 
 ---
 

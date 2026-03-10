@@ -116,18 +116,7 @@ The same `Brewfile` works on macOS and Linux. `if OS.mac?` blocks are silently s
 ## Updating all packages
 
 ```sh
-# Homebrew (macOS)
-brew bundle --file=~/dotfiles/packages/Brewfile
-
-# Homebrew (Linux) — re-run in container
-bash ~/dotfiles/install/linux-packages.sh
-
-# Cargo tools (uses binstall for pre-built binaries)
-bash ~/dotfiles/install/rust.sh
-
-# Python venv
-bash ~/dotfiles/install/python.sh
-
-# Claude plugins + MCP servers
-bash ~/dotfiles/install/claude.sh
+~/dotfiles/bootstrap.sh
 ```
+
+Re-running bootstrap is the canonical way to upgrade. Every script is idempotent — it upgrades what's installed, installs what's missing, and skips what's already current. Works the same on macOS and Linux.
