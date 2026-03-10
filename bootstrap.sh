@@ -81,7 +81,7 @@ fi
 _REPO_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/home"
 if [[ -d "$_REPO_HOME" ]]; then
     log_info "Using local repo at $_REPO_HOME"
-    "$CHEZMOI_BIN" init --apply --source "$_REPO_HOME"
+    "$CHEZMOI_BIN" init --apply --force --source "$_REPO_HOME"
     # Persist sourceDir so subsequent chezmoi commands (diff, apply, update)
     # work without needing --source each time. Not needed for GitHub-based init
     # since chezmoi clones to ~/.local/share/chezmoi/ automatically.
@@ -97,7 +97,7 @@ if [[ -d "$_REPO_HOME" ]]; then
     fi
 else
     log_info "Initialising from GitHub ($GITHUB_REPO)"
-    "$CHEZMOI_BIN" init --apply "https://github.com/${GITHUB_REPO}.git"
+    "$CHEZMOI_BIN" init --apply --force "https://github.com/${GITHUB_REPO}.git"
 fi
 
 log_ok "Dotfiles applied"

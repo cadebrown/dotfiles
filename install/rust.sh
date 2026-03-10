@@ -59,8 +59,8 @@ export PATH="$CARGO_HOME/bin:$PATH"
 # This avoids slow compilation for common tools and works around macOS linker
 # sandbox restrictions in restricted shell environments.
 
-if cargo binstall --version &>/dev/null 2>&1; then
-    log_ok "cargo-binstall already installed: $(cargo binstall --version 2>/dev/null)"
+if cargo binstall -V &>/dev/null 2>&1; then
+    log_ok "cargo-binstall already installed: $(cargo binstall -V 2>/dev/null)"
 else
     log_info "Installing cargo-binstall (pre-built binary)"
     # Official installer: downloads a pre-built binary, no compilation needed
@@ -74,30 +74,19 @@ fi
 CARGO_TXT="$PACKAGES_DIR/cargo.txt"
 [[ -f "$CARGO_TXT" ]] || { log_warn "No cargo.txt at $CARGO_TXT — skipping"; exit 0; }
 
-# Build a set of already-installed tools to avoid redundant reinstalls
-declare -A _installed
-while IFS= read -r line; do
-    pkg="${line%% *}"
-    _installed["$pkg"]=1
-done < <(cargo install --list 2>/dev/null | grep -E '^[a-z]' | awk '{print $1}')
+log_info "Installing/upgrading cargo tools from cargo.txt"
 
-log_info "Installing cargo tools from cargo.txt"
-
-_ok=0 _skip=0 _fail=0
+# cargo binstall handles idempotency: skips if already at latest version,
+# upgrades if a newer release exists, installs if missing.
+# Falls back to source compilation if no pre-built binary is available.
+_ok=0 _fail=0
 
 while IFS= read -r line; do
     # Skip blank lines and comments
     [[ -z "$line" || "$line" == \#* ]] && continue
     pkg="${line%% *}"
 
-    if [[ -n "${_installed[$pkg]:-}" ]]; then
-        log_info "  skip  $pkg (already installed)"
-        (( _skip++ )) || true
-        continue
-    fi
-
-    log_info "  install $pkg"
-    # Try binstall first (pre-built binary); fall back to source if unavailable
+    log_info "  binstall $pkg"
     if run_logged cargo binstall --no-confirm --log-level warn "$pkg" \
         || run_logged cargo install "$pkg"; then
         log_ok "  ok    $pkg"
@@ -108,4 +97,4 @@ while IFS= read -r line; do
     fi
 done < "$CARGO_TXT"
 
-log_ok "cargo tools: ${_ok} installed, ${_skip} already up to date, ${_fail} failed"
+log_ok "cargo tools: ${_ok} ok, ${_fail} failed"

@@ -26,7 +26,6 @@ brew "gh"
 
 ### Search & Files ###
 brew "ripgrep"
-# fd, sd, zoxide installed via cargo (packages/cargo.txt) — no Homebrew dupe
 brew "bat"
 brew "bat-extras"
 brew "ast-grep"
@@ -34,6 +33,7 @@ brew "tree"
 brew "ncdu"
 brew "fzf"
 brew "jq"
+brew "xan"
 brew "direnv"
 brew "entr"
 brew "xdelta"
@@ -62,6 +62,7 @@ brew "htop"
 brew "btop"
 brew "bottom"
 brew "glances"
+brew "procs"
 
 ### Build Tools ###
 brew "cmake"
@@ -78,6 +79,7 @@ brew "zig"
 
 ### DevOps ###
 brew "opentofu"
+brew "mdbook"
 
 ### Retro / Embedded ###
 brew "cc65"
@@ -132,7 +134,7 @@ if OS.mac?
   cask "kdenlive"
 
   ### Documents ###
-  cask "mactex"
+  # mactex omitted: ~4GB download, install manually if needed: brew install --cask mactex
   cask "libreoffice"
 
   ### Games ###

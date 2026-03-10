@@ -1,26 +1,22 @@
-# cargo.txt - Rust tools to install via `cargo install`
+# cargo.txt - Rust tools to install via cargo-binstall
 # Usage: install/rust.sh reads this file
+#
+# Only include tools that have pre-built binaries on GitHub Releases.
+# cargo-binstall checks for a release binary first, falling back to source
+# compilation — but source compilation fails under macOS Sequoia's sandbox.
+# Tools with Homebrew bottles go in packages/Brewfile instead.
 
-# CSV utilities
-xan
-
-# Better file finder
+# Better file finder (pre-built: github.com/sharkdp/fd)
 fd-find
 
-# Better sed
+# Better sed (pre-built: github.com/chmln/sd)
 sd
 
-# Benchmarking
+# Benchmarking (pre-built: github.com/sharkdp/hyperfine)
 hyperfine
 
-# Process monitor
-procs
-
-# Better rm (rip)
+# Better rm/rip (pre-built: github.com/nivekuil/rip)
 rm-improved
 
-# Smarter cd
+# Smarter cd (pre-built: github.com/ajeetdsouza/zoxide)
 zoxide
-
-# Docs site builder
-mdbook
