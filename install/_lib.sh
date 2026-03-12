@@ -37,7 +37,15 @@ ARCH="$(uname -m)"
 # Using aarch64 everywhere avoids per-OS conditionals in install scripts.
 [[ "$ARCH" == "arm64" ]] && ARCH="aarch64"
 
-LOCAL_PLAT="$HOME/.local/$PLAT"
+# Resolve LOCAL_PLAT through any symlink so tool configs (rustup, cargo, nvm)
+# store the real physical path. This prevents stale config entries if ~/.local
+# is ever re-pointed (e.g. scratch remount or layout change).
+_LOCAL_ROOT="$HOME/.local"
+if [[ -L "$_LOCAL_ROOT" ]]; then
+    _LOCAL_ROOT="$(readlink -f "$_LOCAL_ROOT")"
+fi
+LOCAL_PLAT="$_LOCAL_ROOT/$PLAT"
+unset _LOCAL_ROOT
 ARCH_BIN="$LOCAL_PLAT/bin"
 
 # Standard per-machine tool paths — install scripts and shell both use these
@@ -68,18 +76,55 @@ NVM_DIR="${NVM_DIR:-$LOCAL_PLAT/nvm}"
 NIX_PROFILE="${NIX_PROFILE:-$LOCAL_PLAT/nix-profile}"
 
 # Scratch space for NFS homes with small quotas.
-# Set DOTFILES_SCRATCH or create ~/scratch symlink to large local storage.
-# install/scratch.sh will symlink ~/.local, ~/.cache, etc. into
-# $SCRATCH/$SCRATCH_HOME_DIR/ (default: .homelinks).
-if [[ -z "${DOTFILES_SCRATCH:-}" && -e "$HOME/scratch" ]]; then
-    DOTFILES_SCRATCH="$(cd "$HOME/scratch" && pwd -P)"
+#
+# When scratch is configured, install/scratch.sh symlinks large home dirs
+# from $HOME into $PATHS/ (a subdir of scratch), keeping the NFS home lean.
+#
+# How to configure (pick one):
+#   a) Create ~/scratch as a symlink to large local storage:
+#        ln -s /local/disk/$USER ~/scratch
+#   b) Set DOTFILES_SCRATCH_PATH before running bootstrap:
+#        DOTFILES_SCRATCH_PATH=/local/disk/$USER ~/dotfiles/bootstrap.sh
+#
+# Variable reference (PATH/LINK pattern):
+#   DOTFILES_SCRATCH_PATH  — actual scratch directory on local disk
+#   DOTFILES_SCRATCH_LINK  — symlink in $HOME pointing to scratch (default: ~/scratch)
+#                            bootstrap.sh creates this symlink if DOTFILES_SCRATCH_PATH is set.
+#   DOTFILES_LINKS_PATHS   — colon-separated list of home dirs to redirect to scratch
+#                            (default: ~/.local:~/.cache)
+#   SCRATCH                — resolved absolute path to scratch root (empty if none)
+#   PATHS                  — $SCRATCH/.paths — where all symlinked dirs live:
+#                              $PATHS/.local/        ← ~/.local
+#                              $PATHS/.cache/        ← ~/.cache
+#                              $PATHS/.oh-my-zsh/    ← ~/.oh-my-zsh
+#                              $PATHS/.oh-my-zsh-custom/ ← ~/.oh-my-zsh-custom
+#                              $PATHS/.config/       ← ~/.config (if in DOTFILES_LINKS_PATHS)
+#
+# Downstream variables (all under $PATHS/.local/$PLAT/ when scratch is used):
+#   LOCAL_PLAT        = $HOME/.local/$PLAT          (logical path, may be via symlink)
+#   ARCH_BIN          = $LOCAL_PLAT/bin             chezmoi, uv, uvx
+#   RUSTUP_HOME       = $LOCAL_PLAT/rustup          Rust toolchain
+#   CARGO_HOME        = $LOCAL_PLAT/cargo           Cargo (bins at cargo/bin/)
+#   CARGO_TARGET_DIR  = $LOCAL_PLAT/cargo-build     build artifacts (macOS sandbox workaround)
+#   VENV              = $LOCAL_PLAT/venv            Python virtualenv
+#   UV_TOOL_BIN_DIR   = $LOCAL_PLAT/bin             uv tool binaries
+#   UV_TOOL_DIR       = $LOCAL_PLAT/uv/tools        uv tool metadata
+#   UV_PYTHON_INSTALL_DIR = $LOCAL_PLAT/uv/python   uv-managed Python builds
+#   NVM_DIR           = $LOCAL_PLAT/nvm             nvm + Node versions
+#   NIX_PROFILE       = $LOCAL_PLAT/nix-profile     Nix user profile
+#   BREW_PREFIX       = $LOCAL_PLAT/brew            Homebrew (Linux native install)
+DOTFILES_SCRATCH_PATH="${DOTFILES_SCRATCH_PATH:-}"
+DOTFILES_SCRATCH_LINK="${DOTFILES_SCRATCH_LINK:-$HOME/scratch}"
+if [[ -z "${DOTFILES_SCRATCH_PATH:-}" && -e "$DOTFILES_SCRATCH_LINK" ]]; then
+    DOTFILES_SCRATCH_PATH="$(cd "$DOTFILES_SCRATCH_LINK" && pwd -P)"
 fi
-SCRATCH="${DOTFILES_SCRATCH:-}"
-SCRATCH_HOME_DIR="${SCRATCH_HOME_DIR:-.homelinks}"
+SCRATCH="${DOTFILES_SCRATCH_PATH:-}"
+PATHS="${SCRATCH:+$SCRATCH/.paths}"
+export DOTFILES_SCRATCH_PATH DOTFILES_SCRATCH_LINK SCRATCH PATHS
 
 export PLAT LOCAL_PLAT RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR VENV \
        UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR \
-       NVM_DIR NIX_PROFILE SCRATCH SCRATCH_HOME_DIR
+       NVM_DIR NIX_PROFILE
 
 # Install scripts clone public repos and must not be affected by the user's
 # gitconfig (which may have url.insteadOf SSH rewrites, breaking clones on

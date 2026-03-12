@@ -153,7 +153,8 @@ Every install script sources `_lib.sh` first. It defines all PLAT paths as varia
 | `UV_PYTHON_INSTALL_DIR` | `$LOCAL_PLAT/uv/python` | uv managed Pythons |
 | `OS` | `darwin` or `linux` | Normalised OS |
 | `ARCH` | `aarch64` or `x86_64` | Normalised arch (arm64 → aarch64) |
-| `SCRATCH` | `$DOTFILES_SCRATCH` or resolved `~/scratch` | Scratch space for NFS homes (empty if none) |
+| `SCRATCH` | `$DOTFILES_SCRATCH_PATH` or resolved `~/scratch` | Scratch space root (empty if none) |
+| `PATHS` | `$SCRATCH/.paths` | Symlink targets for ~/.local, ~/.cache, etc. (empty if no scratch) |
 
 `_lib.sh` also sets `GIT_CONFIG_GLOBAL=/dev/null` to prevent `url.insteadOf` SSH
 rewrites from breaking curl-based installers (oh-my-zsh, nvm, etc.) on machines
@@ -250,20 +251,18 @@ On Linux machines with shared NFS home directories and small quotas,
 `~/.local/$PLAT` (2-5 GB), `~/.cache`, and oh-my-zsh can exhaust the quota.
 
 **Setup:** Create `~/scratch` as a symlink to large local storage (e.g. `/scratch/$USER`),
-or set `DOTFILES_SCRATCH=/path/to/storage`. Then run bootstrap — `install/scratch.sh`
-(step 2.5) will symlink these directories to scratch:
+or set `DOTFILES_SCRATCH_PATH=/path/to/storage`. Then run bootstrap — `install/scratch.sh`
+(step 0, before any tool installs) will symlink these directories to scratch:
 
 | Home path | Scratch target |
 |---|---|
-| `~/.local` | `$SCRATCH/.homelinks/.local` |
-| `~/.cache` | `$SCRATCH/.homelinks/.cache` |
-| `~/.oh-my-zsh` | `$SCRATCH/.homelinks/.oh-my-zsh` |
-| `~/.oh-my-zsh-custom` | `$SCRATCH/.homelinks/.oh-my-zsh-custom` |
-| `~/dotfiles` | `$SCRATCH/.homelinks/dotfiles` |
+| `~/.local` | `$SCRATCH/.paths/.local` |
+| `~/.cache` | `$SCRATCH/.paths/.cache` |
 
-Optional (set `SCRATCH_CONFIG=1`): `~/.config` → `$SCRATCH/.homelinks/.config`.
+Override with `DOTFILES_LINKS_PATHS` (colon-separated). `~/.config` is intentionally excluded — chezmoi manages files inside it as a real directory and will replace a symlink. `~/.oh-my-zsh` is excluded too — `install/zsh.sh` installs fresh.
 
-The `.homelinks` subdirectory name is configurable via `SCRATCH_HOME_DIR`.
+The `$PATHS` variable in `_lib.sh` points to `$SCRATCH/.paths` and is the
+single source of truth for where symlink targets live.
 
 No-op when no scratch space is detected — existing setups are unaffected.
 

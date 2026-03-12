@@ -3,16 +3,25 @@
 #
 # On NFS homes with small quotas, ~/.local (~2-5 GB), ~/.cache,
 # and oh-my-zsh can exhaust the quota during bootstrap. When scratch
-# space is available (~/scratch symlink or DOTFILES_SCRATCH env var),
+# space is available (DOTFILES_SCRATCH_PATH env var or ~/scratch symlink),
 # this script moves those directories to scratch and creates symlinks.
 #
 # Layout on scratch:
-#   $SCRATCH/.homelinks/         ← configurable via SCRATCH_HOME_DIR
+#   $SCRATCH/.paths/
 #     ├── .local/                ← symlinked from ~/.local
-#     ├── .cache/                ← symlinked from ~/.cache
-#     ├── .oh-my-zsh/            ← symlinked from ~/.oh-my-zsh
-#     ├── .oh-my-zsh-custom/     ← symlinked from ~/.oh-my-zsh-custom
-#     └── dotfiles/              ← symlinked from ~/dotfiles (if repo exists there)
+#     └── .cache/                ← symlinked from ~/.cache
+#
+# Which dirs are migrated is controlled by DOTFILES_LINKS_PATHS (colon-separated).
+# Default: ~/.local:~/.cache
+# Note: ~/.config is NOT migrated — chezmoi manages files inside it as a real directory.
+# Note: ~/.oh-my-zsh and ~/.oh-my-zsh-custom are NOT migrated — install/zsh.sh installs fresh.
+#
+# All variables are defined in _lib.sh:
+#   SCRATCH               — absolute path to scratch root (empty if not configured)
+#   PATHS                 — $SCRATCH/.paths — the directory holding all symlink targets
+#   DOTFILES_SCRATCH_PATH — env var to set scratch root
+#   DOTFILES_SCRATCH_LINK — symlink in $HOME pointing to scratch (default: ~/scratch)
+#   DOTFILES_LINKS_PATHS  — colon-separated dirs to migrate (override above defaults)
 #
 # Safe to re-run: skips directories that are already correctly symlinked.
 # No-op when no scratch space is detected.
@@ -20,7 +29,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 if [[ -z "$SCRATCH" ]]; then
-    log_info "No scratch space detected (no ~/scratch or \$DOTFILES_SCRATCH) — skipping"
+    log_info "No scratch space detected (no \$DOTFILES_SCRATCH_LINK or \$DOTFILES_SCRATCH_PATH) — skipping"
     exit 0
 fi
 
@@ -40,19 +49,35 @@ if command -v findmnt &>/dev/null; then
     fi
 fi
 
-# Configurable subdirectory for home symlink targets
-SCRATCH_HOME="${SCRATCH}/${SCRATCH_HOME_DIR:-.homelinks}"
+# Migrate from old .homelinks layout (renamed to .paths in 2026-03)
+_OLD_PATHS="$SCRATCH/.homelinks"
+if [[ -d "$_OLD_PATHS" && ! -d "$PATHS" ]]; then
+    log_info "Migrating $SCRATCH/.homelinks → $SCRATCH/.paths"
+    mv "$_OLD_PATHS" "$PATHS"
+    log_ok "Migration done — updating any symlinks that still point to .homelinks"
+    # Fix any symlinks in $HOME that still target the old path
+    for _link in "$HOME/.local" "$HOME/.cache" "$HOME/.oh-my-zsh" "$HOME/.oh-my-zsh-custom"; do
+        if [[ -L "$_link" ]]; then
+            _target="$(readlink "$_link")"
+            _new_target="${_target/.homelinks/.paths}"
+            if [[ "$_target" != "$_new_target" && -e "$_new_target" ]]; then
+                ln -sfn "$_new_target" "$_link"
+                log_ok "Updated: $_link → $_new_target"
+            fi
+        fi
+    done
+fi
 
-# link_to_scratch HOME_PATH SCRATCH_NAME
-#   HOME_PATH:    the path in $HOME to symlink (e.g. ~/.local)
-#   SCRATCH_NAME: name under $SCRATCH_HOME (e.g. .local)
+# link_to_scratch HOME_PATH PATHS_NAME
+#   HOME_PATH:   the path in $HOME to symlink (e.g. ~/.local)
+#   PATHS_NAME:  name under $PATHS (e.g. .local)
 #
 #   If HOME_PATH is already a symlink to the right place → skip
 #   If HOME_PATH is a real directory → move contents to scratch, replace with symlink
 #   If HOME_PATH doesn't exist → create scratch target, create symlink
 link_to_scratch() {
     local home_path="$1"
-    local scratch_target="$SCRATCH_HOME/$2"
+    local scratch_target="$PATHS/$2"
 
     # Already correct symlink
     if [[ -L "$home_path" ]]; then
@@ -72,16 +97,13 @@ link_to_scratch() {
     # Real directory with contents — move to scratch
     if [[ -d "$home_path" ]]; then
         log_info "Moving $home_path → $scratch_target"
-        # Copy contents to scratch target
         cp -a "$home_path/." "$scratch_target/" 2>/dev/null || true
         # Rename old dir out of the way (handles NFS open-file locks better
         # than rm -rf, which fails on .nfs* silly-rename files).
         _old="${home_path}.old.$$"
         mv "$home_path" "$_old"
-        # Create symlink at the now-free path
         ln -sfn "$scratch_target" "$home_path"
         log_ok "Linked: $home_path → $scratch_target"
-        # Best-effort cleanup of the old dir (may fail on NFS busy files)
         rm -rf "$_old" 2>/dev/null || log_warn "Could not fully remove $_old (NFS busy files?) — clean up later"
         return 0
     fi
@@ -92,34 +114,19 @@ link_to_scratch() {
     log_ok "Linked: $home_path → $scratch_target"
 }
 
-log_info "Scratch space: $SCRATCH"
-log_info "Home links:    $SCRATCH_HOME"
+log_info "Scratch: $SCRATCH"
+log_info "Paths:   $PATHS"
 
-# Always redirect these directories
-link_to_scratch "$HOME/.local"           ".local"
-link_to_scratch "$HOME/.cache"           ".cache"
-link_to_scratch "$HOME/.oh-my-zsh"       ".oh-my-zsh"
-link_to_scratch "$HOME/.oh-my-zsh-custom" ".oh-my-zsh-custom"
+_DEFAULT_LINKS="$HOME/.local:$HOME/.cache"
+DOTFILES_LINKS_PATHS="${DOTFILES_LINKS_PATHS:-$_DEFAULT_LINKS}"
+unset _DEFAULT_LINKS
 
-# Optional: redirect ~/.config (for very tight quotas)
-if [[ "${SCRATCH_CONFIG:-0}" == "1" ]]; then
-    link_to_scratch "$HOME/.config"      ".config"
-fi
-
-# Symlink the dotfiles repo itself to scratch
-if [[ -d "$DOTFILES_ROOT" && ! -L "$DOTFILES_ROOT" ]]; then
-    _scratch_repo="$SCRATCH_HOME/dotfiles"
-    if [[ ! -d "$_scratch_repo" ]]; then
-        log_info "Moving dotfiles repo to scratch"
-        cp -a "$DOTFILES_ROOT/." "$_scratch_repo/" 2>/dev/null || true
-        _old="${DOTFILES_ROOT}.old.$$"
-        mv "$DOTFILES_ROOT" "$_old"
-        ln -sfn "$_scratch_repo" "$DOTFILES_ROOT"
-        log_ok "Linked: $DOTFILES_ROOT → $_scratch_repo"
-        rm -rf "$_old" 2>/dev/null || log_warn "Could not fully remove $_old (NFS busy files?) — clean up later"
-    fi
-elif [[ -L "$DOTFILES_ROOT" ]]; then
-    log_ok "Dotfiles repo already symlinked: $DOTFILES_ROOT → $(readlink -f "$DOTFILES_ROOT")"
-fi
+IFS=: read -ra _link_paths <<< "$DOTFILES_LINKS_PATHS"
+for _home_path in "${_link_paths[@]}"; do
+    [[ -z "$_home_path" ]] && continue
+    _name="$(basename "$_home_path")"
+    link_to_scratch "$_home_path" "$_name"
+done
+unset _link_paths _home_path _name
 
 log_ok "Scratch space setup complete"

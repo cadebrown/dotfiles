@@ -124,8 +124,7 @@ Any step can be disabled:
 INSTALL_PACKAGES=0   # skip Homebrew + brew bundle
 INSTALL_SERVICES=0   # skip colima/iTerm2 service setup (macOS)
 INSTALL_ZSH=0        # skip oh-my-zsh
-INSTALL_NODE=0       # skip nvm + Node.js
-INSTALL_NPM=0        # skip global npm packages
+INSTALL_NODE=0       # skip nvm + Node.js + global npm packages
 INSTALL_RUST=0       # skip rustup + cargo tools
 INSTALL_PYTHON=0     # skip uv + venv
 INSTALL_CLAUDE=0     # skip Claude Code plugins + MCP servers

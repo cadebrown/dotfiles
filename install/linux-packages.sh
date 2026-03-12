@@ -64,7 +64,7 @@ log_info "Pulling $IMAGE"
 # The resolved scratch path is the canonical location — the symlink at
 # ~/.local/$PLAT is just a convenience for the host.
 # Resolve ~/.local (the symlink) to the real scratch path.
-# On NFS homes, ~/.local → $SCRATCH/.homelinks/.local
+# On NFS homes, ~/.local → $SCRATCH/.paths/.local
 _REAL_LOCAL="$(readlink -f "$HOME/.local")"
 _REAL_LOCAL_PLAT="$_REAL_LOCAL/$PLAT"
 _REAL_BREW_PREFIX="$_REAL_LOCAL_PLAT/brew"
@@ -119,9 +119,44 @@ fi
 
 eval "$($BREW_PREFIX/bin/brew shellenv)"
 
-# if OS.mac? blocks in Brewfile are skipped automatically on Linux
-echo "[info] Running brew bundle (--no-upgrade for idempotency)"
-brew bundle install --file="$BREWFILE" --no-upgrade --verbose
+# Build from source targeting x86-64-v3 so binaries run on any AVX2 machine.
+#
+# Why not pour bottles?
+#   Homebrew CI compiles Linux x86_64 bottles for x86-64-v4 (AVX-512). These
+#   crash with "Fatal glibc error: CPU does not support x86-64-v4" on machines
+#   that lack AVX-512 (e.g. AMD EPYC 7742). Since we share one brew prefix over
+#   NFS, we need binaries that work on every machine sharing the home directory.
+#
+# Why not HOMEBREW_BUILD_FROM_SOURCE=1?
+#   brew bundle calls brew install internally; the env var is ignored by those
+#   calls. brew install --build-from-source (a command-line flag) cannot be
+#   ignored, so we use a two-pass approach instead.
+#
+# Why x86-64-v3?
+#   v3 = AVX/AVX2/BMI2/FMA (Intel Haswell+, AMD Zen 2+) — the floor for all
+#   machines we run on. Compiling for v3 gives better performance than the
+#   generic x86-64 baseline while staying compatible with non-AVX-512 CPUs.
+#   Change to -march=x86-64-v2 if you have older hardware.
+export HOMEBREW_OPTFLAGS="-march=x86-64-v3 -O2"
+
+# Pass 1: install taps so tap-prefixed formulas can be resolved in pass 2
+echo "[info] Pass 1: installing taps"
+brew bundle install --file="$BREWFILE" --no-upgrade --taps 2>&1 || true
+
+# Pass 2: install each formula from source
+echo "[info] Pass 2: installing formulas from source (x86-64-v3)"
+_ok=0 _fail=0
+while IFS= read -r _formula; do
+    [[ -z "$_formula" ]] && continue
+    echo "[info]   building: $_formula"
+    if brew install --build-from-source "$_formula" 2>&1; then
+        ((_ok++)) || true
+    else
+        echo "[warn]   failed: $_formula"
+        ((_fail++)) || true
+    fi
+done < <(brew bundle list --brews --file="$BREWFILE" 2>/dev/null)
+echo "[info] Formulas: ${_ok} built, ${_fail} failed"
 OUTER_EOF
 
 rm -f "$_BREWFILE_TMP" "$_PASSWD_TMP" "$_GROUP_TMP" 2>/dev/null || true
