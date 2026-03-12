@@ -6,6 +6,34 @@ across different CPU architectures without requiring sudo on Linux.
 
 ---
 
+## Rules for agents
+
+### Adding a tool to this config
+
+1. Read `install/_lib.sh` first — it defines all path variables.
+2. Check `packages/cargo.txt`, `packages/Brewfile`, and `packages/npm.txt`
+   for duplicates. Never install the same tool in two layers.
+3. Follow the priority in "Adding a program" below. Rust CLI tools go in
+   `cargo.txt` (binstall pre-built binaries, no Linux container needed),
+   not Brewfile.
+4. New install scripts: source `_lib.sh`, use its variables and helpers,
+   guard with idempotency checks, add an `INSTALL_*` flag to `bootstrap.sh`,
+   add tests to `tests/`.
+
+### Editing dotfiles
+
+Edit chezmoi sources in `home/` (e.g. `home/dot_zshrc.tmpl`), never the
+deployed files directly. Binary files like `dot_iterm2/*.plist` are not
+templates — no `.tmpl` extension.
+
+### Hard constraints
+
+- No `sudo` in any script (Linux runs without root).
+- No compiled binaries in `~/.local/bin/` (arch-neutral scripts only).
+- No hardcoded paths — use `$LOCAL_PLAT`, `$CARGO_HOME`, etc. from `_lib.sh`.
+
+---
+
 ## Core invariants
 
 These must never be broken:
@@ -74,6 +102,8 @@ dotfiles/
 │   ├── python.sh              # uv + venv + pip installs from packages/pip.txt
 │   ├── npm.sh                 # Global npm packages from packages/npm.txt
 │   ├── claude.sh              # Claude Code: Linux native binary + plugins (macOS: Homebrew cask)
+│   ├── scratch.sh             # Symlink large dirs to scratch space (NFS quota relief)
+│   ├── verify-path.sh         # Diagnostic: check PATH binaries for arch/lib/symlink issues
 │   └── nix.sh                 # Optional: Nix + home-manager (NOT called by bootstrap.sh)
 │
 ├── docs/                      # mdBook documentation (served at dotfiles.cade.io)
@@ -98,7 +128,8 @@ dotfiles/
     ├── entrypoint.sh          # Runs inside container: bootstrap + bats
     ├── bootstrap.bats         # Test: dotfiles applied, plugins installed, chezmoi idempotent
     ├── shell.bats             # Test: ~/.zprofile sources cleanly, env vars correct
-    └── paths.bats             # Test: compiled tools in correct PLAT dirs
+    ├── paths.bats             # Test: compiled tools in correct PLAT dirs
+    └── verify.bats            # Test: verify-path.sh diagnostic passes
 ```
 
 ---
@@ -122,6 +153,7 @@ Every install script sources `_lib.sh` first. It defines all PLAT paths as varia
 | `UV_PYTHON_INSTALL_DIR` | `$LOCAL_PLAT/uv/python` | uv managed Pythons |
 | `OS` | `darwin` or `linux` | Normalised OS |
 | `ARCH` | `aarch64` or `x86_64` | Normalised arch (arm64 → aarch64) |
+| `SCRATCH` | `$DOTFILES_SCRATCH` or resolved `~/scratch` | Scratch space for NFS homes (empty if none) |
 
 `_lib.sh` also sets `GIT_CONFIG_GLOBAL=/dev/null` to prevent `url.insteadOf` SSH
 rewrites from breaking curl-based installers (oh-my-zsh, nvm, etc.) on machines
@@ -192,12 +224,13 @@ Result: **~0.14s** shell startup (down from ~1.1s with eager nvm loading).
 ## bootstrap.sh flow
 
 ```
-1. chezmoi      → install binary to $ARCH_BIN, run chezmoi apply
-2. dotfiles     → chezmoi apply (prompts name/email on first run)
-3. ZSH          → oh-my-zsh + plugins via install/zsh.sh
-4. packages     → macOS: homebrew.sh | Linux: linux-packages.sh
-5. services     → macOS: colima autostart + iTerm2 prefs (install/services.sh)
-6. runtimes     → node.sh, rust.sh, python.sh, claude.sh
+1.   chezmoi      → install binary to $ARCH_BIN, run chezmoi apply
+2.   dotfiles     → chezmoi apply (prompts name/email on first run)
+2.5  scratch      → symlink ~/.local, ~/.cache, etc. to scratch (if available)
+3.   ZSH          → oh-my-zsh + plugins via install/zsh.sh
+4.   packages     → macOS: homebrew.sh | Linux: linux-packages.sh
+5.   services     → macOS: colima autostart + iTerm2 prefs (install/services.sh)
+6.   runtimes     → node.sh, rust.sh, python.sh, claude.sh
 ```
 
 Each step has an `INSTALL_*=0` env var to skip it. The Linux packages step
@@ -211,20 +244,51 @@ CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" ~/dotfiles/bootstrap.sh
 
 ---
 
+## Scratch space (NFS homes)
+
+On Linux machines with shared NFS home directories and small quotas,
+`~/.local/$PLAT` (2-5 GB), `~/.cache`, and oh-my-zsh can exhaust the quota.
+
+**Setup:** Create `~/scratch` as a symlink to large local storage (e.g. `/scratch/$USER`),
+or set `DOTFILES_SCRATCH=/path/to/storage`. Then run bootstrap — `install/scratch.sh`
+(step 2.5) will symlink these directories to scratch:
+
+| Home path | Scratch target |
+|---|---|
+| `~/.local` | `$SCRATCH/.homelinks/.local` |
+| `~/.cache` | `$SCRATCH/.homelinks/.cache` |
+| `~/.oh-my-zsh` | `$SCRATCH/.homelinks/.oh-my-zsh` |
+| `~/.oh-my-zsh-custom` | `$SCRATCH/.homelinks/.oh-my-zsh-custom` |
+| `~/dotfiles` | `$SCRATCH/.homelinks/dotfiles` |
+
+Optional (set `SCRATCH_CONFIG=1`): `~/.config` → `$SCRATCH/.homelinks/.config`.
+
+The `.homelinks` subdirectory name is configurable via `SCRATCH_HOME_DIR`.
+
+No-op when no scratch space is detected — existing setups are unaffected.
+
+**For agents:** The symlinks are transparent. `$LOCAL_PLAT` still resolves to
+`~/.local/$PLAT` — tools install there as usual, the OS follows the symlink.
+Don't add scratch-specific logic to install scripts; just use the standard
+`_lib.sh` variables.
+
+---
+
 ## Common tasks
 
 ### Adding a program
 
-Follow this priority order:
+Follow this priority order — native installers first, Homebrew as fallback:
 
 1. **cargo** — add to `packages/cargo.txt` if it's a Rust crate.
-   `install/rust.sh` uses `cargo-binstall` to fetch pre-built binaries when available.
+   `cargo-binstall` downloads pre-built binaries (fast, no container needed on Linux).
 2. **npm** — add to `packages/npm.txt` if it's an npm package
-3. **Homebrew** — add `brew "name"` to `packages/Brewfile` if it's in Homebrew
-   (works on macOS via bottles, compiles from source on Linux)
-4. **Special script** — look at an existing `install/` script for patterns and follow them;
+3. **pip/uv** — add to `packages/pip.txt` if it's a Python package
+4. **Homebrew** — add `brew "name"` to `packages/Brewfile` for non-language-specific
+   tools, C libraries, and things without native installers
+5. **Custom script** — look at an existing `install/` script for patterns and follow them;
    add an `INSTALL_*` flag to `bootstrap.sh`
-5. **Ask** — if none of the above fits, ask before inventing a new mechanism
+6. **Ask** — if none of the above fits, ask before inventing a new mechanism
 
 For macOS-only things (casks, GUI apps, macOS services), wrap in `if OS.mac?`:
 
@@ -340,6 +404,19 @@ bats tests/shell.bats
 Tests run in an Ubuntu 24.04 container. Bootstrap runs with
 `INSTALL_NIX=0 INSTALL_PACKAGES=0` (Nix and Linux packages need
 privileges/container-in-container that aren't available in test).
+
+### Verify PATH health
+
+```sh
+verify-path              # alias — runs all checks
+bash ~/dotfiles/install/verify-path.sh --arch        # architecture match only
+bash ~/dotfiles/install/verify-path.sh --libs        # shared library check (Linux)
+bash ~/dotfiles/install/verify-path.sh --duplicates  # find shadowed binaries
+bash ~/dotfiles/install/verify-path.sh --symlinks    # broken symlinks
+bash ~/dotfiles/install/verify-path.sh --full        # check entire PATH, not just PLAT dirs
+```
+
+Not called by bootstrap — run manually after install or when debugging path issues.
 
 ---
 

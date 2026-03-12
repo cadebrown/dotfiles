@@ -20,15 +20,10 @@ brew "neovim"
 ### Git ###
 brew "git"
 brew "git-lfs"
-brew "git-delta"
-brew "difftastic"
 brew "gh"
 
 ### Search & Files ###
-brew "ripgrep"
-brew "bat"
 brew "bat-extras"
-brew "ast-grep"
 brew "tree"
 brew "ncdu"
 brew "fzf"
@@ -60,9 +55,7 @@ brew "ffmpeg"
 ### Monitoring ###
 brew "htop"
 brew "btop"
-brew "bottom"
 brew "glances"
-brew "procs"
 
 ### Build Tools ###
 brew "cmake"

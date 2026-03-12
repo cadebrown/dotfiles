@@ -20,6 +20,7 @@
 #   INSTALL_RUST     — set to 0 to skip Rust install
 #   INSTALL_PYTHON   — set to 0 to skip Python install
 #   INSTALL_CLAUDE   — set to 0 to skip Claude Code plugins install
+#   INSTALL_SCRATCH  — set to 0 to skip scratch space symlink setup
 
 set -euo pipefail
 
@@ -106,6 +107,44 @@ log_ok "Dotfiles applied"
 if [[ ! -d "$INSTALL_DIR" ]]; then
     # source-path points to home/ (via .chezmoiroot), install/ is one level up
     INSTALL_DIR="$(dirname "$("$CHEZMOI_BIN" source-path)")/install"
+fi
+
+### 2.5 scratch space ###
+
+log_section "2.5 — scratch space"
+
+if [[ "${INSTALL_SCRATCH:-1}" != "0" ]]; then
+    bash "$INSTALL_DIR/scratch.sh"
+else
+    log_info "Skipping scratch setup (INSTALL_SCRATCH=0)"
+fi
+
+### 2.7 — path sanity check ###
+
+log_section "2.7 — path sanity check"
+
+# Verify PLAT paths are writable and not stale symlinks before installing anything.
+# Catches: wrong scratch mount, broken symlinks, permission issues.
+_sanity_fail=0
+for _dir in "$ARCH_BIN" "$CARGO_HOME" "$RUSTUP_HOME" "$NVM_DIR" "$VENV"; do
+    _parent="$(dirname "$_dir")"
+    if [[ -L "$_parent" && ! -e "$_parent" ]]; then
+        log_error "Broken symlink: $_parent → $(readlink "$_parent")"
+        _sanity_fail=1
+    fi
+done
+if [[ "$_sanity_fail" -eq 1 ]]; then
+    die "Path sanity check failed — fix broken symlinks before continuing"
+fi
+# Ensure base dirs exist and are writable
+ensure_dir "$ARCH_BIN"
+if [[ ! -w "$ARCH_BIN" ]]; then
+    die "ARCH_BIN=$ARCH_BIN is not writable"
+fi
+log_ok "All PLAT paths resolve and are writable (LOCAL_PLAT=$LOCAL_PLAT)"
+if [[ -n "$SCRATCH" ]]; then
+    log_info "Scratch space: $SCRATCH"
+    log_info "LOCAL_PLAT resolves to: $(readlink -f "$LOCAL_PLAT")"
 fi
 
 ### 3. ZSH ###

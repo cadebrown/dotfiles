@@ -20,3 +20,24 @@ rm-improved
 
 # Smarter cd (pre-built: github.com/ajeetdsouza/zoxide)
 zoxide
+
+# Cat with syntax highlighting (pre-built: github.com/sharkdp/bat)
+bat
+
+# Better grep (pre-built: github.com/BurntSushi/ripgrep)
+ripgrep
+
+# Git diff viewer (pre-built: github.com/dandavison/delta)
+git-delta
+
+# Structural diff (pre-built: github.com/Wilfred/difftastic)
+difftastic
+
+# Better ps (pre-built: github.com/dalance/procs)
+procs
+
+# System monitor (pre-built: github.com/ClementTsang/bottom)
+bottom
+
+# Structural code search (pre-built: github.com/ast-grep/ast-grep)
+ast-grep

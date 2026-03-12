@@ -17,7 +17,7 @@ Every package layer has a declarative text file and an idempotent install script
 
 ## Adding a package — priority order
 
-Choose the first layer that applies:
+Choose the first layer that applies. Native installers first, Homebrew as fallback:
 
 ### 1. cargo — Rust crates
 
@@ -25,6 +25,7 @@ Choose the first layer that applies:
 # Add to packages/cargo.txt
 fd-find
 ripgrep
+bat
 my-new-tool
 ```
 
@@ -34,11 +35,36 @@ Re-run: `bash ~/dotfiles/install/rust.sh`
 download a pre-built binary from GitHub releases first (fast, no compilation), and falls back to
 `cargo install` (source compilation) if no binary is available.
 
+On Linux, cargo-binstall avoids the manylinux container round-trip entirely. On macOS, it downloads
+the same pre-built binary that Homebrew bottles provide — same quality, faster install.
+
 > **macOS note:** Source compilation requires running from a normal terminal. The macOS Sequoia
 > linker enforces `com.apple.provenance` on object files and will block compilation in sandboxed
 > contexts (e.g., certain CI environments). This isn't an issue for day-to-day use.
 
-### 2. Homebrew — everything else
+### 2. npm — npm-specific tools
+
+```sh
+# packages/npm.txt
+@scope/package-name
+```
+
+Re-run: `bash ~/dotfiles/install/npm.sh`
+
+### 3. pip — Python packages
+
+```sh
+# packages/pip.txt
+requests
+black
+numpy
+```
+
+Re-run: `bash ~/dotfiles/install/python.sh`
+
+Installs into `$LOCAL_PLAT/venv` via `uv`. The venv is activated in `.zprofile`.
+
+### 4. Homebrew — non-language-specific tools and C libraries
 
 ```ruby
 # packages/Brewfile
@@ -55,27 +81,8 @@ Re-run: `brew bundle --file=~/dotfiles/packages/Brewfile`
 
 `if OS.mac?` blocks are silently skipped on Linux. Everything outside those blocks runs on both platforms.
 
-### 3. pip — Python packages
-
-```sh
-# packages/pip.txt
-requests
-black
-numpy
-```
-
-Re-run: `bash ~/dotfiles/install/python.sh`
-
-Installs into `$LOCAL_PLAT/venv` via `uv`. The venv is activated in `.zprofile`.
-
-### 4. npm — npm-specific tools
-
-```sh
-# packages/npm.txt
-@scope/package-name
-```
-
-Re-run: `bash ~/dotfiles/install/npm.sh`
+Prefer Homebrew for tools that aren't available via cargo/npm/pip, have complex C dependencies, or are
+macOS-specific (casks, GUI apps).
 
 ### 5. Custom install script
 
@@ -89,9 +96,10 @@ Look at an existing `install/` script for patterns and follow them. Add an `INST
 
 ---
 
-## Why cargo over Homebrew for some tools
+## Why cargo over Homebrew for Rust tools
 
-Tools like `fd`, `sd`, `zoxide`, and `hyperfine` live in `cargo.txt` because:
+Tools like `fd`, `sd`, `bat`, `ripgrep`, `git-delta`, `difftastic`, `procs`, `bottom`,
+`ast-grep`, `zoxide`, and `hyperfine` live in `cargo.txt` because:
 
 - `$CARGO_HOME/bin/` is already under `$LOCAL_PLAT/` — PLAT isolation is free
 - `cargo-binstall` downloads pre-built GitHub release binaries — no slower than Homebrew bottles

@@ -67,14 +67,32 @@ NVM_DIR="${NVM_DIR:-$LOCAL_PLAT/nvm}"
 # the other arch's machine. NIX_PROFILE is respected by both nix and home-manager.
 NIX_PROFILE="${NIX_PROFILE:-$LOCAL_PLAT/nix-profile}"
 
+# Scratch space for NFS homes with small quotas.
+# Set DOTFILES_SCRATCH or create ~/scratch symlink to large local storage.
+# install/scratch.sh will symlink ~/.local, ~/.cache, etc. into
+# $SCRATCH/$SCRATCH_HOME_DIR/ (default: .homelinks).
+if [[ -z "${DOTFILES_SCRATCH:-}" && -e "$HOME/scratch" ]]; then
+    DOTFILES_SCRATCH="$(cd "$HOME/scratch" && pwd -P)"
+fi
+SCRATCH="${DOTFILES_SCRATCH:-}"
+SCRATCH_HOME_DIR="${SCRATCH_HOME_DIR:-.homelinks}"
+
 export PLAT LOCAL_PLAT RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR VENV \
        UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR \
-       NVM_DIR NIX_PROFILE
+       NVM_DIR NIX_PROFILE SCRATCH SCRATCH_HOME_DIR
 
 # Install scripts clone public repos and must not be affected by the user's
 # gitconfig (which may have url.insteadOf SSH rewrites, breaking clones on
 # machines without SSH keys — Docker, CI, fresh Linux boxes).
 export GIT_CONFIG_GLOBAL=/dev/null
+
+# Source credential env files (e.g. ~/.nvidia.env with GITHUB_TOKEN) so that
+# install scripts can authenticate with GitHub APIs (cargo-binstall, gh, etc.).
+# Uses bash globbing — no error if no files match.
+for _envfile in "$HOME"/.*.env; do
+    [[ -f "$_envfile" ]] && source "$_envfile"
+done
+unset _envfile
 
 ### COLORS ###
 

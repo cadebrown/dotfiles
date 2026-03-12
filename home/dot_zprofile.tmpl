@@ -114,6 +114,8 @@ function cuda_use() {
 
 if [ -e "$HOME/.cuda" ]; then cuda_use "$HOME/.cuda"; fi
 
+# Scratch space: large local storage for NFS homes with small quotas.
+# install/scratch.sh symlinks ~/.local, ~/.cache, etc. here.
 if [ -e "$HOME/scratch" ]; then
     export SCRATCH=$(realpath "$HOME/scratch")
 fi
