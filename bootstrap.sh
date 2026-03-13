@@ -338,7 +338,7 @@ if [[ "${INSTALL_PACKAGES:-1}" != "0" ]]; then
             bash "$INSTALL_DIR/homebrew.sh"
             ;;
         linux)
-            log_info "Linux — Homebrew in manylinux_2_28 container"
+            log_info "Linux — Homebrew (native, no container)"
             bash "$INSTALL_DIR/linux-packages.sh"
             # Activate brew for the rest of this bootstrap session
             BREW_BIN="$LOCAL_PLAT/brew/bin/brew"

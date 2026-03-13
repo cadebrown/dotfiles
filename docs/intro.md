@@ -7,17 +7,18 @@ CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" \
   curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
 ```
 
-The name and email are only asked once (or can be pre-seeded as above for unattended installs). Everything else is automatic.
+Name and email are only asked once (or pre-seeded as above for unattended installs). Everything else is automatic.
 
 ---
 
 ## What this gives you
 
 - **One bootstrap command** — installs every tool, dotfile, and language runtime from scratch
-- **PLAT isolation** — compiled binaries live under `~/.local/$(uname -m)-$(uname -s)/`, so two machines sharing an NFS home directory never conflict
-- **No sudo on Linux** — Homebrew runs inside a rootless container; everything installs to user paths
-- **Idempotent** — every script is safe to re-run; running bootstrap on a second machine just installs that machine's arch-specific tools
-- **Single source of truth** — one `Brewfile` for both macOS and Linux; `if OS.mac?` blocks handle the differences automatically
+- **Per-CPU isolation** — compiled binaries live under `~/.local/$PLAT/` where `PLAT` is detected from CPU features (e.g. `plat_Linux_x86-64-v4`, `plat_Darwin_arm64`). Two machines sharing an NFS home never conflict.
+- **No sudo anywhere** — Homebrew installs to user paths; no container or root daemon needed on Linux
+- **Self-contained binaries** — Homebrew installs its own glibc 2.35; binaries don't depend on host system libraries
+- **Idempotent** — every script is safe to re-run; running bootstrap on a second machine just installs that machine's tools
+- **Single source of truth** — one `Brewfile` for macOS and Linux; `if OS.mac?` blocks handle differences
 - **Fast shell startup** — lazy nvm loading, single `compinit`, ~140ms warm startup
 
 ---
@@ -26,12 +27,12 @@ The name and email are only asked once (or can be pre-seeded as above for unatte
 
 | | macOS | Linux |
 |---|---|---|
-| Packages | Homebrew (native bottles) | Homebrew in `manylinux_2_28` container |
+| Packages | Homebrew (native) | Homebrew (native, no container) |
 | Rust toolchain | Homebrew `rustup` (code-signed, required for Sequoia+) | `sh.rustup.rs` |
 | Rust tools | `cargo-binstall` (pre-built binaries first, source fallback) | same |
 | Services | colima auto-started; iTerm2 prefs configured | — |
 | Claude Code | Homebrew cask | Native binary |
-| First run | ~5 min | ~10 min |
+| First run | ~5 min | ~5 min |
 
 ---
 
@@ -41,10 +42,11 @@ The name and email are only asked once (or can be pre-seeded as above for unatte
 
 ```
 bootstrap.sh
+  ↓ scratch.sh           redirect ~/.local, ~/.cache to local storage (NFS homes)
   ↓ chezmoi apply        dotfiles → ~/
   ↓ install/zsh.sh       oh-my-zsh + plugins
   ↓ homebrew.sh          packages from Brewfile (macOS)
-    linux-packages.sh    packages from Brewfile (Linux, via container)
+    linux-packages.sh    glibc + packages from Brewfile (Linux)
   ↓ install/services.sh  colima login service + iTerm2 prefs (macOS)
   ↓ install/node.sh      nvm → Node.js
   ↓ install/rust.sh      rustup → cargo-binstall → cargo tools
@@ -52,7 +54,21 @@ bootstrap.sh
   ↓ install/claude.sh    Claude Code + plugins + MCP servers
 ```
 
-Compiled tools land under `~/.local/$PLAT/` — a different directory per arch+OS. A shared home has no conflicts. Text configs (dotfiles) are shared freely; they're arch-neutral by design.
+Compiled tools land under `~/.local/$PLAT/` — a separate directory per CPU level. On a shared home directory, each machine installs into its own `$PLAT` subdirectory. Text configs are arch-neutral and shared freely.
+
+### CPU-level detection
+
+On Linux x86-64, the bootstrap detects the highest microarchitecture level the CPU supports:
+
+| PLAT | CPU requirement | Typical hardware |
+|---|---|---|
+| `plat_Linux_x86-64-v4` | AVX-512 | Intel Ice Lake+, AMD Zen 4+ |
+| `plat_Linux_x86-64-v3` | AVX2/FMA | Intel Haswell+ (2013+), AMD Zen 2+ (2019+) |
+| `plat_Linux_x86-64-v2` | SSE4.2 | Intel Nehalem+ (2008+) |
+| `plat_Linux_aarch64` | any AArch64 | Graviton, Ampere, etc. |
+| `plat_Darwin_arm64` | Apple Silicon | M1/M2/M3/M4+ |
+
+Each level gets binaries compiled with the appropriate `-march=` flags, so tools use the best available instruction set on each machine.
 
 ---
 

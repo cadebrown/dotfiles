@@ -317,24 +317,23 @@ Result: **~0.14s** shell startup (down from ~1.1s with eager nvm loading).
 ## bootstrap.sh flow
 
 ```
-source _lib.sh      → detect PLAT from install/plat/ (or fallback), set paths
-0.   scratch        → create ~/scratch → DOTFILES_SCRATCH_PATH; symlink ~/.local, ~/.cache
-                      re-resolve LOCAL_PLAT after ~/.local is symlinked to scratch
-0.5  dotfiles repo  → clone if not present; ~/dotfiles → DOTFILES_PATH
-0.3  PLAT detect    → re-detect PLAT from real repo's install/plat/; migrate old dir
-                      sources .plat_env.sh for CFLAGS/RUSTFLAGS/HOMEBREW_OPTFLAGS
-2.7  path sanity    → check PLAT paths are writable and not stale symlinks
-1.   chezmoi        → install binary to $ARCH_BIN, run chezmoi apply
-2.   dotfiles       → chezmoi apply (prompts name/email on first run)
-3.   ZSH            → oh-my-zsh + plugins via install/zsh.sh
-4.   packages       → macOS: homebrew.sh | Linux: linux-packages.sh
-5.   services       → macOS: colima autostart + iTerm2 prefs (install/services.sh)
-6.   runtimes       → node.sh, rust.sh, python.sh, claude.sh
+source _lib.sh   → detect PLAT from install/plat/ check scripts, set all path vars
+1.  scratch      → create ~/scratch → DOTFILES_SCRATCH_PATH; symlink ~/.local, ~/.cache
+                   re-resolve LOCAL_PLAT now that ~/.local may point to scratch
+2.  repo         → clone dotfiles if not present; create ~/dotfiles symlink
+                   re-detect PLAT from real repo's install/plat/; source .plat_env.sh
+3.  chezmoi      → install binary to $ARCH_BIN; chezmoi apply (prompts name/email once)
+4.  path check   → verify PLAT paths are writable and not stale symlinks
+5.  ZSH          → oh-my-zsh + plugins via install/zsh.sh
+6.  packages     → macOS: homebrew.sh | Linux: linux-packages.sh (glibc + brew bundle)
+7.  services     → macOS: colima autostart + iTerm2 prefs (install/services.sh)
+8.  runtimes     → node.sh, rust.sh, python.sh, claude.sh
 ```
 
-Each step has an `INSTALL_*=0` env var to skip it. The Linux packages step
-runs `brew bundle` directly on the host (no container, no Docker required); most
-packages pour as precompiled bottles. glibc builds from source on first install (~2 min).
+Each step after scratch has an `INSTALL_*=0` env var to skip it. The Linux packages
+step installs Homebrew's own glibc first, then runs `brew bundle` — no container, no
+Docker required. Most packages pour as precompiled bottles; glibc builds from source
+on first install (~2 min).
 
 Pre-seed name/email to avoid interactive prompts:
 ```sh
@@ -378,7 +377,7 @@ Don't add scratch-specific logic to install scripts; just use the standard
 Follow this priority order — native installers first, Homebrew as fallback:
 
 1. **cargo** — add to `packages/cargo.txt` if it's a Rust crate.
-   `cargo-binstall` downloads pre-built binaries (fast, no container needed on Linux).
+   `cargo-binstall` downloads pre-built binaries from GitHub releases (fast).
 2. **npm** — add to `packages/npm.txt` if it's an npm package
 3. **pip/uv** — add to `packages/pip.txt` if it's a Python package
 4. **Homebrew** — add `brew "name"` to `packages/Brewfile` for non-language-specific
@@ -499,8 +498,8 @@ bats tests/shell.bats
 ```
 
 Tests run in an Ubuntu 24.04 container. Bootstrap runs with
-`INSTALL_NIX=0 INSTALL_PACKAGES=0` (Nix and Linux packages need
-privileges/container-in-container that aren't available in test).
+`INSTALL_NIX=0 INSTALL_PACKAGES=0` (Nix and package installs are skipped
+in the test environment to keep tests fast and hermetic).
 
 ### Verify PATH health
 

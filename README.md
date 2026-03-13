@@ -1,18 +1,18 @@
 # dotfiles
 
-Personal dotfiles managed with [chezmoi](https://chezmoi.io). Works on macOS (arm64) and Linux (arm64 + x86_64), including shared home directories across machines with no sudo required on Linux.
+Personal dotfiles managed with [chezmoi](https://chezmoi.io). Works on macOS (arm64) and Linux (arm64 + x86-64), including shared home directories across machines — no sudo required anywhere.
 
 ## Install
 
-### Quick start — no repo needed
+### Quick start
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
 ```
 
-Prompts for name and email on first run. Everything else is automatic.
+Prompts for name and email once. Everything else is automatic.
 
-### With name/email pre-seeded (unattended)
+### Unattended (CI / shared systems)
 
 ```sh
 CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" \
@@ -26,7 +26,7 @@ git clone https://github.com/cadebrown/dotfiles ~/dotfiles
 CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" ~/dotfiles/bootstrap.sh
 ```
 
-All steps are idempotent — safe to re-run. On a machine sharing a home directory, re-running just installs that machine's arch-specific binaries under `~/.local/$PLAT/`.
+All steps are idempotent — safe to re-run. On a shared home directory, re-running on a second machine just installs that machine's arch-specific binaries under `~/.local/$PLAT/`.
 
 ---
 
@@ -34,13 +34,13 @@ All steps are idempotent — safe to re-run. On a machine sharing a home directo
 
 | | macOS | Linux |
 |---|---|---|
-| Package manager | Homebrew (native bottles) | Homebrew on host (no container, no sudo) |
+| Package manager | Homebrew (native) | Homebrew (native, no container, no sudo) |
 | Rust toolchain | Homebrew `rustup` (code-signed) | `sh.rustup.rs` |
 | Docker/Podman | Colima (auto-started at login) | Not required |
 | Claude Code | Homebrew cask | Native binary |
-| First run time | ~5 min | ~5 min (glibc builds from source ~2 min) |
+| First run time | ~5 min | ~5 min |
 
-See [docs/setup/bootstrap.md](docs/setup/bootstrap.md) for full platform requirements.
+See [docs/setup/bootstrap.md](docs/setup/bootstrap.md) for full platform details.
 
 ---
 
@@ -61,7 +61,7 @@ bash ~/dotfiles/install/rust.sh
 bash ~/dotfiles/install/python.sh
 bash ~/dotfiles/install/claude.sh
 
-# Sync packages
+# Sync packages (macOS or Linux with brew on PATH)
 brew bundle --file=~/dotfiles/packages/Brewfile
 ```
 
