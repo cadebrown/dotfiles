@@ -1,11 +1,11 @@
 # Brewfile - packages managed by Homebrew on macOS and Linux
 #
 # if OS.mac? blocks: casks and macOS-specific tools (skipped on Linux)
-# Everything else: cross-platform CLI tools compiled from source on Linux
+# Everything else: cross-platform CLI tools installed on both platforms
 #
 # Usage:
 #   macOS: brew bundle --file=~/dotfiles/packages/Brewfile
-#   Linux: see install/linux-packages.sh (runs brew bundle inside a container)
+#   Linux: bash ~/dotfiles/install/linux-packages.sh
 
 ### Shells ###
 brew "zsh"
@@ -15,7 +15,6 @@ brew "nushell"
 
 ### Editors ###
 brew "vim"
-brew "neovim"
 
 ### Git ###
 brew "git"
@@ -23,7 +22,6 @@ brew "git-lfs"
 brew "gh"
 
 ### Search & Files ###
-brew "bat-extras"
 brew "tree"
 brew "ncdu"
 brew "fzf"
@@ -45,9 +43,17 @@ brew "fetch"
 brew "lynx"
 brew "tmux"
 brew "moreutils"
-brew "pandoc"
 brew "graphviz"
 brew "texinfo"
+
+### Documents ###
+# pandoc: macOS only — on Linux the Homebrew formula has no bottle for custom
+# prefixes and would need to build GHC (Haskell compiler) from source.
+# Install the official static Linux binary manually from:
+#   https://github.com/jgm/pandoc/releases
+if OS.mac?
+  brew "pandoc"
+end
 
 ### Media ###
 brew "ffmpeg"
@@ -61,7 +67,8 @@ brew "glances"
 brew "cmake"
 brew "ninja"
 brew "meson"
-brew "llvm"
+brew "gcc"
+brew "llvm"   # includes clang, clang++, lld, lldb
 brew "fftw"
 brew "glfw"
 brew "openjdk"
@@ -100,6 +107,7 @@ if OS.mac?
   ### Editors & IDEs ###
   cask "visual-studio-code"
   cask "cursor"
+
   ### Window Management ###
   cask "nikitabobko/tap/aerospace"
   cask "linearmouse"
@@ -145,4 +153,3 @@ if OS.mac?
   ### Utilities ###
   cask "balenaetcher"
 end
-
