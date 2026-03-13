@@ -10,7 +10,8 @@
 ### Shells ###
 brew "zsh"
 brew "bash"
-brew "fish"
+# fish: transitive dependency on python@3.14 (PGO test failures on custom prefix)
+# brew "fish"
 
 ### Editors ###
 # vim: requires python@3.14 which has persistent PGO test failures on custom
@@ -18,7 +19,9 @@ brew "fish"
 # brew "vim"
 
 ### Git ###
-brew "git"
+# git: transitive dependency on python@3.14 (PGO test failures on custom prefix)
+# Use system git or install from source manually. git-lfs and gh work fine.
+# brew "git"
 brew "git-lfs"
 brew "gh"
 
