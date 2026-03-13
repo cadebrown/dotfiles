@@ -39,7 +39,7 @@ templates — no `.tmpl` extension.
 These must never be broken:
 
 1. **No sudo on Linux.** Every install script runs as the current user. Homebrew on Linux
-   runs inside a rootless container (Docker or Podman).
+   runs directly on the host (no root, no container). Docker/Podman is not required.
 
 2. **PLAT isolation.** Every compiled binary lives under `~/.local/$PLAT/` where
    `PLAT` is detected from `install/plat/` check scripts (e.g. `plat_Linux_x86-64-v4`,
@@ -50,9 +50,9 @@ These must never be broken:
 
 3. **Idempotent.** Every script is safe to re-run. Check before installing; skip if already done.
 
-4. **glibc portability.** Linux packages install inside a `manylinux_2_28` container
-   (AlmaLinux 8, glibc 2.28). Most packages pour as precompiled bottles; Homebrew
-   bundles its own glibc 2.35 so binaries are self-contained.
+4. **glibc portability.** Homebrew bundles its own glibc 2.35 — binaries are self-contained
+   and independent of the host system glibc. Most packages pour as precompiled bottles;
+   glibc itself builds from source (~2 min) using the native CPU march on first install.
 
 5. **Same Brewfile everywhere.** `packages/Brewfile` is the single source of truth for packages
    on both macOS and Linux. `if OS.mac?` blocks handle casks and macOS-specific tools.
@@ -104,10 +104,10 @@ dotfiles/
 │   │   ├── plat_Darwin_arm64/     # Apple Silicon
 │   │   └── plat_Darwin_x86-64/    # Intel Mac
 │   ├── migrate-plat.sh        # One-time: rename old x86_64-Linux dir to plat_Linux_* format
-│   ├── brew-shell.sh          # Debug helper: interactive Homebrew shell in manylinux container
+│   ├── brew-shell.sh          # Debug helper: interactive Homebrew shell in manylinux container (optional)
 │   ├── chezmoi.sh             # Install chezmoi binary → $ARCH_BIN
 │   ├── homebrew.sh            # macOS: install Homebrew + brew bundle
-│   ├── linux-packages.sh      # Linux: brew bundle inside manylinux_2_28 container
+│   ├── linux-packages.sh      # Linux: brew bundle on host (no container); HOMEBREW_NO_CONTAINER=0 for manylinux fallback
 │   ├── zsh.sh                 # oh-my-zsh + plugins (pure, autosuggestions, fsh, completions)
 │   ├── services.sh            # macOS: colima login service + iTerm2 prefs
 │   ├── node.sh                # nvm + Node.js → $LOCAL_PLAT/nvm/
@@ -228,13 +228,24 @@ Also sourced by `.zprofile` at login so interactive `cargo build`, `cmake`, etc.
 ```bash
 #!/usr/bin/env bash
 # plat_Linux_x86-64-v3/.plat_env.sh
-export CFLAGS="-march=x86-64-v3 -O2"
-export CXXFLAGS="-march=x86-64-v3 -O2"
-export RUSTFLAGS="-C target-cpu=x86-64-v3"
-export HOMEBREW_OPTFLAGS="-march=x86-64-v3 -O2"   # controls glibc build in manylinux
-export CMAKE_C_FLAGS="-march=x86-64-v3 -O2"
-export CMAKE_CXX_FLAGS="-march=x86-64-v3 -O2"
+export CFLAGS="${CFLAGS:--march=x86-64-v3 -O2}"
+export CXXFLAGS="${CXXFLAGS:--march=x86-64-v3 -O2}"
+export RUSTFLAGS="${RUSTFLAGS:--C target-cpu=x86-64-v3}"
+export HOMEBREW_OPTFLAGS="${HOMEBREW_OPTFLAGS:--march=x86-64-v3 -O2}"
+export CMAKE_C_FLAGS="${CMAKE_C_FLAGS:--march=x86-64-v3 -O2}"
+export CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS:--march=x86-64-v3 -O2}"
 ```
+
+`HOMEBREW_OPTFLAGS` is sourced from `.plat_env.sh` but is **not** passed into Homebrew
+in the default (no-container) mode — Homebrew's native march detection runs on the host
+CPU, which is exactly what we want (v3 machine → `-march=znver2`, v4 → `-march=native` for
+that host). Only glibc builds from source; all user tools pour as precompiled bottles.
+
+Container mode (`HOMEBREW_NO_CONTAINER=0`): `HOMEBREW_OPTFLAGS_PLAT` is passed via
+`docker -e` to override the container's native detection. The init script translates
+`x86-64-v{n}` → `x86-64` for bootstrap gcc (GCC 9, which predates the v-level syntax
+added in GCC 11). Use this when building on a high-end machine for deployment on older
+hardware.
 
 ### Adding a new PLAT
 
@@ -323,8 +334,8 @@ source _lib.sh      → detect PLAT from install/plat/ (or fallback), set paths
 ```
 
 Each step has an `INSTALL_*=0` env var to skip it. The Linux packages step
-starts a `manylinux_2_28` container and runs `brew bundle` inside it; most
-packages pour as precompiled bottles — first bootstrap takes ~10 min.
+runs `brew bundle` directly on the host (no container, no Docker required); most
+packages pour as precompiled bottles. glibc builds from source on first install (~2 min).
 
 Pre-seed name/email to avoid interactive prompts:
 ```sh

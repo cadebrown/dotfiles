@@ -34,11 +34,11 @@ All steps are idempotent — safe to re-run. On a machine sharing a home directo
 
 | | macOS | Linux |
 |---|---|---|
-| Package manager | Homebrew (native bottles) | Homebrew in `manylinux_2_28` container |
+| Package manager | Homebrew (native bottles) | Homebrew on host (no container, no sudo) |
 | Rust toolchain | Homebrew `rustup` (code-signed) | `sh.rustup.rs` |
-| Docker/Podman | Colima (auto-started at login) | Required pre-requisite for packages |
+| Docker/Podman | Colima (auto-started at login) | Not required |
 | Claude Code | Homebrew cask | Native binary |
-| First run time | ~5 min | ~10 min (some packages compile) |
+| First run time | ~5 min | ~5 min (glibc builds from source ~2 min) |
 
 See [docs/setup/bootstrap.md](docs/setup/bootstrap.md) for full platform requirements.
 
