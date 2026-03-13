@@ -40,11 +40,9 @@ brew "cloc"
 brew "imagemagick"
 brew "fastfetch"
 brew "fetch"
-brew "lynx"
 brew "tmux"
 brew "moreutils"
 brew "graphviz"
-brew "texinfo"
 
 ### Documents ###
 brew "pandoc"
@@ -57,6 +55,10 @@ brew "htop"
 brew "btop"
 brew "glances"
 
+### Compression ###
+brew "lz4"
+brew "zstd"
+
 ### Build Tools ###
 brew "cmake"
 brew "ninja"
@@ -64,10 +66,9 @@ brew "meson"
 brew "gcc"
 brew "llvm"   # clang, clang++, lldb, llvm-ar, opt, etc.
 brew "lld"    # LLVM linker (now a separate formula)
+brew "mold"   # fast modern linker
 brew "fftw"
 brew "glfw"
-brew "openjdk"
-brew "openssh"
 
 ### Languages ###
 brew "zig"
@@ -84,6 +85,10 @@ if OS.mac?
   # Homebrew's rustup is code-signed — avoids macOS linker sandbox restrictions.
   # On Linux, install/rust.sh uses rustup-init directly (no Homebrew needed).
   brew "rustup"
+
+  ### Languages & Runtimes (macOS) ###
+  brew "openjdk"
+  brew "openssh"
 
   ### Dev Tools - VMs & Containers (macOS) ###
   brew "colima"
