@@ -40,7 +40,7 @@ case "$ARCH" in
 esac
 log_info "Build image:       $IMAGE"
 
-BREW_PREFIX="$LOCAL_PLAT/brew"
+BREW_PREFIX="${BREW_PREFIX:-$LOCAL_PLAT/brew}"
 log_info "Homebrew prefix:   $BREW_PREFIX"
 
 log_info "Pulling $IMAGE"
@@ -61,13 +61,11 @@ log_info "Pulling $IMAGE"
 
 # Resolve symlinks so Docker mounts the real filesystem paths.
 # On NFS homes with scratch symlinks, Docker can't mount NFS paths directly.
-# The resolved scratch path is the canonical location — the symlink at
-# ~/.local/$PLAT is just a convenience for the host.
-# Resolve ~/.local (the symlink) to the real scratch path.
-# On NFS homes, ~/.local → $SCRATCH/.paths/.local
-_REAL_LOCAL="$(readlink -f "$HOME/.local")"
-_REAL_LOCAL_PLAT="$_REAL_LOCAL/$PLAT"
-_REAL_BREW_PREFIX="$_REAL_LOCAL_PLAT/brew"
+# If BREW_PREFIX was overridden (e.g. building v3 from a v4 machine), resolve
+# from that path; otherwise derive from LOCAL_PLAT as usual.
+mkdir -p "$BREW_PREFIX"
+_REAL_BREW_PREFIX="$(readlink -f "$BREW_PREFIX")"
+_REAL_LOCAL_PLAT="$(dirname "$_REAL_BREW_PREFIX")"
 
 # Copy Brewfile to scratch so it's accessible inside the container.
 # The source repo may be on NFS which Docker can't mount.
@@ -114,6 +112,7 @@ log_info "Running brew bundle in container (first run builds glibc from source �
     -e HOMEBREW_NO_ANALYTICS=1 \
     -e HOMEBREW_NO_ENV_HINTS=1 \
     -e HOMEBREW_OPTFLAGS="$HOMEBREW_OPTFLAGS" \
+    -e HOMEBREW_OPTFLAGS_PLAT="$HOMEBREW_OPTFLAGS" \
     "$IMAGE" \
     bash << 'OUTER_EOF'
 set -euo pipefail
@@ -131,13 +130,35 @@ else
     echo "[ok]   Homebrew already installed at $BREW_PREFIX"
 fi
 
+_GIT_PATH="$(command -v git 2>/dev/null || true)"
 eval "$($BREW_PREFIX/bin/brew shellenv)"
+[[ -n "$_GIT_PATH" ]] && export HOMEBREW_GIT_PATH="$_GIT_PATH"
+unset _GIT_PATH
 
-# HOMEBREW_OPTFLAGS is passed from the host via -e above.
-# It controls the -march= flag for any formula that builds from source,
-# primarily glibc (which has no bottle for custom prefixes).
-# All other packages pour as precompiled bottles from Homebrew's CDN.
-echo "[info] HOMEBREW_OPTFLAGS: ${HOMEBREW_OPTFLAGS:-<unset>}"
+# Patch Homebrew's Ruby build env to respect HOMEBREW_OPTFLAGS_PLAT.
+# super.rb unconditionally sets self["HOMEBREW_OPTFLAGS"] = determine_optflags,
+# and on Linux determine_optflags always returns "-march=native".
+# This patch makes it check HOMEBREW_OPTFLAGS_PLAT first (passed via docker -e).
+# The glibc bootstrap gcc (an older, stripped-down GCC) doesn't support the
+# x86-64-v{n} syntax added in GCC 11. Translate to baseline -march=x86-64 so
+# configure can compile its test file. glibc is the only source-built package;
+# user tools (jq, bat, etc.) pour as pre-compiled bottles and are unaffected.
+HOMEBREW_OPTFLAGS_PLAT="${HOMEBREW_OPTFLAGS_PLAT//-march=x86-64-v?/-march=x86-64}"
+export HOMEBREW_OPTFLAGS_PLAT
+echo "[info] HOMEBREW_OPTFLAGS_PLAT: ${HOMEBREW_OPTFLAGS_PLAT:-<unset>}"
+# HOMEBREW_REPOSITORY is set by brew shellenv — it's the git clone root.
+_SUPER_RB="$HOMEBREW_REPOSITORY/Library/Homebrew/extend/ENV/super.rb"
+if [[ -f "$_SUPER_RB" ]] && ! grep -q "HOMEBREW_OPTFLAGS_PLAT" "$_SUPER_RB"; then
+    sed -i \
+        's/self\["HOMEBREW_OPTFLAGS"\] = determine_optflags/self["HOMEBREW_OPTFLAGS"] = ENV["HOMEBREW_OPTFLAGS_PLAT"] || determine_optflags/' \
+        "$_SUPER_RB"
+    echo "[info] Patched super.rb: HOMEBREW_OPTFLAGS_PLAT overrides native detection"
+elif [[ -f "$_SUPER_RB" ]]; then
+    echo "[ok]   super.rb already patched"
+else
+    echo "[warn] super.rb not found at $_SUPER_RB — skipping patch"
+fi
+unset _SUPER_RB
 
 brew bundle install --file="$BREWFILE" --no-upgrade 2>&1
 OUTER_EOF

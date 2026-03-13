@@ -59,6 +59,10 @@ BREW_PREFIX="${BREW_PREFIX:-$_DEFAULT_BREW_PREFIX}"
 # Resolve prefix itself in case it's under a symlink dir
 mkdir -p "$BREW_PREFIX"
 BREW_PREFIX="$(readlink -f "$BREW_PREFIX")"
+# HOME inside the container is the parent of BREW_PREFIX (the PLAT dir).
+# We mount this parent so Homebrew can write its cache there.
+_BREW_HOME="$(dirname "$BREW_PREFIX")"
+mkdir -p "$_BREW_HOME"
 
 ### passwd/group so `whoami` works (required by Homebrew) ###
 
@@ -84,8 +88,51 @@ else
     echo "[ok]   Homebrew already at $BREW_PREFIX"
 fi
 
+# Capture git path before brew shellenv modifies PATH.
+# Homebrew needs git but brew shellenv prepends its own bin/ first, and on a
+# fresh install there's no brew-installed git yet. HOMEBREW_GIT_PATH pins it.
+_GIT_PATH="$(command -v git 2>/dev/null || true)"
+
 eval "$($BREW_PREFIX/bin/brew shellenv)"
 export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_ENV_HINTS=1
+[[ -n "$_GIT_PATH" ]] && export HOMEBREW_GIT_PATH="$_GIT_PATH"
+unset _GIT_PATH
+
+# Patch Homebrew's Ruby build env to respect HOMEBREW_OPTFLAGS_PLAT.
+#
+# Problem: Library/Homebrew/extend/ENV/super.rb line ~95 unconditionally runs:
+#   self["HOMEBREW_OPTFLAGS"] = determine_optflags
+# On Linux, determine_optflags always returns "-march=native" because
+# Library/Homebrew/extend/os/linux/extend/ENV/shared.rb hardcodes:
+#   effective_arch → :native  (for Intel and ARM, regardless of OS env).
+# This overwrites any HOMEBREW_OPTFLAGS we pass in from outside.
+# glibc.rb then reads: cflags = "-O2 #{ENV["HOMEBREW_OPTFLAGS"]}"
+# On an AVX-512 host that produces glibc compiled for x86-64-v4, crashing on
+# AVX2-only machines: "Fatal glibc error: CPU does not support x86-64-v4".
+#
+# Fix: patch super.rb to check HOMEBREW_OPTFLAGS_PLAT first.
+# We pass HOMEBREW_OPTFLAGS_PLAT (= our target march flags) via docker -e.
+# The patch is idempotent — guarded by grep.
+# HOMEBREW_REPOSITORY is set by brew shellenv — it's the git clone root.
+_SUPER_RB="$HOMEBREW_REPOSITORY/Library/Homebrew/extend/ENV/super.rb"
+if [[ -f "$_SUPER_RB" ]] && ! grep -q "HOMEBREW_OPTFLAGS_PLAT" "$_SUPER_RB"; then
+    sed -i \
+        's/self\["HOMEBREW_OPTFLAGS"\] = determine_optflags/self["HOMEBREW_OPTFLAGS"] = ENV["HOMEBREW_OPTFLAGS_PLAT"] || determine_optflags/' \
+        "$_SUPER_RB"
+    echo "[info] Patched super.rb: HOMEBREW_OPTFLAGS_PLAT overrides native detection"
+elif [[ -f "$_SUPER_RB" ]]; then
+    echo "[ok]   super.rb already patched"
+else
+    echo "[warn] super.rb not found at $_SUPER_RB — skipping patch"
+fi
+unset _SUPER_RB
+# The glibc bootstrap gcc (an older, stripped-down GCC) doesn't support the
+# x86-64-v{n} syntax added in GCC 11. Translate to baseline -march=x86-64 so
+# configure can compile its test file. glibc is the only source-built package;
+# user tools (jq, bat, etc.) pour as pre-compiled bottles and are unaffected.
+HOMEBREW_OPTFLAGS_PLAT="${HOMEBREW_OPTFLAGS_PLAT//-march=x86-64-v?/-march=x86-64}"
+export HOMEBREW_OPTFLAGS_PLAT
+echo "[info] HOMEBREW_OPTFLAGS_PLAT: ${HOMEBREW_OPTFLAGS_PLAT:-<unset>}"
 
 _glibc_ver=$(ldd --version 2>&1 | head -1 | grep -oP '\d+\.\d+$' || echo "?")
 _brew_ver=$(brew --version 2>/dev/null | head -1 || echo "?")
@@ -121,11 +168,13 @@ log_info ""
     --user "$(id -u):$(id -g)" \
     -v "$_PASSWD_TMP:/etc/passwd:ro" \
     -v "$_GROUP_TMP:/etc/group:ro" \
-    -v "$BREW_PREFIX:$BREW_PREFIX" \
-    -e HOME="$(dirname "$BREW_PREFIX")" \
+    -v "$_BREW_HOME:$_BREW_HOME" \
+    -e HOME="$_BREW_HOME" \
     -e BREW_PREFIX="$BREW_PREFIX" \
     -e HOMEBREW_NO_AUTO_UPDATE=1 \
     -e HOMEBREW_NO_ANALYTICS=1 \
     -e HOMEBREW_NO_ENV_HINTS=1 \
+    -e HOMEBREW_OPTFLAGS="${HOMEBREW_OPTFLAGS:-}" \
+    -e HOMEBREW_OPTFLAGS_PLAT="${HOMEBREW_OPTFLAGS:-}" \
     "$IMAGE" \
     bash -c "$_CMD"
