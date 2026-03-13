@@ -370,10 +370,6 @@ log_section "6 — language runtimes"
 
 if [[ "${INSTALL_NODE:-1}" != "0" ]]; then
     bash "$INSTALL_DIR/node.sh"
-    # Activate nvm for the rest of this bootstrap session so npm.sh can use it
-    # shellcheck source=/dev/null
-    [[ -s "$LOCAL_PLAT/nvm/nvm.sh" ]] && source "$LOCAL_PLAT/nvm/nvm.sh" && nvm use default --silent 2>/dev/null || true
-    bash "$INSTALL_DIR/npm.sh"
 else
     log_info "Skipping Node + npm packages (INSTALL_NODE=0)"
 fi

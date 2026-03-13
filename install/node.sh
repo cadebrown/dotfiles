@@ -36,3 +36,28 @@ nvm use default --silent
 
 log_ok "Node.js: $(node --version)"
 log_ok "npm:     $(npm --version)"
+
+### npm global packages ###
+
+NPM_TXT="$PACKAGES_DIR/npm.txt"
+if [[ ! -f "$NPM_TXT" ]]; then
+    log_warn "No npm.txt at $NPM_TXT — skipping npm packages"
+    exit 0
+fi
+
+_pkg_count=0
+while IFS= read -r line; do
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    pkg="${line%% *}"
+
+    if npm list -g "$pkg" --depth=0 &>/dev/null; then
+        log_ok "  $pkg (already installed)"
+    else
+        log_info "  installing $pkg"
+        run_logged npm install -g "$pkg"
+        log_ok "  $pkg"
+        (( _pkg_count++ )) || true
+    fi
+done < "$NPM_TXT"
+
+[[ $_pkg_count -eq 0 ]] && log_info "All npm packages already installed"
