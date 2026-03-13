@@ -41,3 +41,6 @@ bottom
 
 # Structural code search (pre-built: github.com/ast-grep/ast-grep)
 ast-grep
+
+# Modern shell (pre-built: github.com/nushell/nushell)
+nu
