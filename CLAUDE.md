@@ -178,6 +178,75 @@ without SSH keys configured.
 
 ---
 
+## PLAT specs — install/plat/
+
+Each subdirectory of `install/plat/` defines one platform target.
+`_lib.sh` scans them (sorted reverse — highest first), runs `.plat_check.sh`,
+and sources `.plat_env.sh` from the first one that exits 0.
+
+### Current specs
+
+| PLAT | OS | CPU requirement | Typical hardware |
+|---|---|---|---|
+| `plat_Linux_x86-64-v4` | Linux | AVX-512 (avx512f/bw/cd/dq/vl) | Intel Skylake-X/Ice Lake+, AMD Zen 4+ |
+| `plat_Linux_x86-64-v3` | Linux | AVX2/FMA/BMI2 | Intel Haswell+ (2013+), AMD Zen 2+ (2019+) |
+| `plat_Linux_x86-64-v2` | Linux | SSE4.2/POPCNT | Intel Nehalem+ (2008+), AMD K10+ |
+| `plat_Linux_aarch64` | Linux | any AArch64 | Graviton, Ampere, etc. |
+| `plat_Darwin_arm64` | macOS | any Apple Silicon | M1/M2/M3/M4+ |
+| `plat_Darwin_x86-64` | macOS | any Intel | Intel Mac (all models) |
+
+Detection order (highest to lowest):
+```
+v4 checked first → v3 → v2 → fallback
+```
+The fallback (no matching spec) uses the old `uname-m-uname-s` format for
+backwards compatibility.
+
+### .plat_check.sh — capability detection
+
+POSIX sh (invoked with `/bin/sh`). Exit 0 if this machine supports this PLAT.
+
+```sh
+#!/bin/sh
+# plat_Linux_x86-64-v3/.plat_check.sh
+[ "$(uname -s)" = "Linux" ] || exit 1
+[ "$(uname -m)" = "x86_64" ] || exit 1
+for flag in avx avx2 bmi1 bmi2 f16c fma movbe xsave cx16 popcnt sse4_1 sse4_2 ssse3; do
+    grep -qw "$flag" /proc/cpuinfo 2>/dev/null || exit 1
+done
+exit 0
+```
+
+macOS doesn't have `/proc/cpuinfo` — just check `uname -s` + `uname -m`.
+Linux x86-64 feature flags come from `/proc/cpuinfo` — `grep -qw` does word-boundary matching.
+
+### .plat_env.sh — compile flags
+
+Bash. Sourced after detection to set compile-time flags for that PLAT.
+Also sourced by `.zprofile` at login so interactive `cargo build`, `cmake`, etc. use them.
+
+```bash
+#!/usr/bin/env bash
+# plat_Linux_x86-64-v3/.plat_env.sh
+export CFLAGS="-march=x86-64-v3 -O2"
+export CXXFLAGS="-march=x86-64-v3 -O2"
+export RUSTFLAGS="-C target-cpu=x86-64-v3"
+export HOMEBREW_OPTFLAGS="-march=x86-64-v3 -O2"   # controls glibc build in manylinux
+export CMAKE_C_FLAGS="-march=x86-64-v3 -O2"
+export CMAKE_CXX_FLAGS="-march=x86-64-v3 -O2"
+```
+
+### Adding a new PLAT
+
+1. Create `install/plat/plat_{OS}_{name}/`
+2. Write `.plat_check.sh` — exit 0 if supported, exit 1 if not
+3. Write `.plat_env.sh` — set flags for this target
+4. The name determines sort order — use a name that sorts correctly relative to siblings
+   (e.g. `plat_Linux_x86-64-v4` sorts after `plat_Linux_x86-64-v3`)
+5. Test with: `for d in install/plat/plat_Linux_*/; do /bin/sh "$d/.plat_check.sh" && echo "PASS $(basename $d)" || echo "fail $(basename $d)"; done`
+
+---
+
 ## PATH priority
 
 `.zprofile` sources Homebrew first, then prepends PLAT paths on top. The resulting
