@@ -70,5 +70,37 @@ fi
 log_info "Running brew bundle..."
 brew bundle install --file="$_BREWFILE_TMP" --no-upgrade 2>&1
 
+### Create unversioned compiler symlinks ###
+#
+# gcc and llvm are keg-only — Homebrew doesn't link gcc/g++/clang/clang++ into
+# brew/bin to avoid shadowing system compilers. Create symlinks in $LOCAL_PLAT/bin
+# (which is on PATH ahead of brew/bin) so `gcc` resolves to Homebrew's version.
+_PLAT_BIN="$(dirname "$_REAL_BREW_PREFIX")/bin"
+ensure_dir "$_PLAT_BIN"
+
+if [ -d "$_REAL_BREW_PREFIX/opt/gcc/bin" ]; then
+    _GCC_VER=$(ls "$_REAL_BREW_PREFIX/opt/gcc/bin"/gcc-* 2>/dev/null | grep -oP 'gcc-\K[0-9]+' | sort -n | tail -1)
+    if [ -n "$_GCC_VER" ]; then
+        ln -sf "$_REAL_BREW_PREFIX/bin/gcc-$_GCC_VER" "$_PLAT_BIN/gcc"
+        ln -sf "$_REAL_BREW_PREFIX/bin/g++-$_GCC_VER" "$_PLAT_BIN/g++"
+        ln -sf "$_REAL_BREW_PREFIX/bin/gcc-ar-$_GCC_VER" "$_PLAT_BIN/gcc-ar"
+        ln -sf "$_REAL_BREW_PREFIX/bin/gcc-nm-$_GCC_VER" "$_PLAT_BIN/gcc-nm"
+        ln -sf "$_REAL_BREW_PREFIX/bin/gcc-ranlib-$_GCC_VER" "$_PLAT_BIN/gcc-ranlib"
+        echo "[ok]   Linked gcc-$_GCC_VER → $_PLAT_BIN/gcc"
+    fi
+fi
+
+# LLVM is versioned (llvm@21, llvm@20, etc.) — pick the highest installed
+_LLVM_LATEST=$(ls -1d "$_REAL_BREW_PREFIX/opt/llvm@"*/bin 2>/dev/null | sort -Vr | head -1)
+if [ -n "$_LLVM_LATEST" ]; then
+    _LLVM_VER=$(basename "$(dirname "$_LLVM_LATEST")")
+    ln -sf "$_LLVM_LATEST/clang" "$_PLAT_BIN/clang"
+    ln -sf "$_LLVM_LATEST/clang++" "$_PLAT_BIN/clang++"
+    ln -sf "$_LLVM_LATEST/clang-format" "$_PLAT_BIN/clang-format"
+    ln -sf "$_LLVM_LATEST/clang-tidy" "$_PLAT_BIN/clang-tidy"
+    echo "[ok]   Linked $_LLVM_VER → $_PLAT_BIN/clang"
+fi
+
 log_ok "Linux packages installed at $_REAL_BREW_PREFIX"
+log_info "Compilers: gcc, g++, clang, clang++ → $_PLAT_BIN/"
 log_info "Activate with: eval \"\$($_REAL_BREW_PREFIX/bin/brew shellenv)\""

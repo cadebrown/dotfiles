@@ -57,7 +57,7 @@ elif [ -e "/opt/homebrew" ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 {{ else -}}
-# Linux: Homebrew installed per-PLAT via manylinux_2_28 container
+# Linux: Homebrew installed per-PLAT, no container needed
 if [ -x "$_LOCAL_PLAT/brew/bin/brew" ]; then
     eval "$($_LOCAL_PLAT/brew/bin/brew shellenv)"
 fi
