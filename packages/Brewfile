@@ -47,13 +47,7 @@ brew "graphviz"
 brew "texinfo"
 
 ### Documents ###
-# pandoc: macOS only — on Linux the Homebrew formula has no bottle for custom
-# prefixes and would need to build GHC (Haskell compiler) from source.
-# Install the official static Linux binary manually from:
-#   https://github.com/jgm/pandoc/releases
-if OS.mac?
-  brew "pandoc"
-end
+brew "pandoc"
 
 ### Media ###
 brew "ffmpeg"
@@ -68,7 +62,8 @@ brew "cmake"
 brew "ninja"
 brew "meson"
 brew "gcc"
-brew "llvm"   # includes clang, clang++, lld, lldb
+brew "llvm"   # clang, clang++, lldb, llvm-ar, opt, etc.
+brew "lld"    # LLVM linker (now a separate formula)
 brew "fftw"
 brew "glfw"
 brew "openjdk"
