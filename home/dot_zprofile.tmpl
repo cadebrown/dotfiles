@@ -13,11 +13,39 @@ export USE_CCACHE=ON                    # enable ccache in CMake projects that c
 
 ### PLATFORM ###
 
-# _PLAT identifies the current arch+OS combination.
-# Used to isolate compiled binaries in shared home directories (e.g. NFS mounts
-# shared across x86_64 and aarch64 machines — each gets its own binary paths).
-export _PLAT="$(uname -m)-$(uname -s)"
+# _PLAT identifies the platform and CPU capability level for this machine.
+# Format: plat_{OS}_{cpu-target} — e.g. plat_Linux_x86-64-v3, plat_Darwin_arm64
+# Scans ~/dotfiles/install/plat/plat_${OS}_*/ (highest level first), runs
+# .plat_check.sh, picks the first that exits 0. Also sources .plat_env.sh
+# to set CFLAGS, RUSTFLAGS, HOMEBREW_OPTFLAGS, etc.
+#
+# NFS shared homes: each machine auto-detects its own PLAT and installs to
+# ~/.local/$_PLAT/ — x86-64-v4 and x86-64-v3 machines share the same home
+# but use separate binary dirs and never see each other's builds.
+_plat_detect() {
+    local _os _scan _dir _check
+    _os="$(uname -s)"
+    _scan="$HOME/dotfiles/install/plat"
+    if [[ -d "$_scan" ]]; then
+        for _dir in $(ls -1d "$_scan"/plat_"${_os}"_*/ 2>/dev/null | sort -r); do
+            _check="$_dir/.plat_check.sh"
+            if [[ -f "$_check" ]] && /bin/sh "$_check" 2>/dev/null; then
+                printf '%s' "$(basename "$_dir")"
+                # Source compile flags for this PLAT level
+                [[ -f "$_dir/.plat_env.sh" ]] && source "$_dir/.plat_env.sh"
+                return 0
+            fi
+        done
+    fi
+    # Fallback: old format for backwards compat
+    local _arch
+    _arch="$(uname -m)"
+    [[ "$_arch" == "arm64" ]] && _arch="aarch64"
+    printf '%s' "${_arch}-${_os}"
+}
+export _PLAT="$(_plat_detect)"
 export _LOCAL_PLAT="$HOME/.local/$_PLAT"
+unset -f _plat_detect
 
 ### HOMEBREW ###
 # Source Homebrew first so PLAT paths can prepend on top of it.

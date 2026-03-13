@@ -87,7 +87,20 @@ log_info "Resolved paths:"
 log_info "  BREW_PREFIX: $_REAL_BREW_PREFIX"
 log_info "  Brewfile:    $_BREWFILE_TMP"
 
-log_info "Running brew bundle in container (first run installs bottles + builds glibc — takes ~10 min)"
+# HOMEBREW_OPTFLAGS controls the -march= flag for packages built from source.
+# The main package that always builds from source is glibc (no bottle for
+# custom prefixes). Other packages pour as precompiled bottles and are not
+# affected by this flag.
+#
+# Source: set by .plat_env.sh when _lib.sh detects PLAT (e.g. plat_Linux_x86-64-v3).
+# Each PLAT on an NFS home gets its own brew prefix, so glibc is compiled with
+# the right -march= for the machines that share that PLAT dir.
+# If HOMEBREW_OPTFLAGS is unset (e.g. curl|bash first run before PLAT detection),
+# fall back to x86-64-v2 as a safe generic baseline.
+HOMEBREW_OPTFLAGS="${HOMEBREW_OPTFLAGS:--march=x86-64-v2 -O2}"
+log_info "HOMEBREW_OPTFLAGS: $HOMEBREW_OPTFLAGS"
+
+log_info "Running brew bundle in container (first run builds glibc from source — ~10 min; subsequent runs pour bottles)"
 
 "$RUNTIME" run --rm -i \
     --user "$(id -u):$(id -g)" \
@@ -100,6 +113,7 @@ log_info "Running brew bundle in container (first run installs bottles + builds 
     -e HOMEBREW_NO_AUTO_UPDATE=1 \
     -e HOMEBREW_NO_ANALYTICS=1 \
     -e HOMEBREW_NO_ENV_HINTS=1 \
+    -e HOMEBREW_OPTFLAGS="$HOMEBREW_OPTFLAGS" \
     "$IMAGE" \
     bash << 'OUTER_EOF'
 set -euo pipefail
@@ -119,44 +133,13 @@ fi
 
 eval "$($BREW_PREFIX/bin/brew shellenv)"
 
-# Build from source targeting x86-64-v3 so binaries run on any AVX2 machine.
-#
-# Why not pour bottles?
-#   Homebrew CI compiles Linux x86_64 bottles for x86-64-v4 (AVX-512). These
-#   crash with "Fatal glibc error: CPU does not support x86-64-v4" on machines
-#   that lack AVX-512 (e.g. AMD EPYC 7742). Since we share one brew prefix over
-#   NFS, we need binaries that work on every machine sharing the home directory.
-#
-# Why not HOMEBREW_BUILD_FROM_SOURCE=1?
-#   brew bundle calls brew install internally; the env var is ignored by those
-#   calls. brew install --build-from-source (a command-line flag) cannot be
-#   ignored, so we use a two-pass approach instead.
-#
-# Why x86-64-v3?
-#   v3 = AVX/AVX2/BMI2/FMA (Intel Haswell+, AMD Zen 2+) — the floor for all
-#   machines we run on. Compiling for v3 gives better performance than the
-#   generic x86-64 baseline while staying compatible with non-AVX-512 CPUs.
-#   Change to -march=x86-64-v2 if you have older hardware.
-export HOMEBREW_OPTFLAGS="-march=x86-64-v3 -O2"
+# HOMEBREW_OPTFLAGS is passed from the host via -e above.
+# It controls the -march= flag for any formula that builds from source,
+# primarily glibc (which has no bottle for custom prefixes).
+# All other packages pour as precompiled bottles from Homebrew's CDN.
+echo "[info] HOMEBREW_OPTFLAGS: ${HOMEBREW_OPTFLAGS:-<unset>}"
 
-# Pass 1: install taps so tap-prefixed formulas can be resolved in pass 2
-echo "[info] Pass 1: installing taps"
-brew bundle install --file="$BREWFILE" --no-upgrade --taps 2>&1 || true
-
-# Pass 2: install each formula from source
-echo "[info] Pass 2: installing formulas from source (x86-64-v3)"
-_ok=0 _fail=0
-while IFS= read -r _formula; do
-    [[ -z "$_formula" ]] && continue
-    echo "[info]   building: $_formula"
-    if brew install --build-from-source "$_formula" 2>&1; then
-        ((_ok++)) || true
-    else
-        echo "[warn]   failed: $_formula"
-        ((_fail++)) || true
-    fi
-done < <(brew bundle list --brews --file="$BREWFILE" 2>/dev/null)
-echo "[info] Formulas: ${_ok} built, ${_fail} failed"
+brew bundle install --file="$BREWFILE" --no-upgrade 2>&1
 OUTER_EOF
 
 rm -f "$_BREWFILE_TMP" "$_PASSWD_TMP" "$_GROUP_TMP" 2>/dev/null || true

@@ -42,9 +42,11 @@ These must never be broken:
    runs inside a rootless container (Docker or Podman).
 
 2. **PLAT isolation.** Every compiled binary lives under `~/.local/$PLAT/` where
-   `PLAT = $(uname -m)-$(uname -s)` (e.g. `aarch64-Linux`, `x86_64-Linux`, `arm64-Darwin`).
-   Two machines sharing a home directory compile and install independently into separate PLAT
-   subdirs. Text configs (chezmoi-managed dotfiles) are shared freely.
+   `PLAT` is detected from `install/plat/` check scripts (e.g. `plat_Linux_x86-64-v4`,
+   `plat_Linux_x86-64-v3`, `plat_Darwin_arm64`). Detection picks the highest CPU level
+   the machine supports. Two machines sharing a home directory install into separate PLAT
+   subdirs — an AVX-512 machine and an AVX2-only machine each get their own binaries.
+   Text configs (chezmoi-managed dotfiles) are shared freely.
 
 3. **Idempotent.** Every script is safe to re-run. Check before installing; skip if already done.
 
@@ -92,6 +94,17 @@ dotfiles/
 │
 ├── install/
 │   ├── _lib.sh                # SOURCE OF TRUTH for all PLAT paths and env vars
+│   ├── plat/                  # Per-PLAT capability check + compile-flag scripts
+│   │   ├── plat_Linux_x86-64-v4/
+│   │   │   ├── .plat_check.sh # CPU feature check (AVX-512) — exits 0 if supported
+│   │   │   └── .plat_env.sh   # Sets CFLAGS, RUSTFLAGS, HOMEBREW_OPTFLAGS, etc.
+│   │   ├── plat_Linux_x86-64-v3/  # AVX2/FMA/BMI2 (Haswell+, Zen2+)
+│   │   ├── plat_Linux_x86-64-v2/  # SSE4.2/POPCNT baseline
+│   │   ├── plat_Linux_aarch64/    # 64-bit ARM Linux
+│   │   ├── plat_Darwin_arm64/     # Apple Silicon
+│   │   └── plat_Darwin_x86-64/    # Intel Mac
+│   ├── migrate-plat.sh        # One-time: rename old x86_64-Linux dir to plat_Linux_* format
+│   ├── brew-shell.sh          # Debug helper: interactive Homebrew shell in manylinux container
 │   ├── chezmoi.sh             # Install chezmoi binary → $ARCH_BIN
 │   ├── homebrew.sh            # macOS: install Homebrew + brew bundle
 │   ├── linux-packages.sh      # Linux: brew bundle inside manylinux_2_28 container
@@ -140,7 +153,7 @@ Every install script sources `_lib.sh` first. It defines all PLAT paths as varia
 
 | Variable | Value | Purpose |
 |---|---|---|
-| `PLAT` | `$(uname -m)-$(uname -s)` | Platform identifier |
+| `PLAT` | detected from `install/plat/` (e.g. `plat_Linux_x86-64-v4`) | Platform + CPU-level identifier |
 | `LOCAL_PLAT` | `$HOME/.local/$PLAT` | Root for all compiled tools |
 | `ARCH_BIN` | `$LOCAL_PLAT/bin` | chezmoi, uv, uvx |
 | `RUSTUP_HOME` | `$LOCAL_PLAT/rustup` | Rust toolchain |
@@ -225,13 +238,19 @@ Result: **~0.14s** shell startup (down from ~1.1s with eager nvm loading).
 ## bootstrap.sh flow
 
 ```
-1.   chezmoi      → install binary to $ARCH_BIN, run chezmoi apply
-2.   dotfiles     → chezmoi apply (prompts name/email on first run)
-2.5  scratch      → symlink ~/.local, ~/.cache, etc. to scratch (if available)
-3.   ZSH          → oh-my-zsh + plugins via install/zsh.sh
-4.   packages     → macOS: homebrew.sh | Linux: linux-packages.sh
-5.   services     → macOS: colima autostart + iTerm2 prefs (install/services.sh)
-6.   runtimes     → node.sh, rust.sh, python.sh, claude.sh
+source _lib.sh      → detect PLAT from install/plat/ (or fallback), set paths
+0.   scratch        → create ~/scratch → DOTFILES_SCRATCH_PATH; symlink ~/.local, ~/.cache
+                      re-resolve LOCAL_PLAT after ~/.local is symlinked to scratch
+0.5  dotfiles repo  → clone if not present; ~/dotfiles → DOTFILES_PATH
+0.3  PLAT detect    → re-detect PLAT from real repo's install/plat/; migrate old dir
+                      sources .plat_env.sh for CFLAGS/RUSTFLAGS/HOMEBREW_OPTFLAGS
+2.7  path sanity    → check PLAT paths are writable and not stale symlinks
+1.   chezmoi        → install binary to $ARCH_BIN, run chezmoi apply
+2.   dotfiles       → chezmoi apply (prompts name/email on first run)
+3.   ZSH            → oh-my-zsh + plugins via install/zsh.sh
+4.   packages       → macOS: homebrew.sh | Linux: linux-packages.sh
+5.   services       → macOS: colima autostart + iTerm2 prefs (install/services.sh)
+6.   runtimes       → node.sh, rust.sh, python.sh, claude.sh
 ```
 
 Each step has an `INSTALL_*=0` env var to skip it. The Linux packages step

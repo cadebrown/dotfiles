@@ -12,7 +12,7 @@ PACKAGES_DIR="$DOTFILES_ROOT/packages"
 
 ### PLATFORM ###
 
-# PLAT identifies the current arch+OS, used to isolate compiled binaries
+# PLAT identifies the current platform, used to isolate compiled binaries
 # in shared home directories (e.g. NFS mounts across x86_64 and aarch64).
 # All per-machine tool paths live under ~/.local/$PLAT/:
 #   ~/.local/$PLAT/bin/         chezmoi, uv, uvx, and other compiled tools
@@ -24,10 +24,16 @@ PACKAGES_DIR="$DOTFILES_ROOT/packages"
 #
 # ~/.local/bin/ stays on PATH for arch-neutral shell scripts only.
 #
+# PLAT format: plat_{OS}_{cpu-target} (e.g. plat_Linux_x86-64-v3, plat_Darwin_arm64)
+# Detection: scan install/plat/plat_${OS}_*/ dirs (highest level first), run
+# .plat_check.sh, pick the first that exits 0. Also sources .plat_env.sh to
+# set CFLAGS, RUSTFLAGS, HOMEBREW_OPTFLAGS, etc. for that CPU target.
+#
+# Fallback: old format "$(uname -m)-$(uname -s)" for backwards compat.
+#
 # On a new machine sharing a home directory, simply re-run bootstrap.sh.
 # chezmoi finds the cached config (no prompts), dotfiles are already applied,
 # and only the PLAT-specific tool installs run.
-PLAT="$(uname -m)-$(uname -s)"
 
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 [[ "$OS" == "darwin" ]] && OS="darwin" || OS="linux"
@@ -44,6 +50,33 @@ _LOCAL_ROOT="$HOME/.local"
 if [[ -L "$_LOCAL_ROOT" ]]; then
     _LOCAL_ROOT="$(readlink -f "$_LOCAL_ROOT")"
 fi
+
+# PLAT detection: scan install/plat/ for .plat_check.sh scripts.
+# Sorted reverse = highest level first (v4 > v3 > v2).
+PLAT=""
+_PLAT_SCRIPT_DIR="$DOTFILES_ROOT/install/plat"
+if [[ -d "$_PLAT_SCRIPT_DIR" ]]; then
+    _PLAT_OS="$(uname -s)"
+    while IFS= read -r _plat_dir; do
+        _check="$_plat_dir/.plat_check.sh"
+        if [[ -f "$_check" ]] && /bin/sh "$_check" 2>/dev/null; then
+            PLAT="$(basename "$_plat_dir")"
+            [[ -f "$_plat_dir/.plat_env.sh" ]] && source "$_plat_dir/.plat_env.sh"
+            break
+        fi
+    done < <(ls -1d "$_PLAT_SCRIPT_DIR"/plat_"${_PLAT_OS}"_*/ 2>/dev/null | sort -r)
+    unset _PLAT_OS _plat_dir _check
+fi
+unset _PLAT_SCRIPT_DIR
+
+# Fallback: old format for backwards compat with existing installs
+if [[ -z "$PLAT" ]]; then
+    _fb_arch="$(uname -m)"
+    [[ "$_fb_arch" == "arm64" ]] && _fb_arch="aarch64"
+    PLAT="${_fb_arch}-$(uname -s)"
+    unset _fb_arch
+fi
+
 LOCAL_PLAT="$_LOCAL_ROOT/$PLAT"
 unset _LOCAL_ROOT
 ARCH_BIN="$LOCAL_PLAT/bin"

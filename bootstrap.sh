@@ -158,6 +158,69 @@ fi
 # Point INSTALL_DIR at the real repo (important for curl | bash runs after clone)
 INSTALL_DIR="$DOTFILES_PATH/install"
 
+### 0.3 — PLAT re-detection ###
+#
+# Now that INSTALL_DIR points to the real repo, re-run PLAT detection using
+# install/plat/.plat_check.sh scripts. On a curl|bash first run, _lib.sh was
+# sourced from a temp dir with no plat scripts and fell back to old format.
+# This step upgrades PLAT to the new format and migrates any existing old dir.
+
+log_section "0.3 — PLAT detection"
+
+_PLAT_SCAN="$INSTALL_DIR/plat"
+_PLAT_NEW=""
+if [[ -d "$_PLAT_SCAN" ]]; then
+    _PLAT_OS_RAW="$(uname -s)"
+    while IFS= read -r _pd; do
+        _chk="$_pd/.plat_check.sh"
+        if [[ -f "$_chk" ]] && /bin/sh "$_chk" 2>/dev/null; then
+            _PLAT_NEW="$(basename "$_pd")"
+            break
+        fi
+    done < <(ls -1d "$_PLAT_SCAN"/plat_"${_PLAT_OS_RAW}"_*/ 2>/dev/null | sort -r)
+    unset _PLAT_OS_RAW _pd _chk
+fi
+unset _PLAT_SCAN
+
+if [[ -n "$_PLAT_NEW" && "$_PLAT_NEW" != "$PLAT" ]]; then
+    log_info "PLAT upgraded: $PLAT → $_PLAT_NEW"
+    _OLD_LOCAL_PLAT="$LOCAL_PLAT"
+    PLAT="$_PLAT_NEW"
+
+    # Re-resolve LOCAL_PLAT using the real (scratch-resolved) root
+    _LR="$(readlink -f "$HOME/.local")"
+    LOCAL_PLAT="$_LR/$PLAT"
+    ARCH_BIN="$LOCAL_PLAT/bin"
+    RUSTUP_HOME="$LOCAL_PLAT/rustup"
+    CARGO_HOME="$LOCAL_PLAT/cargo"
+    CARGO_TARGET_DIR="$LOCAL_PLAT/cargo-build"
+    VENV="$LOCAL_PLAT/venv"
+    UV_TOOL_BIN_DIR="$ARCH_BIN"
+    UV_TOOL_DIR="$LOCAL_PLAT/uv/tools"
+    UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
+    NVM_DIR="$LOCAL_PLAT/nvm"
+    NIX_PROFILE="$LOCAL_PLAT/nix-profile"
+    export PLAT LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR VENV \
+           UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR NVM_DIR NIX_PROFILE
+    unset _LR
+
+    # Source compile flags for the new PLAT
+    _PLAT_ENV_SH="$INSTALL_DIR/plat/$PLAT/.plat_env.sh"
+    [[ -f "$_PLAT_ENV_SH" ]] && source "$_PLAT_ENV_SH"
+    unset _PLAT_ENV_SH
+
+    # Migrate old dir if it exists and new dir doesn't
+    if [[ -d "$_OLD_LOCAL_PLAT" && ! -d "$LOCAL_PLAT" ]]; then
+        log_info "Migrating tools: $(basename "$_OLD_LOCAL_PLAT") → $PLAT"
+        bash "$INSTALL_DIR/migrate-plat.sh"
+    fi
+    unset _OLD_LOCAL_PLAT
+fi
+unset _PLAT_NEW
+
+log_ok "PLAT=$PLAT"
+log_ok "LOCAL_PLAT=$LOCAL_PLAT"
+
 ### 1. chezmoi ###
 
 log_section "1 — chezmoi"
