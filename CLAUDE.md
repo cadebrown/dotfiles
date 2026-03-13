@@ -342,6 +342,43 @@ CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" ~/dotfiles/bootstrap.sh
 
 ---
 
+## Linux Homebrew — how it works
+
+`linux-packages.sh` installs Homebrew natively on the host (no Docker, no container,
+no sudo). Key design decisions:
+
+**1. Custom prefix:** Homebrew installs to `~/.local/$PLAT/brew/` instead of the standard
+`/home/linuxbrew/.linuxbrew`. This enables per-CPU-level isolation on shared NFS homes.
+
+**2. glibc first:** The script runs `brew install glibc` explicitly before `brew bundle`.
+Why? Homebrew's bottles are built for `/home/linuxbrew/.linuxbrew` with system glibc ≥ 2.35.
+On a custom prefix:
+- **Packages with relocatable binaries** (jq, ripgrep, etc.) pour as bottles — patchelf
+  rewrites the RPATH and they work fine.
+- **Packages that embed the prefix deeply** (Python, Perl, OpenSSL, ncurses, git, vim)
+  can't be relocated and build from source. These use Homebrew's bundled glibc (~2 min
+  one-time build) as their loader and libc, making them fully self-contained.
+
+Installing glibc first ensures that even on systems where the host glibc is already ≥ 2.35,
+binaries still use Homebrew's loader (`brew/lib/ld.so` → `opt/glibc/bin/ld.so`) instead
+of silently depending on the host system glibc.
+
+**3. Compiler symlinks:** `gcc` and `llvm` are keg-only (Homebrew policy: don't shadow
+system compilers). The script creates unversioned symlinks in `$LOCAL_PLAT/bin/`:
+- `gcc-15` → `gcc`
+- `g++-15` → `g++`
+- `llvm@21/bin/clang` → `clang`
+- `llvm@21/bin/clang++` → `clang++`
+
+This gives clean `gcc`/`clang` commands that resolve to Homebrew's versions. Re-run
+`linux-packages.sh` after a compiler upgrade to refresh symlinks.
+
+**4. Build parallelism:** Homebrew auto-detects `nproc` and sets `HOMEBREW_MAKE_JOBS`
+accordingly (e.g. `make -j112` on 112-core machines). Source builds (glibc, Python,
+Perl, git, vim) use all available cores.
+
+---
+
 ## Scratch space (NFS homes)
 
 On Linux machines with shared NFS home directories and small quotas,
@@ -349,14 +386,18 @@ On Linux machines with shared NFS home directories and small quotas,
 
 **Setup:** Create `~/scratch` as a symlink to large local storage (e.g. `/scratch/$USER`),
 or set `DOTFILES_SCRATCH_PATH=/path/to/storage`. Then run bootstrap — `install/scratch.sh`
-(step 0, before any tool installs) will symlink these directories to scratch:
+(step 1, before any tool installs) will symlink these directories to scratch:
 
-| Home path | Scratch target |
-|---|---|
-| `~/.local` | `$SCRATCH/.paths/.local` |
-| `~/.cache` | `$SCRATCH/.paths/.cache` |
+| Home path | Scratch target | Why |
+|---|---|---|
+| `~/.local` | `$SCRATCH/.paths/.local` | All PLAT binaries (2-5 GB per PLAT) |
+| `~/.cache` | `$SCRATCH/.paths/.cache` | Homebrew downloads, uv cache, build artifacts |
+| `~/.vscode` | `$SCRATCH/.paths/.vscode` | VSCode extensions and state |
+| `~/.vscode-server` | `$SCRATCH/.paths/.vscode-server` | Remote SSH server binaries |
+| `~/.cursor` | `$SCRATCH/.paths/.cursor` | Cursor extensions and state |
+| `~/.cursor-server` | `$SCRATCH/.paths/.cursor-server` | Cursor Remote SSH binaries |
 
-Override with `DOTFILES_LINKS_PATHS` (colon-separated). `~/.config` is intentionally excluded — chezmoi manages files inside it as a real directory and will replace a symlink. `~/.oh-my-zsh` is excluded too — `install/zsh.sh` installs fresh.
+Override with `DOTFILES_LINKS_PATHS` (colon-separated). `~/.config` is intentionally excluded — chezmoi manages files inside it as a real directory and will replace a symlink.
 
 The `$PATHS` variable in `_lib.sh` points to `$SCRATCH/.paths` and is the
 single source of truth for where symlink targets live.
@@ -553,7 +594,16 @@ The `.chezmoi.toml.tmpl` prompts for `name` and `email` on first init via
 
 - **Homebrew on Linux installs glibc first** — `linux-packages.sh` explicitly
   runs `brew install glibc` before `brew bundle` so all bottles link against
-  Homebrew's own glibc (self-contained, not the host system glibc).
+  Homebrew's own glibc (self-contained, not the host system glibc). Even on
+  systems where the host glibc is already ≥ 2.35, forcing glibc install ensures
+  binaries use `brew/lib/ld.so` → `opt/glibc/bin/ld.so` instead of the system
+  loader, making installs portable across different Linux distributions.
+
+- **Compilers are keg-only** — `gcc` and `llvm` formulas don't create unversioned
+  `gcc`/`clang` symlinks in `brew/bin` (Homebrew policy to avoid shadowing system
+  compilers). `linux-packages.sh` creates symlinks in `$LOCAL_PLAT/bin/` pointing
+  to the latest installed versions (e.g. `gcc-15` → `gcc`, `llvm@21/bin/clang` →
+  `clang`). Re-run `linux-packages.sh` after a compiler upgrade to refresh symlinks.
 
 - **`sourceDir` in chezmoi.toml must be a top-level TOML key** — it goes
   before the `[data]` section, not inside it. Misplacing it silently breaks

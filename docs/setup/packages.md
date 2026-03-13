@@ -6,10 +6,10 @@ Every package layer has a declarative text file and an idempotent install script
 
 | Layer | File | Install script | Platform |
 |---|---|---|---|
-| System packages | `packages/Brewfile` | `install/homebrew.sh` / `install/linux-packages.sh` | macOS (bottles) / Linux (manylinux container) |
+| System packages | `packages/Brewfile` | `install/homebrew.sh` / `install/linux-packages.sh` | macOS (bottles) / Linux (native, no container) |
 | Rust tools | `packages/cargo.txt` | `install/rust.sh` | All |
 | Python packages | `packages/pip.txt` | `install/python.sh` | All |
-| Global npm | `packages/npm.txt` | `install/npm.sh` | All |
+| Global npm | `packages/npm.txt` | `install/node.sh` | All |
 | Claude plugins | `packages/claude-plugins.txt` | `install/claude.sh` | All |
 | Claude MCP servers | `packages/claude-mcp.txt` | `install/claude.sh` | All |
 
@@ -49,7 +49,7 @@ the same pre-built binary that Homebrew bottles provide — same quality, faster
 @scope/package-name
 ```
 
-Re-run: `bash ~/dotfiles/install/npm.sh`
+Re-run: `bash ~/dotfiles/install/node.sh`
 
 ### 3. pip — Python packages
 
@@ -102,8 +102,7 @@ Tools like `fd`, `sd`, `bat`, `ripgrep`, `git-delta`, `difftastic`, `procs`, `bo
 `ast-grep`, `zoxide`, and `hyperfine` live in `cargo.txt` because:
 
 - `$CARGO_HOME/bin/` is already under `$LOCAL_PLAT/` — PLAT isolation is free
-- `cargo-binstall` downloads pre-built GitHub release binaries — no slower than Homebrew bottles
-- On Linux, this avoids a round-trip through the manylinux container
+- `cargo-binstall` downloads pre-built GitHub release binaries — fast, no compilation
 
 Tools that have no pre-built binary and are painful to compile (or only make sense on macOS) go in
 `Brewfile` under `if OS.mac?`.
@@ -112,10 +111,24 @@ Tools that have no pre-built binary and are painful to compile (or only make sen
 
 ## Why Homebrew for Linux
 
-Homebrew on Linux runs inside a `manylinux_2_28` container (AlmaLinux 8, glibc 2.28). Compiled
-binaries work on any Linux host since ~2018. Most packages pour as precompiled bottles — no
-compilation. Homebrew bundles its own glibc 2.35 so binaries are fully self-contained regardless of
-the host's glibc version.
+Homebrew on Linux installs natively on the host (no container, no sudo). It bundles its own
+glibc 2.35, making binaries fully self-contained regardless of the host's glibc version.
+
+**Custom prefix tradeoff:** Installing to `~/.local/$PLAT/brew/` instead of the standard
+`/home/linuxbrew/.linuxbrew` enables per-CPU isolation on shared NFS homes, but bottles
+built for the standard prefix can't always be relocated:
+
+- **Relocatable packages** (jq, CLI tools with simple dependencies) pour as bottles — patchelf
+  rewrites RPATH and they work fine
+- **Deep path embedding** (Python, Perl, git, vim, ffmpeg, imagemagick) build from source
+  on first install. Homebrew uses all available CPU cores (auto-detects `nproc`), so builds
+  are fast on modern hardware.
+
+Once built, packages are cached. Subsequent runs and upgrades are bottle-only.
+
+**Compilers:** `gcc` and `llvm` are keg-only (Homebrew doesn't create unversioned `gcc`/`clang`
+symlinks to avoid shadowing system compilers). `linux-packages.sh` creates symlinks in
+`$LOCAL_PLAT/bin/` so `gcc` → `gcc-15` and `clang` → `llvm@21/bin/clang`.
 
 The same `Brewfile` works on macOS and Linux. `if OS.mac?` blocks are silently skipped on Linux.
 

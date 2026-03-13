@@ -1,6 +1,6 @@
 # dotfiles
 
-Personal dotfiles managed with [chezmoi](https://chezmoi.io). Works on macOS (arm64) and Linux (arm64 + x86-64), including shared home directories across machines — no sudo required anywhere.
+Personal dotfiles managed with [chezmoi](https://chezmoi.io). Works on macOS and Linux with per-CPU-level optimization (x86-64-v2/v3/v4, AArch64, Apple Silicon), including shared NFS home directories across machines — no sudo required anywhere.
 
 ## Install
 
@@ -26,7 +26,7 @@ git clone https://github.com/cadebrown/dotfiles ~/dotfiles
 CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" ~/dotfiles/bootstrap.sh
 ```
 
-All steps are idempotent — safe to re-run. On a shared home directory, re-running on a second machine just installs that machine's arch-specific binaries under `~/.local/$PLAT/`.
+All steps are idempotent — safe to re-run. On a shared home directory, each machine detects its CPU capabilities and installs to its own `~/.local/$PLAT/` directory (e.g. `plat_Linux_x86-64-v4` for AVX-512, `plat_Linux_x86-64-v3` for AVX2). Text configs are shared; binaries are isolated.
 
 ---
 
