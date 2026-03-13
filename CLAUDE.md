@@ -107,7 +107,7 @@ dotfiles/
 │   ├── brew-shell.sh          # Debug helper: interactive Homebrew shell in manylinux container (optional)
 │   ├── chezmoi.sh             # Install chezmoi binary → $ARCH_BIN
 │   ├── homebrew.sh            # macOS: install Homebrew + brew bundle
-│   ├── linux-packages.sh      # Linux: brew bundle on host (no container); HOMEBREW_NO_CONTAINER=0 for manylinux fallback
+│   ├── linux-packages.sh      # Linux: install Homebrew + glibc + brew bundle (no container, no sudo)
 │   ├── zsh.sh                 # oh-my-zsh + plugins (pure, autosuggestions, fsh, completions)
 │   ├── services.sh            # macOS: colima login service + iTerm2 prefs
 │   ├── node.sh                # nvm + Node.js → $LOCAL_PLAT/nvm/
@@ -241,11 +241,10 @@ in the default (no-container) mode — Homebrew's native march detection runs on
 CPU, which is exactly what we want (v3 machine → `-march=znver2`, v4 → `-march=native` for
 that host). Only glibc builds from source; all user tools pour as precompiled bottles.
 
-Container mode (`HOMEBREW_NO_CONTAINER=0`): `HOMEBREW_OPTFLAGS_PLAT` is passed via
-`docker -e` to override the container's native detection. The init script translates
-`x86-64-v{n}` → `x86-64` for bootstrap gcc (GCC 9, which predates the v-level syntax
-added in GCC 11). Use this when building on a high-end machine for deployment on older
-hardware.
+`brew-shell.sh` (debug tool) still supports container mode for cross-arch testing.
+If you need to build on a high-end machine for older hardware, `brew-shell.sh` accepts
+`HOMEBREW_OPTFLAGS_PLAT` to override native detection; it translates `x86-64-v{n}` →
+`x86-64` for bootstrap gcc (GCC 9, which predates that syntax).
 
 ### Adding a new PLAT
 
@@ -553,9 +552,9 @@ The `.chezmoi.toml.tmpl` prompts for `name` and `email` on first init via
 - **Don't run install scripts without sourcing `_lib.sh`** — the PLAT paths
   won't be set and tools will land in wrong locations.
 
-- **Homebrew on Linux runs in a container** — `linux-packages.sh` requires
-  Docker or Podman available on the host. Without it, the script exits with
-  a clear error message pointing to the docs.
+- **Homebrew on Linux installs glibc first** — `linux-packages.sh` explicitly
+  runs `brew install glibc` before `brew bundle` so all bottles link against
+  Homebrew's own glibc (self-contained, not the host system glibc).
 
 - **`sourceDir` in chezmoi.toml must be a top-level TOML key** — it goes
   before the `[data]` section, not inside it. Misplacing it silently breaks
