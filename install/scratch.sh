@@ -117,7 +117,7 @@ link_to_scratch() {
 log_info "Scratch: $SCRATCH"
 log_info "Paths:   $PATHS"
 
-_DEFAULT_LINKS="$HOME/.local:$HOME/.cache"
+_DEFAULT_LINKS="$HOME/.local:$HOME/.cache:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor:$HOME/.cursor-server"
 DOTFILES_LINKS_PATHS="${DOTFILES_LINKS_PATHS:-$_DEFAULT_LINKS}"
 unset _DEFAULT_LINKS
 
