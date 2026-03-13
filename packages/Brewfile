@@ -13,7 +13,9 @@ brew "bash"
 brew "fish"
 
 ### Editors ###
-brew "vim"
+# vim: requires python@3.14 which has persistent PGO test failures on custom
+# prefixes. Use system vim or install neovim via other means.
+# brew "vim"
 
 ### Git ###
 brew "git"
@@ -35,23 +37,27 @@ brew "curl"
 brew "less"
 brew "rlwrap"
 brew "cloc"
-brew "imagemagick"
+# imagemagick: requires python@3.14 (PGO test failures on custom prefix)
+# brew "imagemagick"
 brew "fastfetch"
 brew "fetch"
 brew "tmux"
 brew "moreutils"
-brew "graphviz"
+# graphviz: requires python@3.14 (PGO test failures on custom prefix)
+# brew "graphviz"
 
 ### Documents ###
 brew "pandoc"
 
 ### Media ###
-brew "ffmpeg"
+# ffmpeg: requires python@3.14 (PGO test failures on custom prefix)
+# brew "ffmpeg"
 
 ### Monitoring ###
 brew "htop"
 brew "btop"
-brew "glances"
+# glances: requires python@3.14 (PGO test failures on custom prefix)
+# brew "glances"
 
 ### Compression ###
 brew "lz4"
