@@ -2,14 +2,14 @@ theme = "cade_minimal"
 
 [style]
 mode = "plain"
-separator = " | "
+separator = " │ "
 
 [[segments]]
 id = "model"
 enabled = true
 
 [segments.icon]
-plain = "🤖"
+plain = "✽"
 nerd_font = ""
 
 [segments.colors.icon]
@@ -28,7 +28,7 @@ id = "directory"
 enabled = true
 
 [segments.icon]
-plain = "📁"
+plain = "◐"
 nerd_font = "󰉋"
 
 [segments.colors.icon]
@@ -47,7 +47,7 @@ id = "git"
 enabled = true
 
 [segments.icon]
-plain = "🌿"
+plain = "※"
 nerd_font = "󰊢"
 
 [segments.colors.icon]
@@ -67,7 +67,7 @@ id = "context_window"
 enabled = true
 
 [segments.icon]
-plain = "⚡️"
+plain = "◐"
 nerd_font = ""
 
 [segments.colors.icon]
@@ -99,9 +99,9 @@ c16 = 14
 text_bold = false
 
 [segments.options]
+timeout = 2
 cache_duration = 180
 api_base_url = "https://api.anthropic.com"
-timeout = 2
 
 [[segments]]
 id = "cost"
