@@ -85,11 +85,6 @@ brew "mdbook"
 brew "cc65"
 
 if OS.mac?
-  ### Rust (macOS) ###
-  # Homebrew's rustup is code-signed — avoids macOS linker sandbox restrictions.
-  # On Linux, install/rust.sh uses rustup-init directly (no Homebrew needed).
-  brew "rustup"
-
   ### Languages & Runtimes (macOS) ###
   brew "openjdk"
   brew "openssh"
