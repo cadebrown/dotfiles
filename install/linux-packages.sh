@@ -15,7 +15,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 [[ "$OS" == "linux" ]] || { log_warn "Not on Linux — skipping"; exit 0; }
 
-INSTALL_DIR="${INSTALL_DIR:-$DF_ROOT/install}"
+DF_INSTALL_DIR="${DF_INSTALL_DIR:-$DF_ROOT/install}"
 
 log_section "Linux packages (Homebrew)"
 
@@ -75,8 +75,8 @@ export HOMEBREW_NO_INSTALL_FROM_API=1
 log_info "Tapping homebrew-core for editable formulas..."
 brew tap homebrew/core --force 2>&1 | grep -v "^Warning" | head -5
 
-if [[ -f "$INSTALL_DIR/patch-homebrew-python.sh" ]]; then
-    bash "$INSTALL_DIR/patch-homebrew-python.sh"
+if [[ -f "$DF_INSTALL_DIR/patch-homebrew-python.sh" ]]; then
+    bash "$DF_INSTALL_DIR/patch-homebrew-python.sh"
 fi
 
 ### Install all packages ###

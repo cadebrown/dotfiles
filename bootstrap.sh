@@ -23,10 +23,12 @@
 #   DF_SCRATCH_LINK       — ~/scratch symlink (default: $HOME/scratch)
 #   DF_LINKS              — colon-separated paths to redirect to scratch (default: ~/.local:~/.cache)
 #   DF_BREW_UPGRADE       — control Homebrew upgrades (macOS default: 1, Linux default: 0)
+#   DF_DIRS               — colon-separated home dirs to create (default: dev:bones:misc)
 #   DF_DEBUG              — set to 1 for verbose debug output with timing
 #   DF_DO_SCRATCH       — set to 0 to skip scratch space symlink setup
+#   DF_DO_DIRS          — set to 0 to skip home directory creation
 #   DF_DO_PACKAGES      — set to 0 to skip package install (Homebrew on macOS/Linux)
-#   DF_DO_SERVICES      — set to 0 to skip auto-start service registration
+#   DF_DO_MACOS_SERVICES — set to 0 to skip macOS service registration
 #   DF_DO_ZSH           — set to 0 to skip oh-my-zsh + plugins install
 #   DF_DO_NODE          — set to 0 to skip Node install + global npm packages
 #   DF_DO_RUST          — set to 0 to skip Rust install
@@ -73,7 +75,7 @@ else
     source "$_BOOTSTRAP_TMP/_lib.sh"
 fi
 
-INSTALL_DIR="$DF_ROOT/install"
+DF_INSTALL_DIR="$DF_ROOT/install"
 
 _BOOTSTRAP_START=$SECONDS
 
@@ -108,7 +110,7 @@ if [[ "${DF_DO_SCRATCH:-1}" != "0" ]]; then
     fi
 
     # Run scratch.sh to symlink dirs per DF_LINKS
-    _SCRATCH_SH="$INSTALL_DIR/scratch.sh"
+    _SCRATCH_SH="$DF_INSTALL_DIR/scratch.sh"
     if [[ ! -f "$_SCRATCH_SH" ]]; then
         # curl | bash mode — fetch scratch.sh temporarily
         curl -fsSL "https://raw.githubusercontent.com/${DF_REPO}/main/install/scratch.sh" \
@@ -129,6 +131,23 @@ if [[ "${DF_DO_SCRATCH:-1}" != "0" ]]; then
     log_okay "Re-resolved: LOCAL_PLAT=$LOCAL_PLAT"
 else
     log_info "Skipping scratch setup (DF_DO_SCRATCH=0)"
+fi
+
+### 0.1 home directories ###
+
+log_section "0.1 — home directories"
+
+if [[ "${DF_DO_DIRS:-1}" != "0" ]]; then
+    _DIRS_SH="$DF_INSTALL_DIR/dirs.sh"
+    if [[ ! -f "$_DIRS_SH" ]]; then
+        curl -fsSL "https://raw.githubusercontent.com/${DF_REPO}/main/install/dirs.sh" \
+            -o "$_BOOTSTRAP_TMP/dirs.sh"
+        _DIRS_SH="$_BOOTSTRAP_TMP/dirs.sh"
+    fi
+    bash "$_DIRS_SH"
+    unset _DIRS_SH
+else
+    log_info "Skipping home directories (DF_DO_DIRS=0)"
 fi
 
 ### 0.5 dotfiles repo ###
@@ -180,19 +199,19 @@ if [[ "$DF_LINK" != "$DF_PATH" ]]; then
     unset _want
 fi
 
-# Point INSTALL_DIR at the real repo (important for curl | bash runs after clone)
-INSTALL_DIR="$DF_PATH/install"
+# Point DF_INSTALL_DIR at the real repo (important for curl | bash runs after clone)
+DF_INSTALL_DIR="$DF_PATH/install"
 
 ### 0.3 — PLAT re-detection ###
 #
-# Now that INSTALL_DIR points to the real repo, re-run PLAT detection using
+# Now that DF_INSTALL_DIR points to the real repo, re-run PLAT detection using
 # install/plat/.plat_check.sh scripts. On a curl|bash first run, _lib.sh was
 # sourced from a temp dir with no plat scripts and fell back to old format.
 # This step upgrades PLAT to the new format and migrates any existing old dir.
 
 log_section "0.3 — PLAT detection"
 
-_PLAT_SCAN="$INSTALL_DIR/plat"
+_PLAT_SCAN="$DF_INSTALL_DIR/plat"
 _PLAT_NEW=""
 if [[ -d "$_PLAT_SCAN" ]]; then
     _PLAT_OS_RAW="$(uname -s)"
@@ -220,7 +239,7 @@ if [[ -n "$_PLAT_NEW" && "$_PLAT_NEW" != "$PLAT" ]]; then
     unset _LR
 
     # Source compile flags for the new PLAT
-    _PLAT_ENV_SH="$INSTALL_DIR/plat/$PLAT/.plat_env.sh"
+    _PLAT_ENV_SH="$DF_INSTALL_DIR/plat/$PLAT/.plat_env.sh"
     [[ -f "$_PLAT_ENV_SH" ]] && source "$_PLAT_ENV_SH"
     unset _PLAT_ENV_SH
 
@@ -245,7 +264,7 @@ elif [[ -x "$CHEZMOI_BIN" ]]; then
     log_okay "chezmoi already installed: $("$CHEZMOI_BIN" --version)"
 else
     log_info "Installing chezmoi → $ARCH_BIN"
-    run_logged bash "$INSTALL_DIR/chezmoi.sh"
+    run_logged bash "$DF_INSTALL_DIR/chezmoi.sh"
 fi
 
 ### 2. dotfiles ###
@@ -294,9 +313,9 @@ fi
 log_okay "Dotfiles applied"
 
 # Resolve install dir via chezmoi if we bootstrapped from GitHub
-if [[ ! -d "$INSTALL_DIR" ]]; then
+if [[ ! -d "$DF_INSTALL_DIR" ]]; then
     # source-path points to home/ (via .chezmoiroot), install/ is one level up
-    INSTALL_DIR="$(dirname "$("$CHEZMOI_BIN" source-path)")/install"
+    DF_INSTALL_DIR="$(dirname "$("$CHEZMOI_BIN" source-path)")/install"
 fi
 
 ### 2.7 — path sanity check ###
@@ -332,7 +351,7 @@ fi
 log_section "3 — ZSH (oh-my-zsh + plugins)"
 
 if [[ "${DF_DO_ZSH:-1}" != "0" ]]; then
-    bash "$INSTALL_DIR/zsh.sh"
+    bash "$DF_INSTALL_DIR/zsh.sh"
 else
     log_info "Skipping ZSH plugins (DF_DO_ZSH=0)"
 fi
@@ -345,11 +364,11 @@ if [[ "${DF_DO_PACKAGES:-1}" != "0" ]]; then
     case "$OS" in
         darwin)
             log_info "macOS — Homebrew (native bottles)"
-            bash "$INSTALL_DIR/homebrew.sh"
+            bash "$DF_INSTALL_DIR/homebrew.sh"
             ;;
         linux)
             log_info "Linux — Homebrew (native, no container)"
-            bash "$INSTALL_DIR/linux-packages.sh"
+            bash "$DF_INSTALL_DIR/linux-packages.sh"
             # Activate brew for the rest of this bootstrap session
             BREW_BIN="$LOCAL_PLAT/brew/bin/brew"
             if [[ -x "$BREW_BIN" ]]; then
@@ -364,14 +383,14 @@ else
     log_info "Skipping packages (DF_DO_PACKAGES=0)"
 fi
 
-### 5. services ###
+### 5. macOS services ###
 
-log_section "5 — services"
+log_section "5 — macOS services"
 
-if [[ "${DF_DO_SERVICES:-1}" != "0" ]]; then
-    bash "$INSTALL_DIR/services.sh"
+if [[ "${DF_DO_MACOS_SERVICES:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/macos-services.sh"
 else
-    log_info "Skipping services (DF_DO_SERVICES=0)"
+    log_info "Skipping macOS services (DF_DO_MACOS_SERVICES=0)"
 fi
 
 ### 5.5. macOS settings ###
@@ -379,7 +398,7 @@ fi
 log_section "5.5 — macOS settings"
 
 if [[ "${DF_DO_MACOS_SETTINGS:-1}" != "0" ]]; then
-    bash "$INSTALL_DIR/macos-settings.sh"
+    bash "$DF_INSTALL_DIR/macos-settings.sh"
 else
     log_info "Skipping macOS settings (DF_DO_MACOS_SETTINGS=0)"
 fi
@@ -389,31 +408,31 @@ fi
 log_section "6 — language runtimes"
 
 if [[ "${DF_DO_NODE:-1}" != "0" ]]; then
-    bash "$INSTALL_DIR/node.sh"
+    bash "$DF_INSTALL_DIR/node.sh"
 else
     log_info "Skipping Node + npm packages (DF_DO_NODE=0)"
 fi
 
 if [[ "${DF_DO_RUST:-1}" != "0" ]]; then
-    bash "$INSTALL_DIR/rust.sh"
+    bash "$DF_INSTALL_DIR/rust.sh"
 else
     log_info "Skipping Rust (DF_DO_RUST=0)"
 fi
 
 if [[ "${DF_DO_PYTHON:-1}" != "0" ]]; then
-    bash "$INSTALL_DIR/python.sh"
+    bash "$DF_INSTALL_DIR/python.sh"
 else
     log_info "Skipping Python (DF_DO_PYTHON=0)"
 fi
 
 if [[ "${DF_DO_CLAUDE:-1}" != "0" ]]; then
-    bash "$INSTALL_DIR/claude.sh"
+    bash "$DF_INSTALL_DIR/claude.sh"
 else
     log_info "Skipping Claude (DF_DO_CLAUDE=0)"
 fi
 
 if [[ "${DF_DO_CODEX:-1}" != "0" ]]; then
-    bash "$INSTALL_DIR/codex.sh"
+    bash "$DF_INSTALL_DIR/codex.sh"
 else
     log_info "Skipping Codex (DF_DO_CODEX=0)"
 fi
@@ -423,7 +442,7 @@ fi
 log_section "7 — auth (API tokens)"
 
 if [[ "${DF_DO_AUTH:-0}" != "0" ]]; then
-    bash "$INSTALL_DIR/auth.sh"
+    bash "$DF_INSTALL_DIR/auth.sh"
 else
     log_info "Skipping auth (set DF_DO_AUTH=1 to run, or: bash ~/dotfiles/install/auth.sh)"
 fi

@@ -49,7 +49,7 @@ chezmoi init --data=false
 To pre-seed without prompting:
 
 ```sh
-CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" chezmoi init
+DF_NAME="Your Name" DF_EMAIL="you@example.com" chezmoi init
 ```
 
 ---

@@ -110,9 +110,10 @@ dotfiles/
 │   ├── linux-packages.sh      # Linux: install Homebrew + glibc + brew bundle (no container, no sudo)
 │   ├── patch-homebrew-python.sh # Linux: patch python@3.14 formula (uuid, test_datetime fixes)
 │   ├── zsh.sh                 # oh-my-zsh + plugins (pure, autosuggestions, fsh, completions)
-│   ├── services.sh            # macOS: colima login service
+│   ├── macos-services.sh      # macOS: colima login service
 │   ├── macos-settings.sh      # macOS: system preferences (Dock, Finder, keyboard, etc.)
 │   ├── auth.sh                # Interactive API token setup (DF_DO_AUTH=1 in bootstrap)
+│   ├── dirs.sh                # Create ~/dev, ~/bones, ~/misc (symlink to scratch if available)
 │   ├── node.sh                # nvm + Node.js → $LOCAL_PLAT/nvm/
 │   ├── rust.sh                # rustup + cargo-binstall + cargo tools from cargo.txt
 │   ├── python.sh              # uv + venv + pip installs from packages/pip.txt
@@ -124,11 +125,16 @@ dotfiles/
 ├── docs/                      # mdBook documentation (served at dotfiles.cade.io)
 │   ├── book.toml              # mdBook config: theme, repo URL, search
 │   ├── SUMMARY.md             # Table of contents / nav structure
-│   ├── intro.md
-│   └── setup/
-│       ├── bootstrap.md       # System requirements + install instructions per platform
-│       ├── chezmoi.md
-│       └── packages.md
+│   ├── intro.md               # Homepage — overview of everything installed
+│   ├── setup/
+│   │   ├── bootstrap.md       # System requirements + install instructions per platform
+│   │   ├── chezmoi.md         # Dotfile management with chezmoi
+│   │   └── packages.md        # Package layers (cargo, npm, pip, brew)
+│   ├── usage/
+│   │   ├── updates.md         # Day-to-day workflow
+│   │   └── troubleshooting.md # Quick reference for common issues
+│   └── infra/
+│       └── docs-and-hosting.md # How docs are built, deployed, and managed
 │
 ├── infra/
 │   └── cloudflare/            # OpenTofu config for Cloudflare Pages
@@ -155,19 +161,21 @@ Every install script sources `_lib.sh` first. It defines all PLAT paths as varia
 
 | Variable | Value | Purpose |
 |---|---|---|
+| `DF_ROOT` | parent of `install/` | Root of the dotfiles repo |
+| `DF_PACKAGES` | `$DF_ROOT/packages` | Package list directory |
+| `OS` | `darwin` or `linux` | Normalised OS |
+| `ARCH` | `aarch64` or `x86_64` | Normalised arch (arm64 → aarch64) |
 | `PLAT` | detected from `install/plat/` (e.g. `plat_Linux_x86-64-v4`) | Platform + CPU-level identifier |
 | `LOCAL_PLAT` | `$HOME/.local/$PLAT` | Root for all compiled tools |
 | `ARCH_BIN` | `$LOCAL_PLAT/bin` | chezmoi, uv, uvx |
 | `RUSTUP_HOME` | `$LOCAL_PLAT/rustup` | Rust toolchain |
 | `CARGO_HOME` | `$LOCAL_PLAT/cargo` | Cargo (bins at `cargo/bin/`) |
+| `CARGO_TARGET_DIR` | `$LOCAL_PLAT/cargo-build` | Build artifacts (macOS sandbox workaround) |
 | `NVM_DIR` | `$LOCAL_PLAT/nvm` | nvm + Node.js versions |
 | `VENV` | `$LOCAL_PLAT/venv` | Python virtualenv |
-
 | `UV_TOOL_BIN_DIR` | `$LOCAL_PLAT/bin` | uv tool binaries |
 | `UV_TOOL_DIR` | `$LOCAL_PLAT/uv/tools` | uv tool metadata |
 | `UV_PYTHON_INSTALL_DIR` | `$LOCAL_PLAT/uv/python` | uv managed Pythons |
-| `OS` | `darwin` or `linux` | Normalised OS |
-| `ARCH` | `aarch64` or `x86_64` | Normalised arch (arm64 → aarch64) |
 | `SCRATCH` | `$DF_SCRATCH` or resolved `~/scratch` | Scratch space root (empty if none) |
 | `PATHS` | `$SCRATCH/.paths` | Symlink targets for ~/.local, ~/.cache, etc. (empty if no scratch) |
 
@@ -372,19 +380,20 @@ bootstrap.sh upgrade      # update + brew upgrade + cargo upgrade
 
 **Install mode flow:**
 ```
-source _lib.sh   → detect PLAT from install/plat/ check scripts, set all path vars
-0.  scratch      → create ~/scratch → DF_SCRATCH; symlink ~/.local, ~/.cache
-                   re-resolve LOCAL_PLAT now that ~/.local may point to scratch
-0.5 repo         → clone dotfiles if not present; create ~/dotfiles symlink
-                   re-detect PLAT from real repo's install/plat/; source .plat_env.sh
-1.  chezmoi      → install binary to $ARCH_BIN; chezmoi apply (prompts name/email once)
-2.  path check   → verify PLAT paths are writable and not stale symlinks
-3.  ZSH          → oh-my-zsh + plugins via install/zsh.sh
-4.  packages     → macOS: homebrew.sh | Linux: linux-packages.sh (glibc + brew bundle)
-5.  services     → macOS: colima autostart (install/services.sh)
-5.5 settings     → macOS: system preferences (install/macos-settings.sh)
-7.  auth         → API token setup (install/auth.sh, opt-in via DF_DO_AUTH=1)
-6.  runtimes     → node.sh, rust.sh, python.sh, claude.sh
+source _lib.sh     → detect PLAT, set all path vars
+0.   scratch       → symlink ~/.local, ~/.cache to scratch (NFS homes)
+0.1  dirs          → create ~/dev, ~/bones, ~/misc (symlink to scratch if available)
+0.5  repo          → clone dotfiles; create ~/dotfiles symlink
+0.3  PLAT re-detect → re-run PLAT detection from real repo's install/plat/
+1.   chezmoi       → install binary to $ARCH_BIN
+2.   dotfiles      → chezmoi apply (prompts name/email once)
+2.7  path check    → verify PLAT paths are writable and not stale symlinks
+3.   ZSH           → oh-my-zsh + plugins via install/zsh.sh
+4.   packages      → macOS: homebrew.sh | Linux: linux-packages.sh
+5.   services      → macOS: colima autostart (install/macos-services.sh)
+5.5  settings      → macOS: system preferences (install/macos-settings.sh)
+6.   runtimes      → node.sh, rust.sh, python.sh, claude.sh, codex.sh
+7.   auth          → API token setup (install/auth.sh, opt-in via DF_DO_AUTH=1)
 ```
 
 **Update/upgrade mode:** skips scratch setup and repo cloning, pulls latest changes instead.

@@ -86,7 +86,7 @@ macOS-specific (casks, GUI apps).
 
 ### 5. Custom install script
 
-Look at an existing `install/` script for patterns and follow them. Add an `INSTALL_*` flag to `bootstrap.sh`.
+Look at an existing `install/` script for patterns and follow them. Add a `DF_DO_*` flag to `bootstrap.sh`.
 
 ---
 
@@ -141,7 +141,8 @@ The same `Brewfile` works on macOS and Linux. `if OS.mac?` blocks are silently s
 ## Updating all packages
 
 ```sh
-~/dotfiles/bootstrap.sh
+~/dotfiles/bootstrap.sh update    # pull + refresh (install missing, skip current)
+~/dotfiles/bootstrap.sh upgrade   # update + brew upgrade + cargo upgrade
 ```
 
-Re-running bootstrap is the canonical way to upgrade. Every script is idempotent — it upgrades what's installed, installs what's missing, and skips what's already current. Works the same on macOS and Linux.
+`update` refreshes tools without upgrading existing versions. `upgrade` additionally enables Homebrew upgrades and forces cargo-binstall to re-check for newer binaries. Both are idempotent — safe to run at any time.

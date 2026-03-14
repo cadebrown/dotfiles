@@ -52,7 +52,7 @@ bootstrap.sh upgrade      # update + brew upgrade + cargo upgrade
 | Xcode Command Line Tools | Homebrew prompts automatically, or: `xcode-select --install` |
 | Internet access | — |
 
-No sudo required.
+Sudo is required for the Homebrew installer.
 
 ### What gets installed
 
@@ -75,6 +75,7 @@ No sudo required.
    - Cargo tools install to `~/.local/$PLAT/cargo/bin/`
 9. **Python** via uv → `~/.local/$PLAT/venv/`
 10. **Claude Code** native binary → `~/.local/$PLAT/bin/claude` + plugins + MCP servers
+11. **Codex CLI** native binary → `~/.local/$PLAT/bin/codex`
 
 Total time: ~5 minutes on a fast connection (most packages pour as precompiled bottles).
 
@@ -110,6 +111,7 @@ No sudo required. No Docker or Podman needed.
      falls back to source compilation otherwise
 7. **Python** via uv → `~/.local/$PLAT/venv/`
 8. **Claude Code** native binary → `~/.local/$PLAT/bin/claude` + plugins + MCP servers
+9. **Codex CLI** native binary → `~/.local/$PLAT/bin/codex`
 
 Total time: ~5 minutes on a fast connection.
 
@@ -120,8 +122,10 @@ Total time: ~5 minutes on a fast connection.
 Any step can be disabled with an environment variable:
 
 ```sh
+DF_DO_SCRATCH=0         # skip scratch space symlink setup
+DF_DO_DIRS=0            # skip home directory creation (~/dev, ~/bones, ~/misc)
 DF_DO_PACKAGES=0        # skip Homebrew + brew bundle
-DF_DO_SERVICES=0        # skip colima service setup (macOS)
+DF_DO_MACOS_SERVICES=0  # skip colima service setup (macOS)
 DF_DO_MACOS_SETTINGS=0  # skip macOS settings (Dock, Finder, keyboard, etc.)
 DF_DO_ZSH=0             # skip oh-my-zsh
 DF_DO_NODE=0            # skip nvm + Node.js + global npm packages

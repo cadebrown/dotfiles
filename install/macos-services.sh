@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install/services.sh - register macOS login services via launchd (brew services)
+# install/macos-services.sh - register macOS login services via launchd (brew services)
 #
 # Each entry here starts the service now AND makes it auto-start at login.
 # Re-running is safe: brew services start is idempotent (already-running = no-op).

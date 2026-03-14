@@ -10,3 +10,7 @@
 
 - [Day-to-day workflow](usage/updates.md)
 - [Troubleshooting](usage/troubleshooting.md)
+
+# Infrastructure
+
+- [Docs and hosting](infra/docs-and-hosting.md)

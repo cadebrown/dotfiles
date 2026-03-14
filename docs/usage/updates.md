@@ -2,13 +2,15 @@
 
 ---
 
-## Upgrade all packages
+## Update and upgrade
 
 ```sh
-~/dotfiles/bootstrap.sh
+~/dotfiles/bootstrap.sh update    # pull latest + refresh tools (no brew upgrade)
+~/dotfiles/bootstrap.sh upgrade   # update + brew upgrade + cargo upgrade
+~/dotfiles/bootstrap.sh           # full install (same as first run, idempotent)
 ```
 
-That's it. Every install script is idempotent — it upgrades what's installed, installs what's missing, and skips what's already current. Re-running bootstrap is safe at any time and is the same command whether you're on a fresh machine or updating an existing one.
+`update` pulls the repo, applies chezmoi, refreshes zsh plugins, and re-runs all install scripts (which skip already-installed tools). `upgrade` does the same but also enables Homebrew upgrades and forces cargo-binstall to re-check for newer binaries.
 
 ---
 
