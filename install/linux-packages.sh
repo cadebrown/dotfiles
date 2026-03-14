@@ -88,28 +88,57 @@ else
 fi
 unset _openssl_cert _brew_ca_cert
 
-### Patch python@3.14 formula ###
+### Patch Homebrew formulas for Linux compatibility ###
 #
-# Apply custom patches for Linux compatibility (uuid module, test_datetime PGO issues).
-# See install/patch-homebrew-python.sh for details.
+# Several Homebrew formulas don't build cleanly on a custom Linux prefix due to
+# upstream assumptions about the build environment. We patch formula Ruby files
+# in-place before running brew bundle. All patches are idempotent (safe to re-run)
+# and print 'already applied' if the target formula has already been patched.
+#
+# Each patch script documents:
+#   - WHY: the root cause and upstream issue
+#   - WHAT: exactly what the patch changes
+#   - SIDE EFFECTS: what you lose (usually nothing useful on a headless server)
+#   - WHEN TO REMOVE: the conditions under which the patch is no longer needed
+#   - SKIP FLAG: per-patch DF_PATCH_BREW_* env var to disable individually
+#
+# Master skip: DF_PATCH_BREW_ALL=0 disables all formula patches at once (useful
+# to test whether upstream has fixed things, or if you've already applied them):
+#   DF_PATCH_BREW_ALL=0 bash install/linux-packages.sh
+#
+# Individual skips (also supported, see each script's header):
+#   DF_PATCH_BREW_MESA=0 DF_PATCH_BREW_FISH=0 bash install/linux-packages.sh
+#
+# Patching requires the tap to be cloned locally (HOMEBREW_NO_INSTALL_FROM_API=1).
+# Without this, Homebrew uses a pre-built JSON API and formula files aren't present.
 export HOMEBREW_NO_INSTALL_FROM_API=1
 log_info "Tapping homebrew-core for editable formulas..."
+# Note: grep -v exits 1 if it matches nothing (no Warning lines), which would kill
+# the script under set -euo pipefail. The '|| true' absorbs that non-fatal exit.
 brew tap homebrew/core --force 2>&1 | grep -v "^Warning" | head -5 || true
 
-if [[ -f "$DF_INSTALL_DIR/patch-homebrew-python.sh" ]]; then
-    bash "$DF_INSTALL_DIR/patch-homebrew-python.sh"
-fi
+if [[ "${DF_PATCH_BREW_ALL:-1}" == "0" ]]; then
+    log_info "DF_PATCH_BREW_ALL=0 — skipping all Homebrew formula patches"
+else
+    # python@3.14: fixes uuid module and test_datetime PGO build failures on custom prefix.
+    # See install/patch-homebrew-python.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-python.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-python.sh"
 
-if [[ -f "$DF_INSTALL_DIR/patch-homebrew-mesa.sh" ]]; then
-    bash "$DF_INSTALL_DIR/patch-homebrew-mesa.sh"
-fi
+    # mesa: fixes GCC 12 AVX2 compile errors in ARM GPU drivers that are built even on
+    # x86 hosts. Two patches: drivers=auto and strip ARM entries from -Dtools=.
+    # See install/patch-homebrew-mesa.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-mesa.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-mesa.sh"
 
-if [[ -f "$DF_INSTALL_DIR/patch-homebrew-fastfetch.sh" ]]; then
-    bash "$DF_INSTALL_DIR/patch-homebrew-fastfetch.sh"
-fi
+    # fastfetch: disables WSL GPU detection (ENABLE_DIRECTX_HEADERS=OFF) which fails to
+    # compile at a custom prefix due to a shim/include-path interaction with directx-headers.
+    # WSL GPU detection is a no-op on bare-metal Linux anyway.
+    # See install/patch-homebrew-fastfetch.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-fastfetch.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-fastfetch.sh"
 
-if [[ -f "$DF_INSTALL_DIR/patch-homebrew-fish.sh" ]]; then
-    bash "$DF_INSTALL_DIR/patch-homebrew-fish.sh"
+    # fish: disables sphinx man page generation (WITH_DOCS=OFF) which fails on headless
+    # cluster nodes due to locale not being configured (locale.Error: unsupported locale).
+    # See install/patch-homebrew-fish.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-fish.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-fish.sh"
 fi
 
 ### Install all packages ###
