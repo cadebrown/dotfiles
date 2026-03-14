@@ -1,5 +1,5 @@
 # CLAUDE.md
-# Keep in sync with ~/.codex/AGENTS.md (home/dot_codex/AGENTS.md)
+# Shared baseline preferences may overlap with Codex, but this file is no longer a strict mirror of ~/.codex/AGENTS.md.
 
 ## Background
 
@@ -40,6 +40,32 @@ Don't commit unless I explicitly ask, but do suggest natural commit points.
 - Open to others; if the right tool isn't obvious, research it before committing to one
 
 For more about my environment and tooling, see `~/dotfiles`.
+
+## Tool Preferences
+
+Prefer these over their traditional counterparts — they're all installed via dotfiles:
+- `fd` over `find`, `rg` over `grep`, `sd` over `sed`, `bat` over `cat`
+- `zoxide` over `cd` (for jumping to known dirs)
+- `uv` over `pip`/`pip install` — always
+- `cargo-binstall` over `cargo install` (downloads pre-built binaries)
+- `jq` for JSON, `yq` for YAML
+- `gh` for GitHub CLI operations
+
+## Research First
+
+For unfamiliar libraries, APIs, or domains: search docs and read before writing code.
+Don't guess at APIs — look them up. Use `/research` for deep dives.
+
+## Git Conventions
+
+- Feature branches off main, rebase before merge
+- PR titles: imperative mood, under 70 chars
+- One logical change per commit
+
+## Testing
+
+Tests define "done" — write them before or alongside implementation.
+Prefer integration tests that exercise real behavior over unit tests with heavy mocking.
 
 ## Code Quality
 

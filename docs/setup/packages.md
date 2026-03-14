@@ -46,10 +46,12 @@ the same pre-built binary that Homebrew bottles provide — same quality, faster
 
 ```sh
 # packages/npm.txt
-@scope/package-name
+@cometix/ccline
 ```
 
 Re-run: `bash ~/dotfiles/install/node.sh`
+
+Currently ships [`@cometix/ccline`](https://github.com/Haleclipse/CCometixLine) — a Rust-based status line for Claude Code with themes and TUI config (`ccline --config`).
 
 ### 3. pip — Python packages
 

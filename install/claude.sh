@@ -123,14 +123,31 @@ _ok=0 _skip=0 _fail=0
 
 while IFS= read -r line; do
     [[ -z "$line" || "$line" == \#* ]] && continue
-    # Format: <name> <transport> <url>
+    # Parse: <name> <transport> <url>  OR  <name> stdio cmd: <command...>
     _name="${line%% *}"; _rest="${line#* }"
-    _transport="${_rest%% *}"; _url="${_rest#* }"
+    _transport="${_rest%% *}"
 
     if claude mcp list 2>/dev/null | grep -qE "^$_name\b"; then
         log_info "  skip  $_name (already registered)"
         (( _skip++ )) || true
+        continue
+    fi
+
+    if [[ "$_transport" == "stdio" && "$_rest" == *"cmd: "* ]]; then
+        # Stdio format: <name> stdio cmd: <command...>
+        _cmd="${_rest#*cmd: }"
+        log_info "  $_name (stdio) → $_cmd"
+        # shellcheck disable=SC2086
+        if claude mcp add --scope user "$_name" -- $_cmd 2>/dev/null; then
+            log_okay "  registered $_name"
+            (( _ok++ )) || true
+        else
+            log_warn "  fail  $_name"
+            (( _fail++ )) || true
+        fi
     else
+        # HTTP/SSE format: <name> <transport> <url>
+        _url="${_rest#* }"
         log_info "  $_name ($_transport) → $_url"
         if claude mcp add --transport "$_transport" --scope user "$_name" "$_url" 2>/dev/null; then
             log_okay "  registered $_name"

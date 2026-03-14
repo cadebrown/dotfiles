@@ -1,7 +1,18 @@
 # claude-mcp.txt - MCP servers for Claude Code
 # Usage: install/claude.sh reads this file
-# Format: <name> <transport> <url>
-# Install manually: claude mcp add --transport <transport> --scope user <name> <url>
+#
+# HTTP/SSE format: <name> <transport> <url>
+# Stdio format:    <name> stdio cmd: <command...>
+#
+# Install manually:
+#   claude mcp add --transport <transport> --scope user <name> <url>
+#   claude mcp add --scope user <name> -- <command...>
 
 # Cloudflare: full API access (Pages, DNS, Workers, R2, Zero Trust, etc.)
 cloudflare http https://mcp.cloudflare.com/mcp
+
+# GitHub: PRs, issues, repo search, code review (authenticate via /mcp after install)
+github http https://api.githubcopilot.com/mcp/
+
+# Context7: up-to-date library documentation for any dependency
+context7 stdio cmd: npx -y @upstash/context7-mcp@latest
