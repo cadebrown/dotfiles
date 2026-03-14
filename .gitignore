@@ -1,3 +1,21 @@
+# Directories
 .claude/
 docs/book/
 old/
+
+# Secrets and credentials (should never be committed)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+terraform.tfvars
+!terraform.tfvars.example
+
+# IDE / OS
+.vscode/settings.json
+.DS_Store
+*.swp

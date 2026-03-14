@@ -105,7 +105,7 @@ If a Homebrew tool is shadowing a cargo tool, check `packages/cargo.txt` and `pa
 Check the build log via the API:
 
 ```sh
-ACCOUNT="5afb385ba43e1a082b138554dfdb141c"
+ACCOUNT="YOUR_CLOUDFLARE_ACCOUNT_ID"
 TOKEN="..."
 # List recent deployments
 curl -s "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/pages/projects/dotfiles/deployments" \
