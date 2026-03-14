@@ -67,16 +67,49 @@ else
     brew install glibc 2>&1
 fi
 
+### Fix Homebrew OpenSSL cert.pem symlink ###
+#
+# openssl@3 expects its cert.pem at $BREW_PREFIX/etc/openssl@3/cert.pem, but
+# the ca-certificates formula only populates $BREW_PREFIX/etc/ca-certificates/cert.pem.
+# On standard Homebrew installs a symlink is created automatically; on custom prefixes
+# (non-/home/linuxbrew/.linuxbrew) the post-install hook sometimes doesn't fire.
+# Without the symlink, Brew's Python/OpenSSL can't verify SSL certs, causing build
+# failures when tools like meson try to download crates.io subproject sources.
+_openssl_cert="$_REAL_BREW_PREFIX/etc/openssl@3/cert.pem"
+_brew_ca_cert="$_REAL_BREW_PREFIX/etc/ca-certificates/cert.pem"
+if [[ ! -e "$_openssl_cert" && -f "$_brew_ca_cert" ]]; then
+    mkdir -p "$(dirname "$_openssl_cert")"
+    ln -sf "$_brew_ca_cert" "$_openssl_cert"
+    log_okay "Created $BREW_PREFIX/etc/openssl@3/cert.pem → ca-certificates/cert.pem"
+elif [[ -e "$_openssl_cert" ]]; then
+    log_okay "openssl@3/cert.pem already exists"
+else
+    log_warn "ca-certificates/cert.pem not found — SSL may fail for source builds"
+fi
+unset _openssl_cert _brew_ca_cert
+
 ### Patch python@3.14 formula ###
 #
 # Apply custom patches for Linux compatibility (uuid module, test_datetime PGO issues).
 # See install/patch-homebrew-python.sh for details.
 export HOMEBREW_NO_INSTALL_FROM_API=1
 log_info "Tapping homebrew-core for editable formulas..."
-brew tap homebrew/core --force 2>&1 | grep -v "^Warning" | head -5
+brew tap homebrew/core --force 2>&1 | grep -v "^Warning" | head -5 || true
 
 if [[ -f "$DF_INSTALL_DIR/patch-homebrew-python.sh" ]]; then
     bash "$DF_INSTALL_DIR/patch-homebrew-python.sh"
+fi
+
+if [[ -f "$DF_INSTALL_DIR/patch-homebrew-mesa.sh" ]]; then
+    bash "$DF_INSTALL_DIR/patch-homebrew-mesa.sh"
+fi
+
+if [[ -f "$DF_INSTALL_DIR/patch-homebrew-fastfetch.sh" ]]; then
+    bash "$DF_INSTALL_DIR/patch-homebrew-fastfetch.sh"
+fi
+
+if [[ -f "$DF_INSTALL_DIR/patch-homebrew-fish.sh" ]]; then
+    bash "$DF_INSTALL_DIR/patch-homebrew-fish.sh"
 fi
 
 ### Install all packages ###
@@ -101,7 +134,12 @@ else
 fi
 
 # shellcheck disable=SC2086
-brew bundle install $_bundle_flags --file="$_BREWFILE_TMP" 2>&1
+_bundle_exit=0
+brew bundle install $_bundle_flags --file="$_BREWFILE_TMP" 2>&1 || _bundle_exit=$?
+if [[ "$_bundle_exit" -ne 0 ]]; then
+    log_warn "brew bundle completed with failures (exit $_bundle_exit) — some packages may not be installed"
+    log_warn "Run 'brew bundle install --file=~/dotfiles/packages/Brewfile' to retry"
+fi
 
 ### Create unversioned compiler symlinks ###
 #

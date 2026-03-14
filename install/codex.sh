@@ -22,8 +22,19 @@ case "$OS" in
         esac
         ;;
     linux)
-        # Use glibc (gnu) by default, musl for Alpine etc.
-        if ldd --version 2>&1 | grep -q musl; then _libc="musl"; else _libc="gnu"; fi
+        # Use musl on Alpine or when glibc < 2.38 (codex gnu binary requires 2.38+).
+        _glibc_ver=$(ldd --version 2>/dev/null | awk 'NR==1 {print $NF}')
+        _glibc_maj="${_glibc_ver%%.*}"
+        _glibc_min="${_glibc_ver##*.}"
+        if ldd --version 2>&1 | grep -q musl; then
+            _libc="musl"
+        elif [[ "$_glibc_maj" -lt 2 || ("$_glibc_maj" -eq 2 && "$_glibc_min" -lt 38) ]]; then
+            log_info "glibc $_glibc_ver < 2.38 — using musl build"
+            _libc="musl"
+        else
+            _libc="gnu"
+        fi
+        unset _glibc_ver _glibc_maj _glibc_min
         case "$ARCH" in
             aarch64) _asset="codex-aarch64-unknown-linux-${_libc}" ;;
             x86_64)  _asset="codex-x86_64-unknown-linux-${_libc}" ;;
