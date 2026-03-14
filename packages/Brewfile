@@ -80,6 +80,7 @@ brew "zig"
 ### DevOps ###
 brew "opentofu"
 brew "mdbook"
+brew "podman"
 
 ### Retro / Embedded ###
 brew "cc65"
@@ -92,7 +93,6 @@ if OS.mac?
   ### Dev Tools - VMs & Containers (macOS) ###
   brew "colima"
   brew "docker"
-  brew "podman"
   brew "qemu"
   brew "mas"
 
