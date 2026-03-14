@@ -1,3 +1,5 @@
+#:schema https://developers.openai.com/codex/config-schema.json
+
 model = "gpt-5-codex"
 model_reasoning_effort = "medium"
 plan_mode_reasoning_effort = "high"
@@ -5,6 +7,7 @@ plan_mode_reasoning_effort = "high"
 web_search = "live"
 sandbox_mode = "workspace-write"
 approval_policy = "on-request"
+file_opener = "none"
 
 project_doc_max_bytes = 32768
 project_doc_fallback_filenames = ["CLAUDE.md"]
@@ -20,6 +23,16 @@ writable_roots = []
 network_access = true
 exclude_tmpdir_env_var = false
 exclude_slash_tmp = false
+
+[history]
+max_bytes = 104857600
+
+[tui]
+alternate_screen = "never"
+animations = false
+notifications = ["agent-turn-complete", "approval-requested"]
+notification_method = "auto"
+show_tooltips = false
 
 [profiles.deep]
 model = "gpt-5-codex"
