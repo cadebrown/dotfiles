@@ -41,7 +41,6 @@ opencv-python
 
 # ML/Scientific
 voila
-aesara
 
 # Build tools (Python bindings)
 cmake
