@@ -88,12 +88,13 @@ log_okay "Screenshots configured"
 ### Safari ###
 
 log_info "Safari"
+# Safari preferences are sandboxed on macOS 26+ pre-release — failures are non-fatal
 # Show the full URL in the address bar
-defaults write com.apple.Safari ShowFullURLInSmartSearchField -bool true
+defaults write com.apple.Safari ShowFullURLInSmartSearchField -bool true 2>/dev/null || true
 # Enable Develop menu
-defaults write com.apple.Safari IncludeDevelopMenu -bool true
-defaults write com.apple.Safari WebKitDeveloperExtrasEnabledPreferenceKey -bool true
-log_okay "Safari configured"
+defaults write com.apple.Safari IncludeDevelopMenu -bool true 2>/dev/null || true
+defaults write com.apple.Safari WebKitDeveloperExtrasEnabledPreferenceKey -bool true 2>/dev/null || true
+log_okay "Safari configured (some settings may require Safari to be open)"
 
 ### iTerm2 ###
 
