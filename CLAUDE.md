@@ -1,740 +1,195 @@
 # CLAUDE.md — dotfiles repo
 
-Personal dotfiles for macOS and Linux. Managed with [chezmoi](https://chezmoi.io),
-bootstrapped with a single `curl | bash`, and designed for shared NFS home directories
-across different CPU architectures without requiring sudo on Linux.
+Personal dotfiles for macOS and Linux, managed with [chezmoi](https://chezmoi.io).
+Bootstrapped with `curl | bash`, designed for shared NFS home directories across
+CPU architectures. Full docs at [dotfiles.cade.io](https://dotfiles.cade.io).
 
----
+## Design constraints
 
-## Rules for agents
+These are non-negotiable and shape every decision in the repo:
 
-### Adding a tool to this config
+1. **Cross-platform.** Everything works on both macOS and Linux, on both ARM and x86.
+2. **PLAT isolation.** Compiled binaries live under `~/.local/$PLAT/` where `PLAT` encodes
+   OS + CPU level (e.g. `plat_Linux_x86-64-v3`, `plat_Darwin_arm64`). Two machines sharing
+   an NFS home install into separate PLAT dirs — no conflicts. Text configs are shared.
+3. **No sudo on Linux.** Homebrew installs to a user-owned prefix with its own glibc.
+4. **Idempotent.** Every script is safe to re-run. Check before installing, skip if done.
+5. **Single source of truth.** One `Brewfile` for both platforms (`if OS.mac?` for differences).
+   One `_lib.sh` for all path variables. One pair of shell profile templates for zsh and bash.
 
-1. Read `install/_lib.sh` first — it defines all path variables.
-2. Check `packages/cargo.txt`, `packages/Brewfile`, and `packages/npm.txt`
-   for duplicates. Never install the same tool in two layers.
-3. Follow the priority in "Adding a program" below. Rust CLI tools go in
-   `cargo.txt` (binstall pre-built binaries, no Linux container needed),
-   not Brewfile.
-4. New install scripts: source `_lib.sh`, use its variables and helpers,
-   guard with idempotency checks, add a `DF_DO_*` flag to `bootstrap.sh`,
-   add tests to `tests/`.
+## Where things live
 
-### Editing dotfiles
-
-Edit chezmoi sources in `home/` (e.g. `home/dot_zshrc.tmpl`), never the
-deployed files directly. Binary files like `dot_iterm2/*.plist` are not
-templates — no `.tmpl` extension.
-
-### Hard constraints
-
-- No `sudo` in any script (Linux runs without root).
-- No compiled binaries in `~/.local/bin/` (arch-neutral scripts only).
-- No hardcoded paths — use `$LOCAL_PLAT`, `$CARGO_HOME`, etc. from `_lib.sh`.
-
----
-
-## Core invariants
-
-These must never be broken:
-
-1. **No sudo on Linux.** Every install script runs as the current user. Homebrew on Linux
-   runs directly on the host (no root, no container). Docker/Podman is not required.
-
-2. **PLAT isolation.** Every compiled binary lives under `~/.local/$PLAT/` where
-   `PLAT` is detected from `install/plat/` check scripts (e.g. `plat_Linux_x86-64-v4`,
-   `plat_Linux_x86-64-v3`, `plat_Darwin_arm64`). Detection picks the highest CPU level
-   the machine supports. Two machines sharing a home directory install into separate PLAT
-   subdirs — an AVX-512 machine and an AVX2-only machine each get their own binaries.
-   Text configs (chezmoi-managed dotfiles) are shared freely.
-
-3. **Idempotent.** Every script is safe to re-run. Check before installing; skip if already done.
-
-4. **glibc portability.** Homebrew bundles its own glibc 2.35 — binaries are self-contained
-   and independent of the host system glibc. Most packages pour as precompiled bottles;
-   glibc itself builds from source (~2 min) using the native CPU march on first install.
-
-5. **Same Brewfile everywhere.** `packages/Brewfile` is the single source of truth for packages
-   on both macOS and Linux. `if OS.mac?` blocks handle casks and macOS-specific tools.
-   Homebrew skips those blocks on Linux automatically.
-
----
-
-## Repo structure
-
-```
-dotfiles/
-├── bootstrap.sh               # Entry point — run this on any new machine
-├── CLAUDE.md                  # This file
-├── README.md
-│
-├── home/                      # Dotfiles managed by chezmoi → applied to ~/
-│   ├── .chezmoiignore         # Skip platform-specific files (e.g. aerospace on Linux)
-│   ├── dot_zshrc.tmpl         # ZSH interactive config (chezmoi template)
-│   ├── dot_zprofile.tmpl      # ZSH login shell: PATH, env vars, tool activation
-│   ├── dot_bashrc.tmpl        # Bash interactive config (aliases, prompt, completions)
-│   ├── dot_bash_profile.tmpl  # Bash login shell: mirrors .zprofile for bash users
-│   ├── dot_gitconfig.tmpl     # Git config (name/email from chezmoi data)
-│   ├── dot_ssh/config.tmpl    # SSH config
-│   ├── dot_claude/CLAUDE.md   # Global Claude Code instructions → ~/.claude/CLAUDE.md
-│   ├── dot_codex/             # OpenAI Codex CLI config → ~/.codex/
-│   │   ├── AGENTS.md          # Global Codex instructions (mirrors dot_claude/CLAUDE.md)
-│   │   ├── create_config.toml # Base settings (create_ prefix: written once, never overwritten)
-│   │   └── rules/default.rules # Auto-allowed shell commands
-│   ├── dot_iterm2/            # iTerm2 preferences → ~/.iterm2/
-│   │   └── com.googlecode.iterm2.plist  # Binary plist — not a template
-│   └── dot_config/            # App configs: nvim, ghostty, git, linearmouse, etc.
-│
-├── packages/
-│   ├── Brewfile               # Homebrew packages — macOS (bottles) + Linux (compiled)
-│   ├── cargo.txt              # Rust tools (read by install/rust.sh via cargo-binstall)
-│   ├── pip.txt                # Python packages for $LOCAL_PLAT/venv (read by install/python.sh)
-│   ├── npm.txt                # Global npm packages (read by install/node.sh)
-│   ├── claude-plugins.txt     # Claude Code plugins (read by install/claude.sh)
-│   └── claude-mcp.txt         # Claude Code MCP servers (read by install/claude.sh)
-│
-├── install/
-│   ├── _lib.sh                # SOURCE OF TRUTH for all PLAT paths and env vars
-│   ├── plat/                  # Per-PLAT capability check + compile-flag scripts
-│   │   ├── plat_Linux_x86-64-v4/
-│   │   │   ├── .plat_check.sh # CPU feature check (AVX-512) — exits 0 if supported
-│   │   │   └── .plat_env.sh   # Sets CFLAGS, RUSTFLAGS, HOMEBREW_OPTFLAGS, etc.
-│   │   ├── plat_Linux_x86-64-v3/  # AVX2/FMA/BMI2 (Haswell+, Zen2+)
-│   │   ├── plat_Linux_x86-64-v2/  # SSE4.2/POPCNT baseline
-│   │   ├── plat_Linux_aarch64/    # 64-bit ARM Linux
-│   │   ├── plat_Darwin_arm64/     # Apple Silicon
-│   │   └── plat_Darwin_x86-64/    # Intel Mac
-│   ├── brew-shell.sh          # Debug helper: interactive Homebrew shell in manylinux container (optional)
-│   ├── chezmoi.sh             # Install chezmoi binary → $ARCH_BIN
-│   ├── homebrew.sh            # macOS: install Homebrew + brew bundle
-│   ├── linux-packages.sh      # Linux: install Homebrew + glibc + brew bundle (no container, no sudo)
-│   ├── patch-homebrew-python.sh # Linux: patch python@3.14 formula (uuid, test_datetime fixes)
-│   ├── zsh.sh                 # oh-my-zsh + plugins (pure, autosuggestions, fsh, completions)
-│   ├── macos-services.sh      # macOS: colima login service
-│   ├── macos-settings.sh      # macOS: system preferences (Dock, Finder, keyboard, etc.)
-│   ├── auth.sh                # Interactive API token setup (DF_DO_AUTH=1 in bootstrap)
-│   ├── dirs.sh                # Create ~/dev, ~/bones, ~/misc (symlink to scratch if available)
-│   ├── node.sh                # nvm + Node.js → $LOCAL_PLAT/nvm/
-│   ├── rust.sh                # rustup + cargo-binstall + cargo tools from cargo.txt
-│   ├── python.sh              # uv + venv + pip installs from packages/pip.txt
-│   ├── claude.sh              # Claude Code: native binary + plugins (all platforms)
-│   ├── codex.sh               # Codex CLI: native binary from GitHub releases
-│   ├── scratch.sh             # Symlink large dirs to scratch space (NFS quota relief)
-│   └── verify-path.sh         # Diagnostic: check PATH binaries for arch/lib/symlink issues
-│
-├── docs/                      # mdBook documentation (served at dotfiles.cade.io)
-│   ├── book.toml              # mdBook config: theme, repo URL, search
-│   ├── SUMMARY.md             # Table of contents / nav structure
-│   ├── intro.md               # Homepage — overview of everything installed
-│   ├── setup/
-│   │   ├── bootstrap.md       # System requirements + install instructions per platform
-│   │   ├── chezmoi.md         # Dotfile management with chezmoi
-│   │   └── packages.md        # Package layers (cargo, npm, pip, brew)
-│   ├── usage/
-│   │   ├── updates.md         # Day-to-day workflow
-│   │   └── troubleshooting.md # Quick reference for common issues
-│   └── infra/
-│       └── docs-and-hosting.md # How docs are built, deployed, and managed
-│
-├── infra/
-│   └── cloudflare/            # OpenTofu config for Cloudflare Pages
-│       ├── main.tf            # Pages project + custom domain + DNS record
-│       ├── build.sh           # Build script: installs mdbook, runs `mdbook build docs`
-│       ├── terraform.tfvars.example
-│       └── .terraform.lock.hcl
-│
-└── tests/
-    ├── Dockerfile             # Ubuntu 24.04 + bats-core test image
-    ├── run.sh                 # Build image and run test suite
-    ├── entrypoint.sh          # Runs inside container: bootstrap + bats
-    ├── bootstrap.bats         # Test: dotfiles applied, plugins installed, chezmoi idempotent
-    ├── shell.bats             # Test: ~/.zprofile sources cleanly, env vars correct
-    ├── paths.bats             # Test: compiled tools in correct PLAT dirs
-    └── verify.bats            # Test: verify-path.sh diagnostic passes
-```
-
----
-
-## install/_lib.sh — the central contract
-
-Every install script sources `_lib.sh` first. It defines all PLAT paths as variables:
-
-| Variable | Value | Purpose |
+| What | Where | Notes |
 |---|---|---|
-| `DF_ROOT` | parent of `install/` | Root of the dotfiles repo |
-| `DF_PACKAGES` | `$DF_ROOT/packages` | Package list directory |
-| `OS` | `darwin` or `linux` | Normalised OS |
-| `ARCH` | `aarch64` or `x86_64` | Normalised arch (arm64 → aarch64) |
-| `PLAT` | detected from `install/plat/` (e.g. `plat_Linux_x86-64-v4`) | Platform + CPU-level identifier |
-| `LOCAL_PLAT` | `$HOME/.local/$PLAT` | Root for all compiled tools |
-| `ARCH_BIN` | `$LOCAL_PLAT/bin` | chezmoi, uv, uvx |
-| `RUSTUP_HOME` | `$LOCAL_PLAT/rustup` | Rust toolchain |
-| `CARGO_HOME` | `$LOCAL_PLAT/cargo` | Cargo (bins at `cargo/bin/`) |
-| `CARGO_TARGET_DIR` | `$LOCAL_PLAT/cargo-build` | Build artifacts (macOS sandbox workaround) |
-| `NVM_DIR` | `$LOCAL_PLAT/nvm` | nvm + Node.js versions |
-| `VENV` | `$LOCAL_PLAT/venv` | Python virtualenv |
-| `UV_TOOL_BIN_DIR` | `$LOCAL_PLAT/bin` | uv tool binaries |
-| `UV_TOOL_DIR` | `$LOCAL_PLAT/uv/tools` | uv tool metadata |
-| `UV_PYTHON_INSTALL_DIR` | `$LOCAL_PLAT/uv/python` | uv managed Pythons |
-| `SCRATCH` | `$DF_SCRATCH` or resolved `~/scratch` | Scratch space root (empty if none) |
-| `PATHS` | `$SCRATCH/.paths` | Symlink targets for ~/.local, ~/.cache, etc. (empty if no scratch) |
+| Dotfile sources | `home/` | chezmoi templates → applied to `~/` |
+| Package lists | `packages/` | `Brewfile`, `cargo.txt`, `pip.txt`, `npm.txt`, `claude-*.txt` |
+| Install scripts | `install/` | Each sources `_lib.sh`, each is idempotent |
+| Path vars + helpers | `install/_lib.sh` | **Read this first** — defines `PLAT`, `LOCAL_PLAT`, all tool paths, logging |
+| PLAT detection | `install/plat/` | `.plat_check.sh` (capability test) + `.plat_env.sh` (compiler flags) per target |
+| Shell profiles | `home/dot_zprofile.tmpl`, `home/dot_bash_profile.tmpl` | Identical — runtime PLAT detection + PATH setup |
+| chezmoi config | `home/.chezmoi.toml.tmpl` | Prompts for `DF_NAME`/`DF_EMAIL` on first init |
+| Bootstrap entry | `bootstrap.sh` | Orchestrates everything; supports `install`/`update`/`upgrade` modes |
+| Docs | `docs/` | mdBook → auto-deployed to dotfiles.cade.io |
+| Infra | `infra/cloudflare/` | OpenTofu for Cloudflare Pages hosting |
+| Tests | `tests/` | Docker-based bats suite |
 
-`_lib.sh` also sets `GIT_CONFIG_GLOBAL=/dev/null` to prevent `url.insteadOf` SSH
-rewrites from breaking curl-based installers (oh-my-zsh, nvm, etc.) on machines
-without SSH keys configured.
+## Install scripts
 
-### Helper functions
+Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `bootstrap.sh`:
 
-| Function | Purpose |
-|---|---|
-| `has cmd` | Check if a command exists on PATH |
-| `log_okay msg` | Print green `[okay]` status line |
-| `log_info msg` | Print blue `[info]` status line |
-| `log_warn msg` | Print yellow `[warn]` status line |
-| `log_fail msg` | Print red `[fail]` to stderr |
-| `log_debug msg` | Print cyan `[dbug]` line (only when `DF_DEBUG=1`) |
-| `log_section msg` | Print bold `=== section ===` header |
-| `die msg` | Print error and exit 1 |
-| `run_logged cmd...` | Run command with output indented 4 spaces (shows cmd + timing when `DF_DEBUG=1`) |
-| `ensure_dir path` | `mkdir -p` if directory doesn't exist |
-| `download url dest` | Download via curl or wget |
-| `_re_derive_plat_vars` | Re-derive all PLAT variables from current `LOCAL_PLAT` (call after `LOCAL_PLAT` changes) |
-| `_read_package_list file` | Read a package list file, skip blanks/comments, output one package name per line |
+| Script | What it does | Key details |
+|---|---|---|
+| `chezmoi.sh` | chezmoi binary → `$ARCH_BIN` | Official installer with checksum |
+| `zsh.sh` | oh-my-zsh + plugins (pure, autosuggestions, fsh, completions) | Clones or updates via git |
+| `homebrew.sh` | macOS: Homebrew + `brew bundle` from Brewfile | Upgrades enabled by default |
+| `linux-packages.sh` | Linux: Homebrew + glibc + `brew bundle` | Custom prefix, compiler symlinks, upgrades off by default |
+| `macos-services.sh` | Colima login service (rootless Docker) | macOS only, skips on Linux |
+| `macos-settings.sh` | System prefs via `defaults write` (Dock, Finder, keyboard, trackpad, Safari, iTerm2) | macOS only |
+| `node.sh` | nvm + Node.js + global npm packages from `npm.txt` | Lazy-loaded in zsh for fast startup |
+| `rust.sh` | rustup + cargo-binstall + tools from `cargo.txt` | macOS: Homebrew rustup (code-signed); Linux: sh.rustup.rs |
+| `python.sh` | uv + venv + packages from `pip.txt` | Venv at `$LOCAL_PLAT/venv` with `--seed` |
+| `claude.sh` | Claude Code binary + plugins + MCP servers | Downloads from Anthropic's GCS bucket |
+| `codex.sh` | Codex CLI binary from GitHub releases | Platform detection + checksum |
+| `auth.sh` | Interactive API token setup (GitHub, Anthropic, OpenAI) | Creates `~/.{service}.env` files, chmod 600 |
+| `dirs.sh` | Creates `~/dev`, `~/bones`, `~/misc` | Symlinks to scratch when available |
+| `scratch.sh` | Symlinks `~/.local`, `~/.cache`, etc. to scratch space | NFS quota relief |
+| `verify-path.sh` | Diagnostic: arch check, library check, duplicates, stale symlinks | Not called by bootstrap |
+| `patch-homebrew-python.sh` | Patches python@3.14 formula for Linux (uuid, test_datetime) | Applied automatically during linux-packages.sh |
 
-**If you add a new tool with compiled binaries, its install path must be under
-`$LOCAL_PLAT/` and the variable must be defined in `_lib.sh`.**
+## Logging functions
 
----
+Defined in `_lib.sh`. Use these in install scripts — 4-char label symmetry:
 
-## PLAT specs — install/plat/
-
-Each subdirectory of `install/plat/` defines one platform target.
-`_lib.sh` scans them (sorted reverse — highest first), runs `.plat_check.sh`,
-and sources `.plat_env.sh` from the first one that exits 0.
-
-### Current specs
-
-| PLAT | OS | CPU requirement | Typical hardware |
-|---|---|---|---|
-| `plat_Linux_x86-64-v4` | Linux | AVX-512 (avx512f/bw/cd/dq/vl) | Intel Skylake-X/Ice Lake+, AMD Zen 4+ |
-| `plat_Linux_x86-64-v3` | Linux | AVX2/FMA/BMI2 | Intel Haswell+ (2013+), AMD Zen 2+ (2019+) |
-| `plat_Linux_x86-64-v2` | Linux | SSE4.2/POPCNT | Intel Nehalem+ (2008+), AMD K10+ |
-| `plat_Linux_aarch64` | Linux | any AArch64 | Graviton, Ampere, etc. |
-| `plat_Darwin_arm64` | macOS | any Apple Silicon | M1/M2/M3/M4+ |
-| `plat_Darwin_x86-64` | macOS | any Intel | Intel Mac (all models) |
-
-Detection order (highest to lowest):
-```
-v4 checked first → v3 → v2 → fallback
-```
-The fallback (no matching spec) uses the old `uname-m-uname-s` format for
-backwards compatibility.
-
-### .plat_check.sh — capability detection
-
-POSIX sh (invoked with `/bin/sh`). Exit 0 if this machine supports this PLAT.
-
-```sh
-#!/bin/sh
-# plat_Linux_x86-64-v3/.plat_check.sh
-[ "$(uname -s)" = "Linux" ] || exit 1
-[ "$(uname -m)" = "x86_64" ] || exit 1
-for flag in avx avx2 bmi1 bmi2 f16c fma movbe xsave cx16 popcnt sse4_1 sse4_2 ssse3; do
-    grep -qw "$flag" /proc/cpuinfo 2>/dev/null || exit 1
-done
-exit 0
-```
-
-macOS doesn't have `/proc/cpuinfo` — just check `uname -s` + `uname -m`.
-Linux x86-64 feature flags come from `/proc/cpuinfo` — `grep -qw` does word-boundary matching.
-
-### .plat_env.sh — compile flags
-
-Bash. Sourced after detection to set compile-time flags for that PLAT.
-Also sourced by `.zprofile` at login so interactive `cargo build`, `cmake`, etc. use them.
-
-```bash
-#!/usr/bin/env bash
-# plat_Linux_x86-64-v3/.plat_env.sh
-export CFLAGS="${CFLAGS:--march=x86-64-v3 -O2}"
-export CXXFLAGS="${CXXFLAGS:--march=x86-64-v3 -O2}"
-export RUSTFLAGS="${RUSTFLAGS:--C target-cpu=x86-64-v3}"
-export HOMEBREW_OPTFLAGS="${HOMEBREW_OPTFLAGS:--march=x86-64-v3 -O2}"
-export CMAKE_C_FLAGS="${CMAKE_C_FLAGS:--march=x86-64-v3 -O2}"
-export CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS:--march=x86-64-v3 -O2}"
-```
-
-`HOMEBREW_OPTFLAGS` is sourced from `.plat_env.sh` but is **not** passed into Homebrew
-in the default (no-container) mode — Homebrew's native march detection runs on the host
-CPU, which is exactly what we want (v3 machine → `-march=znver2`, v4 → `-march=native` for
-that host). Only glibc builds from source; all user tools pour as precompiled bottles.
-
-`brew-shell.sh` (debug tool) still supports container mode for cross-arch testing.
-If you need to build on a high-end machine for older hardware, `brew-shell.sh` accepts
-`HOMEBREW_OPTFLAGS_PLAT` to override native detection; it translates `x86-64-v{n}` →
-`x86-64` for bootstrap gcc (GCC 9, which predates that syntax).
-
-### Adding a new PLAT
-
-1. Create `install/plat/plat_{OS}_{name}/`
-2. Write `.plat_check.sh` — exit 0 if supported, exit 1 if not
-3. Write `.plat_env.sh` — set flags for this target
-4. The name determines sort order — use a name that sorts correctly relative to siblings
-   (e.g. `plat_Linux_x86-64-v4` sorts after `plat_Linux_x86-64-v3`)
-5. Test with: `for d in install/plat/plat_Linux_*/; do /bin/sh "$d/.plat_check.sh" && echo "PASS $(basename $d)" || echo "fail $(basename $d)"; done`
-
----
+| Function | Label | When to use |
+|---|---|---|
+| `log_info msg` | `[info]` | Status updates, what's happening |
+| `log_okay msg` | `[okay]` | Success, already done, skipping |
+| `log_warn msg` | `[warn]` | Non-fatal issues, degraded state |
+| `log_fail msg` | `[fail]` | Errors (prints to stderr) |
+| `log_debug msg` | `[dbug]` | Verbose trace (only when `DF_DEBUG=1`) |
+| `log_section msg` | `=== msg ===` | Major step headers |
+| `die msg` | | `log_fail` + `exit 1` |
+| `run_logged cmd` | | Run with indented output, shows command + timing in debug mode |
 
 ## PATH priority
 
-`.zprofile` sources Homebrew first, then prepends PLAT paths on top. The resulting
-order ensures PLAT-installed tools always win over Homebrew equivalents:
+Shell profiles prepend PLAT paths on top of Homebrew. Highest priority first:
 
 ```
-$LOCAL_PLAT/venv/bin          ← Python venv (highest priority)
-$LOCAL_PLAT/cargo/bin         ← Rust cargo tools (fd, sd, zoxide, etc.)
-$LOCAL_PLAT/nvm/.../bin       ← Node.js via nvm
-$LOCAL_PLAT/bin               ← chezmoi, uv, uvx
-~/.local/bin                  ← arch-neutral scripts
-/opt/homebrew/bin             ← Homebrew (macOS)
-/usr/bin                      ← system
+$LOCAL_PLAT/venv/bin          Python venv
+$LOCAL_PLAT/cargo/bin         Rust tools (fd, sd, zoxide, etc.)
+$LOCAL_PLAT/nvm/.../bin       Node.js via nvm
+$LOCAL_PLAT/bin               chezmoi, uv, claude
+~/.local/bin                  arch-neutral scripts only
+/opt/homebrew/bin             Homebrew (macOS)
+/usr/bin                      system
 ```
 
-**Do not install the same tool via both Homebrew and cargo/npm.** If a tool is in
-`packages/cargo.txt`, remove it from `packages/Brewfile` (and vice versa). PLAT
-paths win on PATH, but duplicates waste install time and disk.
+**Never install the same tool in two layers** — PLAT paths win, but duplicates waste time.
 
----
-
-## macOS vs Linux — Rust toolchain
-
-`install/rust.sh` handles each platform differently:
-
-**macOS:** Uses Homebrew's `rustup` (`brew "rustup"` is in `Brewfile` under `if OS.mac?`).
-Homebrew's build is code-signed, which is required on macOS Sequoia+ where the linker
-enforces `com.apple.provenance` on object files. The upstream `sh.rustup.rs` binary is
-not code-signed and will fail with "Operation not permitted" when `ld` tries to open
-compiled `.o`/`.rlib` files in sandboxed contexts.
-
-**Linux:** Downloads `rustup-init` directly from `sh.rustup.rs`. No Homebrew needed or wanted.
-
-Both platforms install `cargo-binstall` first (via its own pre-built binary installer).
-For each tool in `cargo.txt`, binstall tries to download a pre-built binary from GitHub
-releases; if none is available, it falls back to `cargo install` (source compilation).
-
----
-
-## Shell profiles (zsh and bash)
-
-**Login profiles:** Both `.zprofile` (zsh) and `.bash_profile` (bash) are maintained as
-identical templates that provide the same functionality:
-
-- PLAT detection from `install/plat/` check scripts (picks the highest CPU level the machine supports)
-- Symlink resolution for `~/.local` → ensures all PLAT paths use consistent physical paths
-- Homebrew shellenv sourcing
-- PATH setup (PLAT paths prepended before Homebrew)
-- Tool-specific env vars (Rust, Node, Python)
-- Platform-specific config (CUDA on Linux, Colima on macOS)
-
-**Interactive configs:** `.zshrc` uses oh-my-zsh with plugins (pure prompt, autosuggestions,
-fast-syntax-highlighting, completions, nvm lazy loading). `.bashrc` is minimal: basic prompt
-with git branch, shared aliases (same as `.zshrc`), zoxide, and fzf completions.
-
-**PATH deduplication:** On shared NFS homes with scratch space, `~/.local` is a symlink to
-`/scratch/$USER/.paths/.local`. Without resolution, some tools (Homebrew, Python venv)
-resolve the symlink and add the physical path to PATH, while others (cargo, nvm) use
-the literal `~/.local/$PLAT` path. This creates duplicate PATH entries for the same PLAT.
-Both shell profiles resolve the symlink using `readlink -f` before setting `_LOCAL_PLAT`,
-ensuring all tools add the same physical path.
-
-## nvm lazy loading
-
-nvm.sh is ~6000 lines of bash. Sourcing it at login adds ~400ms to shell startup.
-Instead, we use a two-layer approach:
-
-1. **`.zprofile`/`.bash_profile`** — adds the latest installed node binary dir to PATH directly
-   (`ls $NVM_DIR/versions/node/ | sort -V | tail -1`). This makes `node`/`npm`
-   available in non-interactive shells (scripts, CI) with zero nvm overhead.
-
-2. **`.zshrc`** (zsh only) — enables the oh-my-zsh `nvm` plugin with `lazy yes`. This creates
-   stub functions for `nvm`/`node`/`npm`/`npx` that source the real `nvm.sh` on
-   first use. In interactive zsh shells, the stub overrides the PATH-based node, so
-   `nvm use` works correctly.
-
-Bash interactive shells get node via the PATH entry from step 1 — no nvm lazy loading,
-but `nvm use` is not available without manually sourcing `$NVM_DIR/nvm.sh`.
-
-Result: **~0.14s** zsh shell startup (down from ~1.1s with eager nvm loading).
-
----
-
-## bootstrap.sh flow
-
-Three modes: `install` (default), `update`, `upgrade`.
+## Bootstrap step order
 
 ```
-bootstrap.sh              # install — full idempotent setup
-bootstrap.sh update       # git pull + chezmoi apply + refresh tools
-bootstrap.sh upgrade      # update + brew upgrade + cargo upgrade
+0.   scratch          DF_DO_SCRATCH
+0.1  dirs             DF_DO_DIRS
+0.5  repo clone       (always)
+0.3  PLAT re-detect   (always)
+1.   chezmoi install   (always)
+2.   chezmoi apply     (always)
+2.7  path sanity       (always)
+3.   zsh              DF_DO_ZSH
+4.   packages         DF_DO_PACKAGES
+5.   macOS services   DF_DO_MACOS_SERVICES
+5.5  macOS settings   DF_DO_MACOS_SETTINGS
+6.   runtimes         DF_DO_NODE, DF_DO_RUST, DF_DO_PYTHON, DF_DO_CLAUDE, DF_DO_CODEX
+7.   auth             DF_DO_AUTH (off by default)
 ```
 
-**Install mode flow:**
-```
-source _lib.sh     → detect PLAT, set all path vars
-0.   scratch       → symlink ~/.local, ~/.cache to scratch (NFS homes)
-0.1  dirs          → create ~/dev, ~/bones, ~/misc (symlink to scratch if available)
-0.5  repo          → clone dotfiles; create ~/dotfiles symlink
-0.3  PLAT re-detect → re-run PLAT detection from real repo's install/plat/
-1.   chezmoi       → install binary to $ARCH_BIN
-2.   dotfiles      → chezmoi apply (prompts name/email once)
-2.7  path check    → verify PLAT paths are writable and not stale symlinks
-3.   ZSH           → oh-my-zsh + plugins via install/zsh.sh
-4.   packages      → macOS: homebrew.sh | Linux: linux-packages.sh
-5.   services      → macOS: colima autostart (install/macos-services.sh)
-5.5  settings      → macOS: system preferences (install/macos-settings.sh)
-6.   runtimes      → node.sh, rust.sh, python.sh, claude.sh, codex.sh
-7.   auth          → API token setup (install/auth.sh, opt-in via DF_DO_AUTH=1)
-```
-
-**Update/upgrade mode:** skips scratch setup and repo cloning, pulls latest changes instead.
-Upgrade additionally sets `DF_BREW_UPGRADE=1`.
-
-Each step has a `DF_DO_*=0` env var to skip it. The Linux packages
-step installs Homebrew's own glibc first, then runs `brew bundle` — no container, no
-Docker required. Most packages pour as precompiled bottles; glibc builds from source
-on first install (~2 min).
-
-Pre-seed name/email to avoid interactive prompts:
-```sh
-DF_NAME="Your Name" DF_EMAIL="you@example.com" ~/dotfiles/bootstrap.sh
-```
-
----
-
-## Linux Homebrew — how it works
-
-`linux-packages.sh` installs Homebrew natively on the host (no Docker, no container,
-no sudo). Key design decisions:
-
-**1. Custom prefix:** Homebrew installs to `~/.local/$PLAT/brew/` instead of the standard
-`/home/linuxbrew/.linuxbrew`. This enables per-CPU-level isolation on shared NFS homes.
-
-**2. glibc first:** The script runs `brew install glibc` explicitly before `brew bundle`.
-Why? Homebrew's bottles are built for `/home/linuxbrew/.linuxbrew` with system glibc ≥ 2.35.
-On a custom prefix:
-- **Packages with relocatable binaries** (jq, ripgrep, etc.) pour as bottles — patchelf
-  rewrites the RPATH and they work fine.
-- **Packages that embed the prefix deeply** (Python, Perl, OpenSSL, ncurses, git, vim)
-  can't be relocated and build from source. These use Homebrew's bundled glibc (~2 min
-  one-time build) as their loader and libc, making them fully self-contained.
-
-Installing glibc first ensures that even on systems where the host glibc is already ≥ 2.35,
-binaries still use Homebrew's loader (`brew/lib/ld.so` → `opt/glibc/bin/ld.so`) instead
-of silently depending on the host system glibc.
-
-**3. Compiler symlinks:** `gcc` and `llvm` are keg-only (Homebrew policy: don't shadow
-system compilers). The script creates unversioned symlinks in `$LOCAL_PLAT/bin/`:
-- `gcc-15` → `gcc`
-- `g++-15` → `g++`
-- `llvm@21/bin/clang` → `clang`
-- `llvm@21/bin/clang++` → `clang++`
-
-This gives clean `gcc`/`clang` commands that resolve to Homebrew's versions. Re-run
-`linux-packages.sh` after a compiler upgrade to refresh symlinks.
-
-**4. Upgrades disabled by default.** `brew bundle` runs with `--no-upgrade` on Linux
-because upgrades on a custom prefix are risky:
-- **glibc upgrade** can break every installed binary until a full rebuild completes
-- **gcc/llvm upgrades** invalidate the unversioned compiler symlinks in `$LOCAL_PLAT/bin/`
-  (need to re-run `linux-packages.sh` to refresh)
-- **Python formula upgrades** overwrite the uuid/test_datetime patches
-- **Source builds** (Python, Perl, git, vim) take 10-30 min each on the custom prefix
-
-Override with `DF_BREW_UPGRADE=1` to force upgrades, then re-run `linux-packages.sh`
-to refresh compiler symlinks and `patch-homebrew-python.sh` to re-apply Python patches.
-
-On macOS, upgrades are enabled by default (`DF_BREW_UPGRADE=1`) — bottles are fast and
-casks like Cursor/VS Code benefit from staying current. Set `DF_BREW_UPGRADE=0` to disable.
-
-**5. Build parallelism:** Homebrew auto-detects `nproc` and sets `HOMEBREW_MAKE_JOBS`
-accordingly (e.g. `make -j112` on 112-core machines). Source builds (glibc, Python,
-Perl, git, vim) use all available cores.
-
-### Python@3.14 build issues on Linux
-
-Python 3.14 from Homebrew fails to build on some Linux systems due to:
-
-1. **UUID module detection failure** - configure detects libuuid but build fails
-   - **Fix:** Set `py_cv_module__uuid=n/a` to disable the module entirely
+## chezmoi template rules
 
-2. **test_datetime hangs during PGO** - Profile-guided optimization runs the test suite,
-   but `test_datetime` hangs on AVX-512 CPUs (possibly timezone/locale related)
-   - **Fix:** Patch Makefile's `PROFILE_TASK` to add `-x test_datetime`
+Templates in `home/*.tmpl` render on `chezmoi apply`. On shared NFS homes, **templates
+must render identically on every machine** — otherwise machines overwrite each other.
 
-**Patches are applied automatically** by `install/patch-homebrew-python.sh` during bootstrap.
-
-**Manual re-application** (if Homebrew updates overwrite patches):
-```bash
-bash ~/dotfiles/install/patch-homebrew-python.sh
-brew reinstall --build-from-source python@3.14
-```
+- **Use `{{ .chezmoi.os }}`** (darwin/linux) for platform branching — this is stable across shared homes
+- **Never use `{{ .chezmoi.arch }}`** or per-machine values in templates — use shell runtime detection instead
+- Template variables: `{{ .name }}`, `{{ .email }}` (from chezmoi data), `{{ .chezmoi.os }}`, `{{ .chezmoi.homeDir }}`
 
-**Environment variables** to prevent formula updates:
-- `HOMEBREW_NO_AUTO_UPDATE=1` - set in `.zprofile`, prevents tap updates
-- `HOMEBREW_NO_INSTALL_FROM_API=1` - forces local formula usage
+## Rules for agents
 
----
+### Before making changes
 
-## Scratch space (NFS homes)
+- **Read `install/_lib.sh`** — it defines every path variable, logging function, and helper.
+  All install scripts source it. Don't guess paths; use the variables it exports.
+- **Check for duplicates** across `packages/cargo.txt`, `packages/Brewfile`, and `packages/npm.txt`
+  before adding a tool. Never install the same thing in two layers.
+- **Read the relevant install script** before modifying it. Understand the idempotency guard.
 
-On Linux machines with shared NFS home directories and small quotas,
-`~/.local/$PLAT` (2-5 GB), `~/.cache`, and oh-my-zsh can exhaust the quota.
+### Adding a tool
 
-**Setup:** Create `~/scratch` as a symlink to large local storage (e.g. `/scratch/$USER`),
-or set `DF_SCRATCH=/path/to/storage`. Then run bootstrap — `install/scratch.sh`
-(step 1, before any tool installs) will symlink these directories to scratch:
+Priority order — native installer first, Homebrew as fallback:
 
-| Home path | Scratch target | Why |
-|---|---|---|
-| `~/.local` | `$SCRATCH/.paths/.local` | All PLAT binaries (2-5 GB per PLAT) |
-| `~/.cache` | `$SCRATCH/.paths/.cache` | Homebrew downloads, uv cache, build artifacts |
-| `~/.vscode` | `$SCRATCH/.paths/.vscode` | VSCode extensions and state |
-| `~/.vscode-server` | `$SCRATCH/.paths/.vscode-server` | Remote SSH server binaries |
-| `~/.cursor` | `$SCRATCH/.paths/.cursor` | Cursor extensions and state |
-| `~/.cursor-server` | `$SCRATCH/.paths/.cursor-server` | Cursor Remote SSH binaries |
+1. `packages/cargo.txt` — Rust crates (cargo-binstall downloads pre-built binaries)
+2. `packages/npm.txt` — npm packages
+3. `packages/pip.txt` — Python packages (installed into `$LOCAL_PLAT/venv` via uv)
+4. `packages/Brewfile` — everything else (C libraries, GUI apps, tools without native installers)
+5. New `install/*.sh` script — source `_lib.sh`, add `DF_DO_*` flag to `bootstrap.sh`, add tests
 
-Override with `DF_LINKS` (colon-separated). `~/.config` is intentionally excluded — chezmoi manages files inside it as a real directory and will replace a symlink.
+macOS-only things go in `if OS.mac?` blocks in the Brewfile.
 
-The `$PATHS` variable in `_lib.sh` points to `$SCRATCH/.paths` and is the
-single source of truth for where symlink targets live.
+### Adding an install script
 
-No-op when no scratch space is detected — existing setups are unaffected.
+1. Source `_lib.sh` at the top
+2. Guard with `has tool && { log_okay "already installed"; exit 0; }`
+3. Install under `$LOCAL_PLAT/` (never `~/.local/bin/` for compiled binaries)
+4. Add a `DF_DO_*` flag to `bootstrap.sh`
 
-**For agents:** The symlinks are transparent. `$LOCAL_PLAT` still resolves to
-`~/.local/$PLAT` — tools install there as usual, the OS follows the symlink.
-Don't add scratch-specific logic to install scripts; just use the standard
-`_lib.sh` variables.
+### Editing dotfiles
 
----
+- Edit sources in `home/` (e.g. `home/dot_zshrc.tmpl`), never the deployed files
+- Binary files like `dot_iterm2/*.plist` are not templates — no `.tmpl` extension
+- Shell profiles (`dot_zprofile.tmpl`, `dot_bash_profile.tmpl`) must stay in sync
 
-## Common tasks
+### Env var naming
 
-### Adding a program
+All user-facing env vars use the `DF_` prefix:
 
-Follow this priority order — native installers first, Homebrew as fallback:
+- Config: `DF_NAME`, `DF_EMAIL`, `DF_REPO`, `DF_PATH`, `DF_SCRATCH`, `DF_LINKS`, `DF_DIRS`, etc.
+- Flags: `DF_DO_PACKAGES`, `DF_DO_RUST`, `DF_DO_AUTH`, etc. (set to `0` to skip, `1` to enable)
+- Debug: `DF_DEBUG=1` for verbose output with timing
 
-1. **cargo** — add to `packages/cargo.txt` if it's a Rust crate.
-   `cargo-binstall` downloads pre-built binaries from GitHub releases (fast).
-2. **npm** — add to `packages/npm.txt` if it's an npm package
-3. **pip/uv** — add to `packages/pip.txt` if it's a Python package
-4. **Homebrew** — add `brew "name"` to `packages/Brewfile` for non-language-specific
-   tools, C libraries, and things without native installers
-5. **Custom script** — look at an existing `install/` script for patterns and follow them;
-   add a `DF_DO_*` flag to `bootstrap.sh`
-6. **Ask** — if none of the above fits, ask before inventing a new mechanism
+Internal vars: `DF_ROOT` (repo root), `DF_PACKAGES` (packages dir), `DF_INSTALL_DIR` (install dir).
+Tool-standard vars (`PLAT`, `LOCAL_PLAT`, `RUSTUP_HOME`, `CARGO_HOME`, `NVM_DIR`, etc.) keep
+their conventional names.
 
-For macOS-only things (casks, GUI apps, macOS services), wrap in `if OS.mac?`:
+## Gotchas
 
-```ruby
-if OS.mac?
-  cask "some-app"
-  brew "macos-only-tool"
-end
-```
+These are non-obvious things that have caused real bugs:
 
-### Add a Python package
+- **`sourceDir` in chezmoi.toml must be a top-level key** — not inside `[data]`. Misplacing
+  it silently breaks `chezmoi diff` and `chezmoi update`.
+- **`GIT_CONFIG_GLOBAL=/dev/null`** is set by `_lib.sh` intentionally — prevents SSH URL
+  rewrites from breaking curl-based installers on machines without SSH keys.
+- **macOS Sequoia requires code-signed rustup** — the Homebrew `rustup` formula is signed;
+  upstream `sh.rustup.rs` is not and will fail with linker provenance errors. `install/rust.sh`
+  handles this, but don't change the macOS Rust install path without understanding why.
+- **Don't use legacy paths** (`~/.nvm`, `~/.rustup`, `~/.cargo`) — everything is under `$LOCAL_PLAT/`.
+- **Don't run install scripts without sourcing `_lib.sh`** — PLAT paths won't be set.
+- **Homebrew upgrades are off by default on Linux** (`DF_BREW_UPGRADE=0`) because glibc
+  upgrades can break every installed binary. Use `bootstrap.sh upgrade` deliberately.
+- **Python@3.14 formula is patched on Linux** — `install/patch-homebrew-python.sh` fixes uuid
+  and test_datetime build issues. `HOMEBREW_NO_AUTO_UPDATE=1` prevents Homebrew from
+  overwriting patches.
 
-Add to `packages/pip.txt`. Installed into `$LOCAL_PLAT/venv` via uv.
+## Reference
 
-### Add a Rust tool
+For detailed documentation on any topic, see the docs site or source files:
 
-Add the crate name to `packages/cargo.txt`. `install/rust.sh` will:
-1. Try `cargo binstall` — downloads a pre-built binary from GitHub releases if available
-2. Fall back to `cargo install` — compiles from source otherwise
-
-Run `bash ~/dotfiles/install/rust.sh` to apply. On macOS, source compilation requires
-running from a normal terminal (the signed Homebrew rustup handles the Sequoia linker
-requirements automatically).
-
-### Edit a dotfile
-
-```sh
-chezmoi edit ~/.zshrc      # opens in $EDITOR, applies on save
-chezmoi edit ~/.zprofile
-```
-
-Or edit `home/dot_*.tmpl` directly and run `chezmoi apply`.
-
-### Apply dotfile changes
-
-```sh
-chezmoi apply              # apply pending changes
-chezmoi diff               # preview what would change
-chezmoi update             # git pull + apply
-```
-
-### Update AI agent instructions (Claude / Codex)
-
-Edit both files — they mirror each other:
-
-```sh
-chezmoi edit ~/.claude/CLAUDE.md    # or edit home/dot_claude/CLAUDE.md
-chezmoi edit ~/.codex/AGENTS.md     # or edit home/dot_codex/AGENTS.md
-```
-
-### Add a Codex auto-allowed command
-
-Edit `home/dot_codex/rules/default.rules`:
-
-```
-prefix_rule(pattern=["my-cmd", "arg"], decision="allow")
-```
-
-### Add a new env var or PATH entry
-
-Edit `home/dot_zprofile.tmpl`. For anything arch-specific, use `$_LOCAL_PLAT`:
-
-```sh
-export MY_TOOL_HOME="$_LOCAL_PLAT/my-tool"
-export PATH="$MY_TOOL_HOME/bin:$PATH"
-```
-
-Also add the corresponding variable to `install/_lib.sh` so install scripts
-can reference the same path.
-
-### Add a new install script
-
-1. Create `install/my-thing.sh`, source `_lib.sh` at the top
-2. Guard with `has my-thing && { log_okay ...; exit 0; }` for idempotency
-3. Add a step to `bootstrap.sh` with a `DF_DO_MY_THING` flag
-4. Add tests to `tests/paths.bats` or `tests/bootstrap.bats`
-
-### Work on docs
-
-```sh
-# Serve locally with live reload (opens browser automatically)
-mdbook serve docs/ --open
-
-# Build static output only
-mdbook build docs/        # output → docs/book/
-```
-
-Docs are hosted at https://dotfiles.cade.io via Cloudflare Pages.
-Every push to `main` triggers a rebuild automatically.
-
-### Deploy infrastructure changes
-
-```sh
-cd infra/cloudflare
-export CLOUDFLARE_API_TOKEN=...
-tofu plan    # preview
-tofu apply   # create/update Pages project + DNS
-```
-
-`terraform.tfvars` (contains account_id) is gitignored — copy from
-`terraform.tfvars.example` and fill in on each machine.
-
-### Run tests
-
-```sh
-# Full Docker-based test (requires Docker or Podman)
-./tests/run.sh
-
-# Just the shell env tests locally
-bats tests/shell.bats
-```
-
-Tests run in an Ubuntu 24.04 container. Bootstrap runs with
-`DF_DO_PACKAGES=0` (package installs are skipped
-in the test environment to keep tests fast and hermetic).
-
-### Verify PATH health
-
-```sh
-verify-path              # alias — runs all checks
-bash ~/dotfiles/install/verify-path.sh --arch        # architecture match only
-bash ~/dotfiles/install/verify-path.sh --libs        # shared library check (Linux)
-bash ~/dotfiles/install/verify-path.sh --duplicates  # find shadowed binaries
-bash ~/dotfiles/install/verify-path.sh --symlinks    # broken symlinks
-bash ~/dotfiles/install/verify-path.sh --full        # check entire PATH, not just PLAT dirs
-```
-
-Not called by bootstrap — run manually after install or when debugging path issues.
-
----
-
-## chezmoi template variables
-
-Available in `home/**/*.tmpl`:
-
-| Variable | Example |
-|---|---|
-| `{{ .chezmoi.os }}` | `darwin`, `linux` |
-| `{{ .chezmoi.arch }}` | `arm64`, `amd64` |
-| `{{ .chezmoi.homeDir }}` | `/Users/cade` |
-| `{{ .name }}` | from `chezmoi.toml` data |
-| `{{ .email }}` | from `chezmoi.toml` data |
-
-The `.chezmoi.toml.tmpl` prompts for `name` and `email` on first init via
-`promptStringOnce`. Values are cached in `~/.config/chezmoi/chezmoi.toml`.
-
----
-
-## Pitfalls
-
-- **Don't manually edit chezmoi-managed shell configs** — `.zshrc`, `.zprofile`,
-  `.bashrc`, and `.bash_profile` are managed by chezmoi templates. Use `chezmoi edit` instead.
-  Tools like `uv` may try to auto-add source lines to these files; if they do,
-  run `chezmoi apply --force` to restore the clean template.
-
-- **Don't put compiled binaries in `~/.local/bin/`** — that dir is for
-  arch-neutral shell scripts only. Compiled tools go under `$LOCAL_PLAT/`.
-
-- **Don't use `~/.nvm`, `~/.rustup`, `~/.cargo` paths** — all legacy paths.
-  Everything is under `$LOCAL_PLAT/`.
-
-- **Don't install the same tool via both Homebrew and cargo/npm.** PLAT paths
-  win on PATH, but duplicates waste install time. If it's in `cargo.txt`,
-  remove it from `Brewfile`.
-
-- **Don't modify `.zshrc`, `.zprofile`, `.bashrc`, or `.bash_profile` directly** —
-  chezmoi manages them. Run `chezmoi edit ~/.zshrc` or edit `home/dot_zshrc.tmpl`.
-
-- **Don't run install scripts without sourcing `_lib.sh`** — the PLAT paths
-  won't be set and tools will land in wrong locations.
-
-- **Homebrew on Linux installs glibc first** — `linux-packages.sh` explicitly
-  runs `brew install glibc` before `brew bundle` so all bottles link against
-  Homebrew's own glibc (self-contained, not the host system glibc). Even on
-  systems where the host glibc is already ≥ 2.35, forcing glibc install ensures
-  binaries use `brew/lib/ld.so` → `opt/glibc/bin/ld.so` instead of the system
-  loader, making installs portable across different Linux distributions.
-
-- **Compilers are keg-only** — `gcc` and `llvm` formulas don't create unversioned
-  `gcc`/`clang` symlinks in `brew/bin` (Homebrew policy to avoid shadowing system
-  compilers). `linux-packages.sh` creates symlinks in `$LOCAL_PLAT/bin/` pointing
-  to the latest installed versions (e.g. `gcc-15` → `gcc`, `llvm@21/bin/clang` →
-  `clang`). Re-run `linux-packages.sh` after a compiler upgrade to refresh symlinks.
-
-- **`sourceDir` in chezmoi.toml must be a top-level TOML key** — it goes
-  before the `[data]` section, not inside it. Misplacing it silently breaks
-  `chezmoi diff` and `chezmoi update`.
-
-- **`GIT_CONFIG_GLOBAL=/dev/null`** is set by `_lib.sh` for all install scripts.
-  This is intentional — it prevents `url.insteadOf` SSH rewrites from breaking
-  curl-based installers on machines without SSH keys.
-
-- **macOS Sequoia: use Homebrew's rustup, not sh.rustup.rs.** The Homebrew
-  `rustup` formula is code-signed. On macOS Sequoia+, the linker enforces
-  `com.apple.provenance` on object files and will reject unsigned builds.
-  `install/rust.sh` handles this automatically; `brew "rustup"` is in
-  `Brewfile` under `if OS.mac?`.
-
-- **Python@3.14 patches on Linux** — `install/patch-homebrew-python.sh` patches
-  the Homebrew formula to fix uuid module detection and test_datetime PGO hangs.
-  `HOMEBREW_NO_AUTO_UPDATE=1` and `HOMEBREW_NO_INSTALL_FROM_API=1` (set in both
-  shell profiles) prevent Homebrew from overwriting these patches.
-
-- **`dot_iterm2/` is a binary plist, not a template.** Do not add `.tmpl`
-  extension. If you need to update it, copy the new `com.googlecode.iterm2.plist`
-  from `~/.iterm2/` into `home/dot_iterm2/` and run `chezmoi apply`.
+- **Bootstrap flow and skip flags:** `bootstrap.sh` header comments, [docs/setup/bootstrap.md](docs/setup/bootstrap.md)
+- **Package management:** [docs/setup/packages.md](docs/setup/packages.md)
+- **Chezmoi workflow:** [docs/setup/chezmoi.md](docs/setup/chezmoi.md)
+- **Troubleshooting:** [docs/usage/troubleshooting.md](docs/usage/troubleshooting.md)
+- **PLAT specs and compiler flags:** `install/plat/` directories
+- **verify-path.sh flags:** `bash install/verify-path.sh --help`
+- **nvm lazy loading design:** `home/dot_zprofile.tmpl` (PATH entry) + `home/dot_zshrc.tmpl` (oh-my-zsh plugin)
+- **Homebrew on Linux internals:** `install/linux-packages.sh` comments
+- **Infra/hosting:** [docs/infra/docs-and-hosting.md](docs/infra/docs-and-hosting.md)

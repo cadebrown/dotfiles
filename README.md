@@ -1,8 +1,13 @@
 # dotfiles
 
-Personal dotfiles for macOS and Linux. One command bootstraps a complete dev environment -- idempotent, safe on shared NFS home directories across CPU architectures. No sudo required on Linux.
+My personal dotfiles for both MacOS and Linux machine setup. A single command bootstraps and sets up my development environment. A few key features:
 
-Fork this repo and modify for your own setup.
+* No sudo required on Linux
+* Idempotent, rerun to update/upgrade setup
+* Works on shared NFS home directories across CPU architectures
+* Works on both ARM and x86 machines
+
+Fork this repo and modify for your own setup!
 
 ## Bootstrap
 
