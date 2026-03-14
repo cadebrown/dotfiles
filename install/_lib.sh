@@ -29,7 +29,7 @@ PACKAGES_DIR="$DOTFILES_ROOT/packages"
 # .plat_check.sh, pick the first that exits 0. Also sources .plat_env.sh to
 # set CFLAGS, RUSTFLAGS, HOMEBREW_OPTFLAGS, etc. for that CPU target.
 #
-# Fallback: old format "$(uname -m)-$(uname -s)" for backwards compat.
+# If no spec matches, _lib.sh dies — add a new spec for unsupported platforms.
 #
 # On a new machine sharing a home directory, simply re-run bootstrap.sh.
 # chezmoi finds the cached config (no prompts), dotfiles are already applied,
@@ -69,44 +69,34 @@ if [[ -d "$_PLAT_SCRIPT_DIR" ]]; then
 fi
 unset _PLAT_SCRIPT_DIR
 
-# Fallback: old format for backwards compat with existing installs
+# No matching plat spec — fatal. Ensure install/plat/ has a spec for this machine.
 if [[ -z "$PLAT" ]]; then
-    _fb_arch="$(uname -m)"
-    [[ "$_fb_arch" == "arm64" ]] && _fb_arch="aarch64"
-    PLAT="${_fb_arch}-$(uname -s)"
-    unset _fb_arch
+    die "No matching plat spec in $DOTFILES_ROOT/install/plat/ for $(uname -s) $(uname -m)"
 fi
 
 LOCAL_PLAT="$_LOCAL_ROOT/$PLAT"
 unset _LOCAL_ROOT
 ARCH_BIN="$LOCAL_PLAT/bin"
 
-# Standard per-machine tool paths — install scripts and shell both use these
-RUSTUP_HOME="${RUSTUP_HOME:-$LOCAL_PLAT/rustup}"
-CARGO_HOME="${CARGO_HOME:-$LOCAL_PLAT/cargo}"
+# Standard per-machine tool paths — always derived from LOCAL_PLAT.
+# Never inherit from env (stale RUSTUP_HOME etc. causes installs to wrong dir).
+RUSTUP_HOME="$LOCAL_PLAT/rustup"
+CARGO_HOME="$LOCAL_PLAT/cargo"
 # macOS Sequoia+ blocks ar/ld from writing .rlib archives in system temp
 # (/var/folders/.../T/). Redirect cargo build artifacts to a home-dir path.
-# This is needed even with Homebrew's code-signed rustup when binstall falls
-# back to source compilation for packages without pre-built binaries.
-CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$LOCAL_PLAT/cargo-build}"
-VENV="${VENV:-$LOCAL_PLAT/venv}"
+CARGO_TARGET_DIR="$LOCAL_PLAT/cargo-build"
+VENV="$LOCAL_PLAT/venv"
 
-# uv: keep all arch-specific uv state under LOCAL_PLAT
-# UV_TOOL_BIN_DIR: where `uv tool install` places binaries (default ~/.local/bin — wrong for shared homes)
-# UV_TOOL_DIR:     tool metadata (venvs etc.)
-# UV_PYTHON_INSTALL_DIR: managed Python downloads (compiled binaries, must be PLAT-specific)
-UV_TOOL_BIN_DIR="${UV_TOOL_BIN_DIR:-$ARCH_BIN}"
-UV_TOOL_DIR="${UV_TOOL_DIR:-$LOCAL_PLAT/uv/tools}"
-UV_PYTHON_INSTALL_DIR="${UV_PYTHON_INSTALL_DIR:-$LOCAL_PLAT/uv/python}"
+# uv: keep all arch-specific state under LOCAL_PLAT
+UV_TOOL_BIN_DIR="$ARCH_BIN"
+UV_TOOL_DIR="$LOCAL_PLAT/uv/tools"
+UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
 
-# nvm: node version manager — installed per-PLAT so arch-specific node binaries
-# don't collide across machines sharing an NFS home directory.
-NVM_DIR="${NVM_DIR:-$LOCAL_PLAT/nvm}"
+# nvm: per-PLAT so arch-specific node binaries don't collide on shared homes
+NVM_DIR="$LOCAL_PLAT/nvm"
 
-# Nix: ~/.nix-profile is a symlink into /nix/store — it must be PLAT-specific
-# because /nix/store is machine-local and the symlink target doesn't exist on
-# the other arch's machine. NIX_PROFILE is respected by both nix and home-manager.
-NIX_PROFILE="${NIX_PROFILE:-$LOCAL_PLAT/nix-profile}"
+# Nix: per-PLAT because /nix/store is machine-local
+NIX_PROFILE="$LOCAL_PLAT/nix-profile"
 
 # Scratch space for NFS homes with small quotas.
 #

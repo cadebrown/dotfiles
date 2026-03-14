@@ -37,11 +37,9 @@ _plat_detect() {
             fi
         done
     fi
-    # Fallback: old format for backwards compat
-    local _arch
-    _arch="$(uname -m)"
-    [[ "$_arch" == "arm64" ]] && _arch="aarch64"
-    printf '%s' "${_arch}-${_os}"
+    # No matching plat spec — fatal. Run bootstrap.sh to set up install/plat/.
+    echo "ERROR: no matching plat spec in ~/dotfiles/install/plat/" >&2
+    printf '%s' "unknown"
 }
 export _PLAT="$(_plat_detect)"
 # Resolve symlinks so all PATH entries use the same physical path.
@@ -193,7 +191,11 @@ if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
 else
     if [ -z "$SSH_AUTH_SOCK" ]; then
         eval "$(ssh-agent -s)"
-        # (N): zsh null glob — expands to empty instead of erroring if no keys exist
-        ssh-add ~/.ssh/id_*(N) 2>/dev/null || :
+        # (N): zsh null glob; exclude .pub files
+        for _k in ~/.ssh/id_*(N); do
+            [[ "$_k" == *.pub ]] && continue
+            ssh-add "$_k" 2>/dev/null || :
+        done
+        unset _k
     fi
 fi

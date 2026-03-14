@@ -151,7 +151,6 @@ dotfiles/
 │   │   ├── plat_Linux_aarch64/    # 64-bit ARM Linux
 │   │   ├── plat_Darwin_arm64/     # Apple Silicon
 │   │   └── plat_Darwin_x86-64/    # Intel Mac
-│   ├── migrate-plat.sh        # One-time: rename old x86_64-Linux dir to plat_Linux_* format
 │   ├── brew-shell.sh          # Debug helper: interactive Homebrew shell in manylinux container (optional)
 │   ├── chezmoi.sh             # Install chezmoi binary → $ARCH_BIN
 │   ├── homebrew.sh            # macOS: install Homebrew + brew bundle

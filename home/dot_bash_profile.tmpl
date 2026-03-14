@@ -15,7 +15,8 @@ export USE_CCACHE=ON
 
 ### PLATFORM ###
 
-# _PLAT detection - same logic as .zprofile but bash-compatible
+# _PLAT detection — identical logic to .zprofile.
+# See .zprofile for detailed comments on PLAT format and NFS shared homes.
 _plat_detect() {
     local _os _scan _dir _check
     _os="$(uname -s)"
@@ -31,11 +32,8 @@ _plat_detect() {
             fi
         done
     fi
-    # Fallback: old format for backwards compat
-    local _arch
-    _arch="$(uname -m)"
-    [[ "$_arch" == "arm64" ]] && _arch="aarch64"
-    printf '%s' "${_arch}-${_os}"
+    echo "ERROR: no matching plat spec in ~/dotfiles/install/plat/" >&2
+    printf '%s' "unknown"
 }
 export _PLAT="$(_plat_detect)"
 # Resolve symlinks so all PATH entries use the same physical path.
@@ -154,22 +152,26 @@ docker() { /usr/bin/docker "$@"; }
 
 ### CREDENTIALS ###
 
-# Private credential files
+# Private credential files (e.g. ~/.nvidia.env, ~/.work.env)
+# Bash has no null glob — the [ -f ] guard handles the literal glob when no files match.
 for f in "$HOME"/.*.env; do
     [ -f "$f" ] && . "$f"
 done
 
 ### SSH AGENT ###
 
+# Start ssh-agent only for local sessions — remote sessions rely on agent forwarding.
 if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
-    : # remote session
+    : # remote session — agent forwarding handles it
 else
     if [ -z "$SSH_AUTH_SOCK" ]; then
         eval "$(ssh-agent -s)"
-        for key in "$HOME"/.ssh/id_*; do
-            [ -f "$key" ] && [ ! -f "$key.pub" ] && continue
-            [ -f "$key" ] && ssh-add "$key" 2>/dev/null || :
+        for _k in "$HOME"/.ssh/id_*; do
+            [ -f "$_k" ] || continue
+            [[ "$_k" == *.pub ]] && continue
+            ssh-add "$_k" 2>/dev/null || :
         done
+        unset _k
     fi
 fi
 

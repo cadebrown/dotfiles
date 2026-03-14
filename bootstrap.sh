@@ -209,11 +209,6 @@ if [[ -n "$_PLAT_NEW" && "$_PLAT_NEW" != "$PLAT" ]]; then
     [[ -f "$_PLAT_ENV_SH" ]] && source "$_PLAT_ENV_SH"
     unset _PLAT_ENV_SH
 
-    # Migrate old dir if it exists and new dir doesn't
-    if [[ -d "$_OLD_LOCAL_PLAT" && ! -d "$LOCAL_PLAT" ]]; then
-        log_info "Migrating tools: $(basename "$_OLD_LOCAL_PLAT") → $PLAT"
-        bash "$INSTALL_DIR/migrate-plat.sh"
-    fi
     unset _OLD_LOCAL_PLAT
 fi
 unset _PLAT_NEW
