@@ -44,6 +44,8 @@ No sudo required.
 
 1. **chezmoi** → `~/.local/$PLAT/bin/chezmoi`
 2. **Dotfiles** applied via `chezmoi apply`
+   - Shell configs for both **zsh** (`.zprofile`) and **bash** (`.bash_profile`)
+   - Both shells do identical PLAT detection and PATH setup
 3. **oh-my-zsh** + plugins (pure prompt, autosuggestions, fast-syntax-highlighting, completions)
 4. **Homebrew** → `/opt/homebrew` (Apple Silicon) or `/usr/local` (Intel)
    - All packages from `packages/Brewfile` — CLI tools, casks, macOS-only apps
@@ -79,11 +81,14 @@ No sudo required. No Docker or Podman needed.
 
 1. **chezmoi** → `~/.local/$PLAT/bin/chezmoi`
 2. **Dotfiles** applied via `chezmoi apply`
+   - Shell configs for both **zsh** (`.zprofile`) and **bash** (`.bash_profile`)
+   - Both shells do identical PLAT detection and PATH setup
 3. **oh-my-zsh** + plugins
-4. **Homebrew** → `~/.local/$PLAT/brew/`
+4. **Homebrew** → `~/.local/$PLAT/brew/` (native install, no Docker/Podman needed)
    - Installs Homebrew's own glibc 2.35 first — binaries are fully self-contained,
      independent of the host system glibc
    - Most packages pour as precompiled bottles; glibc builds from source (~2 min) on first run
+   - Custom Python@3.14 patches applied automatically for Linux compatibility
 5. **Node.js** via nvm → `~/.local/$PLAT/nvm/`
 6. **Rust** via `sh.rustup.rs` → `~/.local/$PLAT/rustup/` + `~/.local/$PLAT/cargo/`
    - `cargo-binstall` downloads pre-built binaries from GitHub releases when available,

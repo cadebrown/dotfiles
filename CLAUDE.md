@@ -34,6 +34,53 @@ templates — no `.tmpl` extension.
 
 ---
 
+## Recent changes (March 2026)
+
+### Bash support added
+
+Both zsh and bash are now fully supported with identical configuration:
+- **`home/dot_bash_profile.tmpl`** - New bash login shell config that mirrors `.zprofile`
+- Same PLAT detection, PATH setup, tool activation, and platform-specific config
+- chezmoi manages both; keeps them in sync
+
+### PATH deduplication (symlink resolution)
+
+Both `.zprofile` and `.bash_profile` now resolve `~/.local` symlinks before setting `_LOCAL_PLAT`:
+
+```bash
+# Resolve symlinks so all PATH entries use the same physical path
+_local_root="$HOME/.local"
+if [[ -L "$_local_root" ]]; then
+    _local_root="$(readlink -f "$_local_root")"
+fi
+export _LOCAL_PLAT="$_local_root/$_PLAT"
+```
+
+**Why this matters:** On shared NFS homes with scratch space, `~/.local` is a symlink to
+`/scratch/$USER/.paths/.local`. Without resolution, some tools (Homebrew, Python venv)
+resolve the symlink and add the physical path to PATH, while others (cargo, nvm) use
+the literal `~/.local/$PLAT` path. This created duplicate PATH entries — some using
+`/home/$USER/.local/plat_Linux_x86-64-v4/` and others using
+`/scratch/$USER/.paths/.local/plat_Linux_x86-64-v4/`.
+
+Now all tools add the same physical path → no duplicates, single PLAT in PATH.
+
+### Python@3.14 permanent patches
+
+`install/patch-homebrew-python.sh` automatically patches the Homebrew python@3.14 formula
+on Linux to fix build failures:
+
+1. **UUID module**: `py_cv_module__uuid=n/a` disables uuid (libuuid detection fails)
+2. **PGO test_datetime**: Patches Makefile to skip `test_datetime` during PGO (hangs on some CPUs)
+
+Environment variables prevent auto-updates from overwriting patches:
+- `HOMEBREW_NO_AUTO_UPDATE=1` - set in both shell profiles
+- `HOMEBREW_NO_INSTALL_FROM_API=1` - forces local formula usage
+
+See [Python@3.14 build issues on Linux](#python314-build-issues-on-linux) for manual re-application.
+
+---
+
 ## Core invariants
 
 These must never be broken:
@@ -70,7 +117,8 @@ dotfiles/
 │
 ├── home/                      # Dotfiles managed by chezmoi → applied to ~/
 │   ├── dot_zshrc.tmpl         # ZSH config (chezmoi template)
-│   ├── dot_zprofile.tmpl      # Login shell: PATH, env vars, tool activation
+│   ├── dot_zprofile.tmpl      # ZSH login shell: PATH, env vars, tool activation
+│   ├── dot_bash_profile.tmpl  # Bash login shell: mirrors .zprofile for bash users
 │   ├── dot_gitconfig.tmpl     # Git config (name/email from chezmoi data)
 │   ├── dot_ssh/config.tmpl    # SSH config
 │   ├── dot_claude/CLAUDE.md   # Global Claude Code instructions → ~/.claude/CLAUDE.md
@@ -108,6 +156,7 @@ dotfiles/
 │   ├── chezmoi.sh             # Install chezmoi binary → $ARCH_BIN
 │   ├── homebrew.sh            # macOS: install Homebrew + brew bundle
 │   ├── linux-packages.sh      # Linux: install Homebrew + glibc + brew bundle (no container, no sudo)
+│   ├── patch-homebrew-python.sh # Linux: patch python@3.14 formula (uuid, test_datetime fixes)
 │   ├── zsh.sh                 # oh-my-zsh + plugins (pure, autosuggestions, fsh, completions)
 │   ├── services.sh            # macOS: colima login service + iTerm2 prefs
 │   ├── node.sh                # nvm + Node.js → $LOCAL_PLAT/nvm/
@@ -296,12 +345,31 @@ releases; if none is available, it falls back to `cargo install` (source compila
 
 ---
 
+## Shell profiles (zsh and bash)
+
+Both `.zprofile` (zsh) and `.bash_profile` (bash) are maintained as identical templates
+that provide the same functionality:
+
+- PLAT detection from `install/plat/` check scripts (picks the highest CPU level the machine supports)
+- Symlink resolution for `~/.local` → ensures all PLAT paths use consistent physical paths
+- Homebrew shellenv sourcing
+- PATH setup (PLAT paths prepended before Homebrew)
+- Tool-specific env vars (Rust, Node, Python, Nix)
+- Platform-specific config (CUDA on Linux, Colima on macOS)
+
+**Why symlink resolution matters:** On shared NFS homes with scratch space, `~/.local` is
+a symlink to `/scratch/$USER/.paths/.local`. Without resolution, some tools (Homebrew,
+Python venv) resolve the symlink and add the physical path to PATH, while others (cargo,
+nvm) use the literal `~/.local/$PLAT` path. This creates duplicate PATH entries for the
+same PLAT. Both shell profiles now resolve the symlink using `readlink -f` before setting
+`_LOCAL_PLAT`, ensuring all tools add the same physical path.
+
 ## nvm lazy loading
 
 nvm.sh is ~6000 lines of bash. Sourcing it at login adds ~400ms to shell startup.
 Instead, we use a two-layer approach:
 
-1. **`.zprofile`** — adds the latest installed node binary dir to PATH directly
+1. **`.zprofile`/`.bash_profile`** — adds the latest installed node binary dir to PATH directly
    (`ls $NVM_DIR/versions/node/ | sort -V | tail -1`). This makes `node`/`npm`
    available in non-interactive shells (scripts, CI) with zero nvm overhead.
 
@@ -376,6 +444,29 @@ This gives clean `gcc`/`clang` commands that resolve to Homebrew's versions. Re-
 **4. Build parallelism:** Homebrew auto-detects `nproc` and sets `HOMEBREW_MAKE_JOBS`
 accordingly (e.g. `make -j112` on 112-core machines). Source builds (glibc, Python,
 Perl, git, vim) use all available cores.
+
+### Python@3.14 build issues on Linux
+
+Python 3.14 from Homebrew fails to build on some Linux systems due to:
+
+1. **UUID module detection failure** - configure detects libuuid but build fails
+   - **Fix:** Set `py_cv_module__uuid=n/a` to disable the module entirely
+
+2. **test_datetime hangs during PGO** - Profile-guided optimization runs the test suite,
+   but `test_datetime` hangs on AVX-512 CPUs (possibly timezone/locale related)
+   - **Fix:** Patch Makefile's `PROFILE_TASK` to add `-x test_datetime`
+
+**Patches are applied automatically** by `install/patch-homebrew-python.sh` during bootstrap.
+
+**Manual re-application** (if Homebrew updates overwrite patches):
+```bash
+bash ~/dotfiles/install/patch-homebrew-python.sh
+brew reinstall --build-from-source python@3.14
+```
+
+**Environment variables** to prevent formula updates:
+- `HOMEBREW_NO_AUTO_UPDATE=1` - set in `.zprofile`, prevents tap updates
+- `HOMEBREW_NO_INSTALL_FROM_API=1` - forces local formula usage
 
 ---
 
@@ -575,6 +666,11 @@ The `.chezmoi.toml.tmpl` prompts for `name` and `email` on first init via
 ---
 
 ## Pitfalls
+
+- **Don't manually edit chezmoi-managed shell configs** — `.zshrc`, `.zprofile`,
+  and `.bash_profile` are managed by chezmoi templates. Use `chezmoi edit` instead.
+  Tools like `uv` may try to auto-add source lines to these files; if they do,
+  run `chezmoi apply --force` to restore the clean template.
 
 - **Don't put compiled binaries in `~/.local/bin/`** — that dir is for
   arch-neutral shell scripts only. Compiled tools go under `$LOCAL_PLAT/`.

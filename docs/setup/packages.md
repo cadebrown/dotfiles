@@ -130,6 +130,10 @@ Once built, packages are cached. Subsequent runs and upgrades are bottle-only.
 symlinks to avoid shadowing system compilers). `linux-packages.sh` creates symlinks in
 `$LOCAL_PLAT/bin/` so `gcc` → `gcc-15` and `clang` → `llvm@21/bin/clang`.
 
+**Python@3.14 patches:** On Linux, `install/patch-homebrew-python.sh` automatically patches
+the python@3.14 formula to fix build issues (uuid module detection, test_datetime PGO hangs).
+Patches are applied during bootstrap and protected by `HOMEBREW_NO_AUTO_UPDATE=1`.
+
 The same `Brewfile` works on macOS and Linux. `if OS.mac?` blocks are silently skipped on Linux.
 
 ---

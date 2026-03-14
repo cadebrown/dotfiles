@@ -1,6 +1,6 @@
 # dotfiles
 
-Personal dotfiles managed with [chezmoi](https://chezmoi.io). Works on macOS and Linux with per-CPU-level optimization (x86-64-v2/v3/v4, AArch64, Apple Silicon), including shared NFS home directories across machines — no sudo required anywhere.
+Personal dotfiles managed with [chezmoi](https://chezmoi.io). Works on macOS and Linux with per-CPU-level optimization (x86-64-v2/v3/v4, AArch64, Apple Silicon), including shared NFS home directories across machines — no sudo required anywhere. Supports both **zsh** and **bash** with identical configuration.
 
 ## Install
 

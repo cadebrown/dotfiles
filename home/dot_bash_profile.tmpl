@@ -1,4 +1,6 @@
-# .zprofile - ZSH login shell configuration
+# .bash_profile - Bash login shell configuration
+# For bash-specific interactive config, use ~/.bashrc
+# This file mirrors the structure of ~/.zprofile for consistency
 
 ### GENERAL ###
 
@@ -6,22 +8,14 @@ export LANG=en_US.UTF-8
 export BROWSER='lynx'
 export EDITOR=vim
 
-export CMAKE_EXPORT_COMPILE_COMMANDS=1  # write compile_commands.json for clangd/LSP
-export CMAKE_COLOR_DIAGNOSTICS=ON       # colored compiler output even when piped
-export CLICOLOR_FORCE=1                 # force color output in ls/grep/etc when piped
-export USE_CCACHE=ON                    # enable ccache in CMake projects that check this
+export CMAKE_EXPORT_COMPILE_COMMANDS=1
+export CMAKE_COLOR_DIAGNOSTICS=ON
+export CLICOLOR_FORCE=1
+export USE_CCACHE=ON
 
 ### PLATFORM ###
 
-# _PLAT identifies the platform and CPU capability level for this machine.
-# Format: plat_{OS}_{cpu-target} — e.g. plat_Linux_x86-64-v3, plat_Darwin_arm64
-# Scans ~/dotfiles/install/plat/plat_${OS}_*/ (highest level first), runs
-# .plat_check.sh, picks the first that exits 0. Also sources .plat_env.sh
-# to set CFLAGS, RUSTFLAGS, HOMEBREW_OPTFLAGS, etc.
-#
-# NFS shared homes: each machine auto-detects its own PLAT and installs to
-# ~/.local/$_PLAT/ — x86-64-v4 and x86-64-v3 machines share the same home
-# but use separate binary dirs and never see each other's builds.
+# _PLAT detection - same logic as .zprofile but bash-compatible
 _plat_detect() {
     local _os _scan _dir _check
     _os="$(uname -s)"
@@ -55,7 +49,6 @@ unset _local_root
 unset -f _plat_detect
 
 ### HOMEBREW ###
-# Source Homebrew first so PLAT paths can prepend on top of it.
 
 {{ if eq .chezmoi.os "darwin" -}}
 if [ -e "$HOME/.homebrew" ]; then
@@ -64,32 +57,24 @@ elif [ -e "/opt/homebrew" ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 {{ else -}}
-# Linux: Homebrew installed per-PLAT, no container needed
+# Linux: Homebrew installed per-PLAT
 if [ -x "$_LOCAL_PLAT/brew/bin/brew" ]; then
     eval "$($_LOCAL_PLAT/brew/bin/brew shellenv)"
 fi
 {{ end -}}
 
 # Homebrew formula stability
-# Prevent auto-updates that break custom patches (python@3.14, etc.)
 export HOMEBREW_NO_AUTO_UPDATE=1
 export HOMEBREW_NO_INSTALL_FROM_API=1
 
 ### PLAT PATHS ###
-# These go after Homebrew so PLAT-installed tools take priority.
 
 export PATH="$_LOCAL_PLAT/bin:$HOME/.local/bin:$PATH"
 
-### NODE (nvm — lazy loaded via oh-my-zsh plugin in .zshrc) ###
+### NODE (nvm) ###
 
 export NVM_DIR="$_LOCAL_PLAT/nvm"
-# Add default node to PATH for non-interactive shells (scripts, CI).
-# The full nvm is lazy-loaded in .zshrc for interactive use.
 if [ -d "$NVM_DIR/versions/node" ]; then
-    # Pick the highest installed node version using version-sort (sort -V).
-    # This makes `node`/`npm` available in non-interactive shells (scripts, CI)
-    # without sourcing the full nvm.sh (~4000 lines). The omz nvm plugin in
-    # .zshrc overrides this in interactive shells so `nvm use` works correctly.
     _nvm_default_bin="$NVM_DIR/versions/node/$(ls "$NVM_DIR/versions/node/" | sort -V | tail -1)/bin"
     [ -d "$_nvm_default_bin" ] && export PATH="$_nvm_default_bin:$PATH"
     unset _nvm_default_bin
@@ -103,7 +88,6 @@ export PATH="$CARGO_HOME/bin:$PATH"
 
 ### PYTHON (uv) ###
 
-# Keep all arch-specific uv state under _LOCAL_PLAT so shared homes stay clean
 export UV_TOOL_BIN_DIR="$_LOCAL_PLAT/bin"
 export UV_TOOL_DIR="$_LOCAL_PLAT/uv/tools"
 export UV_PYTHON_INSTALL_DIR="$_LOCAL_PLAT/uv/python"
@@ -118,9 +102,6 @@ fi
 
 ### NIX ###
 
-# NIX_PROFILE is PLAT-specific so shared home directories work correctly across
-# architectures. ~/.nix-profile is a symlink into /nix/store, which is
-# machine-local — the target path doesn't exist on the other arch's machine.
 export NIX_PROFILE="$_LOCAL_PLAT/nix-profile"
 if [ -e "$NIX_PROFILE/etc/profile.d/nix.sh" ]; then
     . "$NIX_PROFILE/etc/profile.d/nix.sh"
@@ -129,7 +110,6 @@ fi
 ### PLATFORM-SPECIFIC ###
 {{ if eq .chezmoi.os "darwin" -}}
 
-# Colima: point Docker CLI at colima's socket (avoids needing Docker Desktop)
 if [ -S "$HOME/.colima/default/docker.sock" ]; then
     export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"
 fi
@@ -140,7 +120,7 @@ export SSL_CERT_DIR=/usr/lib/ssl/certs
 
 ### CUDA ###
 
-function cuda_use() {
+cuda_use() {
     export CUDA_HOME="$1"
     if [ -e "$CUDA_HOME" ]; then
         export PATH="$CUDA_HOME/bin:$PATH"
@@ -154,8 +134,6 @@ function cuda_use() {
 
 if [ -e "$HOME/.cuda" ]; then cuda_use "$HOME/.cuda"; fi
 
-# Scratch space: large local storage for NFS homes with small quotas.
-# install/scratch.sh symlinks ~/.local, ~/.cache, etc. here.
 if [ -e "$HOME/scratch" ]; then
     export SCRATCH=$(realpath "$HOME/scratch")
 fi
@@ -170,30 +148,32 @@ if [ -d "$HOME/ncu" ]; then
     export LD_LIBRARY_PATH="$HOME/ncu/lib64:$HOME/ncu/lib:$LD_LIBRARY_PATH"
 fi
 
-# Docker: always use system docker on Linux
-function docker() { /usr/bin/docker "$@"; }
+docker() { /usr/bin/docker "$@"; }
 
 {{ end -}}
 
 ### CREDENTIALS ###
 
-# Private credential files (e.g. ~/.nvidia.env, ~/.work.env)
-# (N): zsh null glob — expands to empty instead of erroring if no files match
-for f in "$HOME"/.*.env(N); do
-    . "$f"
+# Private credential files
+for f in "$HOME"/.*.env; do
+    [ -f "$f" ] && . "$f"
 done
 
 ### SSH AGENT ###
 
-# Start ssh-agent only for local sessions — remote sessions rely on agent forwarding.
-# SSH_CLIENT / SSH_TTY are set by sshd when connecting remotely.
-# SSH_AUTH_SOCK check prevents starting a second agent in a subshell or tmux.
 if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
-    : # remote session — agent forwarding handles it
+    : # remote session
 else
     if [ -z "$SSH_AUTH_SOCK" ]; then
         eval "$(ssh-agent -s)"
-        # (N): zsh null glob — expands to empty instead of erroring if no keys exist
-        ssh-add ~/.ssh/id_*(N) 2>/dev/null || :
+        for key in "$HOME"/.ssh/id_*; do
+            [ -f "$key" ] && [ ! -f "$key.pub" ] && continue
+            [ -f "$key" ] && ssh-add "$key" 2>/dev/null || :
+        done
     fi
+fi
+
+# Source bashrc if it exists (for interactive non-login shells)
+if [ -f "$HOME/.bashrc" ]; then
+    . "$HOME/.bashrc"
 fi

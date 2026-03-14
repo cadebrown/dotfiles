@@ -65,6 +65,18 @@ else
     brew install glibc 2>&1
 fi
 
+### Patch python@3.14 formula ###
+#
+# Apply custom patches for Linux compatibility (uuid module, test_datetime PGO issues).
+# See install/patch-homebrew-python.sh for details.
+export HOMEBREW_NO_INSTALL_FROM_API=1
+log_info "Tapping homebrew-core for editable formulas..."
+brew tap homebrew/core --force 2>&1 | grep -v "^Warning" | head -5
+
+if [[ -f "$INSTALL_DIR/patch-homebrew-python.sh" ]]; then
+    bash "$INSTALL_DIR/patch-homebrew-python.sh"
+fi
+
 ### Install all packages ###
 
 log_info "Running brew bundle..."

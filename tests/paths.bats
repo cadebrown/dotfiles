@@ -123,3 +123,27 @@ setup() {
 @test "venv is NOT at legacy ~/.venv path" {
     [[ ! -d "$HOME/.venv" ]]
 }
+
+# --- Homebrew Python@3.14 patches (Linux only) ---
+
+skip_if_not_linux() {
+    [[ "$(uname -s)" == "Linux" ]] || skip "Only applies to Linux"
+}
+
+@test "python@3.14 formula has uuid disable patch" {
+    skip_if_not_linux
+
+    BREW_PREFIX="$LOCAL_PLAT/brew"
+    FORMULA="$BREW_PREFIX/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/p/python@3.14.rb"
+    [[ -f "$FORMULA" ]] || skip "Python@3.14 formula not present"
+    grep -q "py_cv_module__uuid=n/a" "$FORMULA"
+}
+
+@test "python@3.14 formula has test_datetime skip patch" {
+    skip_if_not_linux
+
+    BREW_PREFIX="$LOCAL_PLAT/brew"
+    FORMULA="$BREW_PREFIX/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/p/python@3.14.rb"
+    [[ -f "$FORMULA" ]] || skip "Python@3.14 formula not present"
+    grep -q "test_datetime" "$FORMULA"
+}

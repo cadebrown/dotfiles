@@ -33,7 +33,8 @@ bash ~/dotfiles/install/python.sh
 
 ```sh
 chezmoi edit ~/.zshrc          # opens in $EDITOR, applies on save
-chezmoi edit ~/.zprofile
+chezmoi edit ~/.zprofile       # zsh login shell
+chezmoi edit ~/.bash_profile   # bash login shell
 chezmoi edit ~/.gitconfig
 ```
 
@@ -41,6 +42,8 @@ Or edit the source directly and apply:
 
 ```sh
 $EDITOR ~/dotfiles/home/dot_zshrc.tmpl
+$EDITOR ~/dotfiles/home/dot_zprofile.tmpl
+$EDITOR ~/dotfiles/home/dot_bash_profile.tmpl
 chezmoi apply
 ```
 
@@ -69,7 +72,7 @@ chezmoi edit ~/.codex/AGENTS.md
 
 ## Add an env var or PATH entry
 
-Edit `home/dot_zprofile.tmpl`. For anything arch-specific use `$_LOCAL_PLAT` (set at shell startup):
+Edit both `home/dot_zprofile.tmpl` and `home/dot_bash_profile.tmpl` (they should stay identical). For anything arch-specific use `$_LOCAL_PLAT` (set at shell startup):
 
 ```sh
 export MY_TOOL_HOME="$_LOCAL_PLAT/my-tool"

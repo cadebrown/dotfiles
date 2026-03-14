@@ -114,3 +114,23 @@ setup() {
     [ "$status" -eq 0 ]
     [[ "$output" =~ ^Python\ 3 ]]
 }
+
+# --- Homebrew stability env vars ---
+
+skip_if_not_linux() {
+    [[ "$(uname -s)" == "Linux" ]] || skip "Only applies to Linux"
+}
+
+@test "HOMEBREW_NO_AUTO_UPDATE is set to 1" {
+    skip_if_not_linux
+    run zsh --no-rcs -c "$ZSH_SOURCE; echo \$HOMEBREW_NO_AUTO_UPDATE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == "1" ]]
+}
+
+@test "HOMEBREW_NO_INSTALL_FROM_API is set to 1" {
+    skip_if_not_linux
+    run zsh --no-rcs -c "$ZSH_SOURCE; echo \$HOMEBREW_NO_INSTALL_FROM_API"
+    [ "$status" -eq 0 ]
+    [[ "$output" == "1" ]]
+}

@@ -6,6 +6,8 @@
 
 ```sh
 chezmoi edit ~/.zshrc          # edit a dotfile (opens in $EDITOR, applies on save)
+chezmoi edit ~/.zprofile       # zsh login shell config
+chezmoi edit ~/.bash_profile   # bash login shell config (mirrors .zprofile)
 chezmoi apply                  # apply all pending changes
 chezmoi diff                   # preview what would change before applying
 chezmoi update                 # git pull + apply (sync from repo)
@@ -20,6 +22,8 @@ Files in `home/` map to `~/` by chezmoi's naming rules:
 | Source | Target |
 |---|---|
 | `home/dot_zshrc.tmpl` | `~/.zshrc` |
+| `home/dot_zprofile.tmpl` | `~/.zprofile` (zsh login shell) |
+| `home/dot_bash_profile.tmpl` | `~/.bash_profile` (bash login shell) |
 | `home/dot_config/git/ignore` | `~/.config/git/ignore` |
 | `home/dot_ssh/config.tmpl` | `~/.ssh/config` |
 | `home/dot_claude/CLAUDE.md` | `~/.claude/CLAUDE.md` |
@@ -57,16 +61,19 @@ alias open='xdg-open'
 **Via chezmoi** (recommended — auto-applies on save):
 ```sh
 chezmoi edit ~/.zshrc
-chezmoi edit ~/.zprofile
+chezmoi edit ~/.zprofile       # zsh login shell
+chezmoi edit ~/.bash_profile   # bash login shell
 ```
 
 **Directly in the repo** (then apply manually):
 ```sh
 $EDITOR ~/dotfiles/home/dot_zshrc.tmpl
+$EDITOR ~/dotfiles/home/dot_zprofile.tmpl
+$EDITOR ~/dotfiles/home/dot_bash_profile.tmpl
 chezmoi apply
 ```
 
-Never edit `~/.zshrc` directly — chezmoi will overwrite it on the next apply.
+Never edit `~/.zshrc`, `~/.zprofile`, or `~/.bash_profile` directly — chezmoi will overwrite them on the next apply.
 
 ---
 

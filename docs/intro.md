@@ -20,6 +20,7 @@ Name and email are only asked once (or pre-seeded as above for unattended instal
 - **Idempotent** — every script is safe to re-run; running bootstrap on a second machine just installs that machine's tools
 - **Single source of truth** — one `Brewfile` for macOS and Linux; `if OS.mac?` blocks handle differences
 - **Fast shell startup** — lazy nvm loading, single `compinit`, ~140ms warm startup
+- **Both zsh and bash** — identical `.zprofile` and `.bash_profile` templates for consistent experience
 
 ---
 

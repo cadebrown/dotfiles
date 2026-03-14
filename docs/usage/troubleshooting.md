@@ -23,34 +23,18 @@ source ~/.zprofile
 
 ## `nvm` or `node` not available in a script
 
-`nvm.sh` is lazy-loaded in interactive shells only. Non-interactive shells get `node`/`npm` via the PATH entry `.zprofile` adds from the highest installed version. If `node` is missing in a script, either:
+`nvm.sh` is lazy-loaded in interactive shells only. Non-interactive shells get `node`/`npm` via the PATH entry `.zprofile`/`.bash_profile` adds from the highest installed version. If `node` is missing in a script, either:
 
 ```sh
-# Option 1: source zprofile at the top of your script
+# Option 1: source profile at the top of your script (zsh)
 source ~/.zprofile
+
+# Option 1b: source profile at the top of your script (bash)
+source ~/.bash_profile
 
 # Option 2: use the full path
 NODE="$NVM_DIR/versions/node/$(ls $NVM_DIR/versions/node | sort -V | tail -1)/bin/node"
 ```
-
----
-
-## Homebrew on Linux: Docker/Podman not found
-
-`linux-packages.sh` requires a container runtime. Options:
-
-```sh
-# Rootless Docker
-curl -fsSL https://get.docker.com/rootless | sh
-
-# Podman (Debian/Ubuntu)
-apt install podman
-
-# Skip packages entirely and install manually
-INSTALL_PACKAGES=0 ~/dotfiles/bootstrap.sh
-```
-
-See [Bootstrap → Linux](../setup/bootstrap.md#linux) for full setup instructions.
 
 ---
 
@@ -72,13 +56,21 @@ CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" chezmoi init
 
 ## chezmoi diff shows unexpected changes
 
-Another program modified a managed file (e.g. Claude Code updated `~/.claude/settings.json`). Options:
+Another program modified a managed file. Common culprits:
+
+- **`uv`** auto-adds source lines to `.zshrc`/`.bashrc` for its `bin/env` files
+- **Claude Code** updates `~/.claude/settings.json` when plugins are installed
+- **Other tools** may modify shell configs without asking
+
+Options:
 
 ```sh
 chezmoi diff                          # see what changed
-chezmoi apply                         # overwrite with repo version
-chezmoi add ~/.claude/settings.json   # pull the live version into the repo
+chezmoi apply --force                 # overwrite with repo version (safe for shell configs)
+chezmoi add ~/.claude/settings.json   # pull the live version into the repo (for config files)
 ```
+
+For shell configs (`.zshrc`, `.zprofile`, `.bash_profile`), always use `chezmoi apply --force` to restore the clean template. These files should never be manually edited.
 
 ---
 
@@ -146,3 +138,49 @@ chezmoi diff        # shows what chezmoi wants to change vs what's on disk
 ```
 
 The fix is almost always to replace a template variable with a shell runtime expression. See [Managing dotfiles → Shared home safety](../setup/chezmoi.md#shared-home-directory-safety).
+
+---
+
+## Duplicate PLAT paths in PATH (both v3 and v4 showing up)
+
+This is fixed in current versions. Both `.zprofile` (zsh) and `.bash_profile` (bash) now resolve `~/.local` symlinks before setting `_LOCAL_PLAT`, ensuring all PATH entries use consistent physical paths.
+
+If you installed before this fix was added:
+
+```sh
+# Apply updated shell profiles
+chezmoi apply ~/.zprofile ~/.bash_profile
+
+# Open a new shell
+exec zsh -l   # or: exec bash -l
+
+# Verify only one PLAT appears
+echo "$_PLAT"                           # should show only the detected PLAT
+echo "$PATH" | tr ':' '\n' | grep plat  # all paths should have the same PLAT prefix
+```
+
+On a shared NFS home with scratch space, `~/.local` is a symlink to `/scratch/$USER/.paths/.local`. The shell profiles now resolve this symlink so Homebrew, cargo, nvm, and other tools all add the same physical path to PATH (no duplicates).
+
+---
+
+## Python@3.14 build fails on Linux (uuid or test_datetime errors)
+
+Python 3.14 from Homebrew has build issues on some Linux systems:
+
+1. **UUID module detection failure** - configure detects libuuid but the build fails
+2. **test_datetime hangs during PGO** - Profile-guided optimization runs the test suite, but `test_datetime` hangs on some CPUs (timezone-related)
+
+**Fix:** Patches are applied automatically by `install/patch-homebrew-python.sh` during bootstrap. If you need to re-apply manually:
+
+```sh
+bash ~/dotfiles/install/patch-homebrew-python.sh
+brew reinstall --build-from-source python@3.14
+```
+
+The patches:
+- Set `py_cv_module__uuid=n/a` to disable the uuid module
+- Patch Makefile's `PROFILE_TASK` to skip `test_datetime` during PGO
+
+Environment variables in `.zprofile`/`.bash_profile` prevent Homebrew from auto-updating and overwriting these patches:
+- `HOMEBREW_NO_AUTO_UPDATE=1` - prevents tap updates
+- `HOMEBREW_NO_INSTALL_FROM_API=1` - forces local formula usage
