@@ -8,28 +8,54 @@
 #   git clone https://github.com/cadebrown/dotfiles ~/dotfiles
 #   ~/dotfiles/bootstrap.sh
 #
-# Environment variables:
-#   GITHUB_REPO           — override the source repo (default: cadebrown/dotfiles)
-#   CHEZMOI_NAME          — pre-seed display name (skips interactive prompt)
-#   CHEZMOI_EMAIL         — pre-seed email (skips interactive prompt)
-#   DOTFILES_PATH         — dotfiles repo location (default: auto-detect / $HOME/dotfiles)
-#   DOTFILES_LINK         — ~/dotfiles symlink target (default: $HOME/dotfiles)
-#   DOTFILES_SCRATCH_PATH — scratch root on local disk (enables scratch mode)
-#   DOTFILES_SCRATCH_LINK — ~/scratch symlink (default: $HOME/scratch)
-#   DOTFILES_LINKS_PATHS  — colon-separated paths to redirect to scratch (default: ~/.local:~/.cache)
-#   INSTALL_SCRATCH       — set to 0 to skip scratch space symlink setup
-#   INSTALL_PACKAGES      — set to 0 to skip package install (Homebrew on macOS/Linux)
-#   INSTALL_SERVICES      — set to 0 to skip auto-start service registration
-#   INSTALL_ZSH           — set to 0 to skip oh-my-zsh + plugins install
-#   INSTALL_NODE          — set to 0 to skip Node install + global npm packages
-#   INSTALL_RUST          — set to 0 to skip Rust install
-#   INSTALL_PYTHON        — set to 0 to skip Python install
-#   INSTALL_CLAUDE        — set to 0 to skip Claude Code install
-#   INSTALL_CODEX         — set to 0 to skip Codex CLI install
+# Modes:
+#   bootstrap.sh              # install (default) — full idempotent setup
+#   bootstrap.sh update       # git pull + chezmoi apply + refresh tools
+#   bootstrap.sh upgrade      # update + brew upgrade + cargo upgrade
+#
+# Environment variables (DF_ prefix):
+#   DF_REPO               — override the source repo (default: cadebrown/dotfiles)
+#   DF_NAME               — pre-seed display name (skips interactive prompt)
+#   DF_EMAIL              — pre-seed email (skips interactive prompt)
+#   DF_PATH               — dotfiles repo location (default: auto-detect / $HOME/dotfiles)
+#   DF_LINK               — ~/dotfiles symlink target (default: $HOME/dotfiles)
+#   DF_SCRATCH            — scratch root on local disk (enables scratch mode)
+#   DF_SCRATCH_LINK       — ~/scratch symlink (default: $HOME/scratch)
+#   DF_LINKS              — colon-separated paths to redirect to scratch (default: ~/.local:~/.cache)
+#   DF_BREW_UPGRADE       — control Homebrew upgrades (macOS default: 1, Linux default: 0)
+#   DF_DEBUG              — set to 1 for verbose debug output with timing
+#   DF_DO_SCRATCH       — set to 0 to skip scratch space symlink setup
+#   DF_DO_PACKAGES      — set to 0 to skip package install (Homebrew on macOS/Linux)
+#   DF_DO_SERVICES      — set to 0 to skip auto-start service registration
+#   DF_DO_ZSH           — set to 0 to skip oh-my-zsh + plugins install
+#   DF_DO_NODE          — set to 0 to skip Node install + global npm packages
+#   DF_DO_RUST          — set to 0 to skip Rust install
+#   DF_DO_PYTHON        — set to 0 to skip Python install
+#   DF_DO_CLAUDE        — set to 0 to skip Claude Code install
+#   DF_DO_CODEX         — set to 0 to skip Codex CLI install
+#   DF_DO_MACOS_SETTINGS — set to 0 to skip macOS settings
+#   DF_DO_AUTH          — set to 1 to run interactive API token setup
 
 set -euo pipefail
 
-GITHUB_REPO="${GITHUB_REPO:-cadebrown/dotfiles}"
+### Mode ###
+DF_MODE="${1:-install}"
+case "$DF_MODE" in
+    install|update|upgrade) ;;
+    *) echo "Usage: bootstrap.sh [install|update|upgrade]" >&2; exit 1 ;;
+esac
+
+# upgrade implies DF_BREW_UPGRADE=1
+if [[ "$DF_MODE" == "upgrade" ]]; then
+    DF_BREW_UPGRADE="${DF_BREW_UPGRADE:-1}"
+fi
+
+# update/upgrade skip scratch setup and repo clone
+if [[ "$DF_MODE" != "install" ]]; then
+    DF_DO_SCRATCH="${DF_DO_SCRATCH:-0}"
+fi
+
+DF_REPO="${DF_REPO:-cadebrown/dotfiles}"
 
 # Temp dir for any files fetched during bootstrap (curl | bash mode)
 _BOOTSTRAP_TMP="$(mktemp -d)"
@@ -42,15 +68,18 @@ if [[ -f "$_LIB" ]]; then
     source "$_LIB"
 else
     # Running via curl | bash — fetch _lib.sh temporarily
-    curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPO}/main/install/_lib.sh" \
+    curl -fsSL "https://raw.githubusercontent.com/${DF_REPO}/main/install/_lib.sh" \
         -o "$_BOOTSTRAP_TMP/_lib.sh"
     source "$_BOOTSTRAP_TMP/_lib.sh"
 fi
 
-INSTALL_DIR="$DOTFILES_ROOT/install"
+INSTALL_DIR="$DF_ROOT/install"
 
-log_section "dotfiles bootstrap"
+_BOOTSTRAP_START=$SECONDS
+
+log_section "dotfiles bootstrap ($DF_MODE)"
 log_info "OS: $OS | Arch: $ARCH | Host: $(hostname)"
+[[ "$DF_DEBUG" == "1" ]] && log_debug "Debug mode enabled"
 
 ### 0. scratch setup ###
 #
@@ -59,30 +88,30 @@ log_info "OS: $OS | Arch: $ARCH | Host: $(hostname)"
 
 log_section "0 — scratch setup"
 
-if [[ "${INSTALL_SCRATCH:-1}" != "0" ]]; then
-    # Create $DOTFILES_SCRATCH_LINK → $DOTFILES_SCRATCH_PATH if configured
-    if [[ -n "${DOTFILES_SCRATCH_PATH:-}" ]]; then
-        if [[ ! -e "$DOTFILES_SCRATCH_LINK" ]]; then
-            ln -sfn "$DOTFILES_SCRATCH_PATH" "$DOTFILES_SCRATCH_LINK"
-            log_ok "Created: $DOTFILES_SCRATCH_LINK → $DOTFILES_SCRATCH_PATH"
-        elif [[ -L "$DOTFILES_SCRATCH_LINK" ]]; then
-            _cur_target="$(readlink -f "$DOTFILES_SCRATCH_LINK" 2>/dev/null || true)"
-            _want_target="$(cd "$DOTFILES_SCRATCH_PATH" && pwd -P)"
+if [[ "${DF_DO_SCRATCH:-1}" != "0" ]]; then
+    # Create $DF_SCRATCH_LINK → $DF_SCRATCH if configured
+    if [[ -n "${DF_SCRATCH:-}" ]]; then
+        if [[ ! -e "$DF_SCRATCH_LINK" ]]; then
+            ln -sfn "$DF_SCRATCH" "$DF_SCRATCH_LINK"
+            log_okay "Created: $DF_SCRATCH_LINK → $DF_SCRATCH"
+        elif [[ -L "$DF_SCRATCH_LINK" ]]; then
+            _cur_target="$(readlink -f "$DF_SCRATCH_LINK" 2>/dev/null || true)"
+            _want_target="$(cd "$DF_SCRATCH" && pwd -P)"
             if [[ "$_cur_target" != "$_want_target" ]]; then
-                ln -sfn "$DOTFILES_SCRATCH_PATH" "$DOTFILES_SCRATCH_LINK"
-                log_ok "Updated: $DOTFILES_SCRATCH_LINK → $DOTFILES_SCRATCH_PATH (was $_cur_target)"
+                ln -sfn "$DF_SCRATCH" "$DF_SCRATCH_LINK"
+                log_okay "Updated: $DF_SCRATCH_LINK → $DF_SCRATCH (was $_cur_target)"
             else
-                log_ok "Already linked: $DOTFILES_SCRATCH_LINK → $DOTFILES_SCRATCH_PATH"
+                log_okay "Already linked: $DF_SCRATCH_LINK → $DF_SCRATCH"
             fi
             unset _cur_target _want_target
         fi
     fi
 
-    # Run scratch.sh to symlink dirs per DOTFILES_LINKS_PATHS
+    # Run scratch.sh to symlink dirs per DF_LINKS
     _SCRATCH_SH="$INSTALL_DIR/scratch.sh"
     if [[ ! -f "$_SCRATCH_SH" ]]; then
         # curl | bash mode — fetch scratch.sh temporarily
-        curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPO}/main/install/scratch.sh" \
+        curl -fsSL "https://raw.githubusercontent.com/${DF_REPO}/main/install/scratch.sh" \
             -o "$_BOOTSTRAP_TMP/scratch.sh"
         _SCRATCH_SH="$_BOOTSTRAP_TMP/scratch.sh"
     fi
@@ -97,56 +126,62 @@ if [[ "${INSTALL_SCRATCH:-1}" != "0" ]]; then
     LOCAL_PLAT="$_LOCAL_ROOT/$PLAT"
     _re_derive_plat_vars
     unset _LOCAL_ROOT
-    log_ok "Re-resolved: LOCAL_PLAT=$LOCAL_PLAT"
+    log_okay "Re-resolved: LOCAL_PLAT=$LOCAL_PLAT"
 else
-    log_info "Skipping scratch setup (INSTALL_SCRATCH=0)"
+    log_info "Skipping scratch setup (DF_DO_SCRATCH=0)"
 fi
 
 ### 0.5 dotfiles repo ###
 #
-# Ensure the dotfiles repo exists at DOTFILES_PATH and ~/dotfiles → DOTFILES_PATH.
+# Ensure the dotfiles repo exists at DF_PATH and ~/dotfiles → DF_PATH.
 # On a first-time curl | bash run, this clones the repo. On subsequent runs (or
 # when running from a local clone), this is a no-op or just creates the symlink.
 
 log_section "0.5 — dotfiles repo"
 
 # Default: use the directory containing this script (works for local clones)
-DOTFILES_PATH="${DOTFILES_PATH:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
-DOTFILES_LINK="${DOTFILES_LINK:-$HOME/dotfiles}"
+DF_PATH="${DF_PATH:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+DF_LINK="${DF_LINK:-$HOME/dotfiles}"
 
-# Clone if DOTFILES_PATH has no git repo yet
-if [[ ! -d "$DOTFILES_PATH/.git" ]]; then
-    log_info "Cloning $GITHUB_REPO → $DOTFILES_PATH"
-    ensure_dir "$(dirname "$DOTFILES_PATH")"
-    git clone "https://github.com/${GITHUB_REPO}.git" "$DOTFILES_PATH"
-    log_ok "Cloned: $DOTFILES_PATH"
+# Clone if DF_PATH has no git repo yet
+if [[ ! -d "$DF_PATH/.git" ]]; then
+    log_info "Cloning $DF_REPO → $DF_PATH"
+    ensure_dir "$(dirname "$DF_PATH")"
+    git clone "https://github.com/${DF_REPO}.git" "$DF_PATH"
+    log_okay "Cloned: $DF_PATH"
 else
-    log_ok "Repo already at $DOTFILES_PATH"
+    log_okay "Repo already at $DF_PATH"
+    # In update/upgrade mode, pull latest changes
+    if [[ "$DF_MODE" != "install" ]]; then
+        log_info "Pulling latest changes..."
+        run_logged git -C "$DF_PATH" pull --ff-only
+        log_okay "Repo updated"
+    fi
 fi
 
-# Create ~/dotfiles → DOTFILES_PATH symlink if they differ
-if [[ "$DOTFILES_LINK" != "$DOTFILES_PATH" ]]; then
-    _want="$(cd "$DOTFILES_PATH" && pwd -P)"
-    if [[ -L "$DOTFILES_LINK" ]]; then
-        _cur="$(readlink -f "$DOTFILES_LINK" 2>/dev/null || true)"
+# Create ~/dotfiles → DF_PATH symlink if they differ
+if [[ "$DF_LINK" != "$DF_PATH" ]]; then
+    _want="$(cd "$DF_PATH" && pwd -P)"
+    if [[ -L "$DF_LINK" ]]; then
+        _cur="$(readlink -f "$DF_LINK" 2>/dev/null || true)"
         if [[ "$_cur" != "$_want" ]]; then
-            ln -sfn "$DOTFILES_PATH" "$DOTFILES_LINK"
-            log_ok "Updated: $DOTFILES_LINK → $DOTFILES_PATH (was $_cur)"
+            ln -sfn "$DF_PATH" "$DF_LINK"
+            log_okay "Updated: $DF_LINK → $DF_PATH (was $_cur)"
         else
-            log_ok "Already linked: $DOTFILES_LINK → $DOTFILES_PATH"
+            log_okay "Already linked: $DF_LINK → $DF_PATH"
         fi
         unset _cur
-    elif [[ ! -e "$DOTFILES_LINK" ]]; then
-        ln -sfn "$DOTFILES_PATH" "$DOTFILES_LINK"
-        log_ok "Linked: $DOTFILES_LINK → $DOTFILES_PATH"
+    elif [[ ! -e "$DF_LINK" ]]; then
+        ln -sfn "$DF_PATH" "$DF_LINK"
+        log_okay "Linked: $DF_LINK → $DF_PATH"
     else
-        log_warn "$DOTFILES_LINK exists and is not a symlink — skipping"
+        log_warn "$DF_LINK exists and is not a symlink — skipping"
     fi
     unset _want
 fi
 
 # Point INSTALL_DIR at the real repo (important for curl | bash runs after clone)
-INSTALL_DIR="$DOTFILES_PATH/install"
+INSTALL_DIR="$DF_PATH/install"
 
 ### 0.3 — PLAT re-detection ###
 #
@@ -193,8 +228,8 @@ if [[ -n "$_PLAT_NEW" && "$_PLAT_NEW" != "$PLAT" ]]; then
 fi
 unset _PLAT_NEW
 
-log_ok "PLAT=$PLAT"
-log_ok "LOCAL_PLAT=$LOCAL_PLAT"
+log_okay "PLAT=$PLAT"
+log_okay "LOCAL_PLAT=$LOCAL_PLAT"
 
 ### 1. chezmoi ###
 
@@ -205,9 +240,9 @@ ensure_dir "$ARCH_BIN"
 
 if has chezmoi; then
     CHEZMOI_BIN="$(command -v chezmoi)"
-    log_ok "chezmoi already available: $(chezmoi --version)"
+    log_okay "chezmoi already available: $(chezmoi --version)"
 elif [[ -x "$CHEZMOI_BIN" ]]; then
-    log_ok "chezmoi already installed: $("$CHEZMOI_BIN" --version)"
+    log_okay "chezmoi already installed: $("$CHEZMOI_BIN" --version)"
 else
     log_info "Installing chezmoi → $ARCH_BIN"
     run_logged bash "$INSTALL_DIR/chezmoi.sh"
@@ -220,18 +255,18 @@ log_section "2 — dotfiles (chezmoi apply)"
 # Pre-seed name/email from env so chezmoi doesn't prompt — useful for CI and
 # unattended installs. promptStringOnce checks the config file first, so if
 # chezmoi.toml already exists (re-run on same machine), this is a no-op.
-if [[ -n "${CHEZMOI_NAME:-}" || -n "${CHEZMOI_EMAIL:-}" ]]; then
+if [[ -n "${DF_NAME:-}" || -n "${DF_EMAIL:-}" ]]; then
     _CFG="$HOME/.config/chezmoi/chezmoi.toml"
     if [[ ! -f "$_CFG" ]]; then
         ensure_dir "$(dirname "$_CFG")"
         printf '[data]\n  name  = "%s"\n  email = "%s"\n' \
-            "${CHEZMOI_NAME:-}" "${CHEZMOI_EMAIL:-}" > "$_CFG"
-        log_info "Pre-seeded chezmoi config from CHEZMOI_NAME / CHEZMOI_EMAIL"
+            "${DF_NAME:-}" "${DF_EMAIL:-}" > "$_CFG"
+        log_info "Pre-seeded chezmoi config from DF_NAME / DF_EMAIL"
     fi
 fi
 
 # If we have a local repo (always true after step 0.5), use it as the source directly
-_REPO_HOME="$DOTFILES_PATH/home"
+_REPO_HOME="$DF_PATH/home"
 if [[ -d "$_REPO_HOME" ]]; then
     log_info "Using local repo at $_REPO_HOME"
     # --exclude=scripts: skip run_onchange_* on init — bootstrap.sh calls install
@@ -252,11 +287,11 @@ if [[ -d "$_REPO_HOME" ]]; then
         log_info "Set chezmoi sourceDir to $_REPO_HOME"
     fi
 else
-    log_info "Initialising from GitHub ($GITHUB_REPO)"
-    "$CHEZMOI_BIN" init --apply --force --exclude=scripts "https://github.com/${GITHUB_REPO}.git"
+    log_info "Initialising from GitHub ($DF_REPO)"
+    "$CHEZMOI_BIN" init --apply --force --exclude=scripts "https://github.com/${DF_REPO}.git"
 fi
 
-log_ok "Dotfiles applied"
+log_okay "Dotfiles applied"
 
 # Resolve install dir via chezmoi if we bootstrapped from GitHub
 if [[ ! -d "$INSTALL_DIR" ]]; then
@@ -274,7 +309,7 @@ _sanity_fail=0
 for _dir in "$ARCH_BIN" "$CARGO_HOME" "$RUSTUP_HOME" "$NVM_DIR" "$VENV"; do
     _parent="$(dirname "$_dir")"
     if [[ -L "$_parent" && ! -e "$_parent" ]]; then
-        log_error "Broken symlink: $_parent → $(readlink "$_parent")"
+        log_fail "Broken symlink: $_parent → $(readlink "$_parent")"
         _sanity_fail=1
     fi
 done
@@ -286,7 +321,7 @@ ensure_dir "$ARCH_BIN"
 if [[ ! -w "$ARCH_BIN" ]]; then
     die "ARCH_BIN=$ARCH_BIN is not writable"
 fi
-log_ok "All PLAT paths resolve and are writable (LOCAL_PLAT=$LOCAL_PLAT)"
+log_okay "All PLAT paths resolve and are writable (LOCAL_PLAT=$LOCAL_PLAT)"
 if [[ -n "$SCRATCH" ]]; then
     log_info "Scratch space: $SCRATCH"
     log_info "LOCAL_PLAT resolves to: $(readlink -f "$LOCAL_PLAT")"
@@ -296,17 +331,17 @@ fi
 
 log_section "3 — ZSH (oh-my-zsh + plugins)"
 
-if [[ "${INSTALL_ZSH:-1}" != "0" ]]; then
+if [[ "${DF_DO_ZSH:-1}" != "0" ]]; then
     bash "$INSTALL_DIR/zsh.sh"
 else
-    log_info "Skipping ZSH plugins (INSTALL_ZSH=0)"
+    log_info "Skipping ZSH plugins (DF_DO_ZSH=0)"
 fi
 
 ### 4. packages ###
 
 log_section "4 — packages (Homebrew)"
 
-if [[ "${INSTALL_PACKAGES:-1}" != "0" ]]; then
+if [[ "${DF_DO_PACKAGES:-1}" != "0" ]]; then
     case "$OS" in
         darwin)
             log_info "macOS — Homebrew (native bottles)"
@@ -326,59 +361,83 @@ if [[ "${INSTALL_PACKAGES:-1}" != "0" ]]; then
             ;;
     esac
 else
-    log_info "Skipping packages (INSTALL_PACKAGES=0)"
+    log_info "Skipping packages (DF_DO_PACKAGES=0)"
 fi
 
 ### 5. services ###
 
 log_section "5 — services"
 
-if [[ "${INSTALL_SERVICES:-1}" != "0" ]]; then
+if [[ "${DF_DO_SERVICES:-1}" != "0" ]]; then
     bash "$INSTALL_DIR/services.sh"
 else
-    log_info "Skipping services (INSTALL_SERVICES=0)"
+    log_info "Skipping services (DF_DO_SERVICES=0)"
+fi
+
+### 5.5. macOS settings ###
+
+log_section "5.5 — macOS settings"
+
+if [[ "${DF_DO_MACOS_SETTINGS:-1}" != "0" ]]; then
+    bash "$INSTALL_DIR/macos-settings.sh"
+else
+    log_info "Skipping macOS settings (DF_DO_MACOS_SETTINGS=0)"
 fi
 
 ### 6. language runtimes ###
 
 log_section "6 — language runtimes"
 
-if [[ "${INSTALL_NODE:-1}" != "0" ]]; then
+if [[ "${DF_DO_NODE:-1}" != "0" ]]; then
     bash "$INSTALL_DIR/node.sh"
 else
-    log_info "Skipping Node + npm packages (INSTALL_NODE=0)"
+    log_info "Skipping Node + npm packages (DF_DO_NODE=0)"
 fi
 
-if [[ "${INSTALL_RUST:-1}" != "0" ]]; then
+if [[ "${DF_DO_RUST:-1}" != "0" ]]; then
     bash "$INSTALL_DIR/rust.sh"
 else
-    log_info "Skipping Rust (INSTALL_RUST=0)"
+    log_info "Skipping Rust (DF_DO_RUST=0)"
 fi
 
-if [[ "${INSTALL_PYTHON:-1}" != "0" ]]; then
+if [[ "${DF_DO_PYTHON:-1}" != "0" ]]; then
     bash "$INSTALL_DIR/python.sh"
 else
-    log_info "Skipping Python (INSTALL_PYTHON=0)"
+    log_info "Skipping Python (DF_DO_PYTHON=0)"
 fi
 
-if [[ "${INSTALL_CLAUDE:-1}" != "0" ]]; then
+if [[ "${DF_DO_CLAUDE:-1}" != "0" ]]; then
     bash "$INSTALL_DIR/claude.sh"
 else
-    log_info "Skipping Claude (INSTALL_CLAUDE=0)"
+    log_info "Skipping Claude (DF_DO_CLAUDE=0)"
 fi
 
-if [[ "${INSTALL_CODEX:-1}" != "0" ]]; then
+if [[ "${DF_DO_CODEX:-1}" != "0" ]]; then
     bash "$INSTALL_DIR/codex.sh"
 else
-    log_info "Skipping Codex (INSTALL_CODEX=0)"
+    log_info "Skipping Codex (DF_DO_CODEX=0)"
+fi
+
+### 7. auth ###
+
+log_section "7 — auth (API tokens)"
+
+if [[ "${DF_DO_AUTH:-0}" != "0" ]]; then
+    bash "$INSTALL_DIR/auth.sh"
+else
+    log_info "Skipping auth (set DF_DO_AUTH=1 to run, or: bash ~/dotfiles/install/auth.sh)"
 fi
 
 ### done ###
 
 log_section "bootstrap complete"
-log_ok "Done! Open a new shell or: source ~/.zprofile"
+_elapsed=$(( SECONDS - _BOOTSTRAP_START ))
+log_okay "Done in ${_elapsed}s! Open a new shell or: source ~/.zprofile"
 log_info ""
 log_info "Day-to-day:"
-log_info "  chezmoi update          — pull + apply latest dotfile changes"
-log_info "  chezmoi edit ~/.zshrc   — edit a dotfile"
-log_info "  chezmoi diff            — preview pending changes"
+log_info "  chezmoi update                     — pull + apply latest dotfile changes"
+log_info "  chezmoi edit ~/.zshrc              — edit a dotfile"
+log_info "  chezmoi diff                       — preview pending changes"
+log_info "  ~/dotfiles/bootstrap.sh update     — refresh tools without reinstall"
+log_info "  ~/dotfiles/bootstrap.sh upgrade    — update + brew/cargo upgrade"
+log_info "  bash ~/dotfiles/install/auth.sh    — set up API tokens"

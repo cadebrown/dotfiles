@@ -10,7 +10,7 @@ log_section "Node.js (nvm)"
 # (nvm itself is shell scripts, but the node versions it installs are arch-specific)
 
 if [[ -s "$NVM_DIR/nvm.sh" ]]; then
-    log_ok "nvm already installed: $NVM_DIR"
+    log_okay "nvm already installed: $NVM_DIR"
 else
     log_info "Installing nvm..."
     ensure_dir "$NVM_DIR"
@@ -25,7 +25,7 @@ fi
 source "$NVM_DIR/nvm.sh"
 
 if nvm ls 25 2>/dev/null | grep -qE 'v25\.'; then
-    log_ok "Node v25 already installed"
+    log_okay "Node v25 already installed"
 else
     log_info "Installing Node.js v25..."
     run_logged nvm install 25
@@ -34,12 +34,12 @@ fi
 nvm alias default 25
 nvm use default --silent
 
-log_ok "Node.js: $(node --version)"
-log_ok "npm:     $(npm --version)"
+log_okay "Node.js: $(node --version)"
+log_okay "npm:     $(npm --version)"
 
 ### npm global packages ###
 
-NPM_TXT="$PACKAGES_DIR/npm.txt"
+NPM_TXT="$DF_PACKAGES/npm.txt"
 if [[ ! -f "$NPM_TXT" ]]; then
     log_warn "No npm.txt at $NPM_TXT — skipping npm packages"
     exit 0
@@ -48,11 +48,11 @@ fi
 _pkg_count=0
 while IFS= read -r pkg; do
     if npm list -g "$pkg" --depth=0 &>/dev/null; then
-        log_ok "  $pkg (already installed)"
+        log_okay "  $pkg (already installed)"
     else
         log_info "  installing $pkg"
         run_logged npm install -g "$pkg"
-        log_ok "  $pkg"
+        log_okay "  $pkg"
         (( _pkg_count++ )) || true
     fi
 done < <(_read_package_list "$NPM_TXT")

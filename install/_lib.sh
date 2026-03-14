@@ -4,11 +4,64 @@
 
 set -euo pipefail
 
+### COLORS ###
+
+# Respect NO_COLOR convention and non-interactive output
+if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+    _RESET='\033[0m'
+    _BOLD='\033[1m'
+    _DIM='\033[2m'
+    _BLUE='\033[0;34m'
+    _GREEN='\033[0;32m'
+    _YELLOW='\033[0;33m'
+    _RED='\033[0;31m'
+    _CYAN='\033[0;36m'
+    _WHITE='\033[1;37m'
+else
+    _RESET='' _BOLD='' _DIM='' _BLUE='' _GREEN='' _YELLOW='' _RED='' _CYAN='' _WHITE=''
+fi
+
+### LOGGING ###
+
+DF_DEBUG="${DF_DEBUG:-0}"
+
+log_info()    { printf "${_BLUE}${_BOLD}[info]${_RESET}  %s\n"    "$*"; }
+log_okay()    { printf "${_GREEN}${_BOLD}[okay]${_RESET}  %s\n"   "$*"; }
+log_warn()    { printf "${_YELLOW}${_BOLD}[warn]${_RESET}  %s\n"  "$*"; }
+log_fail()    { printf "${_RED}${_BOLD}[fail]${_RESET}  %s\n"     "$*" >&2; }
+log_debug()   { [[ "$DF_DEBUG" == "1" ]] && printf "${_CYAN}[dbug]${_RESET}  ${_DIM}%s${_RESET}\n" "$*" || true; }
+
+_SECTION_START=$SECONDS
+log_section() {
+    local _prev_elapsed=$(( SECONDS - _SECTION_START ))
+    # Print elapsed time of previous section (skip if first section or < 1s)
+    if [[ "$DF_DEBUG" == "1" && "$_prev_elapsed" -gt 0 ]]; then
+        printf "${_DIM}      (${_prev_elapsed}s)${_RESET}\n"
+    fi
+    printf "\n${_WHITE}=== %s ===${_RESET}\n\n" "$*"
+    _SECTION_START=$SECONDS
+}
+
+die() {
+    log_fail "$*"
+    exit 1
+}
+
+### ERROR TRAP ###
+
+_on_error() {
+    local exit_code=$?
+    local line=$1
+    log_fail "Script failed at line $line (exit code $exit_code)"
+    exit "$exit_code"
+}
+trap '_on_error $LINENO' ERR
+
 ### PATHS ###
 
 # Root of the dotfiles repo (parent of install/)
-DOTFILES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PACKAGES_DIR="$DOTFILES_ROOT/packages"
+DF_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DF_PACKAGES="$DF_ROOT/packages"
 
 ### PLATFORM ###
 
@@ -17,7 +70,6 @@ PACKAGES_DIR="$DOTFILES_ROOT/packages"
 # All per-machine tool paths live under ~/.local/$PLAT/:
 #   ~/.local/$PLAT/bin/         chezmoi, uv, uvx, and other compiled tools
 #   ~/.local/$PLAT/nvm/         nvm install + node versions — NVM_DIR
-#   ~/.local/$PLAT/nix-profile/ Nix user profile (symlink into /nix/store) — NIX_PROFILE
 #   ~/.local/$PLAT/rustup/      Rust toolchain — RUSTUP_HOME
 #   ~/.local/$PLAT/cargo/       Cargo home — CARGO_HOME (bins at cargo/bin/)
 #   ~/.local/$PLAT/venv/        Python virtualenv — VENV
@@ -54,7 +106,7 @@ fi
 # PLAT detection: scan install/plat/ for .plat_check.sh scripts.
 # Sorted reverse = highest level first (v4 > v3 > v2).
 PLAT=""
-_PLAT_SCRIPT_DIR="$DOTFILES_ROOT/install/plat"
+_PLAT_SCRIPT_DIR="$DF_ROOT/install/plat"
 if [[ -d "$_PLAT_SCRIPT_DIR" ]]; then
     _PLAT_OS="$(uname -s)"
     while IFS= read -r _plat_dir; do
@@ -71,7 +123,7 @@ unset _PLAT_SCRIPT_DIR
 
 # No matching plat spec — fatal. Ensure install/plat/ has a spec for this machine.
 if [[ -z "$PLAT" ]]; then
-    die "No matching plat spec in $DOTFILES_ROOT/install/plat/ for $(uname -s) $(uname -m)"
+    die "No matching plat spec in $DF_ROOT/install/plat/ for $(uname -s) $(uname -m)"
 fi
 
 LOCAL_PLAT="$_LOCAL_ROOT/$PLAT"
@@ -95,9 +147,6 @@ UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
 # nvm: per-PLAT so arch-specific node binaries don't collide on shared homes
 NVM_DIR="$LOCAL_PLAT/nvm"
 
-# Nix: per-PLAT because /nix/store is machine-local
-NIX_PROFILE="$LOCAL_PLAT/nix-profile"
-
 # Scratch space for NFS homes with small quotas.
 #
 # When scratch is configured, install/scratch.sh symlinks large home dirs
@@ -106,98 +155,43 @@ NIX_PROFILE="$LOCAL_PLAT/nix-profile"
 # How to configure (pick one):
 #   a) Create ~/scratch as a symlink to large local storage:
 #        ln -s /local/disk/$USER ~/scratch
-#   b) Set DOTFILES_SCRATCH_PATH before running bootstrap:
-#        DOTFILES_SCRATCH_PATH=/local/disk/$USER ~/dotfiles/bootstrap.sh
+#   b) Set DF_SCRATCH before running bootstrap:
+#        DF_SCRATCH=/local/disk/$USER ~/dotfiles/bootstrap.sh
 #
-# Variable reference (PATH/LINK pattern):
-#   DOTFILES_SCRATCH_PATH  — actual scratch directory on local disk
-#   DOTFILES_SCRATCH_LINK  — symlink in $HOME pointing to scratch (default: ~/scratch)
-#                            bootstrap.sh creates this symlink if DOTFILES_SCRATCH_PATH is set.
-#   DOTFILES_LINKS_PATHS   — colon-separated list of home dirs to redirect to scratch
-#                            (default: ~/.local:~/.cache)
-#   SCRATCH                — resolved absolute path to scratch root (empty if none)
-#   PATHS                  — $SCRATCH/.paths — where all symlinked dirs live:
-#                              $PATHS/.local/        ← ~/.local
-#                              $PATHS/.cache/        ← ~/.cache
-#                              $PATHS/.oh-my-zsh/    ← ~/.oh-my-zsh
-#                              $PATHS/.oh-my-zsh-custom/ ← ~/.oh-my-zsh-custom
-#                              $PATHS/.config/       ← ~/.config (if in DOTFILES_LINKS_PATHS)
-#
-# Downstream variables (all under $PATHS/.local/$PLAT/ when scratch is used):
-#   LOCAL_PLAT        = $HOME/.local/$PLAT          (logical path, may be via symlink)
-#   ARCH_BIN          = $LOCAL_PLAT/bin             chezmoi, uv, uvx
-#   RUSTUP_HOME       = $LOCAL_PLAT/rustup          Rust toolchain
-#   CARGO_HOME        = $LOCAL_PLAT/cargo           Cargo (bins at cargo/bin/)
-#   CARGO_TARGET_DIR  = $LOCAL_PLAT/cargo-build     build artifacts (macOS sandbox workaround)
-#   VENV              = $LOCAL_PLAT/venv            Python virtualenv
-#   UV_TOOL_BIN_DIR   = $LOCAL_PLAT/bin             uv tool binaries
-#   UV_TOOL_DIR       = $LOCAL_PLAT/uv/tools        uv tool metadata
-#   UV_PYTHON_INSTALL_DIR = $LOCAL_PLAT/uv/python   uv-managed Python builds
-#   NVM_DIR           = $LOCAL_PLAT/nvm             nvm + Node versions
-#   NIX_PROFILE       = $LOCAL_PLAT/nix-profile     Nix user profile
-#   BREW_PREFIX       = $LOCAL_PLAT/brew            Homebrew (Linux native install)
-DOTFILES_SCRATCH_PATH="${DOTFILES_SCRATCH_PATH:-}"
-DOTFILES_SCRATCH_LINK="${DOTFILES_SCRATCH_LINK:-$HOME/scratch}"
-if [[ -z "${DOTFILES_SCRATCH_PATH:-}" && -e "$DOTFILES_SCRATCH_LINK" ]]; then
-    DOTFILES_SCRATCH_PATH="$(cd "$DOTFILES_SCRATCH_LINK" && pwd -P)"
+# Variable reference:
+#   DF_SCRATCH       — actual scratch directory on local disk
+#   DF_SCRATCH_LINK  — symlink in $HOME pointing to scratch (default: ~/scratch)
+#                      bootstrap.sh creates this symlink if DF_SCRATCH is set.
+#   DF_LINKS         — colon-separated list of home dirs to redirect to scratch
+#                      (default: ~/.local:~/.cache)
+#   SCRATCH          — resolved absolute path to scratch root (empty if none)
+#   PATHS            — $SCRATCH/.paths — where all symlinked dirs live
+
+DF_SCRATCH="${DF_SCRATCH:-}"
+DF_SCRATCH_LINK="${DF_SCRATCH_LINK:-$HOME/scratch}"
+if [[ -z "${DF_SCRATCH:-}" && -e "$DF_SCRATCH_LINK" ]]; then
+    DF_SCRATCH="$(cd "$DF_SCRATCH_LINK" && pwd -P)"
 fi
-SCRATCH="${DOTFILES_SCRATCH_PATH:-}"
+SCRATCH="${DF_SCRATCH:-}"
 PATHS="${SCRATCH:+$SCRATCH/.paths}"
-export DOTFILES_SCRATCH_PATH DOTFILES_SCRATCH_LINK SCRATCH PATHS
+export DF_SCRATCH DF_SCRATCH_LINK SCRATCH PATHS
 
 export PLAT LOCAL_PLAT RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR VENV \
        UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR \
-       NVM_DIR NIX_PROFILE
+       NVM_DIR
 
 # Install scripts clone public repos and must not be affected by the user's
 # gitconfig (which may have url.insteadOf SSH rewrites, breaking clones on
 # machines without SSH keys — Docker, CI, fresh Linux boxes).
 export GIT_CONFIG_GLOBAL=/dev/null
 
-# Source credential env files (e.g. ~/.nvidia.env with GITHUB_TOKEN) so that
+# Source credential env files (e.g. ~/.github.env with GITHUB_TOKEN) so that
 # install scripts can authenticate with GitHub APIs (cargo-binstall, gh, etc.).
 # Uses bash globbing — no error if no files match.
 for _envfile in "$HOME"/.*.env; do
     [[ -f "$_envfile" ]] && source "$_envfile"
 done
 unset _envfile
-
-### COLORS ###
-
-# Respect NO_COLOR convention and non-interactive output
-if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
-    _RESET='\033[0m'
-    _BLUE='\033[0;34m'
-    _GREEN='\033[0;32m'
-    _YELLOW='\033[0;33m'
-    _RED='\033[0;31m'
-    _BOLD='\033[1;37m'
-else
-    _RESET='' _BLUE='' _GREEN='' _YELLOW='' _RED='' _BOLD=''
-fi
-
-### LOGGING ###
-
-log_info()    { printf "${_BLUE}[info]${_RESET}  %s\n"    "$*"; }
-log_ok()      { printf "${_GREEN}[ ok ]${_RESET}  %s\n"   "$*"; }
-log_warn()    { printf "${_YELLOW}[warn]${_RESET}  %s\n"  "$*"; }
-log_error()   { printf "${_RED}[err ]${_RESET}  %s\n"     "$*" >&2; }
-log_section() { printf "\n${_BOLD}=== %s ===${_RESET}\n"  "$*"; }
-
-die() {
-    log_error "$*"
-    exit 1
-}
-
-### ERROR TRAP ###
-
-_on_error() {
-    local exit_code=$?
-    local line=$1
-    log_error "Script failed at line $line (exit code $exit_code)"
-    exit "$exit_code"
-}
-trap '_on_error $LINENO' ERR
 
 ### UTILITIES ###
 
@@ -221,7 +215,14 @@ download() {
 }
 
 run_logged() {
+    log_debug "exec: $*"
+    local _start=$SECONDS
     "$@" 2>&1 | sed 's/^/    /'
+    local _rc=${PIPESTATUS[0]}
+    if [[ "$DF_DEBUG" == "1" ]]; then
+        log_debug "exit=$_rc elapsed=$(( SECONDS - _start ))s"
+    fi
+    return "$_rc"
 }
 
 # Re-derive all PLAT-dependent variables from the current LOCAL_PLAT.
@@ -237,9 +238,8 @@ _re_derive_plat_vars() {
     UV_TOOL_DIR="$LOCAL_PLAT/uv/tools"
     UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
     NVM_DIR="$LOCAL_PLAT/nvm"
-    NIX_PROFILE="$LOCAL_PLAT/nix-profile"
     export LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR VENV \
-           UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR NVM_DIR NIX_PROFILE
+           UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR NVM_DIR
 }
 
 # Read a package list file, skipping blank lines and comments.

@@ -26,10 +26,9 @@ echo "PLAT: $PLAT"
 echo "HOME: $HOME"
 echo ""
 
-# INSTALL_NIX=0:     Nix requires /nix on the root filesystem, not available in Docker
-# INSTALL_PACKAGES=0: Homebrew Linux needs Docker-in-Docker, not available here
-# INSTALL_CLAUDE=0:  Claude plugins require a running claude binary + auth
-INSTALL_NIX=0 INSTALL_PACKAGES=0 INSTALL_CLAUDE=0 \
+# DF_DO_PACKAGES=0: Homebrew Linux needs Docker-in-Docker, not available here
+# DF_DO_CLAUDE=0:  Claude plugins require a running claude binary + auth
+DF_DO_PACKAGES=0 DF_DO_CLAUDE=0 \
     bash "$DOTFILES/bootstrap.sh"
 
 echo ""

@@ -45,7 +45,7 @@ _dest="$ARCH_BIN/codex"
 
 # Skip if already on this version
 if [[ -x "$_dest" ]] && "$_dest" --version 2>/dev/null | grep -qF "$_semver"; then
-    log_ok "codex $_semver already installed at $_dest"
+    log_okay "codex $_semver already installed at $_dest"
 else
     log_info "Downloading codex $_semver ($_asset)..."
     ensure_dir "$ARCH_BIN"
@@ -59,7 +59,7 @@ else
     mv "$_tmp/$_asset" "$_dest"
     chmod +x "$_dest"
 
-    log_ok "Installed codex $_semver → $_dest"
+    log_okay "Installed codex $_semver → $_dest"
 fi
 
 unset _asset _release_url _version _semver _dest _url _tmp

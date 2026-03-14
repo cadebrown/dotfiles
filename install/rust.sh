@@ -25,18 +25,18 @@ if [[ "$OS" == "darwin" ]]; then
     fi
 
     if [[ -x "$CARGO_HOME/bin/rustc" ]]; then
-        log_ok "Rust toolchain already in PLAT dir: $("$CARGO_HOME/bin/rustc" --version 2>/dev/null)"
+        log_okay "Rust toolchain already in PLAT dir: $("$CARGO_HOME/bin/rustc" --version 2>/dev/null)"
         log_info "Updating stable toolchain"
         run_logged "$RUSTUP_BIN" update stable --no-self-update
     else
         log_info "Initializing Rust toolchain (Homebrew rustup) → $RUSTUP_HOME"
         run_logged "$RUSTUP_INIT" -y --no-modify-path --default-toolchain stable
-        log_ok "rustup initialized"
+        log_okay "rustup initialized"
     fi
 else
     # Linux: install rustup-init directly — Homebrew not available or not needed
     if [[ -x "$CARGO_HOME/bin/rustup" ]]; then
-        log_ok "rustup already installed: $("$CARGO_HOME/bin/rustup" --version 2>&1)"
+        log_okay "rustup already installed: $("$CARGO_HOME/bin/rustup" --version 2>&1)"
         log_info "Updating stable toolchain"
         run_logged "$CARGO_HOME/bin/rustup" update stable --no-self-update
     else
@@ -46,7 +46,7 @@ else
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o "$_rustup_script"
         run_logged bash "$_rustup_script" -y --no-modify-path --default-toolchain stable
         rm -f "$_rustup_script"
-        log_ok "rustup installed"
+        log_okay "rustup installed"
     fi
 fi
 
@@ -60,18 +60,18 @@ export PATH="$CARGO_HOME/bin:$PATH"
 # sandbox restrictions in restricted shell environments.
 
 if cargo binstall -V &>/dev/null 2>&1; then
-    log_ok "cargo-binstall already installed: $(cargo binstall -V 2>/dev/null)"
+    log_okay "cargo-binstall already installed: $(cargo binstall -V 2>/dev/null)"
 else
     log_info "Installing cargo-binstall (pre-built binary)"
     # Official installer: downloads a pre-built binary, no compilation needed
     run_logged bash <(curl -L --proto '=https' --tlsv1.2 -sSf \
         https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh)
-    log_ok "cargo-binstall installed"
+    log_okay "cargo-binstall installed"
 fi
 
 ### cargo tools ###
 
-CARGO_TXT="$PACKAGES_DIR/cargo.txt"
+CARGO_TXT="$DF_PACKAGES/cargo.txt"
 [[ -f "$CARGO_TXT" ]] || { log_warn "No cargo.txt at $CARGO_TXT — skipping"; exit 0; }
 
 log_info "Installing/upgrading cargo tools from cargo.txt"
@@ -85,7 +85,7 @@ while IFS= read -r pkg; do
     log_info "  binstall $pkg"
     if run_logged cargo binstall --no-confirm --log-level warn "$pkg" \
         || run_logged cargo install "$pkg"; then
-        log_ok "  ok    $pkg"
+        log_okay "  ok    $pkg"
         (( _ok++ )) || true
     else
         log_warn "  fail  $pkg"
@@ -93,4 +93,4 @@ while IFS= read -r pkg; do
     fi
 done < <(_read_package_list "$CARGO_TXT")
 
-log_ok "cargo tools: ${_ok} ok, ${_fail} failed"
+log_okay "cargo tools: ${_ok} ok, ${_fail} failed"

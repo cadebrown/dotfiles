@@ -5,8 +5,8 @@
 #   ./tests/run.sh           # run full test suite
 #
 # Environment variables:
-#   CHEZMOI_NAME     — display name for chezmoi config (default: "Test User")
-#   CHEZMOI_EMAIL    — email for chezmoi config (default: "test@example.com")
+#   DF_NAME     — display name for chezmoi config (default: "Test User")
+#   DF_EMAIL    — email for chezmoi config (default: "test@example.com")
 #   DOCKER_BUILD     — set to 0 to skip rebuilding the image (faster re-runs)
 
 set -euo pipefail
@@ -22,7 +22,7 @@ fi
 echo "==> Running tests"
 docker run --rm \
     -v "$REPO_ROOT:/home/user/dotfiles" \
-    -e CHEZMOI_NAME="${CHEZMOI_NAME:-Test User}" \
-    -e CHEZMOI_EMAIL="${CHEZMOI_EMAIL:-test@example.com}" \
+    -e DF_NAME="${DF_NAME:-Test User}" \
+    -e DF_EMAIL="${DF_EMAIL:-test@example.com}" \
     dotfiles-test \
     bash /home/user/dotfiles/tests/entrypoint.sh

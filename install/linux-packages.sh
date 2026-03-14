@@ -15,7 +15,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 [[ "$OS" == "linux" ]] || { log_warn "Not on Linux — skipping"; exit 0; }
 
-INSTALL_DIR="${INSTALL_DIR:-$DOTFILES_ROOT/install}"
+INSTALL_DIR="${INSTALL_DIR:-$DF_ROOT/install}"
 
 log_section "Linux packages (Homebrew)"
 
@@ -30,7 +30,7 @@ _REAL_LOCAL_PLAT="$(dirname "$_REAL_BREW_PREFIX")"
 
 _BREWFILE_TMP="$_REAL_LOCAL_PLAT/.Brewfile"
 trap 'rm -f "$_BREWFILE_TMP" 2>/dev/null || true' EXIT
-cp "$PACKAGES_DIR/Brewfile" "$_BREWFILE_TMP"
+cp "$DF_PACKAGES/Brewfile" "$_BREWFILE_TMP"
 
 log_info "Resolved prefix:   $_REAL_BREW_PREFIX"
 log_info "Brewfile:          $_BREWFILE_TMP"
@@ -43,7 +43,7 @@ if [[ ! -x "$_REAL_BREW_PREFIX/bin/brew" ]]; then
     mkdir -p "$_REAL_BREW_PREFIX/bin"
     ln -sf "$_REAL_BREW_PREFIX/Homebrew/bin/brew" "$_REAL_BREW_PREFIX/bin/brew"
 else
-    log_ok "Homebrew already installed at $_REAL_BREW_PREFIX"
+    log_okay "Homebrew already installed at $_REAL_BREW_PREFIX"
 fi
 
 # Capture git path before brew shellenv modifies PATH.
@@ -61,7 +61,7 @@ unset _GIT_PATH
 # whose system glibc is already ≥ 2.35 would skip glibc and binaries would
 # silently depend on the host glibc — breaking portability to older systems.
 if brew list glibc &>/dev/null; then
-    log_ok "glibc already installed"
+    log_okay "glibc already installed"
 else
     log_info "Installing glibc (builds from source, ~2 min)..."
     brew install glibc 2>&1
@@ -81,8 +81,27 @@ fi
 
 ### Install all packages ###
 
-log_info "Running brew bundle..."
-brew bundle install --file="$_BREWFILE_TMP" --no-upgrade 2>&1
+# DF_BREW_UPGRADE controls whether existing packages are upgraded.
+# Linux default: NO upgrade. Upgrades on a custom prefix are risky:
+#   - glibc upgrade can break every installed binary until rebuild completes
+#   - gcc/llvm upgrades invalidate compiler symlinks (need re-run to refresh)
+#   - Python formula upgrades overwrite our patches (uuid, test_datetime)
+#   - source builds (Python, Perl, git, vim) take 10-30 min each
+# Override: DF_BREW_UPGRADE=1 to force upgrades (then re-run this script to
+# refresh compiler symlinks and re-apply Python patches).
+_brew_upgrade="${DF_BREW_UPGRADE:-0}"
+_bundle_flags="--no-upgrade"
+[[ "$_brew_upgrade" == "1" ]] && _bundle_flags=""
+
+if [[ -z "$_bundle_flags" ]]; then
+    log_info "Running brew bundle (with upgrades)..."
+    log_warn "Linux upgrades can be slow — source builds for Python/Perl/git/vim"
+else
+    log_info "Running brew bundle (install only, no upgrades)..."
+fi
+
+# shellcheck disable=SC2086
+brew bundle install $_bundle_flags --file="$_BREWFILE_TMP" 2>&1
 
 ### Create unversioned compiler symlinks ###
 #
@@ -115,6 +134,6 @@ if [[ -n "$_LLVM_LATEST" ]]; then
     echo "[ok]   Linked $_LLVM_VER → $_PLAT_BIN/clang"
 fi
 
-log_ok "Linux packages installed at $_REAL_BREW_PREFIX"
+log_okay "Linux packages installed at $_REAL_BREW_PREFIX"
 log_info "Compilers: gcc, g++, clang, clang++ → $_PLAT_BIN/"
 log_info "Activate with: eval \"\$($_REAL_BREW_PREFIX/bin/brew shellenv)\""

@@ -98,13 +98,6 @@ if [ -e "$HOME/.pythonrc" ]; then
     export PYTHONSTARTUP="$HOME/.pythonrc"
 fi
 
-### NIX ###
-
-export NIX_PROFILE="$_LOCAL_PLAT/nix-profile"
-if [ -e "$NIX_PROFILE/etc/profile.d/nix.sh" ]; then
-    . "$NIX_PROFILE/etc/profile.d/nix.sh"
-fi
-
 ### PLATFORM-SPECIFIC ###
 {{ if eq .chezmoi.os "darwin" -}}
 

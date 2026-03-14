@@ -1,8 +1,8 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV CHEZMOI_NAME="Test User"
-ENV CHEZMOI_EMAIL="test@example.com"
+ENV DF_NAME="Test User"
+ENV DF_EMAIL="test@example.com"
 
 # Base dependencies
 RUN apt-get update && apt-get install -y \

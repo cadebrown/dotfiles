@@ -42,7 +42,7 @@ for arg in "$@"; do
             exit 0
             ;;
         *)
-            log_error "Unknown flag: $arg"
+            log_fail "Unknown flag: $arg"
             exit 1
             ;;
     esac
@@ -90,7 +90,7 @@ if [[ "$CHECK_ARCH" == "1" ]]; then
             case "$file_out" in
                 ELF*|Mach-O*)
                     if ! echo "$file_out" | grep -qi "$ARCH_PATTERN"; then
-                        log_error "Wrong arch: $bin ($file_out)"
+                        log_fail "Wrong arch: $bin ($file_out)"
                         ((ERRORS++)) || true
                     else
                         ((count++)) || true
@@ -99,7 +99,29 @@ if [[ "$CHECK_ARCH" == "1" ]]; then
             esac
         done
     done
-    log_ok "$count binaries match $ARCH"
+    log_okay "$count binaries match $ARCH"
+
+    # Check ~/.local/bin for compiled binaries (should only contain arch-neutral scripts)
+    _local_bin="$HOME/.local/bin"
+    if [[ -d "$_local_bin" ]]; then
+        _compiled=0
+        for bin in "$_local_bin"/*; do
+            [[ -f "$bin" && -x "$bin" ]] || continue
+            [[ -L "$bin" ]] && continue
+            file_out="$(file -b "$bin" 2>/dev/null)" || continue
+            case "$file_out" in
+                ELF*|Mach-O*)
+                    log_fail "Compiled binary in ~/.local/bin/: $(basename "$bin") — move to \$LOCAL_PLAT/bin/"
+                    ((_compiled++)) || true
+                    ;;
+            esac
+        done
+        if [[ "$_compiled" -gt 0 ]]; then
+            ((ERRORS += _compiled))
+        else
+            log_okay "~/.local/bin/ has no compiled binaries (arch-neutral only)"
+        fi
+    fi
 fi
 
 # --- Shared library check (Linux only) ---
@@ -132,7 +154,7 @@ if [[ "$CHECK_LIBS" == "1" && "$OS" == "linux" ]]; then
         log_warn "$missing binaries with missing libraries"
         ((WARNINGS += missing))
     fi
-    log_ok "$count binaries have all shared libraries"
+    log_okay "$count binaries have all shared libraries"
 fi
 
 # --- Duplicate detection ---
@@ -157,7 +179,7 @@ if [[ "$CHECK_DUPES" == "1" ]]; then
         log_warn "$dupes duplicates found"
         ((WARNINGS += dupes))
     else
-        log_ok "No duplicates"
+        log_okay "No duplicates"
     fi
 fi
 
@@ -169,28 +191,28 @@ if [[ "$CHECK_SYMLINKS" == "1" ]]; then
         [[ -d "$dir" ]] || continue
         for bin in "$dir"/*; do
             if [[ -L "$bin" && ! -e "$bin" ]]; then
-                log_error "Broken symlink: $bin → $(readlink "$bin")"
+                log_fail "Broken symlink: $bin → $(readlink "$bin")"
                 ((stale++)) || true
             fi
         done
     done
     if [[ "$stale" -gt 0 ]]; then
-        log_error "$stale broken symlinks"
+        log_fail "$stale broken symlinks"
         ((ERRORS += stale))
     else
-        log_ok "No broken symlinks"
+        log_okay "No broken symlinks"
     fi
 fi
 
 # --- Summary ---
 log_section "Summary"
 if [[ "$ERRORS" -gt 0 ]]; then
-    log_error "$ERRORS errors, $WARNINGS warnings"
+    log_fail "$ERRORS errors, $WARNINGS warnings"
     exit 1
 elif [[ "$WARNINGS" -gt 0 ]]; then
     log_warn "0 errors, $WARNINGS warnings"
     exit 0
 else
-    log_ok "All checks passed"
+    log_okay "All checks passed"
     exit 0
 fi

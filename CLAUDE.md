@@ -17,7 +17,7 @@ across different CPU architectures without requiring sudo on Linux.
    `cargo.txt` (binstall pre-built binaries, no Linux container needed),
    not Brewfile.
 4. New install scripts: source `_lib.sh`, use its variables and helpers,
-   guard with idempotency checks, add an `INSTALL_*` flag to `bootstrap.sh`,
+   guard with idempotency checks, add a `DF_DO_*` flag to `bootstrap.sh`,
    add tests to `tests/`.
 
 ### Editing dotfiles
@@ -91,10 +91,7 @@ dotfiles/
 │   ├── pip.txt                # Python packages for $LOCAL_PLAT/venv (read by install/python.sh)
 │   ├── npm.txt                # Global npm packages (read by install/node.sh)
 │   ├── claude-plugins.txt     # Claude Code plugins (read by install/claude.sh)
-│   ├── claude-mcp.txt         # Claude Code MCP servers (read by install/claude.sh)
-│   └── nix/                   # Nix home-manager config (optional, for Nix users)
-│       ├── flake.nix
-│       └── home.nix
+│   └── claude-mcp.txt         # Claude Code MCP servers (read by install/claude.sh)
 │
 ├── install/
 │   ├── _lib.sh                # SOURCE OF TRUTH for all PLAT paths and env vars
@@ -113,15 +110,16 @@ dotfiles/
 │   ├── linux-packages.sh      # Linux: install Homebrew + glibc + brew bundle (no container, no sudo)
 │   ├── patch-homebrew-python.sh # Linux: patch python@3.14 formula (uuid, test_datetime fixes)
 │   ├── zsh.sh                 # oh-my-zsh + plugins (pure, autosuggestions, fsh, completions)
-│   ├── services.sh            # macOS: colima login service + iTerm2 prefs
+│   ├── services.sh            # macOS: colima login service
+│   ├── macos-settings.sh      # macOS: system preferences (Dock, Finder, keyboard, etc.)
+│   ├── auth.sh                # Interactive API token setup (DF_DO_AUTH=1 in bootstrap)
 │   ├── node.sh                # nvm + Node.js → $LOCAL_PLAT/nvm/
 │   ├── rust.sh                # rustup + cargo-binstall + cargo tools from cargo.txt
 │   ├── python.sh              # uv + venv + pip installs from packages/pip.txt
 │   ├── claude.sh              # Claude Code: native binary + plugins (all platforms)
 │   ├── codex.sh               # Codex CLI: native binary from GitHub releases
 │   ├── scratch.sh             # Symlink large dirs to scratch space (NFS quota relief)
-│   ├── verify-path.sh         # Diagnostic: check PATH binaries for arch/lib/symlink issues
-│   └── nix.sh                 # Optional: Nix + home-manager (NOT called by bootstrap.sh)
+│   └── verify-path.sh         # Diagnostic: check PATH binaries for arch/lib/symlink issues
 │
 ├── docs/                      # mdBook documentation (served at dotfiles.cade.io)
 │   ├── book.toml              # mdBook config: theme, repo URL, search
@@ -164,13 +162,13 @@ Every install script sources `_lib.sh` first. It defines all PLAT paths as varia
 | `CARGO_HOME` | `$LOCAL_PLAT/cargo` | Cargo (bins at `cargo/bin/`) |
 | `NVM_DIR` | `$LOCAL_PLAT/nvm` | nvm + Node.js versions |
 | `VENV` | `$LOCAL_PLAT/venv` | Python virtualenv |
-| `NIX_PROFILE` | `$LOCAL_PLAT/nix-profile` | Nix profile (if used) |
+
 | `UV_TOOL_BIN_DIR` | `$LOCAL_PLAT/bin` | uv tool binaries |
 | `UV_TOOL_DIR` | `$LOCAL_PLAT/uv/tools` | uv tool metadata |
 | `UV_PYTHON_INSTALL_DIR` | `$LOCAL_PLAT/uv/python` | uv managed Pythons |
 | `OS` | `darwin` or `linux` | Normalised OS |
 | `ARCH` | `aarch64` or `x86_64` | Normalised arch (arm64 → aarch64) |
-| `SCRATCH` | `$DOTFILES_SCRATCH_PATH` or resolved `~/scratch` | Scratch space root (empty if none) |
+| `SCRATCH` | `$DF_SCRATCH` or resolved `~/scratch` | Scratch space root (empty if none) |
 | `PATHS` | `$SCRATCH/.paths` | Symlink targets for ~/.local, ~/.cache, etc. (empty if no scratch) |
 
 `_lib.sh` also sets `GIT_CONFIG_GLOBAL=/dev/null` to prevent `url.insteadOf` SSH
@@ -182,13 +180,14 @@ without SSH keys configured.
 | Function | Purpose |
 |---|---|
 | `has cmd` | Check if a command exists on PATH |
-| `log_ok msg` | Print green `[ ok ]` status line |
+| `log_okay msg` | Print green `[okay]` status line |
 | `log_info msg` | Print blue `[info]` status line |
 | `log_warn msg` | Print yellow `[warn]` status line |
-| `log_error msg` | Print red `[err ]` to stderr |
+| `log_fail msg` | Print red `[fail]` to stderr |
+| `log_debug msg` | Print cyan `[dbug]` line (only when `DF_DEBUG=1`) |
 | `log_section msg` | Print bold `=== section ===` header |
 | `die msg` | Print error and exit 1 |
-| `run_logged cmd...` | Run command with output indented 4 spaces |
+| `run_logged cmd...` | Run command with output indented 4 spaces (shows cmd + timing when `DF_DEBUG=1`) |
 | `ensure_dir path` | `mkdir -p` if directory doesn't exist |
 | `download url dest` | Download via curl or wget |
 | `_re_derive_plat_vars` | Re-derive all PLAT variables from current `LOCAL_PLAT` (call after `LOCAL_PLAT` changes) |
@@ -326,7 +325,7 @@ identical templates that provide the same functionality:
 - Symlink resolution for `~/.local` → ensures all PLAT paths use consistent physical paths
 - Homebrew shellenv sourcing
 - PATH setup (PLAT paths prepended before Homebrew)
-- Tool-specific env vars (Rust, Node, Python, Nix)
+- Tool-specific env vars (Rust, Node, Python)
 - Platform-specific config (CUDA on Linux, Colima on macOS)
 
 **Interactive configs:** `.zshrc` uses oh-my-zsh with plugins (pure prompt, autosuggestions,
@@ -363,28 +362,42 @@ Result: **~0.14s** zsh shell startup (down from ~1.1s with eager nvm loading).
 
 ## bootstrap.sh flow
 
+Three modes: `install` (default), `update`, `upgrade`.
+
 ```
-source _lib.sh   → detect PLAT from install/plat/ check scripts, set all path vars
-1.  scratch      → create ~/scratch → DOTFILES_SCRATCH_PATH; symlink ~/.local, ~/.cache
-                   re-resolve LOCAL_PLAT now that ~/.local may point to scratch
-2.  repo         → clone dotfiles if not present; create ~/dotfiles symlink
-                   re-detect PLAT from real repo's install/plat/; source .plat_env.sh
-3.  chezmoi      → install binary to $ARCH_BIN; chezmoi apply (prompts name/email once)
-4.  path check   → verify PLAT paths are writable and not stale symlinks
-5.  ZSH          → oh-my-zsh + plugins via install/zsh.sh
-6.  packages     → macOS: homebrew.sh | Linux: linux-packages.sh (glibc + brew bundle)
-7.  services     → macOS: colima autostart + iTerm2 prefs (install/services.sh)
-8.  runtimes     → node.sh, rust.sh, python.sh, claude.sh
+bootstrap.sh              # install — full idempotent setup
+bootstrap.sh update       # git pull + chezmoi apply + refresh tools
+bootstrap.sh upgrade      # update + brew upgrade + cargo upgrade
 ```
 
-Each step after scratch has an `INSTALL_*=0` env var to skip it. The Linux packages
+**Install mode flow:**
+```
+source _lib.sh   → detect PLAT from install/plat/ check scripts, set all path vars
+0.  scratch      → create ~/scratch → DF_SCRATCH; symlink ~/.local, ~/.cache
+                   re-resolve LOCAL_PLAT now that ~/.local may point to scratch
+0.5 repo         → clone dotfiles if not present; create ~/dotfiles symlink
+                   re-detect PLAT from real repo's install/plat/; source .plat_env.sh
+1.  chezmoi      → install binary to $ARCH_BIN; chezmoi apply (prompts name/email once)
+2.  path check   → verify PLAT paths are writable and not stale symlinks
+3.  ZSH          → oh-my-zsh + plugins via install/zsh.sh
+4.  packages     → macOS: homebrew.sh | Linux: linux-packages.sh (glibc + brew bundle)
+5.  services     → macOS: colima autostart (install/services.sh)
+5.5 settings     → macOS: system preferences (install/macos-settings.sh)
+7.  auth         → API token setup (install/auth.sh, opt-in via DF_DO_AUTH=1)
+6.  runtimes     → node.sh, rust.sh, python.sh, claude.sh
+```
+
+**Update/upgrade mode:** skips scratch setup and repo cloning, pulls latest changes instead.
+Upgrade additionally sets `DF_BREW_UPGRADE=1`.
+
+Each step has a `DF_DO_*=0` env var to skip it. The Linux packages
 step installs Homebrew's own glibc first, then runs `brew bundle` — no container, no
 Docker required. Most packages pour as precompiled bottles; glibc builds from source
 on first install (~2 min).
 
 Pre-seed name/email to avoid interactive prompts:
 ```sh
-CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" ~/dotfiles/bootstrap.sh
+DF_NAME="Your Name" DF_EMAIL="you@example.com" ~/dotfiles/bootstrap.sh
 ```
 
 ---
@@ -420,7 +433,21 @@ system compilers). The script creates unversioned symlinks in `$LOCAL_PLAT/bin/`
 This gives clean `gcc`/`clang` commands that resolve to Homebrew's versions. Re-run
 `linux-packages.sh` after a compiler upgrade to refresh symlinks.
 
-**4. Build parallelism:** Homebrew auto-detects `nproc` and sets `HOMEBREW_MAKE_JOBS`
+**4. Upgrades disabled by default.** `brew bundle` runs with `--no-upgrade` on Linux
+because upgrades on a custom prefix are risky:
+- **glibc upgrade** can break every installed binary until a full rebuild completes
+- **gcc/llvm upgrades** invalidate the unversioned compiler symlinks in `$LOCAL_PLAT/bin/`
+  (need to re-run `linux-packages.sh` to refresh)
+- **Python formula upgrades** overwrite the uuid/test_datetime patches
+- **Source builds** (Python, Perl, git, vim) take 10-30 min each on the custom prefix
+
+Override with `DF_BREW_UPGRADE=1` to force upgrades, then re-run `linux-packages.sh`
+to refresh compiler symlinks and `patch-homebrew-python.sh` to re-apply Python patches.
+
+On macOS, upgrades are enabled by default (`DF_BREW_UPGRADE=1`) — bottles are fast and
+casks like Cursor/VS Code benefit from staying current. Set `DF_BREW_UPGRADE=0` to disable.
+
+**5. Build parallelism:** Homebrew auto-detects `nproc` and sets `HOMEBREW_MAKE_JOBS`
 accordingly (e.g. `make -j112` on 112-core machines). Source builds (glibc, Python,
 Perl, git, vim) use all available cores.
 
@@ -455,7 +482,7 @@ On Linux machines with shared NFS home directories and small quotas,
 `~/.local/$PLAT` (2-5 GB), `~/.cache`, and oh-my-zsh can exhaust the quota.
 
 **Setup:** Create `~/scratch` as a symlink to large local storage (e.g. `/scratch/$USER`),
-or set `DOTFILES_SCRATCH_PATH=/path/to/storage`. Then run bootstrap — `install/scratch.sh`
+or set `DF_SCRATCH=/path/to/storage`. Then run bootstrap — `install/scratch.sh`
 (step 1, before any tool installs) will symlink these directories to scratch:
 
 | Home path | Scratch target | Why |
@@ -467,7 +494,7 @@ or set `DOTFILES_SCRATCH_PATH=/path/to/storage`. Then run bootstrap — `install
 | `~/.cursor` | `$SCRATCH/.paths/.cursor` | Cursor extensions and state |
 | `~/.cursor-server` | `$SCRATCH/.paths/.cursor-server` | Cursor Remote SSH binaries |
 
-Override with `DOTFILES_LINKS_PATHS` (colon-separated). `~/.config` is intentionally excluded — chezmoi manages files inside it as a real directory and will replace a symlink.
+Override with `DF_LINKS` (colon-separated). `~/.config` is intentionally excluded — chezmoi manages files inside it as a real directory and will replace a symlink.
 
 The `$PATHS` variable in `_lib.sh` points to `$SCRATCH/.paths` and is the
 single source of truth for where symlink targets live.
@@ -494,7 +521,7 @@ Follow this priority order — native installers first, Homebrew as fallback:
 4. **Homebrew** — add `brew "name"` to `packages/Brewfile` for non-language-specific
    tools, C libraries, and things without native installers
 5. **Custom script** — look at an existing `install/` script for patterns and follow them;
-   add an `INSTALL_*` flag to `bootstrap.sh`
+   add a `DF_DO_*` flag to `bootstrap.sh`
 6. **Ask** — if none of the above fits, ask before inventing a new mechanism
 
 For macOS-only things (casks, GUI apps, macOS services), wrap in `if OS.mac?`:
@@ -569,8 +596,8 @@ can reference the same path.
 ### Add a new install script
 
 1. Create `install/my-thing.sh`, source `_lib.sh` at the top
-2. Guard with `has my-thing && { log_ok ...; exit 0; }` for idempotency
-3. Add a step to `bootstrap.sh` with an `INSTALL_MY_THING` flag
+2. Guard with `has my-thing && { log_okay ...; exit 0; }` for idempotency
+3. Add a step to `bootstrap.sh` with a `DF_DO_MY_THING` flag
 4. Add tests to `tests/paths.bats` or `tests/bootstrap.bats`
 
 ### Work on docs
@@ -609,7 +636,7 @@ bats tests/shell.bats
 ```
 
 Tests run in an Ubuntu 24.04 container. Bootstrap runs with
-`INSTALL_NIX=0 INSTALL_PACKAGES=0` (Nix and package installs are skipped
+`DF_DO_PACKAGES=0` (package installs are skipped
 in the test environment to keep tests fast and hermetic).
 
 ### Verify PATH health

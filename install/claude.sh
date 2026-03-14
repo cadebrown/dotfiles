@@ -40,7 +40,7 @@ _dest="$ARCH_BIN/claude"
 
 # Skip if already on this version
 if [[ -x "$_dest" ]] && "$_dest" --version 2>/dev/null | grep -qF "$_version"; then
-    log_ok "claude $_version already installed at $_dest"
+    log_okay "claude $_version already installed at $_dest"
 else
     # Download and verify checksum
     log_info "Downloading claude $_version for $_platform..."
@@ -72,10 +72,10 @@ else
             rm -f "$_dest"
             die "Checksum mismatch for claude $_version ($_platform)"
         fi
-        log_ok "Checksum verified"
+        log_okay "Checksum verified"
     fi
 
-    log_ok "Installed claude $_version → $_dest"
+    log_okay "Installed claude $_version → $_dest"
 fi
 
 unset _plat_arch _platform _BUCKET _version _dest _checksum _actual _manifest
@@ -86,7 +86,7 @@ log_section "Claude Code plugins"
 
 has claude || { log_warn "claude not found — skipping plugins"; exit 0; }
 
-PLUGINS_TXT="$PACKAGES_DIR/claude-plugins.txt"
+PLUGINS_TXT="$DF_PACKAGES/claude-plugins.txt"
 [[ -f "$PLUGINS_TXT" ]] || { log_warn "No claude-plugins.txt at $PLUGINS_TXT — skipping"; exit 0; }
 
 _ok=0 _skip=0 _fail=0
@@ -99,7 +99,7 @@ while IFS= read -r line; do
     output=$(claude plugin install "$plugin" 2>&1) && status=0 || status=$?
 
     if [[ $status -eq 0 ]]; then
-        log_ok "  installed $plugin"
+        log_okay "  installed $plugin"
         (( _ok++ )) || true
     elif echo "$output" | grep -qi "already installed\|already enabled"; then
         log_info "  skip  $plugin (already installed)"
@@ -110,13 +110,13 @@ while IFS= read -r line; do
     fi
 done < "$PLUGINS_TXT"
 
-log_ok "Claude plugins: ${_ok} installed, ${_skip} already present, ${_fail} failed"
+log_okay "Claude plugins: ${_ok} installed, ${_skip} already present, ${_fail} failed"
 
 ### MCP SERVERS (all platforms) ###
 
 log_section "Claude Code MCP servers"
 
-MCP_TXT="$PACKAGES_DIR/claude-mcp.txt"
+MCP_TXT="$DF_PACKAGES/claude-mcp.txt"
 [[ -f "$MCP_TXT" ]] || { log_warn "No claude-mcp.txt at $MCP_TXT — skipping"; exit 0; }
 
 _ok=0 _skip=0 _fail=0
@@ -133,7 +133,7 @@ while IFS= read -r line; do
     else
         log_info "  $_name ($_transport) → $_url"
         if claude mcp add --transport "$_transport" --scope user "$_name" "$_url" 2>/dev/null; then
-            log_ok "  registered $_name"
+            log_okay "  registered $_name"
             (( _ok++ )) || true
         else
             log_warn "  fail  $_name"
@@ -142,4 +142,4 @@ while IFS= read -r line; do
     fi
 done < "$MCP_TXT"
 
-log_ok "MCP servers: ${_ok} registered, ${_skip} already present, ${_fail} failed"
+log_okay "MCP servers: ${_ok} registered, ${_skip} already present, ${_fail} failed"

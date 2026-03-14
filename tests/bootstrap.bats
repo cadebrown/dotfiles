@@ -29,12 +29,12 @@ setup() {
     [[ -f "$HOME/.gitconfig" ]]
 }
 
-@test "~/.gitconfig has user name from CHEZMOI_NAME" {
+@test "~/.gitconfig has user name from DF_NAME" {
     # Template renders "name  = ..." (two spaces before =)
     grep -q "name" "$HOME/.gitconfig"
 }
 
-@test "~/.gitconfig has user email from CHEZMOI_EMAIL" {
+@test "~/.gitconfig has user email from DF_EMAIL" {
     grep -q "email = " "$HOME/.gitconfig"
 }
 

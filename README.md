@@ -15,7 +15,7 @@ Prompts for name and email once. Everything else is automatic.
 ### Unattended (CI / shared systems)
 
 ```sh
-CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" \
+DF_NAME="Your Name" DF_EMAIL="you@example.com" \
   curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
 ```
 
@@ -23,10 +23,22 @@ CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" \
 
 ```sh
 git clone https://github.com/cadebrown/dotfiles ~/dotfiles
-CHEZMOI_NAME="Your Name" CHEZMOI_EMAIL="you@example.com" ~/dotfiles/bootstrap.sh
+DF_NAME="Your Name" DF_EMAIL="you@example.com" ~/dotfiles/bootstrap.sh
 ```
 
 All steps are idempotent — safe to re-run. On a shared home directory, each machine detects its CPU capabilities and installs to its own `~/.local/$PLAT/` directory (e.g. `plat_Linux_x86-64-v4` for AVX-512, `plat_Linux_x86-64-v3` for AVX2). Text configs are shared; binaries are isolated.
+
+---
+
+## Update / Upgrade
+
+```sh
+# Pull latest dotfiles + refresh tools (no reinstall, no brew upgrade)
+~/dotfiles/bootstrap.sh update
+
+# Pull + upgrade everything (brew upgrade, cargo upgrade)
+~/dotfiles/bootstrap.sh upgrade
+```
 
 ---
 
@@ -37,7 +49,7 @@ All steps are idempotent — safe to re-run. On a shared home directory, each ma
 | Package manager | Homebrew (native) | Homebrew (native, no container, no sudo) |
 | Rust toolchain | Homebrew `rustup` (code-signed) | `sh.rustup.rs` |
 | Docker/Podman | Colima (auto-started at login) | Not required |
-| Claude Code | Homebrew cask | Native binary |
+| Claude Code | Native binary | Native binary |
 | First run time | ~5 min | ~5 min |
 
 See [docs/setup/bootstrap.md](docs/setup/bootstrap.md) for full platform details.
@@ -61,8 +73,14 @@ bash ~/dotfiles/install/rust.sh
 bash ~/dotfiles/install/python.sh
 bash ~/dotfiles/install/claude.sh
 
-# Sync packages (macOS or Linux with brew on PATH)
-brew bundle --file=~/dotfiles/packages/Brewfile
+# Set up API tokens (interactive)
+bash ~/dotfiles/install/auth.sh
+
+# Apply macOS system preferences
+bash ~/dotfiles/install/macos-settings.sh
+
+# Debug mode — verbose output with timing
+DF_DEBUG=1 ~/dotfiles/bootstrap.sh
 ```
 
 ---
