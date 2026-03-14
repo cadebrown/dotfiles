@@ -1,4 +1,5 @@
 # AGENTS.md
+# Keep in sync with ~/.claude/CLAUDE.md (home/dot_claude/CLAUDE.md)
 
 ## Background
 

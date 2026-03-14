@@ -95,18 +95,7 @@ if [[ "${INSTALL_SCRATCH:-1}" != "0" ]]; then
     _LOCAL_ROOT="$HOME/.local"
     [[ -L "$_LOCAL_ROOT" ]] && _LOCAL_ROOT="$(readlink -f "$_LOCAL_ROOT")"
     LOCAL_PLAT="$_LOCAL_ROOT/$PLAT"
-    ARCH_BIN="$LOCAL_PLAT/bin"
-    RUSTUP_HOME="$LOCAL_PLAT/rustup"
-    CARGO_HOME="$LOCAL_PLAT/cargo"
-    CARGO_TARGET_DIR="$LOCAL_PLAT/cargo-build"
-    VENV="$LOCAL_PLAT/venv"
-    UV_TOOL_BIN_DIR="$ARCH_BIN"
-    UV_TOOL_DIR="$LOCAL_PLAT/uv/tools"
-    UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
-    NVM_DIR="$LOCAL_PLAT/nvm"
-    NIX_PROFILE="$LOCAL_PLAT/nix-profile"
-    export LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR VENV \
-           UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR NVM_DIR NIX_PROFILE
+    _re_derive_plat_vars
     unset _LOCAL_ROOT
     log_ok "Re-resolved: LOCAL_PLAT=$LOCAL_PLAT"
 else
@@ -191,18 +180,8 @@ if [[ -n "$_PLAT_NEW" && "$_PLAT_NEW" != "$PLAT" ]]; then
     # Re-resolve LOCAL_PLAT using the real (scratch-resolved) root
     _LR="$(readlink -f "$HOME/.local")"
     LOCAL_PLAT="$_LR/$PLAT"
-    ARCH_BIN="$LOCAL_PLAT/bin"
-    RUSTUP_HOME="$LOCAL_PLAT/rustup"
-    CARGO_HOME="$LOCAL_PLAT/cargo"
-    CARGO_TARGET_DIR="$LOCAL_PLAT/cargo-build"
-    VENV="$LOCAL_PLAT/venv"
-    UV_TOOL_BIN_DIR="$ARCH_BIN"
-    UV_TOOL_DIR="$LOCAL_PLAT/uv/tools"
-    UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
-    NVM_DIR="$LOCAL_PLAT/nvm"
-    NIX_PROFILE="$LOCAL_PLAT/nix-profile"
-    export PLAT LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR VENV \
-           UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR NVM_DIR NIX_PROFILE
+    _re_derive_plat_vars
+    export PLAT
     unset _LR
 
     # Source compile flags for the new PLAT

@@ -1,4 +1,5 @@
 # CLAUDE.md
+# Keep in sync with ~/.codex/AGENTS.md (home/dot_codex/AGENTS.md)
 
 ## Background
 

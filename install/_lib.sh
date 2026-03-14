@@ -223,3 +223,31 @@ download() {
 run_logged() {
     "$@" 2>&1 | sed 's/^/    /'
 }
+
+# Re-derive all PLAT-dependent variables from the current LOCAL_PLAT.
+# Call this after LOCAL_PLAT changes (e.g. scratch symlink resolution,
+# PLAT re-detection in bootstrap.sh).
+_re_derive_plat_vars() {
+    ARCH_BIN="$LOCAL_PLAT/bin"
+    RUSTUP_HOME="$LOCAL_PLAT/rustup"
+    CARGO_HOME="$LOCAL_PLAT/cargo"
+    CARGO_TARGET_DIR="$LOCAL_PLAT/cargo-build"
+    VENV="$LOCAL_PLAT/venv"
+    UV_TOOL_BIN_DIR="$ARCH_BIN"
+    UV_TOOL_DIR="$LOCAL_PLAT/uv/tools"
+    UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
+    NVM_DIR="$LOCAL_PLAT/nvm"
+    NIX_PROFILE="$LOCAL_PLAT/nix-profile"
+    export LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR VENV \
+           UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR NVM_DIR NIX_PROFILE
+}
+
+# Read a package list file, skipping blank lines and comments.
+# Outputs one package name per line (strips trailing comments/args).
+_read_package_list() {
+    local file="$1"
+    while IFS= read -r line; do
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        printf '%s\n' "${line%% *}"
+    done < "$file"
+}

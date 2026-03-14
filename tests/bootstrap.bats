@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 # tests/bootstrap.bats - verify dotfiles and plugins landed correctly after bootstrap
+#
+# PLAT, LOCAL_PLAT, etc. are inherited from entrypoint.sh (which sources _lib.sh).
 
 setup() {
-    PLAT="$(uname -m)-$(uname -s)"
-    LOCAL_PLAT="$HOME/.local/$PLAT"
     ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh-custom}"
 }
 
@@ -15,6 +15,14 @@ setup() {
 
 @test "~/.zprofile exists" {
     [[ -f "$HOME/.zprofile" ]]
+}
+
+@test "~/.bash_profile exists" {
+    [[ -f "$HOME/.bash_profile" ]]
+}
+
+@test "~/.bashrc exists" {
+    [[ -f "$HOME/.bashrc" ]]
 }
 
 @test "~/.gitconfig exists" {

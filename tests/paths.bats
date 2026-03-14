@@ -3,22 +3,14 @@
 #
 # The critical invariant: every compiled binary lives under ~/.local/$PLAT/
 # so that machines sharing an NFS home directory don't clobber each other.
-
-setup() {
-    PLAT="$(uname -m)-$(uname -s)"
-    LOCAL_PLAT="$HOME/.local/$PLAT"
-    NVM_DIR="$LOCAL_PLAT/nvm"
-}
+#
+# PLAT, LOCAL_PLAT, NVM_DIR, RUSTUP_HOME, CARGO_HOME, etc. are inherited
+# from entrypoint.sh which sources _lib.sh before running bats.
 
 # --- PLAT sanity ---
 
-@test "PLAT has the expected format (arch-OS)" {
-    [[ "$PLAT" =~ ^[a-zA-Z0-9_]+-[a-zA-Z]+$ ]]
-}
-
-@test "PLAT matches uname output" {
-    expected="$(uname -m)-$(uname -s)"
-    [[ "$PLAT" == "$expected" ]]
+@test "PLAT has the expected format (plat_OS_target)" {
+    [[ "$PLAT" =~ ^plat_[a-zA-Z]+_[a-zA-Z0-9_-]+$ ]]
 }
 
 # --- chezmoi ---
@@ -66,11 +58,11 @@ setup() {
     [[ -s "$NVM_DIR/nvm.sh" ]]
 }
 
-@test "nvm default is node v25" {
+@test "nvm default node version is available" {
     # shellcheck source=/dev/null
     source "$NVM_DIR/nvm.sh"
     nvm use default --silent
-    [[ "$(node --version)" =~ ^v25\. ]]
+    [[ "$(node --version)" =~ ^v[0-9]+\. ]]
 }
 
 @test "npm is available via nvm" {

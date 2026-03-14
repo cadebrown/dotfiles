@@ -34,53 +34,6 @@ templates — no `.tmpl` extension.
 
 ---
 
-## Recent changes (March 2026)
-
-### Bash support added
-
-Both zsh and bash are now fully supported with identical configuration:
-- **`home/dot_bash_profile.tmpl`** - New bash login shell config that mirrors `.zprofile`
-- Same PLAT detection, PATH setup, tool activation, and platform-specific config
-- chezmoi manages both; keeps them in sync
-
-### PATH deduplication (symlink resolution)
-
-Both `.zprofile` and `.bash_profile` now resolve `~/.local` symlinks before setting `_LOCAL_PLAT`:
-
-```bash
-# Resolve symlinks so all PATH entries use the same physical path
-_local_root="$HOME/.local"
-if [[ -L "$_local_root" ]]; then
-    _local_root="$(readlink -f "$_local_root")"
-fi
-export _LOCAL_PLAT="$_local_root/$_PLAT"
-```
-
-**Why this matters:** On shared NFS homes with scratch space, `~/.local` is a symlink to
-`/scratch/$USER/.paths/.local`. Without resolution, some tools (Homebrew, Python venv)
-resolve the symlink and add the physical path to PATH, while others (cargo, nvm) use
-the literal `~/.local/$PLAT` path. This created duplicate PATH entries — some using
-`/home/$USER/.local/plat_Linux_x86-64-v4/` and others using
-`/scratch/$USER/.paths/.local/plat_Linux_x86-64-v4/`.
-
-Now all tools add the same physical path → no duplicates, single PLAT in PATH.
-
-### Python@3.14 permanent patches
-
-`install/patch-homebrew-python.sh` automatically patches the Homebrew python@3.14 formula
-on Linux to fix build failures:
-
-1. **UUID module**: `py_cv_module__uuid=n/a` disables uuid (libuuid detection fails)
-2. **PGO test_datetime**: Patches Makefile to skip `test_datetime` during PGO (hangs on some CPUs)
-
-Environment variables prevent auto-updates from overwriting patches:
-- `HOMEBREW_NO_AUTO_UPDATE=1` - set in both shell profiles
-- `HOMEBREW_NO_INSTALL_FROM_API=1` - forces local formula usage
-
-See [Python@3.14 build issues on Linux](#python314-build-issues-on-linux) for manual re-application.
-
----
-
 ## Core invariants
 
 These must never be broken:
@@ -116,8 +69,10 @@ dotfiles/
 ├── README.md
 │
 ├── home/                      # Dotfiles managed by chezmoi → applied to ~/
-│   ├── dot_zshrc.tmpl         # ZSH config (chezmoi template)
+│   ├── .chezmoiignore         # Skip platform-specific files (e.g. aerospace on Linux)
+│   ├── dot_zshrc.tmpl         # ZSH interactive config (chezmoi template)
 │   ├── dot_zprofile.tmpl      # ZSH login shell: PATH, env vars, tool activation
+│   ├── dot_bashrc.tmpl        # Bash interactive config (aliases, prompt, completions)
 │   ├── dot_bash_profile.tmpl  # Bash login shell: mirrors .zprofile for bash users
 │   ├── dot_gitconfig.tmpl     # Git config (name/email from chezmoi data)
 │   ├── dot_ssh/config.tmpl    # SSH config
@@ -134,6 +89,7 @@ dotfiles/
 │   ├── Brewfile               # Homebrew packages — macOS (bottles) + Linux (compiled)
 │   ├── cargo.txt              # Rust tools (read by install/rust.sh via cargo-binstall)
 │   ├── pip.txt                # Python packages for $LOCAL_PLAT/venv (read by install/python.sh)
+│   ├── npm.txt                # Global npm packages (read by install/node.sh)
 │   ├── claude-plugins.txt     # Claude Code plugins (read by install/claude.sh)
 │   ├── claude-mcp.txt         # Claude Code MCP servers (read by install/claude.sh)
 │   └── nix/                   # Nix home-manager config (optional, for Nix users)
@@ -161,7 +117,6 @@ dotfiles/
 │   ├── node.sh                # nvm + Node.js → $LOCAL_PLAT/nvm/
 │   ├── rust.sh                # rustup + cargo-binstall + cargo tools from cargo.txt
 │   ├── python.sh              # uv + venv + pip installs from packages/pip.txt
-│   ├── npm.sh                 # Global npm packages from packages/npm.txt
 │   ├── claude.sh              # Claude Code: native binary + plugins (all platforms)
 │   ├── codex.sh               # Codex CLI: native binary from GitHub releases
 │   ├── scratch.sh             # Symlink large dirs to scratch space (NFS quota relief)
@@ -221,6 +176,23 @@ Every install script sources `_lib.sh` first. It defines all PLAT paths as varia
 `_lib.sh` also sets `GIT_CONFIG_GLOBAL=/dev/null` to prevent `url.insteadOf` SSH
 rewrites from breaking curl-based installers (oh-my-zsh, nvm, etc.) on machines
 without SSH keys configured.
+
+### Helper functions
+
+| Function | Purpose |
+|---|---|
+| `has cmd` | Check if a command exists on PATH |
+| `log_ok msg` | Print green `[ ok ]` status line |
+| `log_info msg` | Print blue `[info]` status line |
+| `log_warn msg` | Print yellow `[warn]` status line |
+| `log_error msg` | Print red `[err ]` to stderr |
+| `log_section msg` | Print bold `=== section ===` header |
+| `die msg` | Print error and exit 1 |
+| `run_logged cmd...` | Run command with output indented 4 spaces |
+| `ensure_dir path` | `mkdir -p` if directory doesn't exist |
+| `download url dest` | Download via curl or wget |
+| `_re_derive_plat_vars` | Re-derive all PLAT variables from current `LOCAL_PLAT` (call after `LOCAL_PLAT` changes) |
+| `_read_package_list file` | Read a package list file, skip blanks/comments, output one package name per line |
 
 **If you add a new tool with compiled binaries, its install path must be under
 `$LOCAL_PLAT/` and the variable must be defined in `_lib.sh`.**
@@ -347,8 +319,8 @@ releases; if none is available, it falls back to `cargo install` (source compila
 
 ## Shell profiles (zsh and bash)
 
-Both `.zprofile` (zsh) and `.bash_profile` (bash) are maintained as identical templates
-that provide the same functionality:
+**Login profiles:** Both `.zprofile` (zsh) and `.bash_profile` (bash) are maintained as
+identical templates that provide the same functionality:
 
 - PLAT detection from `install/plat/` check scripts (picks the highest CPU level the machine supports)
 - Symlink resolution for `~/.local` → ensures all PLAT paths use consistent physical paths
@@ -357,12 +329,16 @@ that provide the same functionality:
 - Tool-specific env vars (Rust, Node, Python, Nix)
 - Platform-specific config (CUDA on Linux, Colima on macOS)
 
-**Why symlink resolution matters:** On shared NFS homes with scratch space, `~/.local` is
-a symlink to `/scratch/$USER/.paths/.local`. Without resolution, some tools (Homebrew,
-Python venv) resolve the symlink and add the physical path to PATH, while others (cargo,
-nvm) use the literal `~/.local/$PLAT` path. This creates duplicate PATH entries for the
-same PLAT. Both shell profiles now resolve the symlink using `readlink -f` before setting
-`_LOCAL_PLAT`, ensuring all tools add the same physical path.
+**Interactive configs:** `.zshrc` uses oh-my-zsh with plugins (pure prompt, autosuggestions,
+fast-syntax-highlighting, completions, nvm lazy loading). `.bashrc` is minimal: basic prompt
+with git branch, shared aliases (same as `.zshrc`), zoxide, and fzf completions.
+
+**PATH deduplication:** On shared NFS homes with scratch space, `~/.local` is a symlink to
+`/scratch/$USER/.paths/.local`. Without resolution, some tools (Homebrew, Python venv)
+resolve the symlink and add the physical path to PATH, while others (cargo, nvm) use
+the literal `~/.local/$PLAT` path. This creates duplicate PATH entries for the same PLAT.
+Both shell profiles resolve the symlink using `readlink -f` before setting `_LOCAL_PLAT`,
+ensuring all tools add the same physical path.
 
 ## nvm lazy loading
 
@@ -373,12 +349,15 @@ Instead, we use a two-layer approach:
    (`ls $NVM_DIR/versions/node/ | sort -V | tail -1`). This makes `node`/`npm`
    available in non-interactive shells (scripts, CI) with zero nvm overhead.
 
-2. **`.zshrc`** — enables the oh-my-zsh `nvm` plugin with `lazy yes`. This creates
+2. **`.zshrc`** (zsh only) — enables the oh-my-zsh `nvm` plugin with `lazy yes`. This creates
    stub functions for `nvm`/`node`/`npm`/`npx` that source the real `nvm.sh` on
-   first use. In interactive shells, the stub overrides the PATH-based node, so
+   first use. In interactive zsh shells, the stub overrides the PATH-based node, so
    `nvm use` works correctly.
 
-Result: **~0.14s** shell startup (down from ~1.1s with eager nvm loading).
+Bash interactive shells get node via the PATH entry from step 1 — no nvm lazy loading,
+but `nvm use` is not available without manually sourcing `$NVM_DIR/nvm.sh`.
+
+Result: **~0.14s** zsh shell startup (down from ~1.1s with eager nvm loading).
 
 ---
 
@@ -668,7 +647,7 @@ The `.chezmoi.toml.tmpl` prompts for `name` and `email` on first init via
 ## Pitfalls
 
 - **Don't manually edit chezmoi-managed shell configs** — `.zshrc`, `.zprofile`,
-  and `.bash_profile` are managed by chezmoi templates. Use `chezmoi edit` instead.
+  `.bashrc`, and `.bash_profile` are managed by chezmoi templates. Use `chezmoi edit` instead.
   Tools like `uv` may try to auto-add source lines to these files; if they do,
   run `chezmoi apply --force` to restore the clean template.
 
@@ -682,8 +661,8 @@ The `.chezmoi.toml.tmpl` prompts for `name` and `email` on first init via
   win on PATH, but duplicates waste install time. If it's in `cargo.txt`,
   remove it from `Brewfile`.
 
-- **Don't modify `.zshrc` or `.zprofile` directly** — chezmoi manages them.
-  Run `chezmoi edit ~/.zshrc` or edit `home/dot_zshrc.tmpl`.
+- **Don't modify `.zshrc`, `.zprofile`, `.bashrc`, or `.bash_profile` directly** —
+  chezmoi manages them. Run `chezmoi edit ~/.zshrc` or edit `home/dot_zshrc.tmpl`.
 
 - **Don't run install scripts without sourcing `_lib.sh`** — the PLAT paths
   won't be set and tools will land in wrong locations.
@@ -714,6 +693,11 @@ The `.chezmoi.toml.tmpl` prompts for `name` and `email` on first init via
   `com.apple.provenance` on object files and will reject unsigned builds.
   `install/rust.sh` handles this automatically; `brew "rustup"` is in
   `Brewfile` under `if OS.mac?`.
+
+- **Python@3.14 patches on Linux** — `install/patch-homebrew-python.sh` patches
+  the Homebrew formula to fix uuid module detection and test_datetime PGO hangs.
+  `HOMEBREW_NO_AUTO_UPDATE=1` and `HOMEBREW_NO_INSTALL_FROM_API=1` (set in both
+  shell profiles) prevent Homebrew from overwriting these patches.
 
 - **`dot_iterm2/` is a binary plist, not a template.** Do not add `.tmpl`
   extension. If you need to update it, copy the new `com.googlecode.iterm2.plist`

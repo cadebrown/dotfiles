@@ -1,0 +1,45 @@
+# .bashrc - interactive bash shell configuration
+# Keep aliases in sync with .zshrc (home/dot_zshrc.tmpl)
+
+### HISTORY ###
+
+HISTSIZE=50000
+HISTFILESIZE=100000
+HISTCONTROL=ignoredups:ignorespace:erasedups
+shopt -s histappend
+
+### PROMPT ###
+
+# Simple two-line prompt: user@host:dir (git branch if available)
+_bash_git_branch() {
+    local branch
+    branch="$(git symbolic-ref --short HEAD 2>/dev/null)" && printf ' (%s)' "$branch"
+}
+PS1='\u@\h:\w$(_bash_git_branch)\n\$ '
+
+### ALIASES ###
+
+alias g='git'
+alias p='uv run python'
+alias e='vim'
+alias cat='bat --paging=never'
+
+alias datestamp='date +"%Y%m%d"'
+alias timestamp='date +"%Y%m%d%H%M%S"'
+alias verify-path='bash ~/dotfiles/install/verify-path.sh'
+
+{{ if eq .chezmoi.os "linux" -}}
+alias open='xdg-open'
+{{ end -}}
+
+### COMPLETIONS ###
+
+# Zoxide
+if command -v zoxide &>/dev/null; then
+    eval "$(zoxide init bash)"
+fi
+
+# fzf
+if command -v fzf &>/dev/null; then
+    eval "$(fzf --bash)"
+fi

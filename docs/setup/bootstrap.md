@@ -59,7 +59,7 @@ No sudo required.
      falls back to source compilation otherwise
    - Cargo tools install to `~/.local/$PLAT/cargo/bin/`
 8. **Python** via uv → `~/.local/$PLAT/venv/`
-9. **Claude Code** via Homebrew cask + plugins + MCP servers
+9. **Claude Code** native binary → `~/.local/$PLAT/bin/claude` + plugins + MCP servers
 
 Total time: ~5 minutes on a fast connection (most packages pour as precompiled bottles).
 
@@ -111,7 +111,8 @@ INSTALL_ZSH=0        # skip oh-my-zsh
 INSTALL_NODE=0       # skip nvm + Node.js + global npm packages
 INSTALL_RUST=0       # skip rustup + cargo tools
 INSTALL_PYTHON=0     # skip uv + venv
-INSTALL_CLAUDE=0     # skip Claude Code plugins + MCP servers
+INSTALL_CLAUDE=0     # skip Claude Code install + plugins + MCP servers
+INSTALL_CODEX=0      # skip Codex CLI install
 ```
 
 Example — dotfiles only, no runtimes:

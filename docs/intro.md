@@ -19,8 +19,8 @@ Name and email are only asked once (or pre-seeded as above for unattended instal
 - **Self-contained binaries** — Homebrew installs its own glibc 2.35; binaries don't depend on host system libraries
 - **Idempotent** — every script is safe to re-run; running bootstrap on a second machine just installs that machine's tools
 - **Single source of truth** — one `Brewfile` for macOS and Linux; `if OS.mac?` blocks handle differences
-- **Fast shell startup** — lazy nvm loading, single `compinit`, ~140ms warm startup
-- **Both zsh and bash** — identical `.zprofile` and `.bash_profile` templates for consistent experience
+- **Fast shell startup** — lazy nvm loading (zsh only, via oh-my-zsh plugin), single `compinit`, ~140ms warm startup
+- **Both zsh and bash** — identical `.zprofile` and `.bash_profile` templates for consistent environment; bash gets the latest node directly via PATH without nvm lazy loading
 
 ---
 
@@ -32,7 +32,7 @@ Name and email are only asked once (or pre-seeded as above for unattended instal
 | Rust toolchain | Homebrew `rustup` (code-signed, required for Sequoia+) | `sh.rustup.rs` |
 | Rust tools | `cargo-binstall` (pre-built binaries first, source fallback) | same |
 | Services | colima auto-started; iTerm2 prefs configured | — |
-| Claude Code | Homebrew cask | Native binary |
+| Claude Code | Native binary | Native binary |
 | First run | ~5 min | ~5 min |
 
 ---

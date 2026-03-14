@@ -20,8 +20,11 @@ if has colima; then
         log_ok "colima already running as a service"
     else
         log_info "Starting colima service (auto-start at login)"
-        run_logged brew services start colima
-        log_ok "colima service registered"
+        if run_logged brew services start colima; then
+            log_ok "colima service registered"
+        else
+            log_warn "colima service start failed — run 'brew services start colima' manually"
+        fi
     fi
 else
     log_warn "colima not found — skipping (run install/homebrew.sh first)"

@@ -46,10 +46,7 @@ if [[ ! -f "$NPM_TXT" ]]; then
 fi
 
 _pkg_count=0
-while IFS= read -r line; do
-    [[ -z "$line" || "$line" == \#* ]] && continue
-    pkg="${line%% *}"
-
+while IFS= read -r pkg; do
     if npm list -g "$pkg" --depth=0 &>/dev/null; then
         log_ok "  $pkg (already installed)"
     else
@@ -58,6 +55,6 @@ while IFS= read -r line; do
         log_ok "  $pkg"
         (( _pkg_count++ )) || true
     fi
-done < "$NPM_TXT"
+done < <(_read_package_list "$NPM_TXT")
 
 [[ $_pkg_count -eq 0 ]] && log_info "All npm packages already installed"

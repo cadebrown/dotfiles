@@ -42,5 +42,19 @@ PIP_TXT="$PACKAGES_DIR/pip.txt"
 log_info "Syncing packages from pip.txt"
 # --python $VENV/bin/python: explicit path so uv targets the PLAT venv even when
 # another Python is active (e.g. if the system python is higher on PATH).
-run_logged uv pip install --python "$VENV/bin/python" -r "$PIP_TXT"
-log_ok "Python packages up to date"
+_ok=0 _fail=0
+while IFS= read -r pkg; do
+    if run_logged uv pip install --python "$VENV/bin/python" "$pkg"; then
+        log_ok "  ok    $pkg"
+        (( _ok++ )) || true
+    else
+        log_warn "  fail  $pkg"
+        (( _fail++ )) || true
+    fi
+done < <(_read_package_list "$PIP_TXT")
+
+if [[ $_fail -eq 0 ]]; then
+    log_ok "Python packages: ${_ok} ok"
+else
+    log_warn "Python packages: ${_ok} ok, ${_fail} failed"
+fi

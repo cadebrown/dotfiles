@@ -81,11 +81,7 @@ log_info "Installing/upgrading cargo tools from cargo.txt"
 # Falls back to source compilation if no pre-built binary is available.
 _ok=0 _fail=0
 
-while IFS= read -r line; do
-    # Skip blank lines and comments
-    [[ -z "$line" || "$line" == \#* ]] && continue
-    pkg="${line%% *}"
-
+while IFS= read -r pkg; do
     log_info "  binstall $pkg"
     if run_logged cargo binstall --no-confirm --log-level warn "$pkg" \
         || run_logged cargo install "$pkg"; then
@@ -95,6 +91,6 @@ while IFS= read -r line; do
         log_warn "  fail  $pkg"
         (( _fail++ )) || true
     fi
-done < "$CARGO_TXT"
+done < <(_read_package_list "$CARGO_TXT")
 
 log_ok "cargo tools: ${_ok} ok, ${_fail} failed"

@@ -1,7 +1,7 @@
 # npm.txt - global npm packages
-# Usage: install/npm.sh reads this file
+# Usage: install/node.sh reads this file
 # Install manually: npm install -g <package>
 
 # (currently empty — add npm-specific packages here)
-# claude-code: installed via Homebrew cask (macOS) or install/claude.sh (Linux)
-# codex: installed via native binary — not tracked here
+# claude-code: installed via native binary (install/claude.sh)
+# codex: installed via native binary (install/codex.sh)

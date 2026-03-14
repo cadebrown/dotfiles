@@ -15,6 +15,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 [[ "$OS" == "linux" ]] || { log_warn "Not on Linux — skipping"; exit 0; }
 
+INSTALL_DIR="${INSTALL_DIR:-$DOTFILES_ROOT/install}"
+
 log_section "Linux packages (Homebrew)"
 
 BREW_PREFIX="${BREW_PREFIX:-$LOCAL_PLAT/brew}"
@@ -90,9 +92,9 @@ brew bundle install --file="$_BREWFILE_TMP" --no-upgrade 2>&1
 _PLAT_BIN="$(dirname "$_REAL_BREW_PREFIX")/bin"
 ensure_dir "$_PLAT_BIN"
 
-if [ -d "$_REAL_BREW_PREFIX/opt/gcc/bin" ]; then
+if [[ -d "$_REAL_BREW_PREFIX/opt/gcc/bin" ]]; then
     _GCC_VER=$(ls "$_REAL_BREW_PREFIX/opt/gcc/bin"/gcc-* 2>/dev/null | grep -oP 'gcc-\K[0-9]+' | sort -n | tail -1)
-    if [ -n "$_GCC_VER" ]; then
+    if [[ -n "$_GCC_VER" ]]; then
         ln -sf "$_REAL_BREW_PREFIX/bin/gcc-$_GCC_VER" "$_PLAT_BIN/gcc"
         ln -sf "$_REAL_BREW_PREFIX/bin/g++-$_GCC_VER" "$_PLAT_BIN/g++"
         ln -sf "$_REAL_BREW_PREFIX/bin/gcc-ar-$_GCC_VER" "$_PLAT_BIN/gcc-ar"
@@ -104,7 +106,7 @@ fi
 
 # LLVM is versioned (llvm@21, llvm@20, etc.) — pick the highest installed
 _LLVM_LATEST=$(ls -1d "$_REAL_BREW_PREFIX/opt/llvm@"*/bin 2>/dev/null | sort -Vr | head -1)
-if [ -n "$_LLVM_LATEST" ]; then
+if [[ -n "$_LLVM_LATEST" ]]; then
     _LLVM_VER=$(basename "$(dirname "$_LLVM_LATEST")")
     ln -sf "$_LLVM_LATEST/clang" "$_PLAT_BIN/clang"
     ln -sf "$_LLVM_LATEST/clang++" "$_PLAT_BIN/clang++"

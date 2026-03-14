@@ -1,21 +1,19 @@
 #!/usr/bin/env bats
-# tests/shell.bats - verify ~/.zprofile sources cleanly and sets the right env
+# tests/shell.bats - verify ~/.zprofile and ~/.bash_profile source cleanly
 #
-# Each test invokes a fresh zsh with --no-rcs (skips ~/.zshrc) and sources
-# ~/.zprofile explicitly, then asserts on the resulting environment.
+# Each test invokes a fresh shell and sources the login profile, then asserts
+# on the resulting environment.
 # SSH_AUTH_SOCK=1 prevents the ssh-agent block from running in the container.
+#
+# PLAT, LOCAL_PLAT, etc. are inherited from entrypoint.sh (which sources _lib.sh).
 
 # Use export to set SSH_AUTH_SOCK before sourcing — prevents the ssh-agent
 # block from running (no keys in test environment). `VAR=val source` doesn't
 # work reliably for zsh builtins.
 ZSH_SOURCE='export SSH_AUTH_SOCK=already_running; source ~/.zprofile'
+BASH_SOURCE_CMD='export SSH_AUTH_SOCK=already_running; source ~/.bash_profile'
 
-setup() {
-    PLAT="$(uname -m)-$(uname -s)"
-    LOCAL_PLAT="$HOME/.local/$PLAT"
-}
-
-# --- Sourcing ---
+# --- zsh sourcing ---
 
 @test "zprofile sources in zsh without error" {
     run zsh --no-rcs -c "$ZSH_SOURCE"
@@ -27,7 +25,19 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
-# --- PLAT variables ---
+# --- bash sourcing ---
+
+@test "bash_profile sources in bash without error" {
+    run bash --norc --noprofile -c "$BASH_SOURCE_CMD"
+    [ "$status" -eq 0 ]
+}
+
+@test "bash_profile is idempotent (source twice, no error)" {
+    run bash --norc --noprofile -c "$BASH_SOURCE_CMD; $BASH_SOURCE_CMD"
+    [ "$status" -eq 0 ]
+}
+
+# --- PLAT variables (zsh) ---
 
 @test "_PLAT is set after sourcing zprofile" {
     run zsh --no-rcs -c "$ZSH_SOURCE; echo \$_PLAT"
@@ -37,6 +47,20 @@ setup() {
 
 @test "_LOCAL_PLAT points to ~/.local/\$PLAT" {
     run zsh --no-rcs -c "$ZSH_SOURCE; echo \$_LOCAL_PLAT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == "$LOCAL_PLAT" ]]
+}
+
+# --- PLAT variables (bash) ---
+
+@test "_PLAT is set after sourcing bash_profile" {
+    run bash --norc --noprofile -c "$BASH_SOURCE_CMD; echo \$_PLAT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == "$PLAT" ]]
+}
+
+@test "_LOCAL_PLAT points to ~/.local/\$PLAT (bash)" {
+    run bash --norc --noprofile -c "$BASH_SOURCE_CMD; echo \$_LOCAL_PLAT"
     [ "$status" -eq 0 ]
     [[ "$output" == "$LOCAL_PLAT" ]]
 }
