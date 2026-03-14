@@ -162,7 +162,8 @@ dotfiles/
 │   ├── rust.sh                # rustup + cargo-binstall + cargo tools from cargo.txt
 │   ├── python.sh              # uv + venv + pip installs from packages/pip.txt
 │   ├── npm.sh                 # Global npm packages from packages/npm.txt
-│   ├── claude.sh              # Claude Code: Linux native binary + plugins (macOS: Homebrew cask)
+│   ├── claude.sh              # Claude Code: native binary + plugins (all platforms)
+│   ├── codex.sh               # Codex CLI: native binary from GitHub releases
 │   ├── scratch.sh             # Symlink large dirs to scratch space (NFS quota relief)
 │   ├── verify-path.sh         # Diagnostic: check PATH binaries for arch/lib/symlink issues
 │   └── nix.sh                 # Optional: Nix + home-manager (NOT called by bootstrap.sh)

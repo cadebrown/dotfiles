@@ -24,7 +24,8 @@
 #   INSTALL_NODE          — set to 0 to skip Node install + global npm packages
 #   INSTALL_RUST          — set to 0 to skip Rust install
 #   INSTALL_PYTHON        — set to 0 to skip Python install
-#   INSTALL_CLAUDE        — set to 0 to skip Claude Code plugins install
+#   INSTALL_CLAUDE        — set to 0 to skip Claude Code install
+#   INSTALL_CODEX         — set to 0 to skip Codex CLI install
 
 set -euo pipefail
 
@@ -384,7 +385,13 @@ fi
 if [[ "${INSTALL_CLAUDE:-1}" != "0" ]]; then
     bash "$INSTALL_DIR/claude.sh"
 else
-    log_info "Skipping Claude plugins (INSTALL_CLAUDE=0)"
+    log_info "Skipping Claude (INSTALL_CLAUDE=0)"
+fi
+
+if [[ "${INSTALL_CODEX:-1}" != "0" ]]; then
+    bash "$INSTALL_DIR/codex.sh"
+else
+    log_info "Skipping Codex (INSTALL_CODEX=0)"
 fi
 
 ### done ###

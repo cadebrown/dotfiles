@@ -2,6 +2,9 @@
   "permissions": {
     "defaultMode": "bypassPermissions"
   },
+  "env": {
+    "DISABLE_AUTOUPDATER": "1"
+  },
   "enabledPlugins": {
     "rust-analyzer-lsp@claude-plugins-official": true,
     "clangd-lsp@claude-plugins-official": true,
