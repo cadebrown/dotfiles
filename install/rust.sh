@@ -79,11 +79,21 @@ log_info "Installing/upgrading cargo tools from cargo.txt"
 # cargo binstall handles idempotency: skips if already at latest version,
 # upgrades if a newer release exists, installs if missing.
 # Falls back to source compilation if no pre-built binary is available.
+#
+# DF_CARGO_STRATEGIES: override binstall strategy (e.g. "compile" to skip
+#   GitHub release fetchers entirely — useful behind a VPN where the release
+#   download endpoints time out before the compile fallback kicks in).
+# GITHUB_TOKEN: if set, passed to binstall to authenticate GitHub API calls
+#   and raise the rate limit from 60 to 5000 req/hr.
+_binstall_flags=(--no-confirm --log-level warn)
+[[ -n "${DF_CARGO_STRATEGIES:-}" ]] && _binstall_flags+=(--strategies "$DF_CARGO_STRATEGIES")
+[[ -n "${GITHUB_TOKEN:-}" ]] && _binstall_flags+=(--github-token "$GITHUB_TOKEN")
+
 _ok=0 _fail=0
 
 while IFS= read -r pkg; do
     log_info "  binstall $pkg"
-    if run_logged cargo binstall --no-confirm --log-level warn "$pkg" \
+    if run_logged cargo binstall "${_binstall_flags[@]}" "$pkg" \
         || run_logged cargo install "$pkg"; then
         log_okay "  ok    $pkg"
         (( _ok++ )) || true
