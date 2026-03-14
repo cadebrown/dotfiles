@@ -27,6 +27,7 @@ Files in `home/` map to `~/` by chezmoi's naming rules:
 | `home/dot_config/git/ignore` | `~/.config/git/ignore` |
 | `home/dot_ssh/config.tmpl` | `~/.ssh/config` |
 | `home/dot_claude/CLAUDE.md` | `~/.claude/CLAUDE.md` |
+| `home/dot_codex/AGENTS.md` | `~/.codex/AGENTS.md` |
 
 - `dot_` prefix → `.` in target
 - `.tmpl` suffix → rendered as a Go template before writing
@@ -107,3 +108,6 @@ chezmoi add ~/.claude/settings.json   # pull the live version back into the repo
 Notable examples:
 - `~/.claude/settings.json` — updated by Claude Code when plugins are installed
 - `~/.codex/config.toml` — Codex appends project trust levels at runtime; managed with `create_` prefix so chezmoi writes it once and never overwrites
+
+Codex-specific note:
+- `~/.codex/AGENTS.md`, `~/.codex/skills/`, and `~/.codex/rules/` are intentionally Codex-specific and do not mirror Claude one-for-one

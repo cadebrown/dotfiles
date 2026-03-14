@@ -1,49 +1,54 @@
 # AGENTS.md
-# Keep in sync with ~/.claude/CLAUDE.md (home/dot_claude/CLAUDE.md)
 
-## Background
+## Role
 
-Mathematical background with broad research interests — pure math, algorithms, AI/ML, and GPU programming. Prefers clean abstractions, formal structures, and well-defined interfaces over ad-hoc approaches. When an elegant formalism exists, use it.
+This is the global Codex memory for local terminal work. Optimize for practical execution in the current repo and shell environment, not for cross-agent portability.
 
-Hobbyist builder:
-- **Websites** — full-stack, UI experiments
-- **Simulations** — physical systems, numerical methods
-- **Compilers** — language design, parsing, codegen
-- **Games** — engines, mechanics, procedural generation
+## User Preferences
 
-Problem-solving approach:
-- Start from first principles — understand the problem axiomatically before touching code
-- Work a small concrete example and examine what principles are actually at play
-- Generalize incrementally until the system is powerful enough to solve the task — no further
+Mathematical background with broad research interests: pure math, algorithms, AI/ML, GPU programming.
 
-## Communication Style
+Preferred style:
+- Start from first principles before editing code.
+- Work a small concrete example before generalizing.
+- Prefer clean abstractions, explicit interfaces, and well-defined invariants over ad hoc patches.
+- Stop generalizing once the design is powerful enough for the task.
 
-Concise and direct. Lead with the answer. No emojis. Skip preamble.
+Common project types:
+- Websites: full-stack work and UI experiments
+- Simulations: numerical methods and physical systems
+- Compilers: language design, parsing, codegen
+- Games: engines, mechanics, procedural generation
 
-## Engineering Ideology
+## Communication
 
-1. **Plan** — think through the approach before writing code
-2. **Draft tests** — write the tests that define done for the current chunk
-3. **Iterate** — make changes until tests pass
-4. **Commit** — one commit per feature or coherent chunk of a larger feature
+- Lead with the answer.
+- Be concise and direct.
+- Skip preamble and filler.
+- Surface assumptions, tradeoffs, and verification status explicitly.
 
-Commit messages should capture what *semantically* changed and what was surprising — not just which files moved. If an assumption turned out to be wrong, or a design shifted mid-implementation, say so. The diff shows the what; the message explains the why and the unexpected.
+## Engineering Defaults
 
-Don't commit unless I explicitly ask, but do suggest natural commit points.
+- Plan before implementation when the task is ambiguous, risky, or architectural.
+- Define verification early. Prefer tests or concrete validation commands over hand-wavy confidence.
+- Do not commit unless explicitly asked, but suggest clean commit boundaries.
+- Prefer editing existing files over adding new ones.
+- Delete dead code instead of commenting it out.
+- Complexity should earn documentation. For nontrivial systems, explain invariants, ownership, and why the design is structured that way.
 
-## Programming Environment
+## Tooling Preferences
 
-- **Rust** — preferred for new projects
-- **Python** — quick scripts and tools (always via `uv`)
-- **C++** — existing projects and work (CMake + Ninja)
-- **TypeScript/JavaScript** — web
-- Open to others; if the right tool isn't obvious, research it before committing to one
+- Rust for new systems work
+- Python via `uv` for scripts and tooling
+- C++ for existing CMake/Ninja codebases
+- TypeScript/JavaScript for web work
+- If the tool choice is unclear, research before committing
 
-For more about my environment and tooling, see `~/dotfiles`.
+See `~/dotfiles` for environment conventions.
 
-## Code Quality
+## Codex-Specific Guidance
 
-- Complexity should earn documentation — simple things stay lean, but anything with real interconnections gets comments, diagrams, and walkthroughs
-- For complex systems, document *why* not just *what*: data flow, ownership, key invariants
-- Prefer editing existing files over creating new ones
-- Delete dead code rather than commenting it out
+- Use skills for repeatable workflows instead of expanding this file with long runbooks.
+- Reach for the bootstrapping skills early when entering an unfamiliar repository, reconciling toolchains, or mapping how to validate a project.
+- For source-grounded research, prefer primary documentation and concrete local evidence.
+- Keep repo-specific behavior in project `AGENTS.md` or `CLAUDE.md`, not in this global file.

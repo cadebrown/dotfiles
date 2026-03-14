@@ -63,11 +63,33 @@ chezmoi update                 # git pull + chezmoi apply
 
 ## Update AI agent instructions
 
-Claude (`~/.claude/CLAUDE.md`) and Codex (`~/.codex/AGENTS.md`) mirror each other — edit both:
+Claude and Codex now diverge intentionally:
 
 ```sh
 chezmoi edit ~/.claude/CLAUDE.md
 chezmoi edit ~/.codex/AGENTS.md
+```
+
+Use `~/.claude/CLAUDE.md` for Claude-specific memory and `~/.codex/AGENTS.md` for Codex-specific guidance. Keep only genuinely shared preferences aligned.
+
+Claude Code's status line is powered by [CCometixLine](https://github.com/Haleclipse/CCometixLine) (`@cometix/ccline` in `npm.txt`). To pick a theme: `ccline --config`.
+
+Codex also has global skills and rules:
+
+```sh
+chezmoi edit ~/.codex/config.toml
+chezmoi edit ~/.codex/rules/default.rules
+```
+
+Skills live under `home/dot_codex/skills/` in the repo and apply to `~/.codex/skills/`.
+
+Useful Codex commands after updating:
+
+```sh
+codex --profile fast
+codex --profile review
+codex execpolicy check --pretty --rules ~/.codex/rules/default.rules -- git status
+codex '$project-bootstrapper Map this repository and propose the first validation step.'
 ```
 
 ---
