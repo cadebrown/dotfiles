@@ -115,10 +115,10 @@ _bash_prompt() {
     # Prompt char: magenta on success, red on failure — pure theme aesthetic
     local _cc; [[ $_exit -eq 0 ]] && _cc=$_PC_MAG || _cc=$_PC_RED
 
-    # Two-line prompt with blank line separator (pure-inspired):
+    # Two-line prompt with blank line separator:
     #   ~/path/to/dir  main *
-    #   ❯
-    PS1="\n${_PC_BOLD}\w${_PC_RST}${_git}\n${_cc}❯${_PC_RST} "
+    #   $
+    PS1="\n${_PC_BOLD}\w${_PC_RST}${_git}\n${_cc}\$${_PC_RST} "
 
     _BASH_IN_PROMPT=0
 }
