@@ -14,6 +14,7 @@ setopt SHARE_HISTORY        # share history across all open sessions in real tim
 setopt APPEND_HISTORY       # append rather than overwrite history file on exit
 setopt HIST_EXPIRE_DUPS_FIRST  # evict duplicates first when history file is full
 setopt HIST_IGNORE_SPACE    # don't record commands prefixed with a space (private cmds)
+setopt HIST_FCNTL_LOCK      # use fcntl locks for history file (more NFS-compatible)
 
 # Globbing
 setopt EXTENDED_GLOB        # enable #, ~, ^ glob operators
