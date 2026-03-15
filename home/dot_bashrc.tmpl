@@ -1,21 +1,129 @@
 # .bashrc - interactive bash shell configuration
 # Keep aliases in sync with .zshrc (home/dot_zshrc.tmpl)
 
+### SHELL OPTIONS ###
+
+shopt -s checkwinsize   # update LINES/COLUMNS after each command
+shopt -s cdspell        # fix minor typos in cd targets
+shopt -s dirspell       # fix typos during tab completion
+shopt -s autocd         # bare path → cd into it
+shopt -s cdable_vars    # cd $var expands $var as a directory path
+shopt -s globstar       # ** recursive glob (like zsh)
+shopt -s extglob        # extended patterns: ?(x) *(x) +(x) @(x) !(x)
+shopt -s nocaseglob     # case-insensitive filename globbing
+shopt -s histverify     # load !-expansions into edit buffer, don't execute
+shopt -s cmdhist        # fold multi-line commands into one history entry
+shopt -s lithist        # preserve newlines in multi-line history (needs cmdhist)
+
 ### HISTORY ###
 
-HISTSIZE=50000
-HISTFILESIZE=100000
-HISTCONTROL=ignoredups:ignorespace:erasedups
-shopt -s histappend
+# Unlimited history: -1 supported in bash 4.3+; fall back to a large number
+if [[ ${BASH_VERSINFO[0]} -gt 4 || \
+    ( ${BASH_VERSINFO[0]} -eq 4 && ${BASH_VERSINFO[1]} -ge 3 ) ]]; then
+    HISTSIZE=-1
+    HISTFILESIZE=-1
+else
+    HISTSIZE=500000
+    HISTFILESIZE=1000000
+fi
+
+HISTTIMEFORMAT='%FT%T  '           # ISO 8601 timestamp prepended to every entry
+HISTCONTROL=ignorespace:ignoredups  # skip space-prefixed cmds; skip consecutive dupes
+                                    # NOTE: not erasedups — removing entries corrupts
+                                    # concurrent sessions sharing the same HISTFILE
+HISTIGNORE='ls:ll:la:cd:cd -:pwd:exit:clear:history:bg:fg'
+
+shopt -s histappend  # append to HISTFILE on exit, never overwrite
+
+# XDG state dir for history — keeps history out of $HOME clutter.
+_BASH_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/bash"
+[[ -d $_BASH_STATE ]] || mkdir -p "$_BASH_STATE" 2>/dev/null
+HISTFILE="$_BASH_STATE/history"
+
+### SIDECAR LOG ###
+
+# Rich command log that captures what HISTFILE cannot: exit code, working directory,
+# hostname, and shell PID. Format is TSV, one line per command:
+#
+#   iso_timestamp  host  shell_pid  exit_code  pwd  command
+#
+# Stored at ~/.local/state/bash/log. Search it with bash_log_search().
+#
+# Implementation notes:
+#   - trap DEBUG fires in the CURRENT shell before each simple command (not a subshell),
+#     so variable assignments persist back to the parent — this is why it works for
+#     command capture while $() cannot.
+#   - _BASH_IN_PROMPT suppresses re-capture while PROMPT_COMMAND runs its own commands.
+#   - The trap is set last (after all rc setup) so sourcing .bashrc isn't logged.
+
+_BASH_LOG="$_BASH_STATE/log"
+_BASH_LOGCMD=''
+_BASH_IN_PROMPT=0
+
+_bash_capture() {
+    # Skip subshells and our own PROMPT_COMMAND bookkeeping
+    [[ $BASH_SUBSHELL -gt 0 || $_BASH_IN_PROMPT -eq 1 ]] && return
+    # Capture only the first simple command per prompt cycle (e.g. for pipelines,
+    # we log the first segment; the full command is always in HISTFILE)
+    [[ -n $_BASH_LOGCMD ]] && return
+    _BASH_LOGCMD="$BASH_COMMAND"
+}
 
 ### PROMPT ###
 
-# Simple two-line prompt: user@host:dir (git branch if available)
-_bash_git_branch() {
-    local branch
-    branch="$(git symbolic-ref --short HEAD 2>/dev/null)" && printf ' (%s)' "$branch"
+# Color codes cached at startup — avoids spawning tput subprocesses per prompt.
+# \001..\002 are readline's non-printing-sequence markers (same as \[..\] in PS1
+# literals, but usable in dynamically-built strings).
+if [[ -t 1 && $TERM != dumb && -n $TERM ]]; then
+    _PC_BOLD=$'\001\e[1m\002'
+    _PC_CYAN=$'\001\e[36m\002'
+    _PC_RED=$'\001\e[31m\002'
+    _PC_MAG=$'\001\e[35m\002'
+    _PC_RST=$'\001\e[0m\002'
+else
+    _PC_BOLD='' _PC_CYAN='' _PC_RED='' _PC_MAG='' _PC_RST=''
+fi
+
+PROMPT_DIRTRIM=4  # truncate \w to last 4 path components with "..." prefix
+
+_bash_prompt() {
+    local _exit=$?
+    _BASH_IN_PROMPT=1
+
+    # Write sidecar log entry (2>/dev/null: silently skip if path unwritable)
+    printf '%s\t%s\t%d\t%d\t%s\t%s\n' \
+        "$(date -u +%FT%TZ 2>/dev/null)" \
+        "${HOSTNAME%%.*}" "$$" "$_exit" "$PWD" "${_BASH_LOGCMD:--}" \
+        >> "$_BASH_LOG" 2>/dev/null
+    _BASH_LOGCMD=''
+
+    # Flush new history to shared HISTFILE.
+    # Append-only (no -c/-r reload) — safe for NFS: avoids read-after-write latency
+    # and concurrent-write races. New sessions pick up all prior history on start.
+    history -a
+
+    # Git: branch name + staged/unstaged dirty marker
+    # --untracked-files=no skips the untracked scan, which is slow on large/NFS repos
+    local _git='' _branch
+    if _branch=$(git symbolic-ref --short HEAD 2>/dev/null); then
+        local _dirty=''
+        [[ -n $(git status --porcelain --untracked-files=no 2>/dev/null) ]] \
+            && _dirty=" ${_PC_RED}*${_PC_RST}"
+        _git=" ${_PC_CYAN}${_branch}${_PC_RST}${_dirty}"
+    fi
+
+    # Prompt char: magenta on success, red on failure — pure theme aesthetic
+    local _cc; [[ $_exit -eq 0 ]] && _cc=$_PC_MAG || _cc=$_PC_RED
+
+    # Two-line prompt with blank line separator (pure-inspired):
+    #   ~/path/to/dir  main *
+    #   ❯
+    PS1="\n${_PC_BOLD}\w${_PC_RST}${_git}\n${_cc}❯${_PC_RST} "
+
+    _BASH_IN_PROMPT=0
 }
-PS1='\u@\h:\w$(_bash_git_branch)\n\$ '
+
+PROMPT_COMMAND='_bash_prompt'
 
 ### ALIASES ###
 
@@ -32,7 +140,59 @@ alias verify-path='bash ~/dotfiles/install/verify-path.sh'
 alias open='xdg-open'
 {{ end -}}
 
+### FUNCTIONS ###
+
+# mkcd — mkdir + cd in one
+mkcd() { mkdir -p "$1" && cd "$1"; }
+
+# up [N] — go up N directory levels (default 1)
+up() {
+    local p='' n=${1:-1}
+    for (( i = 0; i < n; i++ )); do p="../$p"; done
+    cd "$p"
+}
+
+# extract — universal archive unpacker
+extract() {
+    case "$1" in
+        *.tar.bz2|*.tbz2)  tar xjf "$1"         ;;
+        *.tar.gz|*.tgz)    tar xzf "$1"         ;;
+        *.tar.xz)          tar xJf "$1"         ;;
+        *.tar.zst)         tar --zstd -xf "$1"  ;;
+        *.tar)             tar xf  "$1"         ;;
+        *.bz2)             bunzip2 "$1"         ;;
+        *.gz)              gunzip  "$1"         ;;
+        *.zip)             unzip   "$1"         ;;
+        *.7z)              7z x    "$1"         ;;
+        *)  printf 'extract: unknown format: %s\n' "$1" >&2; return 1 ;;
+    esac
+}
+
+# bash_log_search — search the sidecar command log
+# Usage: bash_log_search <pattern> [grep options]
+bash_log_search() {
+    local log="${XDG_STATE_HOME:-$HOME/.local/state}/bash/log"
+    [[ -f $log ]] || { printf 'no log at %s\n' "$log" >&2; return 1; }
+    grep --color=auto -i -- "$@" "$log"
+}
+
 ### COMPLETIONS ###
+
+# bash-completion@2 (Homebrew — provides completions for git, gh, cargo, etc.)
+if [[ -n $HOMEBREW_PREFIX && -r $HOMEBREW_PREFIX/etc/profile.d/bash_completion.sh ]]; then
+    source "$HOMEBREW_PREFIX/etc/profile.d/bash_completion.sh"
+fi
+
+# Xan CSV tool
+if command -v xan &>/dev/null; then
+    _xan_complete() { xan compgen "$1" "$2" "$3"; }
+    complete -F _xan_complete -o default xan
+fi
+
+# Direnv
+if command -v direnv &>/dev/null; then
+    eval "$(direnv hook bash)"
+fi
 
 # Zoxide
 if command -v zoxide &>/dev/null; then
@@ -43,3 +203,6 @@ fi
 if command -v fzf &>/dev/null; then
     eval "$(fzf --bash)"
 fi
+
+# Set trap last so .bashrc sourcing itself isn't logged as a user command
+trap '_bash_capture' DEBUG

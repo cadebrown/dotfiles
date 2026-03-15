@@ -1,0 +1,45 @@
+# ~/.inputrc — readline configuration for bash (and any other readline-using program)
+# Applied globally: python REPL, gdb, etc. inherit these settings.
+
+$include /etc/inputrc
+
+# ── Core ─────────────────────────────────────────────────────────────────────
+
+set editing-mode emacs
+set bell-style none
+set enable-bracketed-paste on   # multi-line pastes don't execute immediately
+
+# ── Completion ───────────────────────────────────────────────────────────────
+
+set completion-ignore-case on          # case-insensitive tab completion
+set completion-map-case on             # treat - and _ as equivalent
+set show-all-if-ambiguous on           # show matches on first Tab, not second
+set show-all-if-unmodified on          # also show if nothing was completed
+set menu-complete-display-prefix on    # show typed prefix while cycling
+set visible-stats on                   # append type indicators (/ * @ etc.)
+set mark-symlinked-directories on      # append / to symlinked directories
+set colored-stats on                   # color file types like ls --color
+set colored-completion-prefix on       # highlight the common prefix
+set skip-completed-text on             # don't re-insert already-typed text
+set page-completions off               # never paginate long completion lists
+
+# ── Key bindings ─────────────────────────────────────────────────────────────
+
+# Up/Down arrows search history by the prefix already typed.
+# Type "git " then press ↑ to cycle only through previous git commands.
+"\e[A": history-search-backward
+"\e[B": history-search-forward
+"\eOA": history-search-backward
+"\eOB": history-search-forward
+
+# Ctrl-P / Ctrl-N: same prefix search without leaving the home row
+"\C-p": history-search-backward
+"\C-n": history-search-forward
+
+# Tab cycles forward through completions; Shift-Tab reverses
+TAB: menu-complete
+"\e[Z": menu-complete-backward
+
+# Word-by-word navigation (Ctrl-Left / Ctrl-Right)
+"\e[1;5C": forward-word
+"\e[1;5D": backward-word
