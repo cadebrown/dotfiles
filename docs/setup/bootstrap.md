@@ -76,6 +76,9 @@ Sudo is required for the Homebrew installer.
 9. **Python** via uv → `~/.local/$PLAT/venv/`
 10. **Claude Code** native binary → `~/.local/$PLAT/bin/claude` + plugins + MCP servers
 11. **Codex CLI** native binary → `~/.local/$PLAT/bin/codex`
+12. **CMake toolchain files** → `~/.local/$PLAT/cmake/toolchains/`
+    - `llvm.cmake` and `gcc.cmake` deployed from `install/cmake/toolchains/`
+    - `~/.profile` sets `CMAKE_TOOLCHAIN_FILE` to the LLVM file automatically
 
 Total time: ~5 minutes on a fast connection (most packages pour as precompiled bottles).
 
@@ -112,6 +115,9 @@ No sudo required. No Docker or Podman needed.
 7. **Python** via uv → `~/.local/$PLAT/venv/`
 8. **Claude Code** native binary → `~/.local/$PLAT/bin/claude` + plugins + MCP servers
 9. **Codex CLI** native binary → `~/.local/$PLAT/bin/codex`
+10. **CMake toolchain files** → `~/.local/$PLAT/cmake/toolchains/`
+    - `llvm.cmake` and `gcc.cmake` deployed from `install/cmake/toolchains/`
+    - `~/.profile` sets `CMAKE_TOOLCHAIN_FILE` to the LLVM file automatically
 
 Total time: ~5 minutes on a fast connection.
 
@@ -133,6 +139,7 @@ DF_DO_RUST=0            # skip rustup + cargo tools
 DF_DO_PYTHON=0          # skip uv + venv
 DF_DO_CLAUDE=0          # skip Claude Code install + plugins + MCP servers
 DF_DO_CODEX=0           # skip Codex CLI install
+DF_DO_CMAKE=0           # skip CMake toolchain file deployment
 DF_DO_AUTH=1             # run interactive API token setup
 DF_BREW_UPGRADE=0       # skip Homebrew upgrades (macOS default: 1, Linux default: 0)
 ```

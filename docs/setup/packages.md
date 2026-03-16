@@ -132,11 +132,105 @@ Once built, packages are cached. Subsequent runs and upgrades are bottle-only.
 symlinks to avoid shadowing system compilers). `linux-packages.sh` creates symlinks in
 `$LOCAL_PLAT/bin/` so `gcc` → `gcc-15` and `clang` → `llvm@21/bin/clang`.
 
+See [Compiler toolchains](#compiler-toolchains) below for CMake integration.
+
 **Python@3.14 patches:** On Linux, `install/patch-homebrew-python.sh` automatically patches
 the python@3.14 formula to fix build issues (uuid module detection, test_datetime PGO hangs).
 Patches are applied during bootstrap and protected by `HOMEBREW_NO_AUTO_UPDATE=1`.
 
 The same `Brewfile` works on macOS and Linux. `if OS.mac?` blocks are silently skipped on Linux.
+
+---
+
+---
+
+## Compiler toolchains
+
+CMake compiler selection is handled by toolchain files deployed per-PLAT, not by raw
+`CC`/`CXX` env vars. `install/cmake.sh` copies them from `install/cmake/toolchains/`
+to `$LOCAL_PLAT/cmake/toolchains/` on every bootstrap run (always overwrites, so they
+stay in sync with the repo).
+
+### Default: LLVM (Homebrew clang)
+
+When Homebrew LLVM is present, `~/.profile` automatically sets:
+
+```sh
+export CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/llvm.cmake"
+```
+
+The toolchain configures:
+
+| CMake variable | Value |
+|---|---|
+| `CMAKE_C_COMPILER` | `$LOCAL_PLAT/brew/opt/llvm/bin/clang` |
+| `CMAKE_CXX_COMPILER` | `$LOCAL_PLAT/brew/opt/llvm/bin/clang++` |
+| `CMAKE_AR` / `RANLIB` / `NM` | `llvm-ar`, `llvm-ranlib`, `llvm-nm` |
+| `CMAKE_LINKER_TYPE` | `LLD` (Linux only; macOS requires Apple ld) |
+| `CMAKE_CUDA_HOST_COMPILER` | `clang++` |
+
+### Switching to GCC 15
+
+Per-invocation:
+
+```sh
+CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/gcc.cmake" cmake -B build
+```
+
+Per-session:
+
+```sh
+export CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/gcc.cmake"
+```
+
+Per-project (`CMakePresets.json`):
+
+```json
+{ "cacheVariables": { "CMAKE_TOOLCHAIN_FILE": "/absolute/path/to/gcc.cmake" } }
+```
+
+The GCC toolchain uses versioned binaries (`gcc-15`, `g++-15`, etc.) because Homebrew
+does not create unversioned `gcc` symlinks on macOS. Linker priority: mold → lld → gold → system ld.
+
+### Disabling the toolchain
+
+```sh
+unset CMAKE_TOOLCHAIN_FILE   # let CMake auto-detect compilers
+```
+
+### CUDA
+
+CUDA is not managed by bootstrap — install the toolkit separately (system package, NVIDIA
+runfile, or a module system on HPC). Then point the per-PLAT symlink at it:
+
+```sh
+ln -sfn /usr/local/cuda "$_LOCAL_PLAT/.cuda"        # system default
+ln -sfn /opt/nvidia/cuda/12.6 "$_LOCAL_PLAT/.cuda"  # versioned install
+```
+
+`~/.profile` resolves the symlink at login and exports:
+
+- `CUDA_PATH` and `CUDAToolkit_ROOT` — picked up by CMake's `find_package(CUDAToolkit)`
+  and most other build systems
+- Prepends `$CUDA_PATH/bin` to `PATH` so `nvcc` is on the path
+
+Both toolchain files also set `CMAKE_CUDA_COMPILER` to `$LOCAL_PLAT/.cuda/bin/nvcc` when the
+symlink exists, so `enable_language(CUDA)` works without any project-level configuration.
+
+Different machines on a shared NFS home can point their `$LOCAL_PLAT/.cuda` symlinks at
+different toolkit versions — no conflicts.
+
+### Source files
+
+Toolchain source files live in `install/cmake/toolchains/` — edit them there, not in the
+deployed copies under `$LOCAL_PLAT/`. Re-deploy with:
+
+```sh
+bash ~/dotfiles/install/cmake.sh
+```
+
+Then wipe the CMake cache (`rm -rf build/CMakeCache.txt build/CMakeFiles`) for the changes
+to take effect in an existing build directory.
 
 ---
 
