@@ -50,8 +50,6 @@ if [ -x "$_LOCAL_PLAT/brew/bin/brew" ]; then
 fi
 {{ end -}}
 
-export PATH="$_LOCAL_PLAT/bin:$HOME/.local/bin:$PATH"
-
 ### ZSH HANDOFF ###
 # Prefer zsh — exec into it for interactive login shells.
 # Guards:
@@ -76,6 +74,9 @@ if [[ -z "$ZSH_VERSION" ]]; then
         [[ -n "$DF_DEBUG" ]] && echo "[dbug] bash->zsh handoff skipped: stdin is not a tty (tty=$(tty 2>/dev/null))" >&2
     fi
 fi
+
+# Reached only when staying in bash (no tty or zsh unavailable).
+export PATH="$_LOCAL_PLAT/bin:$HOME/.local/bin:$PATH"
 
 ### GENERAL ###
 

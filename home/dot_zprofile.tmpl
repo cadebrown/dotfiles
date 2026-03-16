@@ -53,6 +53,10 @@ export _LOCAL_PLAT="$_local_root/$_PLAT"
 unset _local_root
 unset -f _plat_detect
 
+# Deduplicate PATH entries. When bash_profile exec's into zsh, PATH is already
+# partially built; typeset -U ensures prepended entries move to front, not duplicate.
+typeset -U path
+
 ### HOMEBREW ###
 # Source Homebrew first so PLAT paths can prepend on top of it.
 
