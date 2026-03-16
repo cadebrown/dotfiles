@@ -63,6 +63,7 @@ if [[ -z "$ZSH_VERSION" ]]; then
     if [[ -t 0 ]]; then
         if _zsh="$(command -v zsh 2>/dev/null)"; then
             if "$_zsh" -c true 2>/dev/null; then
+                export SHELL="$_zsh"
                 exec "$_zsh" -l
             else
                 echo "warning: zsh found at $_zsh but failed smoke test — staying in bash" >&2
