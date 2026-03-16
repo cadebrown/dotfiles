@@ -2,6 +2,9 @@
 Include {{ .chezmoi.homeDir }}/.colima/ssh_config
 
 {{ end -}}
+# Machine-specific and private host blocks (e.g. from dotfiles-nvidia)
+Include ~/.ssh/config.d/*
+
 Host *
     # Multiplexing — socket on local disk (not NFS)
     ControlPath /tmp/ssh-%C
@@ -23,11 +26,6 @@ Host *
     # Security
     StrictHostKeyChecking accept-new
     HashKnownHosts yes
-    IdentitiesOnly yes
 
-    # Agent forwarding is opt-in per host (see example below)
-    ForwardAgent no
-
-# Example: enable agent forwarding for jump hosts
-# Host jump.example.com
-#     ForwardAgent yes
+    # Agent forwarding — on by default; disable per-host if needed
+    ForwardAgent yes

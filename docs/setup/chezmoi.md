@@ -96,6 +96,40 @@ The existing templates only branch on `{{ .chezmoi.os }}` (darwin vs linux), whi
 
 ---
 
+## Multi-machine sync
+
+`chezmoi apply` only affects the machine it runs on. Each home is independent — macOS
+(`/Users/cadeb/`) and Linux NFS (`/home/cadeb/`) don't share target files.
+
+**Normal workflow — commit first, then sync remotes:**
+
+```sh
+# 1. Edit and apply locally
+chezmoi edit ~/.ssh/config
+chezmoi apply
+
+# 2. Commit and push
+cd ~/dotfiles
+git add home/dot_ssh/config.tmpl
+git commit -m "ssh: describe what changed"
+git push
+
+# 3. On each remote — pull and apply
+ssh remote-host 'bash -l ~/dotfiles/bootstrap.sh update'
+```
+
+**If you applied locally without committing** (the wrong order), remotes are stale.
+Quick workaround while you clean it up:
+
+```sh
+# Render the template locally and copy the result over
+chezmoi cat ~/.ssh/config | ssh remote-host 'cat > ~/.ssh/config'
+```
+
+Then commit and push so the repo catches up.
+
+---
+
 ## Files that other tools also write
 
 Some tracked files are mutated at runtime. chezmoi won't auto-apply — drift is intentional until you decide what to do:
