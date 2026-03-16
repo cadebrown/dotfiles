@@ -31,25 +31,38 @@ export USE_CCACHE=ON                    # enable ccache in CMake projects that c
 
 ### TOOLCHAIN ###
 
-# Activate the CMake LLVM toolchain file when Homebrew LLVM is present.
-# Compiler/linker env vars (CC, CXX, AR, LDFLAGS) are intentionally not set here —
-# the toolchain file owns those for CMake. The GCC elif below sets env vars as a
-# fallback for non-cmake builds on machines without LLVM.
+# Toolchain selection — versioned cmake files live in $_LOCAL_PLAT/cmake/toolchains/.
+# Linux default: GCC (works with CUDA host compiler, no clang/CUDA friction).
+# macOS default: LLVM (Xcode clang is ancient; brew LLVM is the primary toolchain).
+# CC/CXX/AR/etc are only set for GCC — LLVM relies solely on the CMake toolchain file
+# since the CMake file is the single owner for CMake builds, and non-CMake builds
+# on LLVM should set the compiler explicitly per-project.
 if [ -n "${HOMEBREW_PREFIX:-}" ]; then
-    if [ -x "$HOMEBREW_PREFIX/opt/llvm/bin/clang" ]; then
-        # Compiler/AR/linker selection for CMake is owned by the toolchain file.
-        # install/cmake.sh deploys it to $_LOCAL_PLAT/cmake/toolchains/llvm.cmake.
-        # Switch to GCC: CMAKE_TOOLCHAIN_FILE=$_LOCAL_PLAT/cmake/toolchains/gcc.cmake cmake ...
-        # For non-CMake builds (meson, make, autoconf), set CC/CXX explicitly per-project.
-        export CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/llvm.cmake"
-    elif [ -x "$HOMEBREW_PREFIX/bin/gcc-15" ]; then
-        export CC="${CC:-$HOMEBREW_PREFIX/bin/gcc-15}"
-        export CXX="${CXX:-$HOMEBREW_PREFIX/bin/g++-15}"
-        export AR="${AR:-$HOMEBREW_PREFIX/bin/gcc-ar-15}"
-        export RANLIB="${RANLIB:-$HOMEBREW_PREFIX/bin/gcc-ranlib-15}"
-        export NM="${NM:-$HOMEBREW_PREFIX/bin/gcc-nm-15}"
-        export CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$_LOCAL_PLAT/cmake/toolchains/gcc.cmake}"
+    _os="$(uname -s)"
+    if [ "$_os" = "Linux" ]; then
+        if [ -x "$HOMEBREW_PREFIX/bin/gcc-15" ]; then
+            export CC="${CC:-$HOMEBREW_PREFIX/bin/gcc-15}"
+            export CXX="${CXX:-$HOMEBREW_PREFIX/bin/g++-15}"
+            export AR="${AR:-$HOMEBREW_PREFIX/bin/gcc-ar-15}"
+            export RANLIB="${RANLIB:-$HOMEBREW_PREFIX/bin/gcc-ranlib-15}"
+            export NM="${NM:-$HOMEBREW_PREFIX/bin/gcc-nm-15}"
+            export CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$_LOCAL_PLAT/cmake/toolchains/gcc-15.cmake}"
+        elif [ -x "$HOMEBREW_PREFIX/opt/llvm/bin/clang" ]; then
+            export CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$_LOCAL_PLAT/cmake/toolchains/llvm-22.cmake}"
+        fi
+    else
+        if [ -x "$HOMEBREW_PREFIX/opt/llvm/bin/clang" ]; then
+            export CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$_LOCAL_PLAT/cmake/toolchains/llvm-22.cmake}"
+        elif [ -x "$HOMEBREW_PREFIX/bin/gcc-15" ]; then
+            export CC="${CC:-$HOMEBREW_PREFIX/bin/gcc-15}"
+            export CXX="${CXX:-$HOMEBREW_PREFIX/bin/g++-15}"
+            export AR="${AR:-$HOMEBREW_PREFIX/bin/gcc-ar-15}"
+            export RANLIB="${RANLIB:-$HOMEBREW_PREFIX/bin/gcc-ranlib-15}"
+            export NM="${NM:-$HOMEBREW_PREFIX/bin/gcc-nm-15}"
+            export CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$_LOCAL_PLAT/cmake/toolchains/gcc-15.cmake}"
+        fi
     fi
+    unset _os
 fi
 
 ### CUDA ###

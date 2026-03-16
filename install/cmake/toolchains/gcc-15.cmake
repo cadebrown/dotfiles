@@ -1,8 +1,8 @@
-# gcc.cmake — Homebrew GCC 15 toolchain for CMake
+# gcc-15.cmake — Homebrew GCC 15 toolchain for CMake
 # Installed per-PLAT by install/cmake.sh to $_LOCAL_PLAT/cmake/toolchains/.
 #
 # Switch to this:
-#   CMAKE_TOOLCHAIN_FILE=$_LOCAL_PLAT/cmake/toolchains/gcc.cmake cmake ...
+#   CMAKE_TOOLCHAIN_FILE=$_LOCAL_PLAT/cmake/toolchains/gcc-15.cmake cmake ...
 #
 # No-ops if gcc-15 is absent.
 

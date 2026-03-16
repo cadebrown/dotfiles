@@ -1,16 +1,21 @@
-# llvm.cmake — Homebrew LLVM toolchain for CMake
+# llvm-22.cmake — Homebrew LLVM 22 toolchain for CMake
 # Installed per-PLAT by install/cmake.sh to $_LOCAL_PLAT/cmake/toolchains/.
 # Activated via CMAKE_TOOLCHAIN_FILE (set in ~/.profile when brew LLVM is present).
 #
 # Switch to GCC:
-#   CMAKE_TOOLCHAIN_FILE=$_LOCAL_PLAT/cmake/toolchains/gcc.cmake cmake ...
+#   CMAKE_TOOLCHAIN_FILE=$_LOCAL_PLAT/cmake/toolchains/gcc-15.cmake cmake ...
 # Per-project override (takes precedence over CACHE):
 #   cmake -DCMAKE_C_COMPILER=...
 
-set(_llvm "$ENV{_LOCAL_PLAT}/brew/opt/llvm")
+# Prefer the pinned opt/llvm@22 dir; fall back to the unversioned opt/llvm symlink
+# so the file still works on machines where only the latter is present.
+set(_llvm "$ENV{_LOCAL_PLAT}/brew/opt/llvm@22")
+if(NOT IS_DIRECTORY "${_llvm}/bin")
+    set(_llvm "$ENV{_LOCAL_PLAT}/brew/opt/llvm")
+endif()
 
 if(NOT IS_DIRECTORY "${_llvm}/bin")
-    message(STATUS "llvm.cmake: ${_llvm}/bin not found — toolchain inactive")
+    message(STATUS "llvm-22.cmake: ${_llvm}/bin not found — toolchain inactive")
     unset(_llvm)
     return()
 endif()
