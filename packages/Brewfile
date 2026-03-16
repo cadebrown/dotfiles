@@ -71,6 +71,8 @@ brew "gcc"
 brew "llvm"   # clang, clang++, lldb, llvm-ar, opt, etc.
 brew "lld"    # LLVM linker (now a separate formula)
 brew "mold"   # fast modern linker
+brew "ccache"  # C/C++ compiler cache
+brew "sccache" # compiler cache with Rust support (RUSTC_WRAPPER)
 brew "fftw"
 brew "glfw"
 

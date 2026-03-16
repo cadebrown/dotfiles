@@ -1,0 +1,23 @@
+# Smart case: case-insensitive unless the pattern contains uppercase
+--smart-case
+
+# Line numbers in output
+--line-number
+
+# Cap match display width to avoid terminal flood; show truncation indicator
+--max-columns=200
+--max-columns-preview
+
+# Follow symlinks
+--follow
+
+# Search hidden files and dirs by default (add .ignore or .rgignore to exclude specific paths)
+--hidden
+
+# Global excludes
+--glob=!.git/
+--glob=!node_modules/
+--glob=!.venv/
+--glob=!__pycache__/
+--glob=!target/
+--glob=!.cache/

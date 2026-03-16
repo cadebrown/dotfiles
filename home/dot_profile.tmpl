@@ -1,0 +1,64 @@
+# ~/.profile — sourced by both .zprofile and .bash_profile
+# PLAT-independent program defaults. All vars here use only $HOME or literal values.
+# Guard prevents double-sourcing on bash→zsh exec (zsh inherits bash's env).
+[ -n "$_PROFILE_SOURCED" ] && return 0
+export _PROFILE_SOURCED=1
+
+### GENERAL ###
+
+export EDITOR=vim
+
+# Pager and viewer defaults
+export LESS="-RF"                   # -R: ANSI colors; -F: quit if fits on one screen
+export PAGER="less"
+if command -v bat >/dev/null 2>&1; then
+    export MANPAGER="sh -c 'col -bx | bat -l man -p'"  # col -bx strips man's overstrike formatting
+    export BAT_THEME="Monokai Extended"
+    export BAT_STYLE="numbers,changes,header-filename"
+fi
+
+# ripgrep config
+export RIPGREP_CONFIG_PATH="${HOME}/.config/ripgrep/ripgreprc"
+
+### CMAKE ###
+
+export CMAKE_EXPORT_COMPILE_COMMANDS=1  # write compile_commands.json for clangd/LSP
+export CMAKE_COLOR_DIAGNOSTICS=ON       # colored compiler output even when piped
+export CMAKE_GENERATOR=Ninja            # default to Ninja for faster incremental builds
+export CMAKE_BUILD_PARALLEL_LEVEL="$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)"
+export CLICOLOR_FORCE=1                 # force color in ls/grep/etc when piped
+export USE_CCACHE=ON                    # enable ccache in CMake projects that check this var
+
+### COMPILER CACHING ###
+
+if command -v ccache >/dev/null 2>&1; then
+    export CMAKE_C_COMPILER_LAUNCHER=ccache
+    export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+    export CMAKE_CUDA_COMPILER_LAUNCHER=ccache
+    export CCACHE_DIR="${HOME}/.cache/ccache"  # lands on scratch when ~/.cache is symlinked
+    export CCACHE_MAXSIZE=10G
+fi
+if command -v sccache >/dev/null 2>&1; then
+    export RUSTC_WRAPPER=sccache
+    export SCCACHE_DIR="${HOME}/.cache/sccache"  # lands on scratch when ~/.cache is symlinked
+    export SCCACHE_CACHE_SIZE=10G
+fi
+
+### HOMEBREW ###
+
+export HOMEBREW_NO_AUTO_UPDATE=1
+export HOMEBREW_NO_INSTALL_FROM_API=1
+
+### RUST ###
+
+export RUST_BACKTRACE=1                      # show backtraces on panic (dev default)
+export CARGO_NET_GIT_FETCH_WITH_CLI=true     # use git CLI for SSH key auth — critical on NFS homes
+
+### PYTHON ###
+
+export PYTHONDONTWRITEBYTECODE=1    # no .pyc files — saves NFS quota, avoids stale cache conflicts
+export PYTHONFAULTHANDLER=1         # enable crash dumps — useful for debugging C extensions
+export VIRTUAL_ENV_DISABLE_PROMPT=1 # pure theme handles the venv indicator
+if [ -e "$HOME/.pythonrc" ]; then
+    export PYTHONSTARTUP="$HOME/.pythonrc"
+fi

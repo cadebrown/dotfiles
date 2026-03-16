@@ -88,16 +88,9 @@ export LANG=en_US.UTF-8
 # by bash's setlocale(), causing "cannot change locale" warnings on every subshell.
 # LANG alone is sufficient and doesn't trigger the warning.
 {{- end }}
-export EDITOR=vim
 
-export CMAKE_EXPORT_COMPILE_COMMANDS=1
-export CMAKE_COLOR_DIAGNOSTICS=ON
-export CLICOLOR_FORCE=1
-export USE_CCACHE=ON
-
-# Homebrew formula stability
-export HOMEBREW_NO_AUTO_UPDATE=1
-export HOMEBREW_NO_INSTALL_FROM_API=1
+# Program defaults — see ~/.profile; PLAT-dependent config follows
+. "$HOME/.profile"
 
 ### NODE (nvm) ###
 
@@ -120,12 +113,8 @@ export UV_TOOL_BIN_DIR="$_LOCAL_PLAT/bin"
 export UV_TOOL_DIR="$_LOCAL_PLAT/uv/tools"
 export UV_PYTHON_INSTALL_DIR="$_LOCAL_PLAT/uv/python"
 
-export VIRTUAL_ENV_DISABLE_PROMPT=1
 if [ -e "$_LOCAL_PLAT/venv/bin/activate" ]; then
     source "$_LOCAL_PLAT/venv/bin/activate"
-fi
-if [ -e "$HOME/.pythonrc" ]; then
-    export PYTHONSTARTUP="$HOME/.pythonrc"
 fi
 
 ### PLATFORM-SPECIFIC ###
