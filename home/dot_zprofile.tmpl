@@ -180,20 +180,114 @@ if ! command -v nvcc &>/dev/null && [ -e "$_LOCAL_PLAT/.cuda" ]; then
     cuda_use "$_LOCAL_PLAT/.cuda"
 fi
 
+### NSIGHT SYSTEMS ###
+
+# Activate a specific Nsight Systems installation.
+function nsys_use() {
+    export NSYS_HOME="$1"
+    if [ -e "$NSYS_HOME" ]; then
+        export PATH="$NSYS_HOME/bin:$PATH"
+        export LD_LIBRARY_PATH="$NSYS_HOME/lib64:$NSYS_HOME/lib:${LD_LIBRARY_PATH:-}"
+    else
+        echo "ERROR: nsys not found at $NSYS_HOME" >&2
+    fi
+}
+
+# List installed Nsight Systems versions. * marks the active default.
+function nsys_list() {
+    local _nsyss_dir="$_LOCAL_PLAT/.nsyss"
+    local _current=""
+    [ -L "$_LOCAL_PLAT/.nsys" ] && _current="$(basename "$(readlink "$_LOCAL_PLAT/.nsys")")"
+    if [ ! -d "$_nsyss_dir" ]; then
+        echo "No nsys installs found at $_nsyss_dir" >&2
+        return 1
+    fi
+    for _d in "$_nsyss_dir"/*/; do
+        local _name
+        _name="$(basename "$_d")"
+        if [ "$_name" = "$_current" ]; then
+            echo "* $_name"
+        else
+            echo "  $_name"
+        fi
+    done
+}
+
+# Switch the active Nsight Systems default for this PLAT.
+# Usage: nsys_switch public_nsys_2025.3.1.90
+function nsys_switch() {
+    local _target="$_LOCAL_PLAT/.nsyss/$1"
+    if [ ! -e "$_target" ]; then
+        echo "ERROR: not found: $1" >&2
+        echo "Run nsys_list to see available versions" >&2
+        return 1
+    fi
+    ln -sfn "$_target" "$_LOCAL_PLAT/.nsys"
+    nsys_use "$_LOCAL_PLAT/.nsys"
+    echo "Switched to $1"
+}
+
+# Auto-activate default nsys if nsys isn't already in PATH.
+if ! command -v nsys &>/dev/null && [ -e "$_LOCAL_PLAT/.nsys" ]; then
+    nsys_use "$_LOCAL_PLAT/.nsys"
+fi
+
+### NSIGHT COMPUTE ###
+
+# Activate a specific Nsight Compute installation.
+function ncu_use() {
+    export NCU_HOME="$1"
+    if [ -e "$NCU_HOME" ]; then
+        export PATH="$NCU_HOME/bin:$PATH"
+        export LD_LIBRARY_PATH="$NCU_HOME/lib64:$NCU_HOME/lib:${LD_LIBRARY_PATH:-}"
+    else
+        echo "ERROR: ncu not found at $NCU_HOME" >&2
+    fi
+}
+
+# List installed Nsight Compute versions. * marks the active default.
+function ncu_list() {
+    local _ncus_dir="$_LOCAL_PLAT/.ncus"
+    local _current=""
+    [ -L "$_LOCAL_PLAT/.ncu" ] && _current="$(basename "$(readlink "$_LOCAL_PLAT/.ncu")")"
+    if [ ! -d "$_ncus_dir" ]; then
+        echo "No ncu installs found at $_ncus_dir" >&2
+        return 1
+    fi
+    for _d in "$_ncus_dir"/*/; do
+        local _name
+        _name="$(basename "$_d")"
+        if [ "$_name" = "$_current" ]; then
+            echo "* $_name"
+        else
+            echo "  $_name"
+        fi
+    done
+}
+
+# Switch the active Nsight Compute default for this PLAT.
+# Usage: ncu_switch public_ncu_2025.1.0
+function ncu_switch() {
+    local _target="$_LOCAL_PLAT/.ncus/$1"
+    if [ ! -e "$_target" ]; then
+        echo "ERROR: not found: $1" >&2
+        echo "Run ncu_list to see available versions" >&2
+        return 1
+    fi
+    ln -sfn "$_target" "$_LOCAL_PLAT/.ncu"
+    ncu_use "$_LOCAL_PLAT/.ncu"
+    echo "Switched to $1"
+}
+
+# Auto-activate default ncu if ncu isn't already in PATH.
+if ! command -v ncu &>/dev/null && [ -e "$_LOCAL_PLAT/.ncu" ]; then
+    ncu_use "$_LOCAL_PLAT/.ncu"
+fi
+
 # Scratch space: large local storage for NFS homes with small quotas.
 # install/scratch.sh symlinks ~/.local, ~/.cache, etc. here.
 if [ -e "$HOME/scratch" ]; then
     export SCRATCH=$(realpath "$HOME/scratch")
-fi
-
-if [ -d "$HOME/nsys" ]; then
-    export PATH="$HOME/nsys/bin:$PATH"
-    export LD_LIBRARY_PATH="$HOME/nsys/lib64:$HOME/nsys/lib:$LD_LIBRARY_PATH"
-fi
-
-if [ -d "$HOME/ncu" ]; then
-    export PATH="$HOME/ncu/bin:$PATH"
-    export LD_LIBRARY_PATH="$HOME/ncu/lib64:$HOME/ncu/lib:$LD_LIBRARY_PATH"
 fi
 
 # Docker: always use system docker on Linux
