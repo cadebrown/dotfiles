@@ -36,12 +36,33 @@ if command -v ccache >/dev/null 2>&1; then
     export CMAKE_CXX_COMPILER_LAUNCHER=ccache
     export CMAKE_CUDA_COMPILER_LAUNCHER=ccache
     export CCACHE_DIR="${HOME}/.cache/ccache"  # lands on scratch when ~/.cache is symlinked
-    export CCACHE_MAXSIZE=10G
+    # Size cache at 2% of total partition size, clamped to [10G, 100G].
+    # df -Pk: POSIX portable, 1K blocks. total is column 2. result in GiB.
+    _cache_total_kb="$(df -Pk "${HOME}/.cache" 2>/dev/null | awk 'NR==2{print $2}')"
+    if [ -n "$_cache_total_kb" ]; then
+        _cache_target_g=$(( _cache_total_kb / 50 / 1024 / 1024 ))
+        [ "$_cache_target_g" -lt 10  ] && _cache_target_g=10
+        [ "$_cache_target_g" -gt 100 ] && _cache_target_g=100
+        export CCACHE_MAXSIZE="${_cache_target_g}G"
+        unset _cache_total_kb _cache_target_g
+    else
+        export CCACHE_MAXSIZE=10G
+    fi
 fi
 if command -v sccache >/dev/null 2>&1; then
     export RUSTC_WRAPPER=sccache
     export SCCACHE_DIR="${HOME}/.cache/sccache"  # lands on scratch when ~/.cache is symlinked
-    export SCCACHE_CACHE_SIZE=10G
+    # Size cache at 2% of total partition size, clamped to [10G, 100G].
+    _cache_total_kb="$(df -Pk "${HOME}/.cache" 2>/dev/null | awk 'NR==2{print $2}')"
+    if [ -n "$_cache_total_kb" ]; then
+        _cache_target_g=$(( _cache_total_kb / 50 / 1024 / 1024 ))
+        [ "$_cache_target_g" -lt 10  ] && _cache_target_g=10
+        [ "$_cache_target_g" -gt 100 ] && _cache_target_g=100
+        export SCCACHE_CACHE_SIZE="${_cache_target_g}G"
+        unset _cache_total_kb _cache_target_g
+    else
+        export SCCACHE_CACHE_SIZE=10G
+    fi
 fi
 
 ### HOMEBREW ###
