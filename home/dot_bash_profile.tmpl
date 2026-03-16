@@ -2,21 +2,11 @@
 # For bash-specific interactive config, use ~/.bashrc
 # This file mirrors the structure of ~/.zprofile for consistency
 
-### GENERAL ###
-
-export LANG=en_US.UTF-8
-export BROWSER='lynx'
-export EDITOR=vim
-
-export CMAKE_EXPORT_COMPILE_COMMANDS=1
-export CMAKE_COLOR_DIAGNOSTICS=ON
-export CLICOLOR_FORCE=1
-export USE_CCACHE=ON
-
 ### PLATFORM ###
 
 # _PLAT detection — identical logic to .zprofile.
 # See .zprofile for detailed comments on PLAT format and NFS shared homes.
+# Runs first so PATH is fully built before the zsh handoff below.
 _plat_detect() {
     local _os _scan _dir _check
     _os="$(uname -s)"
@@ -46,7 +36,7 @@ export _LOCAL_PLAT="$_local_root/$_PLAT"
 unset _local_root
 unset -f _plat_detect
 
-### HOMEBREW ###
+### HOMEBREW (early — needed so zsh handoff finds the right zsh) ###
 
 {{ if eq .chezmoi.os "darwin" -}}
 if [ -e "$HOME/.homebrew" ]; then
@@ -55,19 +45,58 @@ elif [ -e "/opt/homebrew" ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 {{ else -}}
-# Linux: Homebrew installed per-PLAT
 if [ -x "$_LOCAL_PLAT/brew/bin/brew" ]; then
     eval "$($_LOCAL_PLAT/brew/bin/brew shellenv)"
 fi
 {{ end -}}
 
+export PATH="$_LOCAL_PLAT/bin:$HOME/.local/bin:$PATH"
+
+### ZSH HANDOFF ###
+# Prefer zsh — exec into it for interactive login shells.
+# Guards:
+#   ZSH_VERSION set  → already in zsh, skip
+#   stdin not a tty  → skip (SFTP, remote commands, scripts, scp)
+#   zsh missing      → warn and stay in bash
+#   zsh broken       → warn and stay in bash
+if [[ -z "$ZSH_VERSION" ]]; then
+    if [[ -t 0 ]]; then
+        if _zsh="$(command -v zsh 2>/dev/null)"; then
+            if "$_zsh" -c true 2>/dev/null; then
+                exec "$_zsh" -l
+            else
+                echo "warning: zsh found at $_zsh but failed smoke test — staying in bash" >&2
+            fi
+        else
+            echo "warning: zsh not found in PATH — staying in bash" >&2
+        fi
+        unset _zsh
+    else
+        [[ -n "$DF_DEBUG" ]] && echo "[dbug] bash->zsh handoff skipped: stdin is not a tty (tty=$(tty 2>/dev/null))" >&2
+    fi
+fi
+
+### GENERAL ###
+
+{{ if eq .chezmoi.os "darwin" -}}
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+{{- else -}}
+export LANG=en_US.UTF-8
+# LC_ALL is intentionally not set on Linux — the locale archive can't be loaded
+# by bash's setlocale(), causing "cannot change locale" warnings on every subshell.
+# LANG alone is sufficient and doesn't trigger the warning.
+{{- end }}
+export EDITOR=vim
+
+export CMAKE_EXPORT_COMPILE_COMMANDS=1
+export CMAKE_COLOR_DIAGNOSTICS=ON
+export CLICOLOR_FORCE=1
+export USE_CCACHE=ON
+
 # Homebrew formula stability
 export HOMEBREW_NO_AUTO_UPDATE=1
 export HOMEBREW_NO_INSTALL_FROM_API=1
-
-### PLAT PATHS ###
-
-export PATH="$_LOCAL_PLAT/bin:$HOME/.local/bin:$PATH"
 
 ### NODE (nvm) ###
 
@@ -108,6 +137,11 @@ fi
 {{ else -}}
 
 export SSL_CERT_DIR=/usr/lib/ssl/certs
+
+# LOCPATH tells brew's glibc where to find locale data (it has no locale archive
+# by default). Without this, setlocale() falls back to C/ASCII and wcwidth()
+# counts bytes instead of display columns, breaking ZLE completion rendering.
+export LOCPATH="$_LOCAL_PLAT/locale"
 
 ### CUDA ###
 

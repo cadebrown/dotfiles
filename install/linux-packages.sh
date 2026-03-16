@@ -170,6 +170,39 @@ if [[ "$_bundle_exit" -ne 0 ]]; then
     log_warn "Run 'brew bundle install --file=~/dotfiles/packages/Brewfile' to retry"
 fi
 
+### LOCALE (brew glibc needs its own locale archive) ###
+#
+# Homebrew's glibc has no locale archive by default — localedef is present but
+# $prefix/lib/locale/ is empty. Without locale data, setlocale() falls back to
+# C/ASCII (CODESET: ANSI_X3.4-1968), which makes wcwidth() count bytes instead
+# of display columns. This breaks ZLE cursor positioning in brew zsh: every
+# tab-completion leaves remnant characters on screen.
+#
+# Fix: generate en_US.UTF-8 into $LOCAL_PLAT/locale/ using brew's own localedef
+# and i18n data. The shell profiles export LOCPATH pointing there so brew zsh
+# picks it up at startup.
+
+BREW_GLIBC="$LOCAL_PLAT/brew/opt/glibc"
+LOCALE_DIR="$LOCAL_PLAT/locale"
+
+if [[ -x "$BREW_GLIBC/bin/localedef" ]]; then
+    if [[ -f "$LOCALE_DIR/en_US.UTF-8/LC_CTYPE" ]]; then
+        log_okay "brew glibc locale already generated"
+    else
+        log_info "Generating en_US.UTF-8 locale for brew glibc → $LOCALE_DIR"
+        ensure_dir "$LOCALE_DIR"
+        I18NPATH="$BREW_GLIBC/share/i18n" \
+        GCONV_PATH="$BREW_GLIBC/lib/gconv" \
+            run_logged "$BREW_GLIBC/bin/localedef" \
+                --prefix="$LOCALE_DIR" \
+                -i en_US -f UTF-8 \
+                "$LOCALE_DIR/en_US.UTF-8"
+        log_okay "locale generated"
+    fi
+else
+    log_warn "brew glibc localedef not found — skipping locale generation"
+fi
+
 ### Create unversioned compiler symlinks ###
 #
 # gcc and llvm are keg-only — Homebrew doesn't link gcc/g++/clang/clang++ into

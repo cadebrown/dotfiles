@@ -163,6 +163,46 @@ On a shared NFS home with scratch space, `~/.local` is a symlink to `/scratch/$U
 
 ---
 
+## Brew zsh tab completion leaves remnant characters (Linux)
+
+Symptom: after pressing Tab, stale characters remain on the line instead of being erased.
+
+Root cause chain:
+1. Brew zsh's RUNPATH loads Homebrew's own glibc (`brew/opt/glibc/lib/libc.so.6`)
+2. Homebrew's glibc ships no `lib/locale/` data → `setlocale()` silently falls back to `C/ASCII`
+3. In the C locale, `wcwidth()` returns byte counts instead of display columns
+4. Every cursor-position calculation in ZLE/completion is off → artifacts
+
+Confirm by checking the codeset inside brew zsh:
+
+```sh
+zsh --no-rcs -c 'zmodload zsh/langinfo; echo $langinfo[CODESET]'
+# broken:  ANSI_X3.4-1968
+# working: UTF-8
+```
+
+**Fix:** `linux-packages.sh` generates `en_US.UTF-8` locale data for brew's glibc into
+`$LOCAL_PLAT/locale/` using brew's own `localedef`. The shell profiles export `LOCPATH`
+pointing there so brew zsh picks it up at startup.
+
+If you installed before this fix:
+
+```sh
+# Regenerate locale data
+bash ~/dotfiles/install/linux-packages.sh
+
+# Apply updated shell profiles (adds LOCPATH export)
+chezmoi apply ~/.zprofile ~/.bash_profile
+
+# Open a new login shell and verify
+exec zsh -l
+zsh --no-rcs -c 'zmodload zsh/langinfo; echo $langinfo[CODESET]'  # UTF-8
+```
+
+Test suite: `bash ~/dotfiles/tests/test-locale.sh`
+
+---
+
 ## Python@3.14 build fails on Linux (uuid or test_datetime errors)
 
 Python 3.14 from Homebrew has build issues on some Linux systems:

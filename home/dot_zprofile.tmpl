@@ -2,8 +2,15 @@
 
 ### GENERAL ###
 
+{{ if eq .chezmoi.os "darwin" -}}
 export LANG=en_US.UTF-8
-export BROWSER='lynx'
+export LC_ALL=en_US.UTF-8
+{{- else -}}
+export LANG=en_US.UTF-8
+# LC_ALL is intentionally not set on Linux — the locale archive can't be loaded
+# by bash's setlocale(), causing "cannot change locale" warnings on every subshell.
+# LANG alone is sufficient and doesn't trigger the warning.
+{{- end }}
 export EDITOR=vim
 
 export CMAKE_EXPORT_COMPILE_COMMANDS=1  # write compile_commands.json for clangd/LSP
@@ -125,6 +132,11 @@ fi
 {{ else -}}
 
 export SSL_CERT_DIR=/usr/lib/ssl/certs
+
+# LOCPATH tells brew's glibc where to find locale data (it has no locale archive
+# by default). Without this, setlocale() falls back to C/ASCII and wcwidth()
+# counts bytes instead of display columns, breaking ZLE completion rendering.
+export LOCPATH="$_LOCAL_PLAT/locale"
 
 ### CUDA ###
 

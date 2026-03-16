@@ -174,6 +174,11 @@ These are non-obvious things that have caused real bugs:
   handles this, but don't change the macOS Rust install path without understanding why.
 - **Don't use legacy paths** (`~/.nvm`, `~/.rustup`, `~/.cargo`) — everything is under `$LOCAL_PLAT/`.
 - **Don't run install scripts without sourcing `_lib.sh`** — PLAT paths won't be set.
+- **Brew zsh needs its own locale data on Linux.** Homebrew's glibc has no `lib/locale/`
+  archive, so `setlocale()` falls back to C/ASCII and `wcwidth()` counts bytes instead of
+  display columns — ZLE completion leaves remnant characters. Fix: `linux-packages.sh`
+  generates `en_US.UTF-8` into `$LOCAL_PLAT/locale/` via brew's `localedef`; shell profiles
+  export `LOCPATH` pointing there. Test: `bash tests/test-locale.sh`.
 - **Homebrew upgrades are off by default on Linux** (`DF_BREW_UPGRADE=0`) because glibc
   upgrades can break every installed binary. Use `bootstrap.sh upgrade` deliberately.
 - **Python@3.14 formula is patched on Linux** — `install/patch-homebrew-python.sh` fixes uuid
