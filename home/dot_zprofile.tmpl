@@ -11,12 +11,9 @@ export LANG=en_US.UTF-8
 # by bash's setlocale(), causing "cannot change locale" warnings on every subshell.
 # LANG alone is sufficient and doesn't trigger the warning.
 {{- end }}
-export EDITOR=vim
 
-export CMAKE_EXPORT_COMPILE_COMMANDS=1  # write compile_commands.json for clangd/LSP
-export CMAKE_COLOR_DIAGNOSTICS=ON       # colored compiler output even when piped
-export CLICOLOR_FORCE=1                 # force color output in ls/grep/etc when piped
-export USE_CCACHE=ON                    # enable ccache in CMake projects that check this
+# Program defaults — see ~/.profile; PLAT-dependent config follows
+. "$HOME/.profile"
 
 ### PLATFORM ###
 
@@ -75,11 +72,6 @@ if [ -x "$_LOCAL_PLAT/brew/bin/brew" ]; then
 fi
 {{ end -}}
 
-# Homebrew formula stability
-# Prevent auto-updates that break custom patches (python@3.14, etc.)
-export HOMEBREW_NO_AUTO_UPDATE=1
-export HOMEBREW_NO_INSTALL_FROM_API=1
-
 ### PLAT PATHS ###
 # These go after Homebrew so PLAT-installed tools take priority.
 
@@ -113,12 +105,8 @@ export UV_TOOL_BIN_DIR="$_LOCAL_PLAT/bin"
 export UV_TOOL_DIR="$_LOCAL_PLAT/uv/tools"
 export UV_PYTHON_INSTALL_DIR="$_LOCAL_PLAT/uv/python"
 
-export VIRTUAL_ENV_DISABLE_PROMPT=1
 if [ -e "$_LOCAL_PLAT/venv/bin/activate" ]; then
     source "$_LOCAL_PLAT/venv/bin/activate"
-fi
-if [ -e "$HOME/.pythonrc" ]; then
-    export PYTHONSTARTUP="$HOME/.pythonrc"
 fi
 
 ### PLATFORM-SPECIFIC ###
@@ -140,19 +128,57 @@ export LOCPATH="$_LOCAL_PLAT/locale"
 
 ### CUDA ###
 
+# Activate a specific CUDA toolkit installation.
 function cuda_use() {
     export CUDA_HOME="$1"
     if [ -e "$CUDA_HOME" ]; then
         export PATH="$CUDA_HOME/bin:$PATH"
-        export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib:$LD_LIBRARY_PATH"
-        export C_INCLUDE_PATH="$CUDA_HOME/include:$C_INCLUDE_PATH"
-        export CPLUS_INCLUDE_PATH="$CUDA_HOME/include:$CPLUS_INCLUDE_PATH"
+        export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib:${LD_LIBRARY_PATH:-}"
+        export C_INCLUDE_PATH="$CUDA_HOME/include:${C_INCLUDE_PATH:-}"
+        export CPLUS_INCLUDE_PATH="$CUDA_HOME/include:${CPLUS_INCLUDE_PATH:-}"
     else
         echo "ERROR: CUDA not found at $CUDA_HOME" >&2
     fi
 }
 
-if [ -e "$HOME/.cuda" ]; then cuda_use "$HOME/.cuda"; fi
+# List installed CUDA versions. * marks the active default.
+function cuda_list() {
+    local _cudas_dir="$_LOCAL_PLAT/.cudas"
+    local _current=""
+    [ -L "$_LOCAL_PLAT/.cuda" ] && _current="$(basename "$(readlink "$_LOCAL_PLAT/.cuda")")"
+    if [ ! -d "$_cudas_dir" ]; then
+        echo "No CUDA installs found at $_cudas_dir" >&2
+        return 1
+    fi
+    for _d in "$_cudas_dir"/*/; do
+        local _name
+        _name="$(basename "$_d")"
+        if [ "$_name" = "$_current" ]; then
+            echo "* $_name"
+        else
+            echo "  $_name"
+        fi
+    done
+}
+
+# Switch the active CUDA default for this PLAT.
+# Usage: cuda_switch public_cuda_12.8.0
+function cuda_switch() {
+    local _target="$_LOCAL_PLAT/.cudas/$1"
+    if [ ! -e "$_target" ]; then
+        echo "ERROR: not found: $1" >&2
+        echo "Run cuda_list to see available versions" >&2
+        return 1
+    fi
+    ln -sfn "$_target" "$_LOCAL_PLAT/.cuda"
+    cuda_use "$_LOCAL_PLAT/.cuda"
+    echo "Switched to $1"
+}
+
+# Auto-activate default CUDA if nvcc isn't already in PATH.
+if ! command -v nvcc &>/dev/null && [ -e "$_LOCAL_PLAT/.cuda" ]; then
+    cuda_use "$_LOCAL_PLAT/.cuda"
+fi
 
 # Scratch space: large local storage for NFS homes with small quotas.
 # install/scratch.sh symlinks ~/.local, ~/.cache, etc. here.

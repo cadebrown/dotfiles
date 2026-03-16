@@ -448,6 +448,18 @@ else
     log_info "Skipping auth (set DF_DO_AUTH=1 to run, or: bash ~/dotfiles/install/auth.sh)"
 fi
 
+### 7.5. overlay auth ###
+
+if [[ "${DF_DO_AUTH:-0}" != "0" ]]; then
+    for _overlay_auth in "$DF_ROOT"/dotfiles-*/install/auth.sh; do
+        [[ -f "$_overlay_auth" ]] || continue
+        _overlay_name="$(basename "$(dirname "$(dirname "$_overlay_auth")")")"
+        log_info "Running overlay auth: $_overlay_name"
+        bash "$_overlay_auth"
+    done
+    unset _overlay_auth _overlay_name
+fi
+
 ### 8. overlays ###
 
 log_section "8 — dotfiles overlays"
