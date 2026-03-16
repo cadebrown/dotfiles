@@ -219,8 +219,11 @@ function cuda_switch() {
     echo "Switched to $1"
 }
 
-# Auto-activate default CUDA if nvcc isn't already in PATH.
-if ! command -v nvcc &>/dev/null && [ -e "$_LOCAL_PLAT/.cuda" ]; then
+# Always activate the default CUDA. The guard against nvcc already being in PATH
+# was removed because cuda_use sets more than just PATH (NVCC_PREPEND_FLAGS,
+# LD_LIBRARY_PATH, CUDA_HOME) — skipping it when nvcc is found elsewhere
+# (e.g. /usr/local/cuda-*/bin in PATH) leaves those vars unset.
+if [ -e "$_LOCAL_PLAT/.cuda" ]; then
     cuda_use "$_LOCAL_PLAT/.cuda"
 fi
 
