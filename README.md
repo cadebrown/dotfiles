@@ -197,6 +197,61 @@ Every push to `main` auto-deploys to [dotfiles.cade.io](https://dotfiles.cade.io
 
 ---
 
+## Private overlays
+
+If you have machine- or employer-specific config that can't live in a public repo, use an
+overlay. Overlays are separate git repos cloned into `~/dotfiles/dotfiles-<name>/` and
+gitignored from this repo. The bootstrap auto-discovers and runs them after its own steps.
+
+### How overlays work
+
+After step 7 (auth), `bootstrap.sh` globs `~/dotfiles/dotfiles-*/bootstrap.sh` and runs
+each in sorted order. If none exist, the step is a no-op. To skip all overlays:
+
+```sh
+DF_DO_OVERLAYS=0 ~/dotfiles/bootstrap.sh update
+```
+
+Each overlay's `bootstrap.sh` is responsible for its own work. It can source
+`../install/_lib.sh` to get logging utilities and path variables:
+
+```bash
+source "$(dirname "$0")/../install/_lib.sh"
+```
+
+### Setting up a private overlay
+
+```sh
+# Clone your private repo into the right place — name it dotfiles-<something>
+git clone git@your-host:you/dotfiles-work.git ~/dotfiles/dotfiles-work
+
+# The public bootstrap will pick it up automatically on next run, or run directly:
+bash ~/dotfiles/dotfiles-work/bootstrap.sh
+```
+
+### Overlay responsibilities
+
+Overlays should only contain what genuinely can't be public: internal host entries,
+work-specific env vars, employer tooling, private credentials setup. If something could
+go in this repo, it should — overlays are for the remainder.
+
+The public repo owns the shell environment, PATH, language runtimes, and general dotfiles.
+Overlays have no opinion on those.
+
+### Minimal overlay structure
+
+```
+dotfiles-work/                  (separate private git repo)
+├── bootstrap.sh                # entry point; sources ../install/_lib.sh
+└── home/                       # work-specific dotfiles (optional)
+    └── dot_work.env            # ~/.work.env — auto-sourced by ~/.zprofile
+```
+
+`home/` files use the same naming convention as this repo: `dot_foo` → `~/.foo`,
+`dot_foo__bar` → `~/.foo/bar`. `~/.*.env` files are auto-sourced by `~/.zprofile`.
+
+---
+
 ## Docs
 
 Full reference at **[dotfiles.cade.io](https://dotfiles.cade.io)** -- live documentation auto-deployed on every push to `main`. Covers bootstrap details, chezmoi workflow, package management, troubleshooting, and infrastructure.

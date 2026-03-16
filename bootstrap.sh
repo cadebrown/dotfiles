@@ -37,6 +37,7 @@
 #   DF_DO_CODEX         — set to 0 to skip Codex CLI install
 #   DF_DO_MACOS_SETTINGS — set to 0 to skip macOS settings
 #   DF_DO_AUTH          — set to 1 to run interactive API token setup
+#   DF_DO_OVERLAYS      — set to 0 to skip all overlay bootstraps
 
 set -euo pipefail
 
@@ -446,6 +447,24 @@ if [[ "${DF_DO_AUTH:-0}" != "0" ]]; then
 else
     log_info "Skipping auth (set DF_DO_AUTH=1 to run, or: bash ~/dotfiles/install/auth.sh)"
 fi
+
+### 8. overlays ###
+
+log_section "8 — dotfiles overlays"
+_ran_any=0
+for _overlay_bs in "$DF_ROOT"/dotfiles-*/bootstrap.sh; do
+    [[ -f "$_overlay_bs" ]] || continue
+    _overlay_name="$(basename "$(dirname "$_overlay_bs")")"
+    if [[ "${DF_DO_OVERLAYS:-}" == "0" ]]; then
+        log_info "Skipping overlays (DF_DO_OVERLAYS=0)"
+        break
+    fi
+    log_info "Running overlay: $_overlay_name"
+    bash "$_overlay_bs" "$DF_MODE"
+    _ran_any=1
+done
+[[ "$_ran_any" == "0" ]] && log_info "No overlays found in $DF_ROOT/dotfiles-*/"
+unset _overlay_bs _overlay_name _ran_any
 
 ### done ###
 
