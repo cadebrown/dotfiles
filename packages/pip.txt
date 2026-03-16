@@ -27,10 +27,6 @@ rich
 tqdm
 cachetools
 
-# Code formatting
-black
-ruff
-
 # Web/scraping
 requests
 bs4
@@ -42,7 +38,3 @@ opencv-python
 # ML/Scientific
 voila
 
-# Build tools (Python bindings)
-cmake
-ninja
-conan

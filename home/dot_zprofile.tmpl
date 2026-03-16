@@ -128,8 +128,10 @@ export UV_TOOL_BIN_DIR="$_LOCAL_PLAT/bin"
 export UV_TOOL_DIR="$_LOCAL_PLAT/uv/tools"
 export UV_PYTHON_INSTALL_DIR="$_LOCAL_PLAT/uv/python"
 
-if [ -e "$_LOCAL_PLAT/venv/bin/activate" ]; then
-    source "$_LOCAL_PLAT/venv/bin/activate"
+# Prepend venv/bin directly — avoids setting VIRTUAL_ENV, which triggers uv warnings
+# when running `uv run` inside a project with its own .venv.
+if [ -d "$_LOCAL_PLAT/venv/bin" ]; then
+    path=("$_LOCAL_PLAT/venv/bin" $path)
 fi
 
 ### PLATFORM-SPECIFIC ###

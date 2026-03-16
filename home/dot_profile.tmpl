@@ -123,7 +123,6 @@ export CARGO_NET_GIT_FETCH_WITH_CLI=true     # use git CLI for SSH key auth — 
 
 export PYTHONDONTWRITEBYTECODE=1    # no .pyc files — saves NFS quota, avoids stale cache conflicts
 export PYTHONFAULTHANDLER=1         # enable crash dumps — useful for debugging C extensions
-export VIRTUAL_ENV_DISABLE_PROMPT=1 # pure theme handles the venv indicator
 if [ -e "$HOME/.pythonrc" ]; then
     export PYTHONSTARTUP="$HOME/.pythonrc"
 fi

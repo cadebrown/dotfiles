@@ -26,11 +26,12 @@ fi
 if [[ -d "$VENV" ]]; then
     log_okay "~/.venv already exists"
 else
-    log_info "Creating ~/.venv"
+    log_info "Creating ~/.venv (Python 3.14)"
+    # --python 3.14: pin version for reproducibility across machines sharing an NFS home.
     # --seed: pre-install pip + setuptools into the venv.
     # Without it, uv creates a bare venv with no pip, which breaks `pip install`
     # and tools that expect pip to exist (e.g. some build systems).
-    run_logged uv venv "$VENV" --seed
+    run_logged uv venv "$VENV" --python 3.14 --seed
     log_okay "~/.venv created"
 fi
 
@@ -42,19 +43,10 @@ PIP_TXT="$DF_PACKAGES/pip.txt"
 log_info "Syncing packages from pip.txt"
 # --python $VENV/bin/python: explicit path so uv targets the PLAT venv even when
 # another Python is active (e.g. if the system python is higher on PATH).
-_ok=0 _fail=0
-while IFS= read -r pkg; do
-    if run_logged uv pip install --python "$VENV/bin/python" "$pkg"; then
-        log_okay "  ok    $pkg"
-        (( _ok++ )) || true
-    else
-        log_warn "  fail  $pkg"
-        (( _fail++ )) || true
-    fi
-done < <(_read_package_list "$PIP_TXT")
-
-if [[ $_fail -eq 0 ]]; then
-    log_okay "Python packages: ${_ok} ok"
+# -r: single resolution pass — faster and catches inter-package conflicts that
+# the old one-by-one loop let slip through.
+if run_logged uv pip install --python "$VENV/bin/python" -r "$PIP_TXT"; then
+    log_okay "Python packages installed"
 else
-    log_warn "Python packages: ${_ok} ok, ${_fail} failed"
+    log_warn "Python packages: one or more packages failed to install"
 fi
