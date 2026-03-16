@@ -12,9 +12,6 @@ export LANG=en_US.UTF-8
 # LANG alone is sufficient and doesn't trigger the warning.
 {{- end }}
 
-# Program defaults — see ~/.profile; PLAT-dependent config follows
-. "$HOME/.profile"
-
 ### PLATFORM ###
 
 # _PLAT identifies the platform and CPU capability level for this machine.
@@ -71,6 +68,9 @@ if [ -x "$_LOCAL_PLAT/brew/bin/brew" ]; then
     eval "$($_LOCAL_PLAT/brew/bin/brew shellenv)"
 fi
 {{ end -}}
+
+# Program defaults — HOMEBREW_PREFIX is now set, so toolchain vars resolve correctly
+. "$HOME/.profile"
 
 ### PLAT PATHS ###
 # These go after Homebrew so PLAT-installed tools take priority.
