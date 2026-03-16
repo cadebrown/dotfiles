@@ -11,6 +11,14 @@
 # NFS shared homes: each machine auto-detects its own PLAT and installs to
 # ~/.local/$_PLAT/ — x86-64-v4 and x86-64-v3 machines share the same home
 # but use separate binary dirs and never see each other's builds.
+
+# Deduplicate PATH entries immediately — must be set before any PATH modification.
+# Cursor IDE (and similar tools) open login shells that inherit the server's PATH,
+# causing .zprofile to source into an already-populated environment. Setting the
+# unique flag here guarantees all subsequent array-form path=(...) assignments
+# collapse duplicates rather than accumulate them.
+typeset -U path
+
 _plat_detect() {
     local _os _scan _dir _check
     _os="$(uname -s)"
@@ -40,10 +48,6 @@ fi
 export _LOCAL_PLAT="$_local_root/$_PLAT"
 unset _local_root
 unset -f _plat_detect
-
-# Deduplicate PATH entries. When bash_profile exec's into zsh, PATH is already
-# partially built; typeset -U ensures prepended entries move to front, not duplicate.
-typeset -U path
 
 ### GENERAL ###
 
@@ -85,7 +89,16 @@ fi
 ### PLAT PATHS ###
 # These go after Homebrew so PLAT-installed tools take priority.
 
-export PATH="$_LOCAL_PLAT/bin:$HOME/.local/bin:$PATH"
+path=("$_LOCAL_PLAT/bin" "$HOME/.local/bin" $path)
+
+{{ if eq .chezmoi.os "linux" -}}
+# Prefer brew binutils on Linux — system assembler (gas) may be too old for newer
+# toolchains. E.g. NVCC 13+ emits `.base64` pseudo-ops requiring binutils >= 2.39,
+# but Ubuntu 22.04 ships 2.38. This puts brew's as/ld/etc. ahead of /usr/bin.
+if [ -d "${HOMEBREW_PREFIX:-}/opt/binutils/bin" ]; then
+    path=("$HOMEBREW_PREFIX/opt/binutils/bin" $path)
+fi
+{{ end -}}
 
 ### NODE (nvm — lazy loaded via oh-my-zsh plugin in .zshrc) ###
 
@@ -98,7 +111,7 @@ if [ -d "$NVM_DIR/versions/node" ]; then
     # without sourcing the full nvm.sh (~4000 lines). The omz nvm plugin in
     # .zshrc overrides this in interactive shells so `nvm use` works correctly.
     _nvm_default_bin="$NVM_DIR/versions/node/$(ls "$NVM_DIR/versions/node/" | sort -V | tail -1)/bin"
-    [ -d "$_nvm_default_bin" ] && export PATH="$_nvm_default_bin:$PATH"
+    [ -d "$_nvm_default_bin" ] && path=("$_nvm_default_bin" $path)
     unset _nvm_default_bin
 fi
 
@@ -106,7 +119,7 @@ fi
 
 export RUSTUP_HOME="$_LOCAL_PLAT/rustup"
 export CARGO_HOME="$_LOCAL_PLAT/cargo"
-export PATH="$CARGO_HOME/bin:$PATH"
+path=("$CARGO_HOME/bin" $path)
 
 ### PYTHON (uv) ###
 
@@ -137,7 +150,7 @@ export SSL_CERT_DIR=/usr/lib/ssl/certs
 function cuda_use() {
     export CUDA_HOME="$1"
     if [ -e "$CUDA_HOME" ]; then
-        export PATH="$CUDA_HOME/bin:$PATH"
+        path=("$CUDA_HOME/bin" $path)
         export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib:${LD_LIBRARY_PATH:-}"
         export C_INCLUDE_PATH="$CUDA_HOME/include:${C_INCLUDE_PATH:-}"
         export CPLUS_INCLUDE_PATH="$CUDA_HOME/include:${CPLUS_INCLUDE_PATH:-}"
@@ -191,7 +204,7 @@ fi
 function nsys_use() {
     export NSYS_HOME="$1"
     if [ -e "$NSYS_HOME" ]; then
-        export PATH="$NSYS_HOME/bin:$PATH"
+        path=("$NSYS_HOME/bin" $path)
         export LD_LIBRARY_PATH="$NSYS_HOME/lib64:$NSYS_HOME/lib:${LD_LIBRARY_PATH:-}"
     else
         echo "ERROR: nsys not found at $NSYS_HOME" >&2
@@ -243,7 +256,7 @@ fi
 function ncu_use() {
     export NCU_HOME="$1"
     if [ -e "$NCU_HOME" ]; then
-        export PATH="$NCU_HOME/bin:$PATH"
+        path=("$NCU_HOME/bin" $path)
         export LD_LIBRARY_PATH="$NCU_HOME/lib64:$NCU_HOME/lib:${LD_LIBRARY_PATH:-}"
     else
         echo "ERROR: ncu not found at $NCU_HOME" >&2
