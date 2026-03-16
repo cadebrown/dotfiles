@@ -1,5 +1,5 @@
 {
-  "$schema" : "https:\/\/schema.linearmouse.app\/0.10.4",
+  "$schema" : "https:\/\/schema.linearmouse.app\/0.10.2",
   "schemes" : [
     {
       "if" : {
@@ -16,7 +16,7 @@
       },
       "scrolling" : {
         "reverse" : {
-          "vertical" : true
+          "vertical" : false
         }
       }
     },

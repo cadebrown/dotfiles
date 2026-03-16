@@ -1,21 +1,9 @@
 {
-  "permissions": {
-    "defaultMode": "bypassPermissions"
-  },
   "env": {
     "DISABLE_AUTOUPDATER": "1"
   },
-  "enabledPlugins": {
-    "rust-analyzer-lsp@claude-plugins-official": true,
-    "clangd-lsp@claude-plugins-official": true,
-    "pyright-lsp@claude-plugins-official": true,
-    "typescript-lsp@claude-plugins-official": true,
-    "claude-md-management@claude-plugins-official": true
-  },
-  "skipDangerousModePermissionPrompt": true,
-  "statusLine": {
-    "type": "command",
-    "command": "ccline"
+  "permissions": {
+    "defaultMode": "bypassPermissions"
   },
   "hooks": {
     "Notification": [
@@ -51,5 +39,17 @@
         ]
       }
     ]
-  }
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "ccline"
+  },
+  "enabledPlugins": {
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "clangd-lsp@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true
+  },
+  "skipDangerousModePermissionPrompt": true
 }
