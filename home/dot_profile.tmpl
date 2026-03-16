@@ -31,34 +31,46 @@ export USE_CCACHE=ON                    # enable ccache in CMake projects that c
 
 ### TOOLCHAIN ###
 
-# Prefer Homebrew-installed compilers and binutils over system defaults.
-# ${VAR:-value} means: only set if not already set — override before login to change.
-# Priority: Homebrew LLVM (clang/lld/llvm-ar) → Homebrew GCC → system (PATH-resolved).
+# Activate the CMake LLVM toolchain file when Homebrew LLVM is present.
+# Compiler/linker env vars (CC, CXX, AR, LDFLAGS) are intentionally not set here —
+# the toolchain file owns those for CMake. The GCC elif below sets env vars as a
+# fallback for non-cmake builds on machines without LLVM.
 if [ -n "${HOMEBREW_PREFIX:-}" ]; then
     if [ -x "$HOMEBREW_PREFIX/opt/llvm/bin/clang" ]; then
-        _tc="$HOMEBREW_PREFIX/opt/llvm/bin"
-        export CC="${CC:-$_tc/clang}"
-        export CXX="${CXX:-$_tc/clang++}"
-        export AR="${AR:-$_tc/llvm-ar}"
-        export RANLIB="${RANLIB:-$_tc/llvm-ranlib}"
-        export NM="${NM:-$_tc/llvm-nm}"
-        # Linker selection (Linux only — macOS uses Apple ld for code signing / Mach-O)
-        # mold > lld > system ld. mold is not a Homebrew LLVM tool; check PATH separately.
-        if [ "$(uname -s)" = "Linux" ]; then
-            if command -v mold >/dev/null 2>&1; then
-                export LDFLAGS="${LDFLAGS:--fuse-ld=mold}"
-            elif [ -x "$_tc/lld" ]; then
-                export LDFLAGS="${LDFLAGS:--fuse-ld=lld}"
-            fi
-        fi
-        unset _tc
-    elif [ -x "$HOMEBREW_PREFIX/bin/gcc" ]; then
-        export CC="${CC:-$HOMEBREW_PREFIX/bin/gcc}"
-        export CXX="${CXX:-$HOMEBREW_PREFIX/bin/g++}"
-        export AR="${AR:-$HOMEBREW_PREFIX/bin/gcc-ar}"
-        export RANLIB="${RANLIB:-$HOMEBREW_PREFIX/bin/gcc-ranlib}"
-        export NM="${NM:-$HOMEBREW_PREFIX/bin/gcc-nm}"
+        # Compiler/AR/linker selection for CMake is owned by the toolchain file.
+        # install/cmake.sh deploys it to $_LOCAL_PLAT/cmake/toolchains/llvm.cmake.
+        # Switch to GCC: CMAKE_TOOLCHAIN_FILE=$_LOCAL_PLAT/cmake/toolchains/gcc.cmake cmake ...
+        # For non-CMake builds (meson, make, autoconf), set CC/CXX explicitly per-project.
+        export CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/llvm.cmake"
+    elif [ -x "$HOMEBREW_PREFIX/bin/gcc-15" ]; then
+        export CC="${CC:-$HOMEBREW_PREFIX/bin/gcc-15}"
+        export CXX="${CXX:-$HOMEBREW_PREFIX/bin/g++-15}"
+        export AR="${AR:-$HOMEBREW_PREFIX/bin/gcc-ar-15}"
+        export RANLIB="${RANLIB:-$HOMEBREW_PREFIX/bin/gcc-ranlib-15}"
+        export NM="${NM:-$HOMEBREW_PREFIX/bin/gcc-nm-15}"
+        export CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$_LOCAL_PLAT/cmake/toolchains/gcc.cmake}"
     fi
+fi
+
+### CUDA ###
+
+# $_LOCAL_PLAT/.cuda is the per-PLAT symlink to the CUDA toolkit root.
+# CUDA is not managed by bootstrap — create the symlink manually:
+#   ln -sfn /usr/local/cuda "$_LOCAL_PLAT/.cuda"          # system toolkit
+#   ln -sfn /opt/nvidia/cuda/12.6 "$_LOCAL_PLAT/.cuda"    # versioned install
+# Different machines on a shared NFS home can point to different CUDA versions.
+# CMake picks this up via CMAKE_CUDA_COMPILER in the active toolchain file.
+if [ -e "$_LOCAL_PLAT/.cuda" ]; then
+    _cuda_root="$(realpath "$_LOCAL_PLAT/.cuda" 2>/dev/null || true)"
+    if [ -d "$_cuda_root" ]; then
+        export CUDA_PATH="$_cuda_root"
+        export CUDAToolkit_ROOT="$_cuda_root"
+        case ":${PATH:-}:" in
+            *":$_cuda_root/bin:"*) ;;
+            *) export PATH="$_cuda_root/bin${PATH:+:$PATH}" ;;
+        esac
+    fi
+    unset _cuda_root
 fi
 
 ### COMPILER CACHING ###

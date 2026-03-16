@@ -101,9 +101,45 @@ $LOCAL_PLAT/bin               chezmoi, uv, claude
 4.   packages         DF_DO_PACKAGES
 5.   macOS services   DF_DO_MACOS_SERVICES
 5.5  macOS settings   DF_DO_MACOS_SETTINGS
-6.   runtimes         DF_DO_NODE, DF_DO_RUST, DF_DO_PYTHON, DF_DO_CLAUDE, DF_DO_CODEX
+6.   runtimes         DF_DO_NODE, DF_DO_RUST, DF_DO_PYTHON, DF_DO_CLAUDE, DF_DO_CODEX, DF_DO_CMAKE
 7.   auth             DF_DO_AUTH (off by default)
 ```
+
+## CMake toolchains
+
+`install/cmake.sh` deploys `install/cmake/toolchains/{llvm,gcc}.cmake` to
+`$LOCAL_PLAT/cmake/toolchains/`. `~/.profile` sets `CMAKE_TOOLCHAIN_FILE` to
+the LLVM file when Homebrew LLVM is present. Switch with:
+
+```sh
+CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/gcc.cmake" cmake -B build
+```
+
+Source files live in `install/cmake/toolchains/` — edit them there, not in the deployed copies.
+
+## CUDA convention
+
+CUDA is **not** managed by bootstrap. It must be installed separately (system package,
+NVIDIA runfile, or sysadmin-provided module). To integrate it with the PLAT layout:
+
+```sh
+# Point the per-PLAT symlink at whichever toolkit this machine uses
+ln -sfn /usr/local/cuda              "$_LOCAL_PLAT/.cuda"   # system default
+ln -sfn /opt/nvidia/cuda/12.6        "$_LOCAL_PLAT/.cuda"   # versioned
+ln -sfn "$(which nvcc | xargs dirname)/../" "$_LOCAL_PLAT/.cuda"  # from PATH
+```
+
+`~/.profile` resolves `$_LOCAL_PLAT/.cuda` via `realpath` and exports:
+- `CUDA_PATH` — used by many build systems and NVCC itself
+- `CUDAToolkit_ROOT` — the canonical CMake variable for `find_package(CUDAToolkit)`
+- Prepends `$CUDA_PATH/bin` to `PATH` so `nvcc` is available
+
+Both CMake toolchain files (`llvm.cmake`, `gcc.cmake`) check for
+`$_LOCAL_PLAT/.cuda/bin/nvcc` and set `CMAKE_CUDA_COMPILER` when found.
+`CMAKE_CUDA_HOST_COMPILER` is always set to the toolchain's C++ compiler.
+
+Different machines on a shared NFS home can point `$LOCAL_PLAT/.cuda` at
+different toolkit versions — no conflicts.
 
 ## chezmoi template rules
 
