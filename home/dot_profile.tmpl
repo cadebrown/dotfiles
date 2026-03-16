@@ -29,6 +29,38 @@ export CMAKE_BUILD_PARALLEL_LEVEL="$(nproc 2>/dev/null || sysctl -n hw.logicalcp
 export CLICOLOR_FORCE=1                 # force color in ls/grep/etc when piped
 export USE_CCACHE=ON                    # enable ccache in CMake projects that check this var
 
+### TOOLCHAIN ###
+
+# Prefer Homebrew-installed compilers and binutils over system defaults.
+# ${VAR:-value} means: only set if not already set — override before login to change.
+# Priority: Homebrew LLVM (clang/lld/llvm-ar) → Homebrew GCC → system (PATH-resolved).
+if [ -n "${HOMEBREW_PREFIX:-}" ]; then
+    if [ -x "$HOMEBREW_PREFIX/opt/llvm/bin/clang" ]; then
+        _tc="$HOMEBREW_PREFIX/opt/llvm/bin"
+        export CC="${CC:-$_tc/clang}"
+        export CXX="${CXX:-$_tc/clang++}"
+        export AR="${AR:-$_tc/llvm-ar}"
+        export RANLIB="${RANLIB:-$_tc/llvm-ranlib}"
+        export NM="${NM:-$_tc/llvm-nm}"
+        # Linker selection (Linux only — macOS uses Apple ld for code signing / Mach-O)
+        # mold > lld > system ld. mold is not a Homebrew LLVM tool; check PATH separately.
+        if [ "$(uname -s)" = "Linux" ]; then
+            if command -v mold >/dev/null 2>&1; then
+                export LDFLAGS="${LDFLAGS:--fuse-ld=mold}"
+            elif [ -x "$_tc/lld" ]; then
+                export LDFLAGS="${LDFLAGS:--fuse-ld=lld}"
+            fi
+        fi
+        unset _tc
+    elif [ -x "$HOMEBREW_PREFIX/bin/gcc" ]; then
+        export CC="${CC:-$HOMEBREW_PREFIX/bin/gcc}"
+        export CXX="${CXX:-$HOMEBREW_PREFIX/bin/g++}"
+        export AR="${AR:-$HOMEBREW_PREFIX/bin/gcc-ar}"
+        export RANLIB="${RANLIB:-$HOMEBREW_PREFIX/bin/gcc-ranlib}"
+        export NM="${NM:-$HOMEBREW_PREFIX/bin/gcc-nm}"
+    fi
+fi
+
 ### COMPILER CACHING ###
 
 if command -v ccache >/dev/null 2>&1; then
