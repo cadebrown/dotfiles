@@ -1,17 +1,5 @@
 # .zprofile - ZSH login shell configuration
 
-### GENERAL ###
-
-{{ if eq .chezmoi.os "darwin" -}}
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
-{{- else -}}
-export LANG=en_US.UTF-8
-# LC_ALL is intentionally not set on Linux — the locale archive can't be loaded
-# by bash's setlocale(), causing "cannot change locale" warnings on every subshell.
-# LANG alone is sufficient and doesn't trigger the warning.
-{{- end }}
-
 ### PLATFORM ###
 
 # _PLAT identifies the platform and CPU capability level for this machine.
@@ -56,6 +44,24 @@ unset -f _plat_detect
 # Deduplicate PATH entries. When bash_profile exec's into zsh, PATH is already
 # partially built; typeset -U ensures prepended entries move to front, not duplicate.
 typeset -U path
+
+### GENERAL ###
+
+{{ if eq .chezmoi.os "darwin" -}}
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+{{- else -}}
+# LOCPATH must be exported before LANG. Exporting LANG triggers zsh's internal
+# setlocale() call, which reads locale data using LOCPATH. If LOCPATH isn't set
+# first, brew's glibc finds no locale archive and falls back to C/ASCII —
+# wcwidth() then counts bytes instead of display columns, leaving remnant
+# characters on screen after tab-completing multi-byte filenames or commands.
+export LOCPATH="$_LOCAL_PLAT/locale"
+export LANG=en_US.UTF-8
+# LC_ALL is intentionally not set on Linux — the locale archive can't be loaded
+# by bash's setlocale(), causing "cannot change locale" warnings on every subshell.
+# LANG alone is sufficient and doesn't trigger the warning.
+{{- end }}
 
 ### HOMEBREW ###
 # Source Homebrew first so PLAT paths can prepend on top of it.
@@ -124,11 +130,6 @@ fi
 {{ else -}}
 
 export SSL_CERT_DIR=/usr/lib/ssl/certs
-
-# LOCPATH tells brew's glibc where to find locale data (it has no locale archive
-# by default). Without this, setlocale() falls back to C/ASCII and wcwidth()
-# counts bytes instead of display columns, breaking ZLE completion rendering.
-export LOCPATH="$_LOCAL_PLAT/locale"
 
 ### CUDA ###
 
