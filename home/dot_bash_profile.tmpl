@@ -142,7 +142,16 @@ cuda_use() {
     export CUDA_HOME="$1"
     if [ -e "$CUDA_HOME" ]; then
         export PATH="$CUDA_HOME/bin:$PATH"
-        export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib:${LD_LIBRARY_PATH:-}"
+        # System driver libs (libcuda.so, libnvidia-*.so) must come before toolkit libs.
+        # The driver ships with the OS; the toolkit is managed via the .cuda symlink.
+        # Priority: driver > toolkit, so dlopen finds the right libcuda.so first.
+        _drv="/usr/lib/$(uname -m)-linux-gnu"
+        if [ -d "$_drv" ]; then
+            export LD_LIBRARY_PATH="$_drv:$CUDA_HOME/lib64:$CUDA_HOME/lib:${LD_LIBRARY_PATH:-}"
+        else
+            export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib:${LD_LIBRARY_PATH:-}"
+        fi
+        unset _drv
         export C_INCLUDE_PATH="$CUDA_HOME/include:${C_INCLUDE_PATH:-}"
         export CPLUS_INCLUDE_PATH="$CUDA_HOME/include:${CPLUS_INCLUDE_PATH:-}"
     else

@@ -153,7 +153,31 @@ function cuda_use() {
     export CUDA_HOME="$1"
     if [ -e "$CUDA_HOME" ]; then
         path=("$CUDA_HOME/bin" $path)
-        export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib:${LD_LIBRARY_PATH:-}"
+        # System driver libs (libcuda.so, libnvidia-*.so) must come before toolkit libs.
+        # The driver ships with the OS; the toolkit is managed via the .cuda symlink.
+        # Priority: driver > toolkit, so dlopen finds the right libcuda.so first.
+        local _drv="/usr/lib/$(uname -m)-linux-gnu"
+        if [ -d "$_drv" ]; then
+            export LD_LIBRARY_PATH="$_drv:$CUDA_HOME/lib64:$CUDA_HOME/lib:${LD_LIBRARY_PATH:-}"
+        else
+            export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib:${LD_LIBRARY_PATH:-}"
+        fi
+        # nvcc -L: some CUDA installs (e.g. 13.0) only have lib/, not lib64/.
+        # Homebrew GCC doesn't pass LIBRARY_PATH through to ld (custom specs), so
+        # inject -L directly into every nvcc invocation via NVCC_PREPEND_FLAGS.
+        #
+        # --dynamic-linker: Homebrew binutils ld embeds Homebrew glibc's ld.so as
+        # the ELF interpreter. That interpreter's ldconfig cache lacks the system
+        # lib dir, so dlopen("libcuda.so.1") fails at runtime with "CUDA driver
+        # version is insufficient". Force the system interpreter instead.
+        local _ldso
+        case "$(uname -m)" in
+            x86_64)  _ldso="/lib64/ld-linux-x86-64.so.2" ;;
+            aarch64) _ldso="/lib/ld-linux-aarch64.so.1" ;;
+            *)       _ldso="" ;;
+        esac
+        local _dynlinker_flag="${_ldso:+-Xlinker --dynamic-linker=$_ldso}"
+        export NVCC_PREPEND_FLAGS="-L$CUDA_HOME/lib${_dynlinker_flag:+ $_dynlinker_flag}${NVCC_PREPEND_FLAGS:+ $NVCC_PREPEND_FLAGS}"
         export C_INCLUDE_PATH="$CUDA_HOME/include:${C_INCLUDE_PATH:-}"
         export CPLUS_INCLUDE_PATH="$CUDA_HOME/include:${CPLUS_INCLUDE_PATH:-}"
     else
