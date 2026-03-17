@@ -117,3 +117,62 @@ if command -v fzf &>/dev/null; then
     export FZF_DEFAULT_OPTS="--height=40% --reverse --border --info=inline"
     eval "$(fzf --zsh)"
 fi
+
+### TOOLCHAIN ###
+
+# tc — switch between installed CMake toolchains in the current shell session.
+# Usage:
+#   tc              — show active toolchain (CMAKE_TOOLCHAIN_FILE basename)
+#   tc list         — show all available toolchain files
+#   tc gcc-15       — switch to GCC 15 (set CC/CXX/AR/RANLIB/NM + CMAKE_TOOLCHAIN_FILE)
+#   tc gcc-13       — switch to GCC 13
+#   tc llvm-22      — switch to LLVM 22 (clear CC/CXX/AR/RANLIB/NM; CMake file owns them)
+#   tc llvm-21      — switch to LLVM 21
+tc() {
+    local tc_dir="${_LOCAL_PLAT}/cmake/toolchains"
+    local brew="${HOMEBREW_PREFIX}"
+
+    # No args: show current
+    if [[ $# -eq 0 ]]; then
+        if [[ -n "${CMAKE_TOOLCHAIN_FILE:-}" ]]; then
+            print "active: ${CMAKE_TOOLCHAIN_FILE:t}"
+        else
+            print "active: (none — CMAKE_TOOLCHAIN_FILE unset)"
+        fi
+        return 0
+    fi
+
+    case "$1" in
+        list)
+            print "available toolchains in ${tc_dir}:"
+            for f in "${tc_dir}"/*.cmake(N); do print "  ${f:t:r}"; done
+            return 0
+            ;;
+        gcc-15)
+            local bin="${brew}/bin"
+            export CC="${bin}/gcc-15" CXX="${bin}/g++-15"
+            export AR="${bin}/gcc-ar-15" RANLIB="${bin}/gcc-ranlib-15" NM="${bin}/gcc-nm-15"
+            export CMAKE_TOOLCHAIN_FILE="${tc_dir}/gcc-15.cmake"
+            ;;
+        gcc-13)
+            local bin="${brew}/bin"
+            export CC="${bin}/gcc-13" CXX="${bin}/g++-13"
+            export AR="${bin}/gcc-ar-13" RANLIB="${bin}/gcc-ranlib-13" NM="${bin}/gcc-nm-13"
+            export CMAKE_TOOLCHAIN_FILE="${tc_dir}/gcc-13.cmake"
+            ;;
+        llvm-22)
+            unset CC CXX AR RANLIB NM
+            export CMAKE_TOOLCHAIN_FILE="${tc_dir}/llvm-22.cmake"
+            ;;
+        llvm-21)
+            unset CC CXX AR RANLIB NM
+            export CMAKE_TOOLCHAIN_FILE="${tc_dir}/llvm-21.cmake"
+            ;;
+        *)
+            print "tc: unknown toolchain '$1'" >&2
+            print "usage: tc [list | gcc-13 | gcc-15 | llvm-21 | llvm-22]" >&2
+            return 1
+            ;;
+    esac
+    print "switched to: ${CMAKE_TOOLCHAIN_FILE:t}"
+}

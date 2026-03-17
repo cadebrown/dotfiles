@@ -68,7 +68,9 @@ brew "cmake"
 brew "ninja"
 brew "meson"
 brew "gcc"
+brew "gcc@13"
 brew "llvm"   # clang, clang++, lldb, llvm-ar, opt, etc.
+brew "llvm@21"
 brew "lld"    # LLVM linker (now a separate formula)
 brew "mold"   # fast modern linker
 brew "ccache"  # C/C++ compiler cache
