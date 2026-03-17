@@ -145,6 +145,7 @@ while IFS= read -r line; do
         # Stdio format: <name> stdio cmd: <command...>
         _cmd="${_rest#*cmd: }"
         log_info "  $_name (stdio) → $_cmd"
+        # Split $_cmd into words for proper argument passing
         # shellcheck disable=SC2086
         if claude mcp add --scope user "$_name" -- $_cmd 2>/dev/null; then
             log_okay "  registered $_name"

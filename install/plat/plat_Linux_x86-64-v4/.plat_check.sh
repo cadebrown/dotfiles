@@ -6,7 +6,7 @@
 [ "$(uname -s)" = "Linux" ] || exit 1
 [ "$(uname -m)" = "x86_64" ] || exit 1
 for flag in avx512f avx512bw avx512cd avx512dq avx512vl \
-            avx avx2 bmi1 bmi2 f16c fma movbe xsave \
+            avx avx2 bmi1 bmi2 f16c fma lzcnt movbe xsave \
             cx16 popcnt sse4_1 sse4_2 ssse3; do
     grep -qw "$flag" /proc/cpuinfo 2>/dev/null || exit 1
 done

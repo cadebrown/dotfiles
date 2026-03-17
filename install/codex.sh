@@ -67,8 +67,20 @@ else
     _url="https://github.com/openai/codex/releases/download/${_version}/${_asset}.tar.gz"
     download "$_url" "$_tmp/codex.tar.gz"
     tar xzf "$_tmp/codex.tar.gz" -C "$_tmp"
+
+    # Verify the extracted binary is non-empty and executable
+    if [[ ! -s "$_tmp/$_asset" ]]; then
+        die "Downloaded codex binary is empty — possible corrupt download"
+    fi
+
     mv "$_tmp/$_asset" "$_dest"
     chmod +x "$_dest"
+
+    # Smoke test: ensure the binary runs
+    if ! "$_dest" --version &>/dev/null; then
+        rm -f "$_dest"
+        die "codex binary smoke test failed — removed $_dest"
+    fi
 
     log_okay "Installed codex $_semver → $_dest"
 fi

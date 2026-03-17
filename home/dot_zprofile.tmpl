@@ -19,6 +19,9 @@
 # collapse duplicates rather than accumulate them.
 typeset -U path
 
+# TODO: consider caching PLAT detection result, lazy-loading oh-my-zsh,
+# and profiling startup with zsh/zprof if shell init becomes slow.
+
 _plat_detect() {
     local _os _scan _dir _check
     _os="$(uname -s)"

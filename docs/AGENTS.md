@@ -10,11 +10,11 @@ Edit source Markdown in `docs/`. Do not edit generated files under `docs/book/`.
 
 ## Structure
 
-- [docs/SUMMARY.md](/Users/cade/dotfiles/docs/SUMMARY.md): book navigation
-- [docs/book.toml](/Users/cade/dotfiles/docs/book.toml): mdBook config
-- `docs/setup/`: setup and bootstrap docs
-- `docs/usage/`: day-to-day workflow docs
-- `docs/infra/`: hosting and infrastructure docs
+- [SUMMARY.md](SUMMARY.md): book navigation
+- [book.toml](book.toml): mdBook config
+- `setup/`: setup and bootstrap docs
+- `usage/`: day-to-day workflow docs
+- `infra/`: hosting and infrastructure docs
 
 ## Editing Guidance
 

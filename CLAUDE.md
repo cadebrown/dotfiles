@@ -197,6 +197,21 @@ Internal vars: `DF_ROOT` (repo root), `DF_PACKAGES` (packages dir), `DF_INSTALL_
 Tool-standard vars (`PLAT`, `LOCAL_PLAT`, `RUSTUP_HOME`, `CARGO_HOME`, `NVM_DIR`, etc.) keep
 their conventional names.
 
+## Toolchain switching
+
+The `tc` function in `.zshrc` switches CMake toolchains per-session:
+`tc gcc-15`, `tc gcc-13`, `tc llvm-22`, `tc llvm-21`, `tc list`, `tc` (show current).
+GCC variants set CC/CXX/AR/RANLIB/NM; LLVM variants only set CMAKE_TOOLCHAIN_FILE.
+
+## Compiler caching
+
+`~/.profile` auto-configures ccache and sccache when installed. Key settings:
+- `CCACHE_BASEDIR` = scratch root (enables cross-directory cache sharing)
+- `CCACHE_COMPILERCHECK=content` (survives brew reinstalls)
+- `CCACHE_SLOPPINESS=file_stat_matches,time_macros` (higher hit rate)
+- `CCACHE_HARDLINK=1` (zero-copy cache hits on same partition)
+- `RUSTC_WRAPPER=sccache` for Rust builds
+
 ## Gotchas
 
 These are non-obvious things that have caused real bugs:
@@ -220,6 +235,9 @@ These are non-obvious things that have caused real bugs:
 - **Python@3.14 formula is patched on Linux** — `install/patch-homebrew-python.sh` fixes uuid
   and test_datetime build issues. `HOMEBREW_NO_AUTO_UPDATE=1` prevents Homebrew from
   overwriting patches.
+- **openssh is in Brewfile cross-platform** — on Linux, the system ssh may link against a
+  different OpenSSL than Homebrew's, causing `git push` failures. Brew's openssh uses
+  Homebrew's OpenSSL consistently.
 
 ## Reference
 

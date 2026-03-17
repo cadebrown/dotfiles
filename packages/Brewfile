@@ -70,8 +70,10 @@ brew "ninja"
 brew "meson"
 brew "gcc"
 brew "gcc@13"
+brew "gcc@15"
 brew "llvm"   # clang, clang++, lldb, llvm-ar, opt, etc.
 brew "llvm@21"
+brew "llvm@22"
 brew "lld"    # LLVM linker (now a separate formula)
 brew "mold"   # fast modern linker
 brew "ccache"  # C/C++ compiler cache
@@ -93,7 +95,6 @@ brew "cc65"
 if OS.mac?
   ### Languages & Runtimes (macOS) ###
   brew "openjdk"
-  brew "openssh"
 
   ### Dev Tools - VMs & Containers (macOS) ###
   brew "colima"

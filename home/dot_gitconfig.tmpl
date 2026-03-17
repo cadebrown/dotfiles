@@ -43,6 +43,13 @@
     algorithm = histogram
     submodule = log
     colorMoved = default
+    tool = difftastic
+
+[difftool]
+    prompt = false
+
+[difftool "difftastic"]
+    cmd = difft "$LOCAL" "$REMOTE"
 
 [submodule]
     recurse = true

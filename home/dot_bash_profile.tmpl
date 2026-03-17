@@ -84,13 +84,22 @@ export PATH="$_LOCAL_PLAT/bin:$HOME/.local/bin:$PATH"
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 {{- else -}}
+# LOCPATH must be exported before LANG. Exporting LANG triggers bash's internal
+# setlocale() call, which reads locale data using LOCPATH. If LOCPATH isn't set
+# first, brew's glibc finds no locale archive and falls back to C/ASCII.
+export LOCPATH="$_LOCAL_PLAT/locale"
 export LANG=en_US.UTF-8
 # LC_ALL is intentionally not set on Linux — the locale archive can't be loaded
 # by bash's setlocale(), causing "cannot change locale" warnings on every subshell.
 # LANG alone is sufficient and doesn't trigger the warning.
 {{- end }}
 
-# Program defaults — see ~/.profile; PLAT-dependent config follows
+### HOMEBREW ###
+# Source Homebrew first so PLAT paths can prepend on top of it.
+# (already sourced above for zsh handoff, but Homebrew shellenv is
+# idempotent and this ensures HOMEBREW_PREFIX is set for .profile)
+
+# Program defaults — HOMEBREW_PREFIX is now set, so toolchain vars resolve correctly
 . "$HOME/.profile"
 
 ### NODE (nvm) ###
@@ -120,6 +129,19 @@ if [ -d "$_LOCAL_PLAT/venv/bin" ]; then
     export PATH="$_LOCAL_PLAT/venv/bin:$PATH"
 fi
 
+### PLAT PATHS ###
+# These go after Homebrew so PLAT-installed tools take priority.
+# (bash doesn't have zsh's typeset -U, so PATH dedup is manual)
+
+{{ if eq .chezmoi.os "linux" -}}
+# Prefer brew binutils on Linux — system assembler (gas) may be too old for newer
+# toolchains. E.g. NVCC 13+ emits `.base64` pseudo-ops requiring binutils >= 2.39,
+# but Ubuntu 22.04 ships 2.38. This puts brew's as/ld/etc. ahead of /usr/bin.
+if [ -d "${HOMEBREW_PREFIX:-}/opt/binutils/bin" ]; then
+    export PATH="$HOMEBREW_PREFIX/opt/binutils/bin:$PATH"
+fi
+{{ end -}}
+
 ### PLATFORM-SPECIFIC ###
 {{ if eq .chezmoi.os "darwin" -}}
 
@@ -131,27 +153,49 @@ fi
 
 export SSL_CERT_DIR=/usr/lib/ssl/certs
 
-# LOCPATH tells brew's glibc where to find locale data (it has no locale archive
-# by default). Without this, setlocale() falls back to C/ASCII and wcwidth()
-# counts bytes instead of display columns, breaking ZLE completion rendering.
-export LOCPATH="$_LOCAL_PLAT/locale"
-
 ### CUDA ###
 
+# Activate a specific CUDA toolkit installation.
 cuda_use() {
     export CUDA_HOME="$1"
     if [ -e "$CUDA_HOME" ]; then
         export PATH="$CUDA_HOME/bin:$PATH"
-        # System driver libs (libcuda.so, libnvidia-*.so) must come before toolkit libs.
-        # The driver ships with the OS; the toolkit is managed via the .cuda symlink.
-        # Priority: driver > toolkit, so dlopen finds the right libcuda.so first.
-        _drv="/usr/lib/$(uname -m)-linux-gnu"
-        if [ -d "$_drv" ]; then
-            export LD_LIBRARY_PATH="$_drv:$CUDA_HOME/lib64:$CUDA_HOME/lib:${LD_LIBRARY_PATH:-}"
-        else
-            export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib:${LD_LIBRARY_PATH:-}"
-        fi
-        unset _drv
+        # LD_LIBRARY_PATH ordering: Homebrew > CUDA toolkit > system.
+        # - Homebrew first ($HOMEBREW_PREFIX/lib): bash uses dlopen for readline, so
+        #   LD_LIBRARY_PATH order determines which readline.so.8 gets loaded. Homebrew's
+        #   lib/ has the readline 8.3 symlinks, which must win over the system's 8.1
+        #   (which crashes brew bash 5.3.9 — missing rl_full_quoting_desired).
+        #   $HOMEBREW_PREFIX/lib is safe to include (no libc/libm/libpthread/libstdc++).
+        # - System last (/usr/lib/<arch>-linux-gnu): provides libcuda.so.1 and driver
+        #   libs for Homebrew-compiled programs, whose glibc ld.so has a separate
+        #   ldconfig cache that excludes the system driver directory.
+        local _sys_lib="/usr/lib/$(uname -m)-linux-gnu"
+        local _brew_lib="${HOMEBREW_PREFIX:+${HOMEBREW_PREFIX}/lib}"
+        export LD_LIBRARY_PATH=\
+"${_brew_lib:+$_brew_lib:}$CUDA_HOME/lib64:$CUDA_HOME/lib"\
+"${_sys_lib:+:$_sys_lib}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+        unset _sys_lib _brew_lib
+        # Two Homebrew-on-Linux linker quirks require NVCC_PREPEND_FLAGS overrides:
+        #
+        # 1) -L: some CUDA installs (e.g. 13.0) only have lib/, not lib64/. nvcc
+        #    hardcodes -L.../lib64 in its link step. Homebrew GCC's custom specs
+        #    don't forward LIBRARY_PATH to ld, so inject -L directly here.
+        #
+        # 2) --dynamic-linker: Homebrew binutils ld embeds Homebrew glibc's ld.so
+        #    as the ELF interpreter. That interpreter has its own ldconfig cache
+        #    (separate from the system one), so dlopen("libcuda.so.1") fails at
+        #    runtime for binaries compiled with Homebrew tools. Force the system
+        #    interpreter so it uses the system ldconfig and finds the real driver.
+        #    (Pre-compiled apps like PyTorch/pycuda rely on the LD_LIBRARY_PATH
+        #    ordering above instead.)
+        local _ldso
+        case "$(uname -m)" in
+            x86_64)  _ldso="/lib64/ld-linux-x86-64.so.2" ;;
+            aarch64) _ldso="/lib/ld-linux-aarch64.so.1" ;;
+            *)       _ldso="" ;;
+        esac
+        local _dynlinker_flag="${_ldso:+-Xlinker --dynamic-linker=$_ldso}"
+        export NVCC_PREPEND_FLAGS="-L$CUDA_HOME/lib${_dynlinker_flag:+ $_dynlinker_flag}${NVCC_PREPEND_FLAGS:+ $NVCC_PREPEND_FLAGS}"
         export C_INCLUDE_PATH="$CUDA_HOME/include:${C_INCLUDE_PATH:-}"
         export CPLUS_INCLUDE_PATH="$CUDA_HOME/include:${CPLUS_INCLUDE_PATH:-}"
     else
@@ -159,6 +203,7 @@ cuda_use() {
     fi
 }
 
+# List installed CUDA versions. * marks the active default.
 cuda_list() {
     local _cudas_dir="$_LOCAL_PLAT/.cudas"
     local _current=""
@@ -168,6 +213,7 @@ cuda_list() {
         return 1
     fi
     for _d in "$_cudas_dir"/*/; do
+        local _name
         _name="$(basename "$_d")"
         if [ "$_name" = "$_current" ]; then
             echo "* $_name"
@@ -191,25 +237,125 @@ cuda_switch() {
     echo "Switched to $1"
 }
 
-# Auto-activate default CUDA if nvcc isn't already in PATH.
-if ! command -v nvcc >/dev/null 2>&1 && [ -e "$_LOCAL_PLAT/.cuda" ]; then
+# Always activate the default CUDA. The guard against nvcc already being in PATH
+# was removed because cuda_use sets more than just PATH (NVCC_PREPEND_FLAGS,
+# LD_LIBRARY_PATH, CUDA_HOME) — skipping it when nvcc is found elsewhere
+# (e.g. /usr/local/cuda-*/bin in PATH) leaves those vars unset.
+if [ -e "$_LOCAL_PLAT/.cuda" ]; then
     cuda_use "$_LOCAL_PLAT/.cuda"
 fi
 
+### NSIGHT SYSTEMS ###
+
+# Activate a specific Nsight Systems installation.
+nsys_use() {
+    export NSYS_HOME="$1"
+    if [ -e "$NSYS_HOME" ]; then
+        export PATH="$NSYS_HOME/bin:$PATH"
+        export LD_LIBRARY_PATH="$NSYS_HOME/lib64:$NSYS_HOME/lib:${LD_LIBRARY_PATH:-}"
+    else
+        echo "ERROR: nsys not found at $NSYS_HOME" >&2
+    fi
+}
+
+# List installed Nsight Systems versions. * marks the active default.
+nsys_list() {
+    local _nsyss_dir="$_LOCAL_PLAT/.nsyss"
+    local _current=""
+    [ -L "$_LOCAL_PLAT/.nsys" ] && _current="$(basename "$(readlink "$_LOCAL_PLAT/.nsys")")"
+    if [ ! -d "$_nsyss_dir" ]; then
+        echo "No nsys installs found at $_nsyss_dir" >&2
+        return 1
+    fi
+    for _d in "$_nsyss_dir"/*/; do
+        local _name
+        _name="$(basename "$_d")"
+        if [ "$_name" = "$_current" ]; then
+            echo "* $_name"
+        else
+            echo "  $_name"
+        fi
+    done
+}
+
+# Switch the active Nsight Systems default for this PLAT.
+# Usage: nsys_switch public_nsys_2025.3.1.90
+nsys_switch() {
+    local _target="$_LOCAL_PLAT/.nsyss/$1"
+    if [ ! -e "$_target" ]; then
+        echo "ERROR: not found: $1" >&2
+        echo "Run nsys_list to see available versions" >&2
+        return 1
+    fi
+    ln -sfn "$_target" "$_LOCAL_PLAT/.nsys"
+    nsys_use "$_LOCAL_PLAT/.nsys"
+    echo "Switched to $1"
+}
+
+# Auto-activate default nsys if nsys isn't already in PATH.
+if ! command -v nsys >/dev/null 2>&1 && [ -e "$_LOCAL_PLAT/.nsys" ]; then
+    nsys_use "$_LOCAL_PLAT/.nsys"
+fi
+
+### NSIGHT COMPUTE ###
+
+# Activate a specific Nsight Compute installation.
+ncu_use() {
+    export NCU_HOME="$1"
+    if [ -e "$NCU_HOME" ]; then
+        export PATH="$NCU_HOME/bin:$PATH"
+        export LD_LIBRARY_PATH="$NCU_HOME/lib64:$NCU_HOME/lib:${LD_LIBRARY_PATH:-}"
+    else
+        echo "ERROR: ncu not found at $NCU_HOME" >&2
+    fi
+}
+
+# List installed Nsight Compute versions. * marks the active default.
+ncu_list() {
+    local _ncus_dir="$_LOCAL_PLAT/.ncus"
+    local _current=""
+    [ -L "$_LOCAL_PLAT/.ncu" ] && _current="$(basename "$(readlink "$_LOCAL_PLAT/.ncu")")"
+    if [ ! -d "$_ncus_dir" ]; then
+        echo "No ncu installs found at $_ncus_dir" >&2
+        return 1
+    fi
+    for _d in "$_ncus_dir"/*/; do
+        local _name
+        _name="$(basename "$_d")"
+        if [ "$_name" = "$_current" ]; then
+            echo "* $_name"
+        else
+            echo "  $_name"
+        fi
+    done
+}
+
+# Switch the active Nsight Compute default for this PLAT.
+# Usage: ncu_switch public_ncu_2025.1.0
+ncu_switch() {
+    local _target="$_LOCAL_PLAT/.ncus/$1"
+    if [ ! -e "$_target" ]; then
+        echo "ERROR: not found: $1" >&2
+        echo "Run ncu_list to see available versions" >&2
+        return 1
+    fi
+    ln -sfn "$_target" "$_LOCAL_PLAT/.ncu"
+    ncu_use "$_LOCAL_PLAT/.ncu"
+    echo "Switched to $1"
+}
+
+# Auto-activate default ncu if ncu isn't already in PATH.
+if ! command -v ncu >/dev/null 2>&1 && [ -e "$_LOCAL_PLAT/.ncu" ]; then
+    ncu_use "$_LOCAL_PLAT/.ncu"
+fi
+
+# Scratch space: large local storage for NFS homes with small quotas.
+# install/scratch.sh symlinks ~/.local, ~/.cache, etc. here.
 if [ -e "$HOME/scratch" ]; then
     export SCRATCH=$(realpath "$HOME/scratch")
 fi
 
-if [ -d "$HOME/nsys" ]; then
-    export PATH="$HOME/nsys/bin:$PATH"
-    export LD_LIBRARY_PATH="$HOME/nsys/lib64:$HOME/nsys/lib:$LD_LIBRARY_PATH"
-fi
-
-if [ -d "$HOME/ncu" ]; then
-    export PATH="$HOME/ncu/bin:$PATH"
-    export LD_LIBRARY_PATH="$HOME/ncu/lib64:$HOME/ncu/lib:$LD_LIBRARY_PATH"
-fi
-
+# Docker: always use system docker on Linux
 docker() { /usr/bin/docker "$@"; }
 
 {{ end -}}

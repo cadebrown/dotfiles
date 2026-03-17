@@ -220,6 +220,42 @@ symlink exists, so `enable_language(CUDA)` works without any project-level confi
 Different machines on a shared NFS home can point their `$LOCAL_PLAT/.cuda` symlinks at
 different toolkit versions — no conflicts.
 
+### Switching toolchains at runtime
+
+The `tc` shell function (defined in `.zshrc`) switches the active toolchain for the current session:
+
+```sh
+tc              # show active toolchain
+tc list         # list available toolchain files
+tc gcc-15       # switch to GCC 15 (sets CC/CXX/AR/RANLIB/NM + CMAKE_TOOLCHAIN_FILE)
+tc gcc-13       # switch to GCC 13
+tc llvm-22      # switch to LLVM 22 (clears CC/CXX; CMake file owns compiler selection)
+tc llvm-21      # switch to LLVM 21
+```
+
+### Compiler caching (ccache / sccache)
+
+`~/.profile` configures ccache and sccache automatically when they're installed:
+
+| Setting | Value | Why |
+|---|---|---|
+| `CCACHE_BASEDIR` | scratch root or `$HOME` | Rewrites absolute paths to relative before hashing — builds in different directories share cache hits |
+| `CCACHE_COMPILERCHECK` | `content` | Hash compiler by content, not mtime — survives brew reinstalls and module swaps |
+| `CCACHE_SLOPPINESS` | `file_stat_matches,time_macros` | Use mtime+size for include checks; cache TUs with `__DATE__`/`__TIME__` |
+| `CCACHE_HARDLINK` | `1` | Hardlink cached objects instead of copying — halves I/O on cache hits |
+| `CCACHE_MAXSIZE` | 2% of partition, clamped [10G, 100G] | Auto-sized to scratch partition |
+| `RUSTC_WRAPPER` | `sccache` | Rust compiler caching |
+| `SCCACHE_CACHE_SIZE` | 2% of partition, clamped [10G, 100G] | Same auto-sizing as ccache |
+
+CMake integration: `CMAKE_C_COMPILER_LAUNCHER=ccache` and `CMAKE_CXX_COMPILER_LAUNCHER=ccache` are exported automatically.
+
+### openssh from Homebrew
+
+The Brewfile installs `openssh` cross-platform (not just macOS) to avoid OpenSSL version
+mismatches between the system ssh and Homebrew-linked libraries. On Linux, the system
+ssh may link against a different OpenSSL than Homebrew's, causing `git push` failures
+when Homebrew's git shells out to ssh. Brew's openssh uses Homebrew's OpenSSL consistently.
+
 ### Source files
 
 Toolchain source files live in `install/cmake/toolchains/` — edit them there, not in the

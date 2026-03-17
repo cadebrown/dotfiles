@@ -141,6 +141,7 @@ DF_DO_CLAUDE=0          # skip Claude Code install + plugins + MCP servers
 DF_DO_CODEX=0           # skip Codex CLI install
 DF_DO_CMAKE=0           # skip CMake toolchain file deployment
 DF_DO_AUTH=1             # run interactive API token setup
+DF_DO_OVERLAYS=0        # skip all overlay bootstraps (dotfiles-*/bootstrap.sh)
 DF_BREW_UPGRADE=0       # skip Homebrew upgrades (macOS default: 1, Linux default: 0)
 ```
 
@@ -193,7 +194,18 @@ DF_NAME="Your Name" DF_EMAIL="you@example.com" \
 ~/dotfiles/bootstrap.sh
 ```
 
-This symlinks `~/.local` and `~/.cache` to `$DF_SCRATCH/.paths/` before any tools are installed, so the multi-GB Homebrew prefix and caches never touch NFS.
+This symlinks large directories to `$DF_SCRATCH/.paths/` before any tools are installed, so the multi-GB Homebrew prefix and caches never touch NFS.
+
+Default directories redirected to scratch (controlled by `DF_LINKS`):
+
+- `~/.local` — PLAT directories, Homebrew prefix, tool binaries
+- `~/.cache` — ccache, sccache, pip/uv cache
+- `~/.vscode` / `~/.vscode-server` — VS Code extensions and data
+- `~/.cursor` / `~/.cursor-server` — Cursor IDE data
+- `~/.nv` — NVIDIA shader and OptiX cache
+- `~/.npm` — npm cache
+- `~/.claude` — Claude Code data and cache
+- `~/.oh-my-zsh` / `~/.oh-my-zsh-custom` — oh-my-zsh and plugins
 
 ---
 

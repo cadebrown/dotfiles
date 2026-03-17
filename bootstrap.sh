@@ -175,8 +175,12 @@ else
     # In update/upgrade mode, pull latest changes
     if [[ "$DF_MODE" != "install" ]]; then
         log_info "Pulling latest changes..."
-        run_logged git -C "$DF_PATH" pull --ff-only
-        log_okay "Repo updated"
+        if ! run_logged git -C "$DF_PATH" pull --ff-only; then
+            log_warn "git pull --ff-only failed — continuing with current HEAD"
+            log_warn "You may need to manually rebase or merge"
+        else
+            log_okay "Repo updated"
+        fi
     fi
 fi
 
@@ -353,7 +357,7 @@ fi
 log_section "3 — ZSH (oh-my-zsh + plugins)"
 
 if [[ "${DF_DO_ZSH:-1}" != "0" ]]; then
-    bash "$DF_INSTALL_DIR/zsh.sh"
+    bash "$DF_INSTALL_DIR/zsh.sh" || die "zsh.sh failed"
 else
     log_info "Skipping ZSH plugins (DF_DO_ZSH=0)"
 fi
@@ -366,11 +370,11 @@ if [[ "${DF_DO_PACKAGES:-1}" != "0" ]]; then
     case "$OS" in
         darwin)
             log_info "macOS — Homebrew (native bottles)"
-            bash "$DF_INSTALL_DIR/homebrew.sh"
+            bash "$DF_INSTALL_DIR/homebrew.sh" || die "homebrew.sh failed"
             ;;
         linux)
             log_info "Linux — Homebrew (native, no container)"
-            bash "$DF_INSTALL_DIR/linux-packages.sh"
+            bash "$DF_INSTALL_DIR/linux-packages.sh" || die "linux-packages.sh failed"
             # Activate brew for the rest of this bootstrap session
             BREW_BIN="$LOCAL_PLAT/brew/bin/brew"
             if [[ -x "$BREW_BIN" ]]; then
@@ -390,7 +394,7 @@ fi
 log_section "5 — macOS services"
 
 if [[ "${DF_DO_MACOS_SERVICES:-1}" != "0" ]]; then
-    bash "$DF_INSTALL_DIR/macos-services.sh"
+    bash "$DF_INSTALL_DIR/macos-services.sh" || die "macos-services.sh failed"
 else
     log_info "Skipping macOS services (DF_DO_MACOS_SERVICES=0)"
 fi
@@ -400,7 +404,7 @@ fi
 log_section "5.5 — macOS settings"
 
 if [[ "${DF_DO_MACOS_SETTINGS:-1}" != "0" ]]; then
-    bash "$DF_INSTALL_DIR/macos-settings.sh"
+    bash "$DF_INSTALL_DIR/macos-settings.sh" || die "macos-settings.sh failed"
 else
     log_info "Skipping macOS settings (DF_DO_MACOS_SETTINGS=0)"
 fi
@@ -410,37 +414,37 @@ fi
 log_section "6 — language runtimes"
 
 if [[ "${DF_DO_NODE:-1}" != "0" ]]; then
-    bash "$DF_INSTALL_DIR/node.sh"
+    bash "$DF_INSTALL_DIR/node.sh" || die "node.sh failed"
 else
     log_info "Skipping Node + npm packages (DF_DO_NODE=0)"
 fi
 
 if [[ "${DF_DO_RUST:-1}" != "0" ]]; then
-    bash "$DF_INSTALL_DIR/rust.sh"
+    bash "$DF_INSTALL_DIR/rust.sh" || die "rust.sh failed"
 else
     log_info "Skipping Rust (DF_DO_RUST=0)"
 fi
 
 if [[ "${DF_DO_PYTHON:-1}" != "0" ]]; then
-    bash "$DF_INSTALL_DIR/python.sh"
+    bash "$DF_INSTALL_DIR/python.sh" || die "python.sh failed"
 else
     log_info "Skipping Python (DF_DO_PYTHON=0)"
 fi
 
 if [[ "${DF_DO_CLAUDE:-1}" != "0" ]]; then
-    bash "$DF_INSTALL_DIR/claude.sh"
+    bash "$DF_INSTALL_DIR/claude.sh" || die "claude.sh failed"
 else
     log_info "Skipping Claude (DF_DO_CLAUDE=0)"
 fi
 
 if [[ "${DF_DO_CODEX:-1}" != "0" ]]; then
-    bash "$DF_INSTALL_DIR/codex.sh"
+    bash "$DF_INSTALL_DIR/codex.sh" || die "codex.sh failed"
 else
     log_info "Skipping Codex (DF_DO_CODEX=0)"
 fi
 
 if [[ "${DF_DO_CMAKE:-1}" != "0" ]]; then
-    bash "$DF_INSTALL_DIR/cmake.sh"
+    bash "$DF_INSTALL_DIR/cmake.sh" || die "cmake.sh failed"
 else
     log_info "Skipping CMake toolchains (DF_DO_CMAKE=0)"
 fi
@@ -450,7 +454,7 @@ fi
 log_section "7 — auth (API tokens)"
 
 if [[ "${DF_DO_AUTH:-0}" != "0" ]]; then
-    bash "$DF_INSTALL_DIR/auth.sh"
+    bash "$DF_INSTALL_DIR/auth.sh" || die "auth.sh failed"
 else
     log_info "Skipping auth (set DF_DO_AUTH=1 to run, or: bash ~/dotfiles/install/auth.sh)"
 fi
