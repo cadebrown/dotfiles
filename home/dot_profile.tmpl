@@ -87,14 +87,83 @@ if [ -e "$_LOCAL_PLAT/.cuda" ]; then
 fi
 
 ### COMPILER CACHING ###
+# Full ccache config reference: https://ccache.dev/manual/latest.html#_configuration_settings
+# Key principle: ccache hashes (compiler, flags, preprocessed source) → object.
+# Every setting below is about maximising hit rate without sacrificing correctness.
 
 if command -v ccache >/dev/null 2>&1; then
+    # Tell CMake to prefix every compile command with ccache.
+    # https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_COMPILER_LAUNCHER.html
     export CMAKE_C_COMPILER_LAUNCHER=ccache
     export CMAKE_CXX_COMPILER_LAUNCHER=ccache
     export CMAKE_CUDA_COMPILER_LAUNCHER=ccache
-    export CCACHE_DIR="${HOME}/.cache/ccache"  # lands on scratch when ~/.cache is symlinked
-    # Size cache at 2% of total partition size, clamped to [10G, 100G].
-    # df -Pk: POSIX portable, 1K blocks. total is column 2. result in GiB.
+
+    # Cache directory. scratch.sh symlinks ~/.cache → local scratch partition,
+    # so this never counts against the NFS home quota.
+    export CCACHE_DIR="${HOME}/.cache/ccache"
+
+    # CCACHE_BASEDIR — the single most important setting for hit rate.
+    # https://ccache.dev/manual/latest.html#config_base_dir
+    #
+    # ccache hashes the *preprocessed* source, which embeds absolute #line
+    # directives. Two builds of the same file in different directories
+    # (e.g. build/ vs build-release/, or two checkouts of the same repo)
+    # always miss without this, because those absolute paths differ.
+    #
+    # With BASEDIR set, ccache rewrites any path that starts with this prefix
+    # to a relative path before hashing — so build directory is irrelevant.
+    #
+    # We resolve the real path of ~/scratch (pwd -P follows the symlink) rather
+    # than using $HOME, because source trees live under the scratch root
+    # (e.g. /home/scratch.cadeb_ent_1/dev/...), which is a *different* filesystem
+    # root than $HOME (/home/cadeb/). Setting BASEDIR=$HOME would never match
+    # paths under scratch and the feature would do nothing.
+    #
+    # Trade-off: DWARF debug info will embed paths relative to BASEDIR instead
+    # of absolute paths. gdb/lldb source lookup still works when running from
+    # the same root; or add "set substitute-path <old> <new>" to .gdbinit.
+    if [ -e "${HOME}/scratch" ]; then
+        export CCACHE_BASEDIR="$(cd "${HOME}/scratch" && pwd -P)"
+    else
+        export CCACHE_BASEDIR="${HOME}"
+    fi
+
+    # Hash the compiler binary by *content*, not mtime (the default).
+    # https://ccache.dev/manual/latest.html#config_compiler_check
+    # Mtime is fragile: brew reinstall, module swap, or a recompiled toolchain
+    # can produce a binary with the same timestamp → wrong cache hits. Content
+    # is slower to check once but guarantees correctness across compiler updates.
+    export CCACHE_COMPILERCHECK=content
+
+    # CCACHE_SLOPPINESS — a comma-separated list of things ccache is allowed
+    # to ignore when computing the hash. Each relaxation trades a theoretical
+    # correctness edge case for a higher hit rate.
+    # https://ccache.dev/manual/latest.html#config_sloppiness
+    #
+    # file_stat_matches:
+    #   Use mtime+size to decide whether an included file has changed, instead
+    #   of rehashing its content on every lookup. Safe as long as editors update
+    #   mtime when they write (all normal editors do). Big speedup for headers.
+    #
+    # time_macros:
+    #   Cache TUs that use __DATE__ / __TIME__. Without this, ccache refuses to
+    #   cache any file that expands these macros because the output changes every
+    #   second. With it, the cached object has the original compile timestamp
+    #   baked in. Acceptable for dev builds — release/dist builds should be
+    #   clean anyway, and build-date strings in dev binaries are rarely load-bearing.
+    export CCACHE_SLOPPINESS=file_stat_matches,time_macros
+
+    # Write cached objects back to the build directory via hardlinks instead of
+    # copies. https://ccache.dev/manual/latest.html#config_hard_link
+    # Since the cache dir and build dirs both live on the same scratch partition,
+    # hardlinking is free (no data movement, just a new directory entry). This
+    # halves the I/O for cache hits and saves scratch space for large CUDA TUs.
+    # Note: object files must not be modified in-place after linking (they won't be).
+    export CCACHE_HARDLINK=1
+
+    # Size the cache at 2% of the scratch partition, clamped to [10G, 100G].
+    # df -Pk gives POSIX-portable output in 1K blocks; column 2 is total size.
+    # https://ccache.dev/manual/latest.html#config_max_size
     _cache_total_kb="$(df -Pk "${HOME}/.cache" 2>/dev/null | awk 'NR==2{print $2}')"
     if [ -n "$_cache_total_kb" ]; then
         _cache_target_g=$(( _cache_total_kb / 50 / 1024 / 1024 ))
