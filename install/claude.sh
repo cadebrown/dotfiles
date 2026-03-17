@@ -42,7 +42,13 @@ _dest="$ARCH_BIN/claude"
 if [[ -x "$_dest" ]] && "$_dest" --version 2>/dev/null | grep -qF "$_version"; then
     log_okay "claude $_version already installed at $_dest"
 else
-    # Download and verify checksum
+    # Download to a temp file in the same dir, then atomically rename.
+    # Writing directly to $_dest fails with curl error 23 on network-mounted
+    # filesystems when an existing binary is already open/executing.
+    _tmp="${_dest}.tmp.$$"
+    # shellcheck disable=SC2064
+    trap "rm -f '$_tmp'" EXIT
+
     log_info "Downloading claude $_version for $_platform..."
     ensure_dir "$ARCH_BIN"
 
@@ -58,27 +64,29 @@ else
         fi
     fi
 
-    download "$_BUCKET/$_version/$_platform/claude" "$_dest"
-    chmod +x "$_dest"
+    download "$_BUCKET/$_version/$_platform/claude" "$_tmp"
+    chmod +x "$_tmp"
 
     # Verify checksum if we got one
     if [[ -n "$_checksum" ]]; then
         if [[ "$OS" == "darwin" ]]; then
-            _actual=$(shasum -a 256 "$_dest" | cut -d' ' -f1)
+            _actual=$(shasum -a 256 "$_tmp" | cut -d' ' -f1)
         else
-            _actual=$(sha256sum "$_dest" | cut -d' ' -f1)
+            _actual=$(sha256sum "$_tmp" | cut -d' ' -f1)
         fi
         if [[ "$_actual" != "$_checksum" ]]; then
-            rm -f "$_dest"
+            rm -f "$_tmp"
             die "Checksum mismatch for claude $_version ($_platform)"
         fi
         log_okay "Checksum verified"
     fi
 
+    mv -f "$_tmp" "$_dest"
+    trap - EXIT
     log_okay "Installed claude $_version → $_dest"
 fi
 
-unset _plat_arch _platform _BUCKET _version _dest _checksum _actual _manifest
+unset _plat_arch _platform _BUCKET _version _dest _tmp _checksum _actual _manifest
 
 ### PLUGINS (all platforms) ###
 
