@@ -153,7 +153,21 @@ function cuda_use() {
     export CUDA_HOME="$1"
     if [ -e "$CUDA_HOME" ]; then
         path=("$CUDA_HOME/bin" $path)
-        export LD_LIBRARY_PATH="$CUDA_HOME/lib64:$CUDA_HOME/lib:${LD_LIBRARY_PATH:-}"
+        # LD_LIBRARY_PATH ordering: Homebrew > CUDA toolkit > system.
+        # - Homebrew first ($HOMEBREW_PREFIX/lib): bash uses dlopen for readline, so
+        #   LD_LIBRARY_PATH order determines which readline.so.8 gets loaded. Homebrew's
+        #   lib/ has the readline 8.3 symlinks, which must win over the system's 8.1
+        #   (which crashes brew bash 5.3.9 — missing rl_full_quoting_desired).
+        #   $HOMEBREW_PREFIX/lib is safe to include (no libc/libm/libpthread/libstdc++).
+        # - System last (/usr/lib/<arch>-linux-gnu): provides libcuda.so.1 and driver
+        #   libs for Homebrew-compiled programs, whose glibc ld.so has a separate
+        #   ldconfig cache that excludes the system driver directory.
+        local _sys_lib="/usr/lib/$(uname -m)-linux-gnu"
+        local _brew_lib="${HOMEBREW_PREFIX:+${HOMEBREW_PREFIX}/lib}"
+        export LD_LIBRARY_PATH=\
+"${_brew_lib:+$_brew_lib:}$CUDA_HOME/lib64:$CUDA_HOME/lib"\
+"${_sys_lib:+:$_sys_lib}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+        unset _sys_lib _brew_lib
         # Two Homebrew-on-Linux linker quirks require NVCC_PREPEND_FLAGS overrides:
         #
         # 1) -L: some CUDA installs (e.g. 13.0) only have lib/, not lib64/. nvcc
@@ -163,10 +177,10 @@ function cuda_use() {
         # 2) --dynamic-linker: Homebrew binutils ld embeds Homebrew glibc's ld.so
         #    as the ELF interpreter. That interpreter has its own ldconfig cache
         #    (separate from the system one), so dlopen("libcuda.so.1") fails at
-        #    runtime ("CUDA driver version is insufficient"). Force the system
+        #    runtime for binaries compiled with Homebrew tools. Force the system
         #    interpreter so it uses the system ldconfig and finds the real driver.
-        #    NOTE: do NOT add /usr/lib/<arch>-linux-gnu to LD_LIBRARY_PATH as a
-        #    workaround — it shadows Homebrew's readline/etc and breaks brew bash.
+        #    (Pre-compiled apps like PyTorch/pycuda rely on the LD_LIBRARY_PATH
+        #    ordering above instead.)
         local _ldso
         case "$(uname -m)" in
             x86_64)  _ldso="/lib64/ld-linux-x86-64.so.2" ;;
