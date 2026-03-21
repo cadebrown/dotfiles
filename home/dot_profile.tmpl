@@ -40,26 +40,31 @@ export USE_CCACHE=ON                    # enable ccache in CMake projects that c
 if [ -n "${HOMEBREW_PREFIX:-}" ]; then
     _os="$(uname -s)"
     if [ "$_os" = "Linux" ]; then
-        if [ -x "$HOMEBREW_PREFIX/bin/gcc-15" ]; then
-            export CC="${CC:-$HOMEBREW_PREFIX/bin/gcc-15}"
-            export CXX="${CXX:-$HOMEBREW_PREFIX/bin/g++-15}"
-            export AR="${AR:-$HOMEBREW_PREFIX/bin/gcc-ar-15}"
-            export RANLIB="${RANLIB:-$HOMEBREW_PREFIX/bin/gcc-ranlib-15}"
-            export NM="${NM:-$HOMEBREW_PREFIX/bin/gcc-nm-15}"
-            export CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$_LOCAL_PLAT/cmake/toolchains/gcc-15.cmake}"
+        if [ -x "$HOMEBREW_PREFIX/bin/gcc-13" ]; then
+            export CC="${CC:-$HOMEBREW_PREFIX/bin/gcc-13}"
+            export CXX="${CXX:-$HOMEBREW_PREFIX/bin/g++-13}"
+            export AR="${AR:-$HOMEBREW_PREFIX/bin/gcc-ar-13}"
+            export RANLIB="${RANLIB:-$HOMEBREW_PREFIX/bin/gcc-ranlib-13}"
+            export NM="${NM:-$HOMEBREW_PREFIX/bin/gcc-nm-13}"
+            export CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$_LOCAL_PLAT/cmake/toolchains/gcc-13.cmake}"
         elif [ -x "$HOMEBREW_PREFIX/opt/llvm/bin/clang" ]; then
             export CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$_LOCAL_PLAT/cmake/toolchains/llvm-22.cmake}"
         fi
+        # RPATH over RUNPATH: mold and lld default to DT_RUNPATH, which the
+        # dynamic linker checks after ld.so.cache — the system's older
+        # libstdc++ wins.  Force DT_RPATH for non-CMake builds (make, meson,
+        # autotools).  CMake builds get this from the toolchain files instead.
+        export LDFLAGS="${LDFLAGS:+$LDFLAGS }-Wl,--disable-new-dtags"
     else
         if [ -x "$HOMEBREW_PREFIX/opt/llvm/bin/clang" ]; then
             export CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$_LOCAL_PLAT/cmake/toolchains/llvm-22.cmake}"
-        elif [ -x "$HOMEBREW_PREFIX/bin/gcc-15" ]; then
-            export CC="${CC:-$HOMEBREW_PREFIX/bin/gcc-15}"
-            export CXX="${CXX:-$HOMEBREW_PREFIX/bin/g++-15}"
-            export AR="${AR:-$HOMEBREW_PREFIX/bin/gcc-ar-15}"
-            export RANLIB="${RANLIB:-$HOMEBREW_PREFIX/bin/gcc-ranlib-15}"
-            export NM="${NM:-$HOMEBREW_PREFIX/bin/gcc-nm-15}"
-            export CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$_LOCAL_PLAT/cmake/toolchains/gcc-15.cmake}"
+        elif [ -x "$HOMEBREW_PREFIX/bin/gcc-13" ]; then
+            export CC="${CC:-$HOMEBREW_PREFIX/bin/gcc-13}"
+            export CXX="${CXX:-$HOMEBREW_PREFIX/bin/g++-13}"
+            export AR="${AR:-$HOMEBREW_PREFIX/bin/gcc-ar-13}"
+            export RANLIB="${RANLIB:-$HOMEBREW_PREFIX/bin/gcc-ranlib-13}"
+            export NM="${NM:-$HOMEBREW_PREFIX/bin/gcc-nm-13}"
+            export CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$_LOCAL_PLAT/cmake/toolchains/gcc-13.cmake}"
         fi
     fi
     unset _os

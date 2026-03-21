@@ -130,7 +130,7 @@ Once built, packages are cached. Subsequent runs and upgrades are bottle-only.
 
 **Compilers:** `gcc` and `llvm` are keg-only (Homebrew doesn't create unversioned `gcc`/`clang`
 symlinks to avoid shadowing system compilers). `linux-packages.sh` creates symlinks in
-`$LOCAL_PLAT/bin/` so `gcc` → `gcc-15` and `clang` → `llvm@21/bin/clang`.
+`$LOCAL_PLAT/bin/` so `gcc` → the highest installed GCC and `clang` → `llvm@21/bin/clang`.
 
 See [Compiler toolchains](#compiler-toolchains) below for CMake integration.
 

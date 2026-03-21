@@ -200,7 +200,7 @@ their conventional names.
 ## Toolchain switching
 
 The `tc` function in `.zshrc` switches CMake toolchains per-session:
-`tc gcc-15`, `tc gcc-13`, `tc llvm-22`, `tc llvm-21`, `tc list`, `tc` (show current).
+`tc gcc-13`, `tc gcc-15`, `tc llvm-22`, `tc llvm-21`, `tc list`, `tc` (show current).
 GCC variants set CC/CXX/AR/RANLIB/NM; LLVM variants only set CMAKE_TOOLCHAIN_FILE.
 
 ## Compiler caching
@@ -235,6 +235,10 @@ These are non-obvious things that have caused real bugs:
 - **Python@3.14 formula is patched on Linux** — `install/patch-homebrew-python.sh` fixes uuid
   and test_datetime build issues. `HOMEBREW_NO_AUTO_UPDATE=1` prevents Homebrew from
   overwriting patches.
+- **mold/lld need `--disable-new-dtags` on Linux** — these linkers default to DT_RUNPATH,
+  which is searched after ld.so.cache, so the system's older libstdc++ wins over Homebrew's.
+  All four CMake toolchain files add `-Wl,--disable-new-dtags` when selecting mold or lld.
+  `~/.profile` also sets `LDFLAGS` with the same flag for non-CMake builds.
 - **openssh is in Brewfile cross-platform** — on Linux, the system ssh may link against a
   different OpenSSL than Homebrew's, causing `git push` failures. Brew's openssh uses
   Homebrew's OpenSSL consistently.

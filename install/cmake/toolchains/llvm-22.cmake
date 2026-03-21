@@ -52,13 +52,24 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 # Linker — Linux only. macOS requires Apple ld for code signing / Mach-O.
+# lld defaults to DT_RUNPATH, which the dynamic linker checks *after* ld.so.cache
+# — so the system's older libstdc++ is found before Homebrew's.
+# --disable-new-dtags forces DT_RPATH (checked first).
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     if(EXISTS "${_llvm}/bin/lld")
+        set(_rpath_fix "-Wl,--disable-new-dtags")
         if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.29")
             set(CMAKE_LINKER_TYPE LLD CACHE STRING "Linker type")
+            set(CMAKE_EXE_LINKER_FLAGS_INIT    "${_rpath_fix}" CACHE STRING "")
+            set(CMAKE_SHARED_LINKER_FLAGS_INIT "${_rpath_fix}" CACHE STRING "")
+            set(CMAKE_MODULE_LINKER_FLAGS_INIT "${_rpath_fix}" CACHE STRING "")
         else()
             set(CMAKE_LINKER "${_llvm}/bin/lld" CACHE FILEPATH "Linker")
+            set(CMAKE_EXE_LINKER_FLAGS_INIT    "${_rpath_fix}" CACHE STRING "")
+            set(CMAKE_SHARED_LINKER_FLAGS_INIT "${_rpath_fix}" CACHE STRING "")
+            set(CMAKE_MODULE_LINKER_FLAGS_INIT "${_rpath_fix}" CACHE STRING "")
         endif()
+        unset(_rpath_fix)
     endif()
 endif()
 
