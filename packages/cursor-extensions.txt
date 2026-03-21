@@ -1,0 +1,38 @@
+# Cursor extensions — one extension ID per line
+# Managed by install/cursor.sh
+# Generate fresh list: cursor --list-extensions
+analytic-signal.preview-mp4
+anthropic.claude-code
+anysphere.cursorpyright
+anysphere.remote-ssh
+astro-build.astro-vscode
+charliermarsh.ruff
+davidanson.vscode-markdownlint
+donjayamanne.githistory
+github.vscode-pull-request-github
+mechatroner.rainbow-csv
+ms-azuretools.vscode-containers
+ms-azuretools.vscode-docker
+ms-playwright.playwright
+ms-python.debugpy
+ms-python.flake8
+ms-python.python
+ms-toolsai.jupyter
+ms-toolsai.jupyter-keymap
+ms-toolsai.jupyter-renderers
+ms-toolsai.vscode-jupyter-cell-tags
+ms-toolsai.vscode-jupyter-slideshow
+ms-vscode-remote.remote-ssh-edit
+ms-vscode.cpptools
+ms-vscode.cpptools-extension-pack
+ms-vscode.cpptools-themes
+ms-vscode.theme-tomorrowkit
+platformio.platformio-ide
+polymeilex.wgsl
+redhat.vscode-yaml
+robbowen.synthwave-vscode
+rust-lang.rust-analyzer
+sumneko.lua
+tamasfe.even-better-toml
+tintinweb.graphviz-interactive-preview
+unifiedjs.vscode-mdx

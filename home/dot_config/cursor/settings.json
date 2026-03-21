@@ -1,0 +1,108 @@
+{
+    "workbench.startupEditor": "newUntitledFile",
+    "explorer.compactFolders": false,
+    "workbench.tree.indent": 16,
+    "editor.fontSize": 14,
+    "editor.wordWrap": "on",
+    "explorer.confirmDelete": false,
+    "explorer.confirmDragAndDrop": false,
+    "settingsSync.ignoredSettings": [
+        "-C_Cpp.default.includePath"
+    ],
+    "cmake.configureOnOpen": false,
+    "git.ignoreLegacyWarning": true,
+    "python.showStartPage": false,
+    "javascript.updateImportsOnFileMove.enabled": "always",
+    "C_Cpp.clang_format_fallbackStyle": "\"{ BasedOnStyle: Google, IndentWidth: 4 }\"",
+    "C_Cpp.default.cppStandard": "c++20",
+    "editor.inlineSuggest.enabled": true,
+    "github.copilot.enable": {
+        "*": true,
+        "yaml": false,
+        "plaintext": true,
+        "markdown": true,
+        "c": true
+    },
+    "C_Cpp.autocompleteAddParentheses": true,
+    "C_Cpp.intelliSenseEngine": "default",
+    "editor.suggestSelection": "first",
+    "C_Cpp.default.cStandard": "c99",
+    "omnisharp.useGlobalMono": "always",
+    "security.workspace.trust.untrustedFiles": "open",
+    "[cpp]": {
+        "editor.wordBasedSuggestions": "off",
+        "editor.suggest.insertMode": "replace",
+        "editor.semanticHighlighting.enabled": true
+    },
+    "[python]": {
+        "editor.formatOnType": true
+    },
+    "typescript.updateImportsOnFileMove.enabled": "always",
+    "workbench.editor.empty.hint": "hidden",
+    "workbench.editor.revealIfOpen": true,
+    "cmake.showOptionsMovedNotification": false,
+    "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
+    "files.associations": {
+        "*.h": "cpp"
+    },
+    "editor.accessibilitySupport": "off",
+    "github.copilot.editor.enableAutoCompletions": true,
+    "C_Cpp.inlayHints.autoDeclarationTypes.enabled": true,
+    "C_Cpp.inlayHints.autoDeclarationTypes.showOnLeft": true,
+    "C_Cpp.inlayHints.referenceOperator.enabled": true,
+    "C_Cpp.inlayHints.parameterNames.enabled": true,
+    "cmake.pinnedCommands": [
+        "workbench.action.tasks.configureTaskRunner",
+        "workbench.action.tasks.runTask"
+    ],
+    "cmake.configureOnEdit": false,
+    "cmake.automaticReconfigure": false,
+    "cmake.useCMakePresets": "never",
+    "cmake.configureArgs": [],
+    "cmake.configureSettings": {},
+    "C_Cpp.default.compilerPath": "",
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "[cuda-cpp]": {
+        "editor.wordBasedSuggestions": "off",
+        "editor.suggest.insertMode": "replace",
+        "editor.semanticHighlighting.enabled": true
+    },
+    "astro.content-intellisense": true,
+    "python.defaultInterpreterPath": "python3",
+    "python.analysis.typeCheckingMode": "standard",
+    "python.analysis.autoImportCompletions": true,
+    "terminal.integrated.shellIntegration.suggestEnabled": true,
+    "terminal.integrated.shellIntegration.history": 1024,
+    "python.terminal.activateEnvironment": false,
+    "[mdx]": {
+        "editor.defaultFormatter": "unifiedjs.vscode-mdx"
+    },
+    "window.zoomLevel": 1,
+    "C_Cpp.loggingLevel": "Debug",
+    "C_Cpp.codeAnalysis.clangTidy.enabled": true,
+    "cmake.skipConfigureIfCachePresent": true,
+    "github.copilot.nextEditSuggestions.enabled": true,
+    "workbench.colorTheme": "SynthWave '84",
+    "chat.editor.wordWrap": "on",
+    "chat.fontSize": 14,
+    "inlineChat.enableV2": true,
+    "inlineChat.notebookAgent": true,
+    "[dockercompose]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.autoIndent": "advanced",
+        "editor.quickSuggestions": {
+            "other": true,
+            "comments": false,
+            "strings": true
+        },
+        "editor.defaultFormatter": "redhat.vscode-yaml"
+    },
+    "[github-actions-workflow]": {
+        "editor.defaultFormatter": "redhat.vscode-yaml"
+    },
+    "cursor.cpp.disabledLanguages": [
+        "yaml"
+    ],
+    "cursor.composer.shouldAllowCustomModes": true
+}

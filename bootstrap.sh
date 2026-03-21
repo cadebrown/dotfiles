@@ -37,6 +37,7 @@
 #   DF_DO_CODEX         — set to 0 to skip Codex CLI install
 #   DF_DO_MACOS_SETTINGS — set to 0 to skip macOS settings
 #   DF_DO_AUTH          — set to 1 to run interactive API token setup
+#   DF_DO_CURSOR        — set to 0 to skip Cursor settings sync
 #   DF_DO_CMAKE         — set to 0 to skip CMake toolchain file install
 #   DF_DO_OVERLAYS      — set to 0 to skip all overlay bootstraps
 
@@ -441,6 +442,12 @@ if [[ "${DF_DO_CODEX:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/codex.sh" || die "codex.sh failed"
 else
     log_info "Skipping Codex (DF_DO_CODEX=0)"
+fi
+
+if [[ "${DF_DO_CURSOR:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/cursor.sh" || die "cursor.sh failed"
+else
+    log_info "Skipping Cursor settings (DF_DO_CURSOR=0)"
 fi
 
 if [[ "${DF_DO_CMAKE:-1}" != "0" ]]; then
