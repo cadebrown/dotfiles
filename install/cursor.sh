@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # install/cursor.sh - symlink Cursor settings from chezmoi-managed source + install extensions
 #
+# Subcommands:
+#   install (default)      — symlink settings + install extensions from cursor-extensions.txt
+#   sync-extensions|sync   — union Cursor's installed extensions back into cursor-extensions.txt
+#
 # Settings source of truth: ~/.config/cursor/{settings,keybindings}.json
 # (deployed by chezmoi from home/dot_config/cursor/)
 #
@@ -9,9 +13,63 @@
 #
 # Edits made in Cursor's UI go through the symlink and land directly in
 # the dotfiles-managed copy — no manual sync needed.
+#
+# The Cursor application itself is managed via Brewfile (cask "cursor").
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+
+_CMD="${1:-install}"
+
+### sync-extensions: union installed extensions back into cursor-extensions.txt ###
+
+if [[ "$_CMD" == "sync-extensions" || "$_CMD" == "sync" ]]; then
+    log_section "Cursor extension sync"
+
+    if ! has cursor; then
+        die "cursor CLI not found — run 'Cursor: Install cursor command in PATH' from the command palette"
+    fi
+
+    EXT_TXT="$DF_PACKAGES/cursor-extensions.txt"
+    [[ -f "$EXT_TXT" ]] || die "No cursor-extensions.txt at $EXT_TXT"
+
+    # Get installed extensions from Cursor
+    _cursor_exts="$(cursor --list-extensions 2>/dev/null)" \
+        || die "Failed to list Cursor extensions"
+
+    # Read existing entries (skip comments and blanks)
+    _file_exts="$(grep -v '^\s*#' "$EXT_TXT" | grep -v '^\s*$' || true)"
+
+    # Union both sets
+    _union="$(printf '%s\n%s\n' "$_file_exts" "$_cursor_exts" | sort -u)"
+
+    # Find what's new
+    _new="$(comm -23 <(echo "$_union") <(echo "$_file_exts" | sort -u))"
+
+    if [[ -z "$_new" ]]; then
+        log_okay "No new extensions to add"
+        exit 0
+    fi
+
+    # Preserve comment header (lines starting with #), then write sorted union
+    _header="$(grep '^\s*#' "$EXT_TXT" || true)"
+    printf '%s\n%s\n' "$_header" "$_union" > "$EXT_TXT"
+
+    _count="$(echo "$_new" | wc -l | tr -d ' ')"
+    log_info "Added $_count new extension(s):"
+    while IFS= read -r ext; do
+        log_info "  + $ext"
+    done <<< "$_new"
+
+    # Show the diff
+    git -C "$DF_ROOT" diff -- packages/cursor-extensions.txt 2>/dev/null || true
+    log_okay "Run 'chezmoi apply' then commit when ready"
+    exit 0
+fi
+
+if [[ "$_CMD" != "install" ]]; then
+    die "Usage: cursor.sh [install|sync-extensions]"
+fi
 
 log_section "Cursor"
 
