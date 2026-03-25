@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
-# install/python.sh - install uv and create ~/.venv with pip.txt packages
+# install/python.sh - install uv and Python CLI tools
+#
+# Strategy:
+#   - Homebrew python@3.14 provides dev headers (Python.h, libpython3.14.so)
+#     and satisfies brew formula deps (vim, imagemagick, etc.)
+#   - uv tool install gives each CLI tool (ipython, jupyter, etc.) its own
+#     isolated venv — no monolithic user-level environment to rot.
+#   - Per-project venvs via `uv init` / `uv sync` for actual library work.
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
@@ -19,34 +26,36 @@ else
     log_okay "Installed: $(uv --version)"
 fi
 
-### venv ###
-
-# VENV is set by _lib.sh to ~/.local/$PLAT/venv
-
-if [[ -d "$VENV" ]]; then
-    log_okay "~/.venv already exists"
-else
-    log_info "Creating ~/.venv (Python 3.14)"
-    # --python 3.14: pin version for reproducibility across machines sharing an NFS home.
-    # --seed: pre-install pip + setuptools into the venv.
-    # Without it, uv creates a bare venv with no pip, which breaks `pip install`
-    # and tools that expect pip to exist (e.g. some build systems).
-    run_logged uv venv "$VENV" --python 3.14 --seed
-    log_okay "~/.venv created"
-fi
-
-### packages ###
+### CLI tools ###
+#
+# Each tool from pip.txt is installed via `uv tool install`, giving it an
+# isolated venv under $LOCAL_PLAT/uv/tools/ with its entrypoint in $ARCH_BIN.
+# UV_TOOL_BIN_DIR and UV_TOOL_DIR are set by _lib.sh.
 
 PIP_TXT="$DF_PACKAGES/pip.txt"
 [[ -f "$PIP_TXT" ]] || { log_warn "No pip.txt at $PIP_TXT — skipping"; exit 0; }
 
-log_info "Syncing packages from pip.txt"
-# --python $VENV/bin/python: explicit path so uv targets the PLAT venv even when
-# another Python is active (e.g. if the system python is higher on PATH).
-# -r: single resolution pass — faster and catches inter-package conflicts that
-# the old one-by-one loop let slip through.
-if run_logged uv pip install --python "$VENV/bin/python" -r "$PIP_TXT"; then
-    log_okay "Python packages installed"
-else
-    log_warn "Python packages: one or more packages failed to install"
-fi
+log_info "Installing CLI tools from pip.txt"
+_installed=0
+_skipped=0
+_failed=0
+
+while IFS= read -r _pkg; do
+    # _read_package_list strips comments/blanks but we read raw here for simplicity
+    _pkg="$(echo "$_pkg" | sed 's/#.*//;s/^[[:space:]]*//;s/[[:space:]]*$//')"
+    [[ -z "$_pkg" ]] && continue
+
+    if uv tool list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "^$_pkg "; then
+        log_debug "Already installed: $_pkg"
+        (( _skipped++ )) || true
+    else
+        if uv tool install "$_pkg" 2>&1; then
+            (( _installed++ )) || true
+        else
+            log_warn "Failed to install: $_pkg"
+            (( _failed++ )) || true
+        fi
+    fi
+done < "$PIP_TXT"
+
+log_okay "Python tools: $_installed installed, $_skipped already present, $_failed failed"

@@ -126,16 +126,13 @@ path=("$CARGO_HOME/bin" $path)
 
 ### PYTHON (uv) ###
 
-# Keep all arch-specific uv state under _LOCAL_PLAT so shared homes stay clean
+# Keep all arch-specific uv state under _LOCAL_PLAT so shared homes stay clean.
+# CLI tools (ipython, jupyter) are installed via `uv tool install` into isolated
+# venvs under uv/tools/, with entrypoints in $_LOCAL_PLAT/bin/ (already on PATH).
+# Homebrew python@3.14 provides dev headers; per-project venvs via `uv init`.
 export UV_TOOL_BIN_DIR="$_LOCAL_PLAT/bin"
 export UV_TOOL_DIR="$_LOCAL_PLAT/uv/tools"
 export UV_PYTHON_INSTALL_DIR="$_LOCAL_PLAT/uv/python"
-
-# Prepend venv/bin directly — avoids setting VIRTUAL_ENV, which triggers uv warnings
-# when running `uv run` inside a project with its own .venv.
-if [ -d "$_LOCAL_PLAT/venv/bin" ]; then
-    path=("$_LOCAL_PLAT/venv/bin" $path)
-fi
 
 ### PLATFORM-SPECIFIC ###
 {{ if eq .chezmoi.os "darwin" -}}

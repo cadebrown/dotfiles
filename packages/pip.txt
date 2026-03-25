@@ -1,40 +1,14 @@
-# pip.txt - Python packages to install into ~/.venv via uv
+# pip.txt - Python CLI tools installed via `uv tool install`
 # Usage: install/python.sh reads this file
+#
+# Each tool gets its own isolated venv — no conflicts, no monolithic environment.
+# Libraries (numpy, scipy, etc.) belong in per-project pyproject.toml, not here.
 
 # Interactive Python
 ipython
 
 # Jupyter
-jupyter
 jupyterlab
-notebook
-
-# NumPy/SciPy stack
-numpy
-scipy
-sympy
-matplotlib
-seaborn
-
-# Data tools
-pandas
-polars
-tabulate
 
 # CLI/output helpers
-click
-rich
-tqdm
-cachetools
-
-# Web/scraping
-requests
-bs4
-
-# Visualization
-wordcloud
-opencv-python
-
-# ML/Scientific
-voila
-
+rich-cli

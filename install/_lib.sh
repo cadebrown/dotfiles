@@ -72,7 +72,8 @@ DF_PACKAGES="$DF_ROOT/packages"
 #   ~/.local/$PLAT/nvm/         nvm install + node versions — NVM_DIR
 #   ~/.local/$PLAT/rustup/      Rust toolchain — RUSTUP_HOME
 #   ~/.local/$PLAT/cargo/       Cargo home — CARGO_HOME (bins at cargo/bin/)
-#   ~/.local/$PLAT/venv/        Python virtualenv — VENV
+#   ~/.local/$PLAT/uv/tools/    uv tool venvs (ipython, jupyter, etc.)
+#   ~/.local/$PLAT/uv/python/   uv-managed Python installs (on-demand)
 #
 # ~/.local/bin/ stays on PATH for arch-neutral shell scripts only.
 #
@@ -137,7 +138,6 @@ CARGO_HOME="$LOCAL_PLAT/cargo"
 # macOS Sequoia+ blocks ar/ld from writing .rlib archives in system temp
 # (/var/folders/.../T/). Redirect cargo build artifacts to a home-dir path.
 CARGO_TARGET_DIR="$LOCAL_PLAT/cargo-build"
-VENV="$LOCAL_PLAT/venv"
 
 # uv: keep all arch-specific state under LOCAL_PLAT
 UV_TOOL_BIN_DIR="$ARCH_BIN"
@@ -177,7 +177,7 @@ PATHS="${SCRATCH:+$SCRATCH/.paths}"
 export DF_SCRATCH DF_SCRATCH_LINK SCRATCH PATHS
 
 export OS ARCH DF_ROOT DF_PACKAGES \
-       PLAT LOCAL_PLAT RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR VENV \
+       PLAT LOCAL_PLAT RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR \
        UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR \
        NVM_DIR
 
@@ -234,12 +234,11 @@ _re_derive_plat_vars() {
     RUSTUP_HOME="$LOCAL_PLAT/rustup"
     CARGO_HOME="$LOCAL_PLAT/cargo"
     CARGO_TARGET_DIR="$LOCAL_PLAT/cargo-build"
-    VENV="$LOCAL_PLAT/venv"
     UV_TOOL_BIN_DIR="$ARCH_BIN"
     UV_TOOL_DIR="$LOCAL_PLAT/uv/tools"
     UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
     NVM_DIR="$LOCAL_PLAT/nvm"
-    export PLAT LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR VENV \
+    export PLAT LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR \
            UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR NVM_DIR
 }
 

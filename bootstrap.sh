@@ -332,7 +332,7 @@ log_section "2.7 — path sanity check"
 # Verify PLAT paths are writable and not stale symlinks before installing anything.
 # Catches: wrong scratch mount, broken symlinks, permission issues.
 _sanity_fail=0
-for _dir in "$ARCH_BIN" "$CARGO_HOME" "$RUSTUP_HOME" "$NVM_DIR" "$VENV"; do
+for _dir in "$ARCH_BIN" "$CARGO_HOME" "$RUSTUP_HOME" "$NVM_DIR"; do
     _parent="$(dirname "$_dir")"
     if [[ -L "$_parent" && ! -e "$_parent" ]]; then
         log_fail "Broken symlink: $_parent → $(readlink "$_parent")"

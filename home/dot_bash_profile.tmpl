@@ -119,15 +119,11 @@ export PATH="$CARGO_HOME/bin:$PATH"
 
 ### PYTHON (uv) ###
 
+# CLI tools via `uv tool install` into isolated venvs; entrypoints in $_LOCAL_PLAT/bin/.
+# Homebrew python@3.14 provides dev headers; per-project venvs via `uv init`.
 export UV_TOOL_BIN_DIR="$_LOCAL_PLAT/bin"
 export UV_TOOL_DIR="$_LOCAL_PLAT/uv/tools"
 export UV_PYTHON_INSTALL_DIR="$_LOCAL_PLAT/uv/python"
-
-# Prepend venv/bin directly — avoids setting VIRTUAL_ENV, which triggers uv warnings
-# when running `uv run` inside a project with its own .venv.
-if [ -d "$_LOCAL_PLAT/venv/bin" ]; then
-    export PATH="$_LOCAL_PLAT/venv/bin:$PATH"
-fi
 
 ### PLAT PATHS ###
 # These go after Homebrew so PLAT-installed tools take priority.
