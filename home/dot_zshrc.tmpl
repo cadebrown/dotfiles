@@ -83,6 +83,92 @@ fi
 
 alias g='git'
 function gsm { if [[ $# -eq 0 ]]; then git submodule update --init --recursive; else git submodule "$@"; fi }
+
+# gwtize — convert a standard git repo to bare+worktree layout in-place.
+# Usage:
+#   gwtize              — convert, worktree name = current branch (/ → -)
+#   gwtize work         — convert, worktree name = "work"
+#   gwtize work feat    — also create worktree for 'feat' branch
+gwtize() {
+    # 1. Validate — must be at repo root, not bare, not already a worktree
+    if [[ ! -d .git ]]; then
+        if [[ -f .git ]]; then
+            print "gwtize: already inside a worktree (.git is a file)" >&2
+            return 1
+        fi
+        print "gwtize: not at a git repo root (no .git/ directory)" >&2
+        return 1
+    fi
+    if git rev-parse --is-bare-repository 2>/dev/null | grep -q true; then
+        print "gwtize: repo is already bare" >&2
+        return 1
+    fi
+
+    # 2. Capture current state
+    local branch detached=0 commit
+    branch=$(git symbolic-ref --short HEAD 2>/dev/null) || {
+        detached=1
+        commit=$(git rev-parse --short HEAD)
+    }
+
+    # Determine worktree directory name
+    local wt_name="${1:-}"
+    if [[ -z "$wt_name" ]]; then
+        if (( detached )); then
+            wt_name="detached-${commit}"
+        else
+            wt_name="${branch//\//-}"
+        fi
+    fi
+    shift 2>/dev/null || true
+    local -a extra_branches=("$@")
+
+    # Save the index to preserve staged state
+    local saved_index
+    saved_index=$(mktemp)
+    cp .git/index "$saved_index"
+
+    # 3. Convert .git → .bare
+    mv .git .bare
+    git --git-dir=.bare config core.bare true
+    git --git-dir=.bare config --unset core.worktree 2>/dev/null || true
+
+    # 4. Create worktree linkage (no checkout — we'll move files ourselves)
+    if (( detached )); then
+        git --git-dir=.bare worktree add --no-checkout --detach "$wt_name" "$commit"
+    else
+        git --git-dir=.bare worktree add --no-checkout "$wt_name" "$branch"
+    fi
+
+    # 5. Move all files/dirs (except .bare/ and wt_name/) into the worktree
+    setopt local_options GLOB_DOTS
+    local item
+    for item in *(N); do
+        [[ "$item" == .bare || "$item" == "$wt_name" ]] && continue
+        mv -- "$item" "$wt_name/"
+    done
+
+    # 6. Restore index — preserves staged vs unstaged state exactly
+    cp "$saved_index" ".bare/worktrees/${wt_name}/index"
+    rm -f "$saved_index"
+
+    # 7. Extra branches
+    local eb
+    for eb in "${extra_branches[@]}"; do
+        [[ -z "$eb" ]] && continue
+        git --git-dir=.bare worktree add "$eb" "$eb" 2>&1 || {
+            print "gwtize: warning: failed to add worktree for '$eb'" >&2
+        }
+    done
+
+    # 8. Summary
+    print "gwtize: converted to bare+worktree layout"
+    git --git-dir=.bare worktree list
+
+    # 9. cd into the primary worktree
+    cd "$wt_name" || return 1
+}
+
 alias p='python'
 alias e='vim'
 alias cat='bat --paging=never'
