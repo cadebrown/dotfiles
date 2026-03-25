@@ -12,14 +12,13 @@
 #     ├── .cache/                ← symlinked from ~/.cache
 #     ├── .nv/                   ← symlinked from ~/.nv (NVIDIA shader/optix cache)
 #     ├── .npm/                  ← symlinked from ~/.npm (npm cache)
-#     ├── .claude/               ← symlinked from ~/.claude (Claude Code data/cache)
 #     ├── .oh-my-zsh/            ← symlinked from ~/.oh-my-zsh
 #     └── .oh-my-zsh-custom/     ← symlinked from ~/.oh-my-zsh-custom
 #
 # Which dirs are migrated is controlled by DF_LINKS (colon-separated).
 # Default: ~/.local:~/.cache
 # Note: ~/.config is NOT migrated — chezmoi manages files inside it as a real directory.
-# Note: ~/.config is NOT migrated — chezmoi manages files inside it as a real directory.
+# Note: ~/.claude is NOT migrated — chezmoi manages files inside it as a real directory.
 #
 # All variables are defined in _lib.sh:
 #   SCRATCH          — absolute path to scratch root (empty if not configured)
@@ -122,7 +121,7 @@ link_to_scratch() {
 log_info "Scratch: $SCRATCH"
 log_info "Paths:   $PATHS"
 
-_DEFAULT_LINKS="$HOME/.local:$HOME/.cache:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.claude:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom"
+_DEFAULT_LINKS="$HOME/.local:$HOME/.cache:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom"
 DF_LINKS="${DF_LINKS:-$_DEFAULT_LINKS}"
 unset _DEFAULT_LINKS
 
