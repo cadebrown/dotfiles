@@ -42,6 +42,14 @@
 # would prematurely terminate the outer string literal and cause a Ruby parse
 # error (we hit this the first time and had to fix it).
 #
+# PITFALL — do NOT write \# in the bash _FIX variable:
+#   In bash double-quoted strings, \# keeps both characters (\ is only special
+#   before $, `, ", \, or newline). So \"-DWITH_DOCS=\#{...}\" written in a
+#   bash double-quoted string produces \# in the Python arg and then in fish.rb.
+#   In Ruby, \# prevents #{} interpolation — cmake then gets the literal string
+#   "#{OS.linux? ? 'OFF' : 'ON'}" which cmake treats as truthy and builds docs,
+#   causing sphinx/Rust to fail. The # needs no escaping in bash double quotes.
+#
 # ─── SIDE EFFECTS ───────────────────────────────────────────────────────────────
 #
 # - 'man fish' will not work (no man pages installed).
@@ -85,25 +93,32 @@ FISH_RB="$LOCAL_PLAT/brew/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/f
 log_section "Patching fish formula for Linux (disable sphinx man pages)"
 
 # Replace -DWITH_DOCS=ON with a Ruby ternary.
-# IMPORTANT: single quotes inside #{} are mandatory here — the outer string is
-# double-quoted, so inner double quotes would end the string and cause a Ruby
-# syntax error. Using _FIX as a shell variable with double-quoted assignment
-# lets us embed the single quotes cleanly without extra escaping.
+# IMPORTANT: single quotes inside #{} are mandatory — the outer string is
+# double-quoted in Ruby, so inner double quotes would end the string.
+# NOTE: do NOT use \# here — \# in a bash double-quoted string keeps the
+# backslash, and in Ruby \# prevents #{} interpolation (literal "#{}").
+# The # is not special in bash double-quoted strings so no escaping is needed.
 _PATCH='                    "-DWITH_DOCS=ON",'
-_FIX="                    \"-DWITH_DOCS=\#{OS.linux? ? 'OFF' : 'ON'}\","
+# v1 (broken): used \# which prevented Ruby interpolation — cmake got the
+# literal string "#{...}" instead of "OFF", so docs built and sphinx failed.
+_BROKEN_FIX="                    \"-DWITH_DOCS=\\#{OS.linux? ? 'OFF' : 'ON'}\","
+# v2 (correct): no \# — Ruby evaluates #{} and cmake gets "OFF" on Linux.
+_FIX="                    \"-DWITH_DOCS=#{OS.linux? ? 'OFF' : 'ON'}\","
 _result=$(python3 -c "
 import sys
-path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+path, orig, broken, fix = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 txt = open(path).read()
-if new in txt:    print('already')
-elif old in txt:  open(path,'w').write(txt.replace(old, new, 1)); print('patched')
-else:             print('notfound')
-" "$FISH_RB" "$_PATCH" "$_FIX")
+if fix in txt:      print('already')
+elif broken in txt: open(path,'w').write(txt.replace(broken, fix, 1)); print('migrated')
+elif orig in txt:   open(path,'w').write(txt.replace(orig, fix, 1)); print('patched')
+else:               print('notfound')
+" "$FISH_RB" "$_PATCH" "$_BROKEN_FIX" "$_FIX")
 case "$_result" in
     already)  log_okay "fish WITH_DOCS patch already applied" ;;
+    migrated) log_okay "Migrated: fish patch fixed (\\# → # to enable Ruby interpolation)" ;;
     patched)  log_okay "Patched: -DWITH_DOCS=OFF on Linux (skips sphinx/Rust man page build)" ;;
     notfound) log_warn "fish patch target not found — formula may have changed; check fish.rb" ;;
 esac
-unset _PATCH _FIX _result
+unset _PATCH _BROKEN_FIX _FIX _result
 
 log_okay "fish.rb patches done"

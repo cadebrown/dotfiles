@@ -13,9 +13,7 @@ brew "bash"
 brew "fish"
 
 ### Editors ###
-# vim: requires python@3.14 which has persistent PGO test failures on custom
-# prefixes. Use system vim or install neovim via other means.
-# brew "vim"
+brew "vim"
 
 ### Git ###
 brew "openssh"  # must precede system ssh in PATH; avoids OpenSSL version mismatch on Linux
@@ -38,27 +36,26 @@ brew "curl"
 brew "less"
 brew "rlwrap"
 brew "cloc"
-# imagemagick: requires python@3.14 (PGO test failures on custom prefix)
-# brew "imagemagick"
+brew "imagemagick"
 brew "fastfetch"
+# opencl-headers: required by fastfetch for GPU info (CL/cl.h). Separate from
+# opencl-icd-loader — headers and runtime are split packages.
+brew "opencl-headers"
 brew "fetch"
 brew "tmux"
 brew "moreutils"
-# graphviz: requires python@3.14 (PGO test failures on custom prefix)
-# brew "graphviz"
+brew "graphviz"
 
 ### Documents ###
 brew "pandoc"
 
 ### Media ###
-# ffmpeg: requires python@3.14 (PGO test failures on custom prefix)
-# brew "ffmpeg"
+brew "ffmpeg"
 
 ### Monitoring ###
 brew "htop"
 brew "btop"
-# glances: requires python@3.14 (PGO test failures on custom prefix)
-# brew "glances"
+brew "glances"
 
 ### Compression ###
 brew "lz4"
@@ -82,6 +79,7 @@ brew "fftw"
 brew "glfw"
 
 ### Languages ###
+brew "python@3.14"  # patched on Linux (see patch-homebrew-python.sh); provides dev headers
 brew "zig"
 
 ### DevOps ###

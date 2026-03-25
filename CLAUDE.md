@@ -47,7 +47,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `macos-settings.sh` | System prefs via `defaults write` (Dock, Finder, keyboard, trackpad, Safari, iTerm2) | macOS only |
 | `node.sh` | nvm + Node.js + global npm packages from `npm.txt` | Lazy-loaded in zsh for fast startup |
 | `rust.sh` | rustup + cargo-binstall + tools from `cargo.txt` | macOS: Homebrew rustup (code-signed); Linux: sh.rustup.rs |
-| `python.sh` | uv + venv + packages from `pip.txt` | Venv at `$LOCAL_PLAT/venv` with `--seed` |
+| `python.sh` | uv + CLI tools from `pip.txt` via `uv tool install` | Each tool gets isolated venv under `$LOCAL_PLAT/uv/tools/`; no monolithic venv |
 | `claude.sh` | Claude Code binary + plugins + MCP servers | Downloads from Anthropic's GCS bucket |
 | `codex.sh` | Codex CLI binary from GitHub releases | Platform detection + checksum |
 | `auth.sh` | Interactive API token setup (GitHub, Anthropic, OpenAI) | Creates `~/.{service}.env` files, chmod 600 |
@@ -55,6 +55,18 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `scratch.sh` | Symlinks `~/.local`, `~/.cache`, etc. to scratch space | NFS quota relief |
 | `verify-path.sh` | Diagnostic: arch check, library check, duplicates, stale symlinks | Not called by bootstrap |
 | `patch-homebrew-python.sh` | Patches python@3.14 formula for Linux (uuid, test_datetime) | Applied automatically during linux-packages.sh |
+| `patch-homebrew-superenv.sh` | Patches Linux superenv (linux-headers isystem, gnulib probe, glibc -L) | Three endemic build failures on custom prefix; see script for details |
+| `patch-homebrew-stdenv.sh` | Patches Linux stdenv for rare stdenv builds (linux-headers isystem) | Companion to superenv patch; stdenv builds skip the shim |
+| `patch-homebrew-ncurses.sh` | Patches ncurses formula for Linux (linux-headers CPPFLAGS) | Fixes configure cascade failure from missing asm/ioctls.h + linux/limits.h |
+| `patch-homebrew-m4.sh` | Patches m4 formula for Linux (bypass gnulib undeclared-builtin probe) | GCC builtins cause probe to silently succeed, configure aborts |
+| `patch-homebrew-pkgconf.sh` | Patches pkgconf formula for Linux (same gnulib probe as m4) | pkgconf is a critical dep (openssh, podman, fish); same fix as m4 |
+| `patch-homebrew-cc65.sh` | Patches cc65 formula for Linux (linux-headers CPATH) | cc65 Makefile uses $(CC) $(CFLAGS) without $(CPPFLAGS); CPATH is reliable |
+| `patch-homebrew-mesa.sh` | Patches mesa formula for Linux (pyyaml binary wheel) | Cython SIGILL in superenv: pyyaml source build crashes; use binary wheel |
+| `patch-homebrew-fastfetch.sh` | Patches fastfetch formula for Linux (disable WSL GPU detection) | directx-headers shim fails at custom prefix |
+| `patch-homebrew-fish.sh` | Patches fish formula for Linux (disable sphinx man pages) | Headless nodes lack configured locale for Python/sphinx |
+| `patch-homebrew-rpm.sh` | Patches rpm formula for Linux (LUA_MATH_LIBRARY cmake fix) | cmake's FindLua can't find libm via find_library; glibc is keg-only |
+| `patch-homebrew-systemd.sh` | Patches systemd formula for Linux (lxml binary wheel) | Cython SIGILL in superenv: lxml source build crashes; use binary wheel |
+| `patch-homebrew-netpbm.sh` | Patches netpbm formula for Linux (GCC 15 C23 + incompatible-pointer fix) | GCC 15 defaults to C23 (bool typedef fails) and promotes -Wincompatible-pointer-types to error |
 
 ## Logging functions
 
@@ -76,7 +88,6 @@ Defined in `_lib.sh`. Use these in install scripts — 4-char label symmetry:
 Shell profiles prepend PLAT paths on top of Homebrew. Highest priority first:
 
 ```
-$LOCAL_PLAT/venv/bin          Python venv
 $LOCAL_PLAT/cargo/bin         Rust tools (fd, sd, zoxide, etc.)
 $LOCAL_PLAT/nvm/.../bin       Node.js via nvm
 $LOCAL_PLAT/bin               chezmoi, uv, claude
@@ -234,7 +245,22 @@ These are non-obvious things that have caused real bugs:
   upgrades can break every installed binary. Use `bootstrap.sh upgrade` deliberately.
 - **Python@3.14 formula is patched on Linux** — `install/patch-homebrew-python.sh` fixes uuid
   and test_datetime build issues. `HOMEBREW_NO_AUTO_UPDATE=1` prevents Homebrew from
-  overwriting patches.
+  overwriting patches. Formulas depending on python@3.14 (vim, imagemagick, graphviz, ffmpeg,
+  glances) now build successfully with these patches.
+- **Python dev headers come from Homebrew** — python@3.14 provides `Python.h` and
+  `libpython3.14.so` at `$(brew --prefix)/opt/python@3.14/include/python3.14/`.
+  CMake's `FindPython3` discovers these automatically via `brew shellenv` paths.
+  There is no user-level venv — CLI tools use `uv tool install` (isolated venvs),
+  and library work uses per-project `uv init` / `uv sync`.
+- **Several formulas need linux-headers@6.8 CPPFLAGS on custom prefix** — Homebrew glibc's
+  headers chain to kernel headers (`asm/ioctls.h`, `linux/limits.h`, `linux/errno.h`) that are
+  NOT in the default include path. Any formula that doesn't declare `linux-headers@6.8` as a
+  build dep will fail. Current patches: `ncurses` (all configure checks cascade-fail when
+  `<stdio.h>` can't include `linux/limits.h`), `cc65` (Makefile doesn't propagate CPPFLAGS).
+- **gcc formula is unversioned and tracks latest GCC** — as of GCC 15, implicit function
+  declarations are errors by default, breaking configure scripts in m4 1.4.21 and ncurses 6.6.
+  `linux-packages.sh` pre-installs gcc@13 and sets `HOMEBREW_CC=gcc-13` for all source builds.
+  The m4 formula is additionally patched to bypass a gnulib probe that fails even with gcc-13.
 - **mold/lld need `--disable-new-dtags` on Linux** — these linkers default to DT_RUNPATH,
   which is searched after ld.so.cache, so the system's older libstdc++ wins over Homebrew's.
   All four CMake toolchain files add `-Wl,--disable-new-dtags` when selecting mold or lld.
@@ -242,6 +268,30 @@ These are non-obvious things that have caused real bugs:
 - **openssh is in Brewfile cross-platform** — on Linux, the system ssh may link against a
   different OpenSSL than Homebrew's, causing `git push` failures. Brew's openssh uses
   Homebrew's OpenSSL consistently.
+- **Cython packages SIGILL in superenv (pip --no-binary)** — Homebrew's `venv.pip_install`
+  always passes `--no-binary=:all:`, forcing source builds. Packages that use Cython
+  (lxml, pyyaml) fail with exit -4 (SIGILL) in the superenv context. Fix: install these
+  packages with `--prefer-binary` instead. Currently patched: `systemd` (lxml), `mesa`
+  (pyyaml). See the respective `patch-homebrew-*.sh` for details.
+- **cmake's FindLua can't find glibc's libm on Linux** — glibc is keg-only, so its lib
+  dir is not in cmake's `find_library()` search path. FindLua requires LUA_MATH_LIBRARY
+  (libm) to link liblua. The `rpm` formula is patched to pass
+  `-DLUA_MATH_LIBRARY=$(Formula["glibc"].opt_lib/"libm.so")` explicitly.
+- **glibc -L missing from HOMEBREW_LIBRARY_PATHS (root cause unclear)** — despite glibc
+  being a keg-only transitive dep of many packages, its opt_lib is not added to the
+  linker's `-L` path. The superenv shim adds `-Wl,-rpath-link` for glibc but this is
+  insufficient for versioned symbol resolution (GLIBC_2.33+ in libstdc++.so). Fixed by
+  `patch-homebrew-superenv.sh` Patch 3: adds `-L/brew/opt/glibc/lib` alongside
+  `-rpath-link` in the shim's `ldflags_linux`.
+- **GCC 15 is stricter: C23 default + new errors** — GCC 15 changed the default C
+  standard from C17 to C23 (breaks `typedef unsigned char bool` in netpbm), and promotes
+  `-Wincompatible-pointer-types` and `-Wimplicit-function-declaration` from warnings to
+  errors. Per-formula patches (`netpbm`, etc.) add `-std=gnu17` and the relevant `-Wno-*`
+  flags on Linux.
+- **`~/.claude` must not be in scratch links** — chezmoi manages `home/dot_claude/` as a
+  real directory. If `scratch.sh` symlinks `~/.claude` to scratch, `chezmoi apply` replaces
+  the symlink with a directory containing only managed files, orphaning all conversation
+  history, sessions, and file-history on scratch.
 
 ## Reference
 

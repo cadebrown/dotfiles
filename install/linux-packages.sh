@@ -67,6 +67,31 @@ else
     brew install glibc 2>&1
 fi
 
+### Pre-install gcc@13 and pin source-build compiler ###
+#
+# The unversioned 'gcc' formula tracks the latest GCC release. As of GCC 15,
+# implicit function declarations are errors by default (previously warnings).
+# This breaks configure scripts in m4 1.4.21 (gnulib probe fails with
+# "cannot make gcc-15 report undeclared builtins") and ncurses 6.6 (all
+# function checks return 'no', leading to "getopt is required for building
+# programs"). Both packages must be built from source on a custom prefix
+# (our prefix ≠ /home/linuxbrew/.linuxbrew, so bottles can't be used).
+#
+# Fix: ensure gcc@13 is installed before brew bundle runs, then set
+# HOMEBREW_CC=gcc-13 so all source builds use it instead of gcc-15.
+# gcc@13 is stable for everything in the Brewfile and is explicitly pinned
+# there. On fresh installs where gcc-13 isn't present yet, we install it
+# here (one-time ~10 min build using the system compiler).
+if brew list gcc@13 &>/dev/null; then
+    log_okay "gcc@13 already installed"
+else
+    log_info "Pre-installing gcc@13 (source-build compiler before brew bundle)..."
+    brew install gcc@13 2>&1
+fi
+export HOMEBREW_CC=gcc-13
+export HOMEBREW_CXX=g++-13
+log_info "Source-build compiler pinned to gcc-13 (gcc-15 breaks m4/ncurses configure)"
+
 ### Fix Homebrew OpenSSL cert.pem symlink ###
 #
 # openssl@3 expects its cert.pem at $BREW_PREFIX/etc/openssl@3/cert.pem, but
@@ -120,12 +145,30 @@ brew tap homebrew/core --force 2>&1 | grep -v "^Warning" | head -5 || true
 if [[ "${DF_PATCH_BREW_ALL:-1}" == "0" ]]; then
     log_info "DF_PATCH_BREW_ALL=0 — skipping all Homebrew formula patches"
 else
+    # superenv: the primary fix for Linux custom-prefix source builds. Patches
+    # Homebrew's superenv (the compiler shim layer used by most formula builds):
+    # (1) Adds linux-headers@6.8 to homebrew_extra_isystem_paths so the shim
+    #     injects -isystem into every gcc call (configure tests AND make builds).
+    #     Homebrew glibc headers chain to kernel headers transitively; without
+    #     this, builds fail with "fatal error: linux/errno.h: No such file".
+    # (2) Pre-sets ac_cv_c_undeclared_builtin_options in the build env to bypass
+    #     the broken gnulib probe that affects m4, pkgconf, libx11, attr, etc.
+    # See install/patch-homebrew-superenv.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-superenv.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-superenv.sh"
+
+    # stdenv: same two fixes for the rare formula builds that use stdenv instead
+    # of superenv (most don't, but belt-and-suspenders).
+    # See install/patch-homebrew-stdenv.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-stdenv.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-stdenv.sh"
+
     # python@3.14: fixes uuid module and test_datetime PGO build failures on custom prefix.
     # See install/patch-homebrew-python.sh for full details.
     [[ -f "$DF_INSTALL_DIR/patch-homebrew-python.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-python.sh"
 
-    # mesa: fixes GCC 12 AVX2 compile errors in ARM GPU drivers that are built even on
-    # x86 hosts. Two patches: drivers=auto and strip ARM entries from -Dtools=.
+    # mesa: installs pyyaml from its binary wheel instead of building from source.
+    # venv.pip_install always passes --no-binary=:all:, forcing a source build;
+    # pyyaml's Cython get_requires_for_build_wheel subprocess receives SIGILL (exit -4)
+    # in the Homebrew superenv on a custom prefix.
     # See install/patch-homebrew-mesa.sh for full details.
     [[ -f "$DF_INSTALL_DIR/patch-homebrew-mesa.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-mesa.sh"
 
@@ -139,6 +182,49 @@ else
     # cluster nodes due to locale not being configured (locale.Error: unsupported locale).
     # See install/patch-homebrew-fish.sh for full details.
     [[ -f "$DF_INSTALL_DIR/patch-homebrew-fish.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-fish.sh"
+
+    # rpm: fixes cmake's FindLua failure caused by LUA_MATH_LIBRARY (libm) not being
+    # found in the superenv. glibc is keg-only so its lib dir is not in cmake's
+    # search path; FindLua computes LUA_LIBRARIES = "liblua;NOTFOUND" and fails.
+    # See install/patch-homebrew-rpm.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-rpm.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-rpm.sh"
+
+    # systemd: installs lxml from its binary wheel instead of building from source.
+    # venv.pip_install always passes --no-binary=:all:, forcing a source build; building
+    # lxml from source fails with SIGILL (exit -4) in the Homebrew superenv on a custom
+    # prefix (Cython get_requires_for_build_wheel subprocess killed by illegal instruction).
+    # See install/patch-homebrew-systemd.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-systemd.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-systemd.sh"
+
+    # ncurses: adds linux-headers@6.8 CPATH (via stdenv patch) and also has its own
+    # per-formula CPATH entry for belt-and-suspenders. ncurses subdirectory Makefiles
+    # do not propagate $(CPPFLAGS) so CPATH is required.
+    # See install/patch-homebrew-ncurses.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-ncurses.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-ncurses.sh"
+
+    # cc65: adds linux-headers@6.8 via CPATH (the raw Makefile uses $(CC) $(CFLAGS)
+    # without $(CPPFLAGS), so CPATH is required for GCC to find linux/errno.h).
+    # See install/patch-homebrew-cc65.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-cc65.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-cc65.sh"
+
+    # m4: pre-sets ac_cv_c_undeclared_builtin_options to bypass a broken gnulib probe
+    # (m4 1.4.21). GCC treats memcpy/strchr as builtins so the probe compiles silently
+    # and configure aborts with "cannot make gcc-NN report undeclared builtins".
+    # linux-headers CPATH is now handled by the stdenv patch.
+    # See install/patch-homebrew-m4.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-m4.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-m4.sh"
+
+    # pkgconf: same gnulib undeclared-builtin probe failure as m4. pkgconf is a
+    # widely-used dependency (openssh, podman, fish, etc.) so this patch is critical.
+    # linux-headers CPATH is now handled by the stdenv patch.
+    # See install/patch-homebrew-pkgconf.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-pkgconf.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-pkgconf.sh"
+
+    # netpbm: GCC 15 changed its default C standard from C17 to C23. C23 makes
+    # `bool` a keyword, breaking netpbm's `typedef unsigned char bool` in buildtools/
+    # libopt.c. Fix: force -std=gnu17 on Linux via ENV.append_to_cflags.
+    # See install/patch-homebrew-netpbm.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-netpbm.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-netpbm.sh"
 fi
 
 ### Install all packages ###
@@ -223,8 +309,11 @@ if [[ -d "$_REAL_BREW_PREFIX/opt/gcc/bin" ]]; then
     fi
 fi
 
-# LLVM is versioned (llvm@21, llvm@20, etc.) — pick the highest installed
-_LLVM_LATEST=$(ls -1d "$_REAL_BREW_PREFIX/opt/llvm@"*/bin 2>/dev/null | sort -Vr | head -1)
+# LLVM is versioned (llvm@21, llvm@22, etc.) — pick the highest installed.
+# The '|| true' absorbs the exit code 2 from ls when no llvm@* dirs exist yet
+# (e.g. first bootstrap run before llvm@XX has been installed); without it,
+# set -eo pipefail kills the script even though the empty result is intentional.
+_LLVM_LATEST=$(ls -1d "$_REAL_BREW_PREFIX/opt/llvm@"*/bin 2>/dev/null | sort -Vr | head -1 || true)
 if [[ -n "$_LLVM_LATEST" ]]; then
     _LLVM_VER=$(basename "$(dirname "$_LLVM_LATEST")")
     ln -sf "$_LLVM_LATEST/clang" "$_PLAT_BIN/clang"

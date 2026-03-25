@@ -3,76 +3,67 @@
 #
 # ─── WHY THIS EXISTS ────────────────────────────────────────────────────────────
 #
-# Homebrew installs mesa from source on custom prefixes (non-/home/linuxbrew).
-# The mesa 26.x formula enables ALL GPU drivers on Intel x86, including drivers
-# for mobile/embedded SoCs that are physically impossible to run on x86 hardware.
-# Those ARM GPU drivers fail to compile with GCC 12 on x86 for two related reasons:
+# mesa is a dependency of fastfetch (and glfw, etc.). The mesa formula builds
+# Python resources (mako, markupsafe, packaging, ply, pyyaml) in a virtualenv
+# for use by mesa's meson build system. pyyaml is required for parsing YAML
+# files in the build.
 #
-#   1. gallium-drivers / vulkan-drivers = "all" on Intel x86
-#      The formula sets:
-#        drivers = Hardware::CPU.intel? ? "all" : "auto"
-#      "all" compiles every driver unconditionally, including freedreno (Qualcomm
-#      Adreno), etnaviv (Vivante), lima (ARM Mali Utgard), panfrost (Mali
-#      Midgard/Bifrost), and asahi (Apple Silicon). These drivers contain
-#      AVX2-vectorised memcpy routines (e.g. fd6_tiled_memcpy.cc) that use
-#      ARM/Adreno-specific intrinsics expressed as GCC vector extensions.
-#      GCC 12 on x86 rejects implicit conversion between __vector(8) float and
-#      __m256i / __m256d with "cannot convert" errors.
-#      Upstream reference: https://gitlab.freedesktop.org/mesa/mesa/-/issues/
+# Homebrew's venv.pip_install always passes --no-binary=:all: (from std_pip_args),
+# which forces source builds for all Python resources. Building pyyaml from source
+# fails on Linux with a custom Homebrew prefix:
 #
-#   2. -Dtools= explicitly lists ARM GPU debug tools
-#      Even when gallium-drivers=auto (which skips the ARM gallium drivers),
-#      the formula still passes:
-#        -Dtools=drm-shim,etnaviv,freedreno,glsl,intel,nir,nouveau,lima,panfrost,asahi,imagination,dlclose-skip
-#      The 'freedreno' entry in -Dtools forces meson to build libfreedreno_layout.a
-#      unconditionally, which contains the same fd6_tiled_memcpy.cc that fails.
-#      This is the non-obvious part: driver selection and tool selection are
-#      independent in mesa's meson build system.
+#   Getting requirements to build wheel: finished with status 'error'
+#   exit code: -4
 #
-# ─── WHAT THE PATCHES DO ────────────────────────────────────────────────────────
+# Exit code -4 means the subprocess received SIGILL (signal 4 = illegal instruction).
+# This happens inside the Homebrew superenv during the pip subprocess that runs
+# `get_requires_for_build_wheel` for pyyaml. The root cause is the same as the
+# systemd/lxml issue: a Cython wheel compiled with instructions that crash in the
+# superenv context.
 #
-# Patch 1 — gallium/vulkan-drivers=auto on Intel x86
-#   Changes: drivers = Hardware::CPU.intel? ? "all" : "auto"
-#        to: drivers = Hardware::CPU.intel? ? "auto" : "auto"
-#   meson's "auto" autodetects only the drivers relevant to the host GPU hardware.
-#   On a headless x86 server with an NVIDIA GPU this enables: iris, crocus, i915,
-#   llvmpipe, softpipe, zink, nouveau, radeonsi, r300, r600, virgl, svga, swrast.
-#   Nothing changes for non-Intel (already "auto").
+# pyyaml provides pre-built binary wheels for manylinux_2_17_x86_64 that install
+# and run correctly. The fix is to install pyyaml using the binary wheel instead
+# of building from source.
 #
-# Patch 2 — remove ARM GPU tools from -Dtools=
-#   Changes: -Dtools=drm-shim,etnaviv,freedreno,glsl,intel,nir,nouveau,lima,panfrost,asahi,imagination,dlclose-skip
-#        to: -Dtools=drm-shim,glsl,intel,nir,nouveau,dlclose-skip
-#   Removed tools and what they are:
-#     freedreno   — Qualcomm Adreno debug/disassembly tools (forces libfreedreno_layout.a)
-#     etnaviv     — Vivante GPU tools (forces libetnaviv)
-#     lima        — ARM Mali Utgard tools
-#     panfrost    — ARM Mali Midgard/Bifrost tools
-#     asahi       — Apple Silicon GPU tools (macOS Metal backend)
-#     imagination — PowerVR GPU tools
-#   These are all irrelevant on x86 hardware and produce zero useful output there.
+# ─── WHAT THE PATCH DOES ────────────────────────────────────────────────────────
+#
+# In the install def, splits venv.pip_install on Linux:
+#
+# Before:
+#   venv.pip_install resources.reject { |r| OS.mac? && r.name == "ply" }
+#
+# After:
+#   if OS.linux?
+#     # pyyaml source builds fail with SIGILL on custom prefix — use binary wheel
+#     venv.pip_install resources.reject { |r| r.name == "pyyaml" || r.name == "ply" }
+#     system python3, "-m", "pip", "--python=#{venv.root}/bin/python",
+#            "install", "--verbose", "--no-deps", "--ignore-installed", "--no-compile",
+#            "--prefer-binary", "pyyaml==6.0.3"
+#   else
+#     venv.pip_install resources.reject { |r| OS.mac? && r.name == "ply" }
+#   end
+#
+# The OS.linux? guard ensures macOS builds are unaffected.
+# --prefer-binary tells pip to use the binary wheel if available, falling back
+# to source only if no wheel exists (avoids the SIGILL path).
+# ply is excluded on Linux too (same as macOS) — mesa's meson build uses its
+# own GLSL parser; the ply-based fallback is not needed on either platform.
 #
 # ─── SIDE EFFECTS ───────────────────────────────────────────────────────────────
 #
-# - The installed mesa lacks Adreno/Mali/Apple debug tools (e.g. freedreno-dump,
-#   lima_disasm). These are only useful when you physically have one of those GPUs.
-# - All OpenGL/Vulkan drivers for the actual hardware (NVIDIA, AMD, Intel) are
-#   unaffected and fully functional.
+# pyyaml is installed from its binary wheel instead of being compiled from source.
+# The wheel is ABI-compatible with the brew python@3.14 build. No functionality
+# is lost — only the compilation step is skipped.
 #
 # ─── WHEN TO REMOVE ─────────────────────────────────────────────────────────────
 #
-# Patch 1: When the upstream formula stops using "all" on Intel x86, or when
-#   GCC 12 is no longer the system compiler (gcc 13+ handles the vector type
-#   conversions differently). Check mesa.rb for the drivers= line.
-#
-# Patch 2: When the upstream formula conditionalises -Dtools= on the target
-#   architecture (i.e. only includes ARM tools when building for ARM). This is
-#   a known packaging oversight that may be fixed upstream.
-#   Check: grep 'freedreno' <path-to-mesa.rb>
+# When the upstream mesa formula explicitly handles the pyyaml source build failure
+# on non-standard prefixes, or when the SIGILL root cause is fixed (e.g., a Cython
+# update that doesn't trigger the issue in the superenv).
 #
 # ─── SKIP FLAG ──────────────────────────────────────────────────────────────────
 #
-# Set DF_PATCH_BREW_MESA=0 to skip these patches (e.g. after upstream fixes them
-# or to diagnose whether they're still needed):
+# Set DF_PATCH_BREW_MESA=0 to skip:
 #   DF_PATCH_BREW_MESA=0 bash install/linux-packages.sh
 #
 # ────────────────────────────────────────────────────────────────────────────────
@@ -82,9 +73,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 [[ "$OS" == "linux" ]] || { log_okay "Not on Linux — skipping mesa patch"; exit 0; }
 
-# Allow opting out via DF_PATCH_BREW_MESA=0
 if [[ "${DF_PATCH_BREW_MESA:-1}" == "0" ]]; then
-    log_info "DF_PATCH_BREW_MESA=0 — skipping mesa formula patches"
+    log_info "DF_PATCH_BREW_MESA=0 — skipping mesa formula patch"
     exit 0
 fi
 
@@ -92,46 +82,37 @@ MESA_RB="$LOCAL_PLAT/brew/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/m
 
 [[ -f "$MESA_RB" ]] || { log_warn "mesa.rb not found at $MESA_RB — skipping"; exit 0; }
 
-log_section "Patching mesa formula for Linux (x86 drivers only)"
+log_section "Patching mesa formula for Linux (pyyaml binary wheel install)"
 
-# Helper: idempotent literal-string replacement via python3.
-# Uses python rather than sd/sed because the target strings contain '?' which is
-# a regex metacharacter — literal replacement avoids silent partial matches.
-# Prints: 'already' | 'patched' | 'notfound'
-_replace() {
-    local path="$1" old="$2" new="$3"
-    python3 -c "
+_ORIG='    venv.pip_install resources.reject { |r| OS.mac? && r.name == "ply" }'
+
+_FIX='    if OS.linux?
+      # pyyaml source builds fail with SIGILL on a custom Homebrew prefix — the
+      # Cython get_requires_for_build_wheel subprocess receives SIGILL in the
+      # superenv context. Install pyyaml from its binary wheel instead.
+      # macOS builds are unaffected (no OS.linux? guard needed there).
+      # ply is excluded here as it is on macOS.
+      venv.pip_install resources.reject { |r| r.name == "pyyaml" || r.name == "ply" }
+      system python3, "-m", "pip", "--python=#{venv.root}/bin/python",
+             "install", "--verbose", "--no-deps", "--ignore-installed", "--no-compile",
+             "--prefer-binary", "pyyaml==6.0.3"
+    else
+      venv.pip_install resources.reject { |r| OS.mac? && r.name == "ply" }
+    end'
+
+_result=$(python3 -c "
 import sys
 path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
 txt = open(path).read()
 if new in txt:    print('already')
 elif old in txt:  open(path,'w').write(txt.replace(old, new, 1)); print('patched')
 else:             print('notfound')
-" "$path" "$old" "$new"
-}
-
-# Patch 1: drivers = "all" → "auto" on Intel (see header for details)
-_result=$(_replace "$MESA_RB" \
-    'drivers = Hardware::CPU.intel? ? "all" : "auto"' \
-    'drivers = Hardware::CPU.intel? ? "auto" : "auto"')
+" "$MESA_RB" "$_ORIG" "$_FIX")
 case "$_result" in
-    already)  log_okay "Patch 1 (drivers=auto) already applied" ;;
-    patched)  log_okay "Patch 1: drivers=all → drivers=auto on Intel x86" ;;
-    notfound) log_warn "Patch 1 target not found — formula may have changed; check mesa.rb" ;;
+    already)  log_okay "mesa pyyaml binary-wheel patch already applied" ;;
+    patched)  log_okay "Patched: mesa pyyaml installs from binary wheel on Linux" ;;
+    notfound) log_warn "mesa patch target not found — formula may have changed; check mesa.rb" ;;
 esac
+unset _ORIG _FIX _result
 
-# Patch 2: remove ARM GPU tools from -Dtools= (see header for details)
-# Keep:    drm-shim, glsl, intel, nir, nouveau, dlclose-skip  (all x86-relevant)
-# Remove:  freedreno, etnaviv, lima, panfrost, asahi, imagination  (ARM/mobile only)
-_result=$(_replace "$MESA_RB" \
-    '-Dtools=drm-shim,etnaviv,freedreno,glsl,intel,nir,nouveau,lima,panfrost,asahi,imagination,dlclose-skip' \
-    '-Dtools=drm-shim,glsl,intel,nir,nouveau,dlclose-skip')
-case "$_result" in
-    already)  log_okay "Patch 2 (tools=x86-only) already applied" ;;
-    patched)  log_okay "Patch 2: removed ARM GPU tools from -Dtools=" ;;
-    notfound) log_warn "Patch 2 target not found — formula may have changed; check mesa.rb" ;;
-esac
-
-unset -f _replace
-
-log_okay "mesa.rb patches done"
+log_okay "mesa.rb patch done"
