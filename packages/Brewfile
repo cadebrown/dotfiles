@@ -55,7 +55,10 @@ brew "ffmpeg"
 ### Monitoring ###
 brew "htop"
 brew "btop"
-brew "glances"
+# glances: Python CLI tool — installed via uv (pip.txt) instead of brew.
+# Brew's glances pulls python@3.13 which has the same PGO failures as 3.14
+# on custom prefix, and we only patch 3.14.
+# brew "glances"
 
 ### Compression ###
 brew "lz4"

@@ -10,5 +10,8 @@ ipython
 # Jupyter
 jupyterlab
 
+# Monitoring
+glances
+
 # CLI/output helpers
 rich-cli
