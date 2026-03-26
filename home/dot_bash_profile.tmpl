@@ -156,21 +156,21 @@ cuda_use() {
     export CUDA_HOME="$1"
     if [ -e "$CUDA_HOME" ]; then
         export PATH="$CUDA_HOME/bin:$PATH"
-        # LD_LIBRARY_PATH ordering: Homebrew > CUDA toolkit > system.
-        # - Homebrew first ($HOMEBREW_PREFIX/lib): bash uses dlopen for readline, so
-        #   LD_LIBRARY_PATH order determines which readline.so.8 gets loaded. Homebrew's
-        #   lib/ has the readline 8.3 symlinks, which must win over the system's 8.1
-        #   (which crashes brew bash 5.3.9 — missing rl_full_quoting_desired).
-        #   $HOMEBREW_PREFIX/lib is safe to include (no libc/libm/libpthread/libstdc++).
-        # - System last (/usr/lib/<arch>-linux-gnu): provides libcuda.so.1 and driver
-        #   libs for Homebrew-compiled programs, whose glibc ld.so has a separate
-        #   ldconfig cache that excludes the system driver directory.
-        local _sys_lib="/usr/lib/$(uname -m)-linux-gnu"
-        local _brew_lib="${HOMEBREW_PREFIX:+${HOMEBREW_PREFIX}/lib}"
+        # LD_LIBRARY_PATH: CUDA toolkit dirs only.
+        #
+        # DO NOT add $HOMEBREW_PREFIX/lib or /usr/lib/<arch> here.
+        # Brew binaries use brew's ld.so + DT_RPATH — they find all their deps
+        # (readline, glibc, etc.) without LD_LIBRARY_PATH. Adding brew/lib
+        # poisons system binaries: they load brew libs (libacl etc.) that need
+        # GLIBC_2.38+, but system libc is too old → "GLIBC_2.38 not found".
+        # Adding brew glibc to fix that causes system ld.so + brew libc mismatch
+        # → segfaults. Adding /usr/lib/<arch> causes brew binaries to find system
+        # libc via LD_LIBRARY_PATH before brew's ldconfig provides brew glibc.
+        #
+        # libcuda.so.1 (driver stub in /usr/lib/<arch>) is discovered by brew's
+        # ld.so via 99-system-ld.so.conf in brew's ldconfig (see linux-packages.sh).
         export LD_LIBRARY_PATH=\
-"${_brew_lib:+$_brew_lib:}$CUDA_HOME/lib64:$CUDA_HOME/lib"\
-"${_sys_lib:+:$_sys_lib}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-        unset _sys_lib _brew_lib
+"$CUDA_HOME/lib64:$CUDA_HOME/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
         # Two Homebrew-on-Linux linker quirks require NVCC_PREPEND_FLAGS overrides:
         #
         # 1) -L: some CUDA installs (e.g. 13.0) only have lib/, not lib64/. nvcc

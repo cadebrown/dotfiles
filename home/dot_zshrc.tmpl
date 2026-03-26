@@ -77,6 +77,11 @@ if [ -d "$ZSH_CUSTOM/themes/pure" ]; then
     autoload -Uz promptinit && promptinit
     zstyle :prompt:pure:git:stash show yes
     prompt pure
+    # Fix %n on hosts where getpwuid() fails (broken NSS/LDAP — no passwd
+    # entry for our uid). %n reads zsh's special $USERNAME param, which we
+    # can't assign without triggering setuid(). Replace %n in the prompt
+    # with $USER (always set by SSH/login, no NSS lookup).
+    [[ -z "$USERNAME" && -n "$USER" ]] && PROMPT=${PROMPT//\%n/$USER}
 fi
 
 ### ALIASES ###

@@ -289,6 +289,42 @@ else
     log_warn "brew glibc localedef not found — skipping locale generation"
 fi
 
+### SYSTEM LDCONFIG (brew's ld.so needs to find system driver libs) ###
+#
+# Homebrew's ld.so has its own ldconfig cache, separate from the system's.
+# By default, it only searches brew-owned directories (opt/glibc/lib, brew/lib).
+# Brew ships a 99-system-ld.so.conf.example that includes system paths — we
+# enable it so brew programs can discover system-provided driver libraries
+# (libcuda.so.1, libnvidia-ml.so.1, etc.) via ldconfig instead of LD_LIBRARY_PATH.
+#
+# This is safe: brew glibc is first in brew's ld.so.conf (sorts before 99-),
+# so brew glibc always wins. System paths only provide libraries that brew
+# doesn't have (driver stubs, vendor-specific libs).
+#
+# Without this, cuda_use() would need /usr/lib/<arch> in LD_LIBRARY_PATH,
+# which poisons brew binaries: they find system libc before brew glibc
+# (LD_LIBRARY_PATH is searched before ldconfig).
+
+_BREW_LDCONF_D="$_REAL_BREW_PREFIX/etc/ld.so.conf.d"
+_BREW_LDCONFIG="$BREW_GLIBC/sbin/ldconfig"
+_SYS_CONF="$_BREW_LDCONF_D/99-system-ld.so.conf"
+_SYS_CONF_EXAMPLE="${_SYS_CONF}.example"
+
+if [[ -x "$_BREW_LDCONFIG" ]]; then
+    if [[ -f "$_SYS_CONF" ]]; then
+        log_okay "brew ldconfig already includes system paths"
+    elif [[ -f "$_SYS_CONF_EXAMPLE" ]]; then
+        log_info "Enabling system paths in brew ldconfig (99-system-ld.so.conf)"
+        cp "$_SYS_CONF_EXAMPLE" "$_SYS_CONF"
+        run_logged "$_BREW_LDCONFIG"
+        log_okay "brew ldconfig rebuilt with system paths"
+    else
+        log_warn "99-system-ld.so.conf.example not found — brew programs may not find system driver libs"
+    fi
+else
+    log_warn "brew ldconfig not found — skipping system path registration"
+fi
+
 ### Create unversioned compiler symlinks ###
 #
 # gcc and llvm are keg-only — Homebrew doesn't link gcc/g++/clang/clang++ into
