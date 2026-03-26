@@ -97,6 +97,9 @@ $LOCAL_PLAT/bin               chezmoi, uv, claude
 /usr/bin                      system
 ```
 
+Note: `$LOCAL_PLAT/venv/bin` was removed — Python CLI tools now use `uv tool install`
+(isolated venvs under `$LOCAL_PLAT/uv/tools/`).
+
 **Never install the same tool in two layers** — PLAT paths win, but duplicates waste time.
 
 ## Bootstrap step order
@@ -113,7 +116,7 @@ $LOCAL_PLAT/bin               chezmoi, uv, claude
 4.   packages         DF_DO_PACKAGES
 5.   macOS services   DF_DO_MACOS_SERVICES
 5.5  macOS settings   DF_DO_MACOS_SETTINGS
-6.   runtimes         DF_DO_NODE, DF_DO_RUST, DF_DO_PYTHON, DF_DO_CLAUDE, DF_DO_CODEX, DF_DO_CMAKE
+6.   runtimes         DF_DO_NODE, DF_DO_RUST, DF_DO_PYTHON, DF_DO_CLAUDE, DF_DO_CODEX, DF_DO_CURSOR, DF_DO_CMAKE
 7.   auth             DF_DO_AUTH (off by default)
 ```
 
