@@ -103,6 +103,9 @@ if OS.mac?
   brew "qemu"
   brew "mas"
 
+  ### GPU Profiling ###
+  cask "nvidia-nsight-systems"
+
   ### X11 ###
   brew "xorg-server"
 
