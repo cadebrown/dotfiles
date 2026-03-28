@@ -88,6 +88,9 @@ brew "zig"
 ### AI Coding Agents ###
 brew "opencode"
 
+### Security ###
+brew "gitleaks"  # secret scanning — also used as a global pre-push hook
+
 ### DevOps ###
 brew "opentofu"
 brew "mdbook"

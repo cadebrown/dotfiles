@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# pre-push hook: scan commits being pushed for secrets with gitleaks.
+# Installed globally via core.hooksPath = ~/.config/git/hooks in ~/.gitconfig.
+#
+# Scans only the commits being pushed (not the full history) for speed.
+# To bypass in an emergency: git push --no-verify
+
+if ! command -v gitleaks &>/dev/null; then
+    echo "warning: gitleaks not found — skipping secret scan (run: brew install gitleaks)" >&2
+    exit 0
+fi
+
+_failed=0
+
+while IFS=' ' read -r _local_ref _local_sha _remote_ref _remote_sha; do
+    # Branch deletion — nothing to scan
+    [[ "$_local_sha" == "0000000000000000000000000000000000000000" ]] && continue
+
+    if [[ "$_remote_sha" == "0000000000000000000000000000000000000000" ]]; then
+        # New remote branch — scan all commits reachable from local sha
+        # that aren't already on any remote ref
+        _log_opts="$_local_sha --not --remotes"
+    else
+        # Existing branch — scan only the new commits
+        _log_opts="${_remote_sha}..${_local_sha}"
+    fi
+
+    if ! gitleaks git --no-banner --log-opts="$_log_opts" 2>/dev/null; then
+        echo "gitleaks: secrets detected in $_local_ref — push blocked" >&2
+        echo "  To review: gitleaks git --log-opts=\"$_log_opts\"" >&2
+        echo "  To bypass (use with care): git push --no-verify" >&2
+        _failed=1
+    fi
+done
+
+exit "$_failed"
