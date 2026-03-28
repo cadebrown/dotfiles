@@ -158,3 +158,28 @@ skip_if_not_linux() {
     [ "$status" -eq 0 ]
     [[ "$output" == "1" ]]
 }
+
+# --- Local LLM env vars ---
+
+skip_if_not_darwin() {
+    [[ "$(uname -s)" == "Darwin" ]] || skip "Only applies to macOS"
+}
+
+@test "HF_HOME set to PLAT cache/huggingface (zsh)" {
+    run zsh --no-rcs -c "$ZSH_SOURCE; echo \$HF_HOME"
+    [ "$status" -eq 0 ]
+    [[ "$output" == "$LOCAL_PLAT/.cache/huggingface" ]]
+}
+
+@test "HF_HOME set to PLAT cache/huggingface (bash)" {
+    run bash --norc --noprofile -c "$BASH_SOURCE_CMD; echo \$HF_HOME"
+    [ "$status" -eq 0 ]
+    [[ "$output" == "$LOCAL_PLAT/.cache/huggingface" ]]
+}
+
+@test "OLLAMA_HOST set on macOS (zsh)" {
+    skip_if_not_darwin
+    run zsh --no-rcs -c "$ZSH_SOURCE; echo \$OLLAMA_HOST"
+    [ "$status" -eq 0 ]
+    [[ "$output" == "http://127.0.0.1:11434" ]]
+}

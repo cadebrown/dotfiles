@@ -30,12 +30,15 @@ setup() {
 }
 
 @test "~/.gitconfig has user name from DF_NAME" {
-    # Template renders "name  = ..." (two spaces before =)
-    grep -q "name" "$HOME/.gitconfig"
+    run git config user.name
+    [ "$status" -eq 0 ]
+    [ -n "$output" ]
 }
 
 @test "~/.gitconfig has user email from DF_EMAIL" {
-    grep -q "email = " "$HOME/.gitconfig"
+    run git config user.email
+    [ "$status" -eq 0 ]
+    [ -n "$output" ]
 }
 
 # --- chezmoi idempotency ---
@@ -88,4 +91,18 @@ setup() {
 @test "pip.txt packages are installed in venv" {
     run uv pip list --python "$LOCAL_PLAT/venv/bin/python"
     [ "$status" -eq 0 ]
+}
+
+# --- Local LLM config files ---
+
+@test "~/.aider.conf.yml exists (deployed by chezmoi)" {
+    [[ -f "$HOME/.aider.conf.yml" ]]
+}
+
+@test "~/.config/opencode/opencode.json exists (deployed by chezmoi)" {
+    [[ -f "$HOME/.config/opencode/opencode.json" ]]
+}
+
+@test "opencode.json references ollama provider" {
+    grep -q '"ollama"' "$HOME/.config/opencode/opencode.json"
 }
