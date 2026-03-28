@@ -43,8 +43,17 @@ _failed=0
 while IFS= read -r _line; do
     # Extract optional # python=X.Y constraint before stripping comments
     _py_ver="$(echo "$_line" | grep -oE 'python=[0-9]+\.[0-9]+' | cut -d= -f2 || true)"
+    # Extract optional # macos-only marker
+    _macos_only="$(echo "$_line" | grep -c 'macos-only' || true)"
     _pkg="$(echo "$_line" | sed 's/#.*//;s/^[[:space:]]*//;s/[[:space:]]*$//')"
     [[ -z "$_pkg" ]] && continue
+
+    # Skip macOS-only tools on Linux (e.g. mlx-lm requires Apple Metal/MLX framework)
+    if [[ "$_macos_only" -gt 0 && "$OS" != "darwin" ]]; then
+        log_debug "Skipping macOS-only package on $OS: $_pkg"
+        (( _skipped++ )) || true
+        continue
+    fi
 
     _uv_args=()
     [[ -n "$_py_ver" ]] && _uv_args=(--python "$_py_ver")
