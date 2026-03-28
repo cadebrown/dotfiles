@@ -9,6 +9,7 @@
 # Usage
 
 - [Day-to-day workflow](usage/updates.md)
+- [AeroSpace window management](usage/aerospace.md)
 - [Troubleshooting](usage/troubleshooting.md)
 
 # Infrastructure
