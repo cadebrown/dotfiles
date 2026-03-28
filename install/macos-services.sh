@@ -37,11 +37,13 @@ fi
 #   - macOS app (/Applications/Ollama.app): manages its own LaunchAgent
 
 if has ollama; then
-    if brew services list 2>/dev/null | grep -q '^ollama.*started'; then
-        log_okay "ollama already running as a brew service"
-    elif [[ -d "/Applications/Ollama.app" ]]; then
-        # App install handles its own auto-start — nothing to register
+    if [[ -d "/Applications/Ollama.app" ]]; then
+        # App install handles its own LaunchAgent — brew services is irrelevant here.
+        # Checking brew first was wrong: the app's agent can appear in brew services
+        # output as "started", giving a misleading "brew service" log message.
         log_okay "ollama installed as macOS app (manages its own LaunchAgent)"
+    elif brew services list 2>/dev/null | grep -q '^ollama.*started'; then
+        log_okay "ollama already running as a brew service"
     elif brew list ollama &>/dev/null 2>&1; then
         log_info "Starting ollama service (auto-start at login)"
         if run_logged brew services start ollama; then

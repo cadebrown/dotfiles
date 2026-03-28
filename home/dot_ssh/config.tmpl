@@ -1,5 +1,8 @@
 {{ if eq .chezmoi.os "darwin" -}}
-Include {{ .chezmoi.homeDir }}/.colima/ssh_config
+# Colima injects SSH config for managed VMs (socket forwarding, etc.)
+# Using a glob so OpenSSH silently skips this if Colima hasn't run yet —
+# a literal path to a non-existent file causes "Bad configuration option: include".
+Include {{ .chezmoi.homeDir }}/.colima/*ssh_config
 
 {{ end -}}
 # Machine-specific and private host blocks (e.g. from dotfiles-nvidia)

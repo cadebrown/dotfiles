@@ -42,6 +42,13 @@ _plat_detect() {
     printf '%s' "unknown"
 }
 export _PLAT="$(_plat_detect)"
+unset -f _plat_detect
+# Abort profile loading if PLAT detection failed — continuing with _PLAT=unknown
+# silently corrupts all tool paths with no visible error to the user.
+if [[ "$_PLAT" == "unknown" ]]; then
+    echo "ERROR: PLAT detection failed — run ~/dotfiles/bootstrap.sh to set up install/plat/" >&2
+    return 1
+fi
 # Resolve symlinks so all PATH entries use the same physical path.
 # This prevents duplicate entries when ~/.local is a symlink to scratch space.
 _local_root="$HOME/.local"
@@ -50,7 +57,6 @@ if [[ -L "$_local_root" ]]; then
 fi
 export _LOCAL_PLAT="$_local_root/$_PLAT"
 unset _local_root
-unset -f _plat_detect
 
 ### GENERAL ###
 
@@ -78,6 +84,9 @@ if [ -e "$HOME/.homebrew" ]; then
     eval "$(~/.homebrew/bin/brew shellenv)"
 elif [ -e "/opt/homebrew" ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [ -e "/usr/local/bin/brew" ]; then
+    # Intel Mac fallback (Homebrew installs to /usr/local on x86-64)
+    eval "$(/usr/local/bin/brew shellenv)"
 fi
 {{ else -}}
 # Linux: Homebrew installed per-PLAT, no container needed
@@ -143,7 +152,8 @@ export HF_HOME="$_LOCAL_PLAT/.cache/huggingface"
 {{ if eq .chezmoi.os "darwin" -}}
 
 # Ollama: explicit API endpoint — read by aider, Continue.dev, OpenHands, etc.
-export OLLAMA_HOST="http://127.0.0.1:11434"
+# Use :- so overlay dotfiles or .env files can override (e.g. remote Ollama server).
+export OLLAMA_HOST="${OLLAMA_HOST:-http://127.0.0.1:11434}"
 
 # Colima: point Docker CLI at colima's socket (avoids needing Docker Desktop)
 if [ -S "$HOME/.colima/default/docker.sock" ]; then
