@@ -47,3 +47,6 @@ nu
 
 # CSV toolkit (pre-built: github.com/medialab/xan)
 xan
+
+# Command runner / Makefile alternative (pre-built: github.com/casey/just)
+just

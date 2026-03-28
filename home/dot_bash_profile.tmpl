@@ -125,6 +125,11 @@ export UV_TOOL_BIN_DIR="$_LOCAL_PLAT/bin"
 export UV_TOOL_DIR="$_LOCAL_PLAT/uv/tools"
 export UV_PYTHON_INSTALL_DIR="$_LOCAL_PLAT/uv/python"
 
+### LOCAL LLM ###
+# HuggingFace: keep MLX/safetensors weights on PLAT-isolated storage.
+# Ollama models use their default location (~/.ollama/models) — managed by the app.
+export HF_HOME="$_LOCAL_PLAT/.cache/huggingface"
+
 ### PLAT PATHS ###
 # These go after Homebrew so PLAT-installed tools take priority.
 # (bash doesn't have zsh's typeset -U, so PATH dedup is manual)
@@ -140,6 +145,9 @@ fi
 
 ### PLATFORM-SPECIFIC ###
 {{ if eq .chezmoi.os "darwin" -}}
+
+# Ollama: explicit API endpoint — read by aider, Continue.dev, OpenHands, etc.
+export OLLAMA_HOST="http://127.0.0.1:11434"
 
 if [ -S "$HOME/.colima/default/docker.sock" ]; then
     export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"

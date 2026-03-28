@@ -43,7 +43,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `zsh.sh` | oh-my-zsh + plugins (pure, autosuggestions, fsh, completions) | Clones or updates via git |
 | `homebrew.sh` | macOS: Homebrew + `brew bundle` from Brewfile | Upgrades enabled by default |
 | `linux-packages.sh` | Linux: Homebrew + glibc + `brew bundle` | Custom prefix, compiler symlinks, upgrades off by default |
-| `macos-services.sh` | Colima login service (rootless Docker) | macOS only, skips on Linux |
+| `macos-services.sh` | Colima + Ollama login services (rootless Docker + local LLM server) | macOS only, skips on Linux |
 | `macos-settings.sh` | System prefs via `defaults write` (Dock, Finder, keyboard, trackpad, Safari, iTerm2) | macOS only |
 | `node.sh` | nvm + Node.js + global npm packages from `npm.txt` | Lazy-loaded in zsh for fast startup |
 | `rust.sh` | rustup + cargo-binstall + tools from `cargo.txt` | macOS: Homebrew rustup (code-signed); Linux: sh.rustup.rs |
@@ -51,6 +51,8 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `claude.sh` | Claude Code binary + plugins + MCP servers | Downloads from Anthropic's GCS bucket |
 | `codex.sh` | Codex CLI binary from GitHub releases | Platform detection + checksum |
 | `cursor.sh` | Cursor settings symlinks + extension install; `sync-extensions` subcommand captures new extensions back | Union-only (never removes); app updated via Brewfile cask |
+| `local-llm.sh` | Creates PLAT-isolated dirs for Ollama + HuggingFace model storage; verifies mlx-lm and aider binaries | macOS primary; dirs also created on Linux |
+| `opencode.sh` | Creates context-boosted Ollama model aliases for OpenCode (256K for qwen3-coder, 128K for others) | Requires ollama server running; skips missing source models |
 | `auth.sh` | Interactive API token setup (GitHub, Anthropic, OpenAI) | Creates `~/.{service}.env` files, chmod 600 |
 | `dirs.sh` | Creates `~/dev`, `~/bones`, `~/misc` | Symlinks to scratch when available |
 | `scratch.sh` | Symlinks `~/.local`, `~/.cache`, etc. to scratch space | NFS quota relief |
@@ -117,6 +119,7 @@ Note: `$LOCAL_PLAT/venv/bin` was removed — Python CLI tools now use `uv tool i
 5.   macOS services   DF_DO_MACOS_SERVICES
 5.5  macOS settings   DF_DO_MACOS_SETTINGS
 6.   runtimes         DF_DO_NODE, DF_DO_RUST, DF_DO_PYTHON, DF_DO_CLAUDE, DF_DO_CODEX, DF_DO_CURSOR, DF_DO_CMAKE
+6.5  local LLM        DF_DO_LOCAL_LLM (local-llm.sh + opencode.sh)
 7.   auth             DF_DO_AUTH (off by default)
 ```
 

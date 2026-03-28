@@ -40,16 +40,20 @@ _installed=0
 _skipped=0
 _failed=0
 
-while IFS= read -r _pkg; do
-    # _read_package_list strips comments/blanks but we read raw here for simplicity
-    _pkg="$(echo "$_pkg" | sed 's/#.*//;s/^[[:space:]]*//;s/[[:space:]]*$//')"
+while IFS= read -r _line; do
+    # Extract optional # python=X.Y constraint before stripping comments
+    _py_ver="$(echo "$_line" | grep -oE 'python=[0-9]+\.[0-9]+' | cut -d= -f2 || true)"
+    _pkg="$(echo "$_line" | sed 's/#.*//;s/^[[:space:]]*//;s/[[:space:]]*$//')"
     [[ -z "$_pkg" ]] && continue
+
+    _uv_args=()
+    [[ -n "$_py_ver" ]] && _uv_args=(--python "$_py_ver")
 
     if uv tool list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "^$_pkg "; then
         log_debug "Already installed: $_pkg"
         (( _skipped++ )) || true
     else
-        if uv tool install "$_pkg" 2>&1; then
+        if uv tool install "$_pkg" "${_uv_args[@]}" 2>&1; then
             (( _installed++ )) || true
         else
             log_warn "Failed to install: $_pkg"

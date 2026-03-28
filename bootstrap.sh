@@ -39,6 +39,7 @@
 #   DF_DO_AUTH          — set to 1 to run interactive API token setup
 #   DF_DO_CURSOR        — set to 0 to skip Cursor settings sync
 #   DF_DO_CMAKE         — set to 0 to skip CMake toolchain file install
+#   DF_DO_LOCAL_LLM     — set to 0 to skip local LLM tooling setup
 #   DF_DO_OVERLAYS      — set to 0 to skip all overlay bootstraps
 
 set -euo pipefail
@@ -454,6 +455,17 @@ if [[ "${DF_DO_CMAKE:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/cmake.sh" || die "cmake.sh failed"
 else
     log_info "Skipping CMake toolchains (DF_DO_CMAKE=0)"
+fi
+
+### 6.5. local LLM tooling ###
+
+log_section "6.5 — local LLM tooling"
+
+if [[ "${DF_DO_LOCAL_LLM:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/local-llm.sh" || die "local-llm.sh failed"
+    bash "$DF_INSTALL_DIR/opencode.sh" || die "opencode.sh failed"
+else
+    log_info "Skipping local LLM tooling (DF_DO_LOCAL_LLM=0)"
 fi
 
 ### 7. auth ###

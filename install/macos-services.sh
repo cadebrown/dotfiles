@@ -30,6 +30,32 @@ else
     log_warn "colima not found — skipping (run install/homebrew.sh first)"
 fi
 
+### ollama ###
+# Local LLM inference server — OpenAI-compatible API on localhost:11434.
+# Two install paths:
+#   - Homebrew formula (`brew install ollama`): managed via `brew services`
+#   - macOS app (/Applications/Ollama.app): manages its own LaunchAgent
+
+if has ollama; then
+    if brew services list 2>/dev/null | grep -q '^ollama.*started'; then
+        log_okay "ollama already running as a brew service"
+    elif [[ -d "/Applications/Ollama.app" ]]; then
+        # App install handles its own auto-start — nothing to register
+        log_okay "ollama installed as macOS app (manages its own LaunchAgent)"
+    elif brew list ollama &>/dev/null 2>&1; then
+        log_info "Starting ollama service (auto-start at login)"
+        if run_logged brew services start ollama; then
+            log_okay "ollama service registered"
+        else
+            log_warn "ollama service start failed — run 'brew services start ollama' manually"
+        fi
+    else
+        log_warn "ollama found but source unknown — start manually: ollama serve"
+    fi
+else
+    log_warn "ollama not found — skipping (run install/homebrew.sh first)"
+fi
+
 ### docker CLI plugins ###
 # docker-compose and docker-buildx are installed by Homebrew but must be
 # symlinked into ~/.docker/cli-plugins/ to work as `docker compose` / `docker buildx`.

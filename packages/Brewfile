@@ -85,6 +85,9 @@ brew "glfw"
 brew "python@3.14"  # patched on Linux (see patch-homebrew-python.sh); provides dev headers
 brew "zig"
 
+### AI Coding Agents ###
+brew "opencode"
+
 ### DevOps ###
 brew "opentofu"
 brew "mdbook"
@@ -105,6 +108,9 @@ if OS.mac?
   brew "docker-buildx"
   brew "qemu"
   brew "mas"
+
+  ### Local AI ###
+  brew "ollama"
 
   ### GPU Profiling ###
   cask "nvidia-nsight-systems"
