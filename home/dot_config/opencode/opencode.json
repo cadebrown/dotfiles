@@ -1,0 +1,21 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "ollama/qwen3-coder:30b-ctx256k",
+  "provider": {
+    "ollama": {
+      "name": "Ollama",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://127.0.0.1:11434/v1"
+      },
+      "models": {
+        "qwen3-coder:30b-ctx256k":  { "name": "Qwen3-Coder 30B (256K)" },
+        "gpt-oss:120b":             { "name": "GPT-OSS 120B" },
+        "gpt-oss:20b-ctx128k":      { "name": "GPT-OSS 20B (128K)" },
+        "llama3.3:70b-ctx128k":     { "name": "Llama 3.3 70B (128K)" },
+        "qwen2.5-coder:7b-ctx128k": { "name": "Qwen2.5-Coder 7B (128K)" },
+        "deepseek-r1:latest":       { "name": "DeepSeek R1 7B" }
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+# ~/.aider.conf.yml — aider defaults for local Ollama inference
+# Docs: https://aider.chat/docs/config/aider_conf.html
+#
+# Context-boosted aliases are created by install/opencode.sh.
+# Switch model at runtime: aider --model ollama/llama3.3:70b-ctx128k
+
+model: ollama/qwen3-coder:30b-ctx256k
+openai-api-base: http://127.0.0.1:11434/v1
+openai-api-key: ollama
