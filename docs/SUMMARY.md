@@ -10,6 +10,7 @@
 
 - [Day-to-day workflow](usage/updates.md)
 - [AeroSpace window management](usage/aerospace.md)
+- [Local AI coding](usage/local-llm.md)
 - [Troubleshooting](usage/troubleshooting.md)
 
 # Infrastructure

@@ -12,6 +12,7 @@ Every package layer has a declarative text file and an idempotent install script
 | Global npm | `packages/npm.txt` | `install/node.sh` | All |
 | Claude plugins | `packages/claude-plugins.txt` | `install/claude.sh` | All |
 | Claude MCP servers | `packages/claude-mcp.txt` | `install/claude.sh` | All |
+| VS Code extensions | `packages/vscode-extensions.txt` | `install/vscode.sh` | All |
 
 ---
 
@@ -89,6 +90,26 @@ macOS-specific (casks, GUI apps).
 ### 5. Custom install script
 
 Look at an existing `install/` script for patterns and follow them. Add a `DF_DO_*` flag to `bootstrap.sh`.
+
+---
+
+## Local AI tools
+
+Local LLM inference and coding agents are split across three layers:
+
+| Tool | Layer | Notes |
+|---|---|---|
+| `ollama` | `packages/Brewfile` (macOS only) | Inference server; installed as Homebrew formula, managed as a LaunchAgent |
+| `opencode` | `packages/Brewfile` | TUI coding agent by the SST team |
+| `mlx-lm` | `packages/pip.txt` | Apple Silicon Metal inference; on-demand only |
+| `aider-chat` | `packages/pip.txt` (`# python=3.12`) | CLI coding agent; pinned to Python 3.12 because scipy has no wheels for 3.14+ |
+| `just` | `packages/cargo.txt` | Command runner / Makefile alternative |
+
+`install/local-llm.sh` creates the PLAT-isolated HuggingFace cache directory (`$LOCAL_PLAT/.cache/huggingface`)
+and verifies that the expected binaries are present. `install/opencode.sh` creates context-boosted Ollama
+model aliases so the 4096-token default doesn't starve the agentic tool-use loop.
+
+See [Local AI coding](../usage/local-llm.md) for usage details.
 
 ---
 

@@ -79,6 +79,10 @@ Sudo is required for the Homebrew installer.
 12. **CMake toolchain files** → `~/.local/$PLAT/cmake/toolchains/`
     - `llvm.cmake` and `gcc.cmake` deployed from `install/cmake/toolchains/`
     - `~/.profile` sets `CMAKE_TOOLCHAIN_FILE` to the LLVM file automatically
+13. **Local LLM tooling** (step 6.5) — HuggingFace cache dir + Ollama context-boosted model aliases
+    - Creates `$LOCAL_PLAT/.cache/huggingface` for mlx-lm model weights
+    - Context-boosted aliases (e.g. `qwen3-coder:30b-ctx256k`) created if the base model is pulled
+    - Skipped gracefully if Ollama is not installed
 
 Total time: ~5 minutes on a fast connection (most packages pour as precompiled bottles).
 
@@ -139,7 +143,10 @@ DF_DO_RUST=0            # skip rustup + cargo tools
 DF_DO_PYTHON=0          # skip uv + venv
 DF_DO_CLAUDE=0          # skip Claude Code install + plugins + MCP servers
 DF_DO_CODEX=0           # skip Codex CLI install
+DF_DO_CURSOR=0          # skip Cursor settings symlinks + extension install
+DF_DO_VSCODE=0          # skip VS Code extension install
 DF_DO_CMAKE=0           # skip CMake toolchain file deployment
+DF_DO_LOCAL_LLM=0       # skip local LLM setup (HuggingFace cache + Ollama context aliases)
 DF_DO_AUTH=1             # run interactive API token setup
 DF_DO_OVERLAYS=0        # skip all overlay bootstraps (dotfiles-*/bootstrap.sh)
 DF_BREW_UPGRADE=0       # skip Homebrew upgrades (macOS default: 1, Linux default: 0)
