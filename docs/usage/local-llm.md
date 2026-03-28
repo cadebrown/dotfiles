@@ -90,7 +90,8 @@ OLLAMA_MODELS=/scratch/$USER/ollama/models ollama pull qwen3-coder:30b
 
 ## mlx-lm
 
-Installed via pip (`mlx-lm` in `packages/pip.txt`). Apple Silicon only — runs on Metal, skips CPU.
+Installed via pip (`mlx-lm` in `packages/pip.txt`, tagged `# macos-only`). Apple Silicon only —
+runs on Metal, skips CPU. Skipped automatically on Linux by `install/python.sh`.
 Not started automatically — launch on demand.
 
 ```sh
@@ -132,9 +133,10 @@ and run `chezmoi apply`. If the model needs a context-boosted alias, add it to
 
 ## aider
 
-Installed via pip (`aider-chat` in `packages/pip.txt`, pinned to Python 3.12 because `scipy` has
-no wheels for Python 3.14+). Config at `~/.aider.conf.yml` (deployed by chezmoi), defaulting to
-the Ollama `qwen3-coder:30b-ctx256k` alias.
+Installed via pip (`aider-chat` in `packages/pip.txt`, tagged `# python=3.12` because `scipy` has
+no wheels for Python 3.14+). Config at `~/.aider.conf.yml` (deployed by chezmoi as a template):
+- **macOS**: defaults to `ollama/qwen3-coder:30b-ctx256k` (local inference)
+- **Linux**: empty config — falls through to `ANTHROPIC_API_KEY` or an explicit `--model` flag
 
 ```sh
 aider                                    # use default model from ~/.aider.conf.yml

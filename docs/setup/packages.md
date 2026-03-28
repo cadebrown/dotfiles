@@ -61,11 +61,17 @@ Currently ships [`@cometix/ccline`](https://github.com/Haleclipse/CCometixLine) 
 requests
 black
 numpy
+some-macos-tool  # macos-only (requires Metal / only available on macOS)
+aider-chat       # python=3.12 (scipy has no wheels for python 3.14+)
 ```
 
 Re-run: `bash ~/dotfiles/install/python.sh`
 
-Installs into `$LOCAL_PLAT/venv` via `uv`. The venv is activated in `.zprofile`.
+Each tool gets its own isolated venv via `uv tool install`, with entrypoints in `$LOCAL_PLAT/bin/`.
+
+**Comment conventions** parsed by `install/python.sh`:
+- `# macos-only` — skipped on Linux (e.g. `mlx-lm` requires Apple Metal/MLX framework)
+- `# python=X.Y` — pins to a specific Python version for that tool (e.g. `aider-chat` needs 3.12 because `scipy` has no wheels for Python 3.14+)
 
 ### 4. Homebrew — non-language-specific tools and C libraries
 
@@ -87,7 +93,26 @@ Re-run: `brew bundle --file=~/dotfiles/packages/Brewfile`
 Prefer Homebrew for tools that aren't available via cargo/npm/pip, have complex C dependencies, or are
 macOS-specific (casks, GUI apps).
 
-### 5. Custom install script
+### 5. VS Code extensions
+
+```sh
+# Add to packages/vscode-extensions.txt
+ms-python.python
+charliermarsh.ruff
+```
+
+Re-run: `bash ~/dotfiles/install/vscode.sh`
+
+To capture newly installed extensions back into the file (union — never removes):
+
+```sh
+bash ~/dotfiles/install/vscode.sh sync-extensions
+```
+
+> **Note:** `settings.json` is **not tracked** — it contains an embedded GitLab token
+> (`cmake.configureEnvironment`). Extensions only.
+
+### 6. Custom install script
 
 Look at an existing `install/` script for patterns and follow them. Add a `DF_DO_*` flag to `bootstrap.sh`.
 

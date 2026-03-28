@@ -187,7 +187,9 @@ Priority order — native installer first, Homebrew as fallback:
 
 1. `packages/cargo.txt` — Rust crates (cargo-binstall downloads pre-built binaries)
 2. `packages/npm.txt` — npm packages
-3. `packages/pip.txt` — Python packages (installed into `$LOCAL_PLAT/venv` via uv)
+3. `packages/pip.txt` — Python packages (installed via `uv tool install`)
+   - `# macos-only` — skip on Linux (e.g. `mlx-lm` requires Apple Metal)
+   - `# python=X.Y` — pin to a specific Python version (e.g. `aider-chat` needs 3.12 because scipy has no wheels for 3.14+)
 4. `packages/Brewfile` — everything else (C libraries, GUI apps, tools without native installers)
 5. New `install/*.sh` script — source `_lib.sh`, add `DF_DO_*` flag to `bootstrap.sh`, add tests
 
@@ -218,6 +220,19 @@ Internal vars: `DF_ROOT` (repo root), `DF_PACKAGES` (packages dir), `DF_INSTALL_
 Tool-standard vars (`PLAT`, `LOCAL_PLAT`, `RUSTUP_HOME`, `CARGO_HOME`, `NVM_DIR`, etc.) keep
 their conventional names.
 
+## Git hooks
+
+A global pre-push hook scans commits for secrets using [gitleaks](https://github.com/gitleaks/gitleaks).
+
+- Installed via `brew "gitleaks"` in `packages/Brewfile`
+- Hook lives at `home/dot_config/git/hooks/executable_pre-push` (deployed by chezmoi)
+- `~/.gitconfig` sets `core.hooksPath = ~/.config/git/hooks` — applies to **every repo**, not just dotfiles
+- Scans only the commits being pushed (not full history) for speed
+- Gracefully skips if gitleaks is not yet installed
+- Emergency bypass: `git push --no-verify`
+
+To run a full history scan manually: `gitleaks git --no-banner` from the repo root.
+
 ## Toolchain switching
 
 The `tc` function in `.zshrc` switches CMake toolchains per-session:
@@ -237,6 +252,9 @@ GCC variants set CC/CXX/AR/RANLIB/NM; LLVM variants only set CMAKE_TOOLCHAIN_FIL
 
 These are non-obvious things that have caused real bugs:
 
+- **gitleaks pre-push hook will block commits with secrets** — `core.hooksPath` applies globally.
+  If a push is blocked unexpectedly, run `gitleaks git --no-banner` to review the finding.
+  Emergency bypass: `git push --no-verify`. Don't disable the hook permanently.
 - **`sourceDir` in chezmoi.toml must be a top-level key** — not inside `[data]`. Misplacing
   it silently breaks `chezmoi diff` and `chezmoi update`.
 - **`GIT_CONFIG_GLOBAL=/dev/null`** is set by `_lib.sh` intentionally — prevents SSH URL
