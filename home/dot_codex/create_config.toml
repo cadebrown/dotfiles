@@ -1,7 +1,7 @@
 #:schema https://developers.openai.com/codex/config-schema.json
 
 model = "gpt-5.3-codex"
-model_reasoning_effort = "medium"
+model_reasoning_effort = "high"
 plan_mode_reasoning_effort = "high"
 
 web_search = "live"
@@ -10,7 +10,7 @@ approval_policy = "on-request"
 file_opener = "none"
 
 project_doc_max_bytes = 32768
-project_doc_fallback_filenames = ["CLAUDE.md"]
+project_doc_fallback_filenames = ["AGENTS.md", "CLAUDE.md"]
 
 [features]
 personality = true
@@ -25,14 +25,17 @@ exclude_tmpdir_env_var = false
 exclude_slash_tmp = false
 
 [history]
+persistence = "save-all"
 max_bytes = 104857600
 
 [tui]
+theme = "neon-noir"
 alternate_screen = "never"
 animations = false
 notifications = ["agent-turn-complete", "approval-requested"]
 notification_method = "auto"
 show_tooltips = false
+status_line = ["git-branch", "current-dir", "model-name", "context-remaining"]
 
 [profiles.deep]
 model = "gpt-5.3-codex"
@@ -42,7 +45,7 @@ sandbox_mode = "workspace-write"
 approval_policy = "on-request"
 
 [profiles.review]
-model = "gpt-5.3-codex"
+model = "gpt-5-pro"
 model_reasoning_effort = "high"
 plan_mode_reasoning_effort = "high"
 sandbox_mode = "read-only"
@@ -61,6 +64,24 @@ model_reasoning_effort = "low"
 plan_mode_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 approval_policy = "on-request"
+
+[profiles.theme_neon.tui]
+theme = "neon-noir"
+animations = true
+show_tooltips = false
+status_line = ["git-branch", "current-dir", "model-name", "context-remaining"]
+
+[profiles.theme_sunrise.tui]
+theme = "sunburst-candy"
+animations = true
+show_tooltips = false
+status_line = ["git-branch", "current-dir", "model-name", "context-remaining"]
+
+[profiles.theme_mint.tui]
+theme = "minty-terminal"
+animations = true
+show_tooltips = false
+status_line = ["git-branch", "current-dir", "model-name", "context-remaining"]
 
 # Project trust levels are added here by codex at runtime — not managed by chezmoi.
 # (chezmoi uses create_ prefix for this file: written once, never overwritten)

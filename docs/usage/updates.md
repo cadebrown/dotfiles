@@ -61,6 +61,12 @@ chezmoi update                 # git pull + chezmoi apply
 
 ---
 
+## AeroSpace config (v2)
+
+Window-management docs are now in [AeroSpace window management](aerospace.md).
+
+---
+
 ## Update AI agent instructions
 
 Claude and Codex now diverge intentionally:
@@ -74,22 +80,47 @@ Use `~/.claude/CLAUDE.md` for Claude-specific memory and `~/.codex/AGENTS.md` fo
 
 Claude Code's status line is powered by [CCometixLine](https://github.com/Haleclipse/CCometixLine) (`@cometix/ccline` in `npm.txt`). To pick a theme: `ccline --config`.
 
-Codex also has global skills and rules:
+Codex also has global skills and rules (edit source-of-truth in the repo):
 
 ```sh
-chezmoi edit ~/.codex/config.toml
-chezmoi edit ~/.codex/rules/default.rules
+$EDITOR ~/dotfiles/home/dot_codex/create_config.toml
+$EDITOR ~/dotfiles/home/dot_codex/rules/default.rules
+chezmoi apply
+~/dotfiles/install/codex.sh sync-config
+```
+
+Codex binary/config health commands:
+
+```sh
+~/dotfiles/install/codex.sh upgrade      # install latest binary + sync config + healthcheck
+~/dotfiles/install/codex.sh sync-config  # sync managed config; preserve runtime trust sections
+~/dotfiles/install/codex.sh check        # verify binary, profiles, and rules
 ```
 
 Skills live under `home/dot_codex/skills/` in the repo and apply to `~/.codex/skills/`.
+Custom domain skills included:
+- `web-shipping`
+- `simulation-lab`
+- `compiler-workbench`
+- `game-systems`
+
+Custom Codex themes live under `home/dot_codex/themes/` and sync to `~/.codex/themes/`:
+- `neon-noir`
+- `sunburst-candy`
+- `minty-terminal`
 
 Useful Codex commands after updating:
 
 ```sh
 codex --profile fast
 codex --profile review
+codex --profile deep
+codex --profile theme_neon
+codex --profile theme_sunrise
+codex --profile theme_mint
 codex execpolicy check --pretty --rules ~/.codex/rules/default.rules -- git status
 codex '$project-bootstrapper Map this repository and propose the first validation step.'
+codex '$simulation-lab Define state variables and a minimal validation case for this model.'
 ```
 
 ---
