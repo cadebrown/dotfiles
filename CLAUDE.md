@@ -51,6 +51,9 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `claude.sh` | Claude Code binary + plugins + MCP servers | Downloads from Anthropic's GCS bucket |
 | `codex.sh` | Codex CLI binary from GitHub releases | Platform detection + checksum |
 | `cursor.sh` | Cursor settings symlinks + extension install; `sync-extensions` subcommand captures new extensions back | Union-only (never removes); app updated via Brewfile cask |
+| `vscode.sh` | VS Code extension install; `sync-extensions` subcommand captures new extensions back | Extensions only — settings.json NOT tracked (contains embedded credentials) |
+| `local-llm.sh` | Creates PLAT-isolated HuggingFace cache dir, verifies ollama/mlx-lm/aider binaries | Warns but does not fail if tools are absent |
+| `opencode.sh` | Creates Ollama context-boosted model aliases via Modelfile | Skips if source model not installed; omits gpt-oss:120b (confirmed hang bug) |
 | `local-llm.sh` | Creates PLAT-isolated dirs for Ollama + HuggingFace model storage; verifies mlx-lm and aider binaries | macOS primary; dirs also created on Linux |
 | `opencode.sh` | Creates context-boosted Ollama model aliases for OpenCode (256K for qwen3-coder, 128K for others) | Requires ollama server running; skips missing source models |
 | `auth.sh` | Interactive API token setup (GitHub, Anthropic, OpenAI) | Creates `~/.{service}.env` files, chmod 600 |
@@ -118,7 +121,7 @@ Note: `$LOCAL_PLAT/venv/bin` was removed — Python CLI tools now use `uv tool i
 4.   packages         DF_DO_PACKAGES
 5.   macOS services   DF_DO_MACOS_SERVICES
 5.5  macOS settings   DF_DO_MACOS_SETTINGS
-6.   runtimes         DF_DO_NODE, DF_DO_RUST, DF_DO_PYTHON, DF_DO_CLAUDE, DF_DO_CODEX, DF_DO_CURSOR, DF_DO_CMAKE
+6.   runtimes         DF_DO_NODE, DF_DO_RUST, DF_DO_PYTHON, DF_DO_CLAUDE, DF_DO_CODEX, DF_DO_CURSOR, DF_DO_VSCODE, DF_DO_CMAKE
 6.5  local LLM        DF_DO_LOCAL_LLM (local-llm.sh + opencode.sh)
 7.   auth             DF_DO_AUTH (off by default)
 ```
