@@ -57,4 +57,4 @@ while IFS= read -r pkg; do
     fi
 done < <(_read_package_list "$NPM_TXT")
 
-[[ $_pkg_count -eq 0 ]] && log_info "All npm packages already installed"
+if [[ $_pkg_count -eq 0 ]]; then log_info "All npm packages already installed"; fi

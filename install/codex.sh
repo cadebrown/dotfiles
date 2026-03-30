@@ -50,7 +50,7 @@ _get_asset() {
             if ldd --version 2>&1 | grep -q musl; then
                 _libc="musl"
             elif [[ "$_glibc_maj" -lt 2 || ("$_glibc_maj" -eq 2 && "$_glibc_min" -lt 38) ]]; then
-                log_info "glibc $_glibc_ver < 2.38 — using musl build"
+                log_info "glibc $_glibc_ver < 2.38 — using musl build" >&2
                 _libc="musl"
             else
                 _libc="gnu"
