@@ -35,7 +35,7 @@
         "editor.semanticHighlighting.enabled": true
     },
     "[python]": {
-        "editor.formatOnType": true
+        "editor.formatOnType": false
     },
     "typescript.updateImportsOnFileMove.enabled": "always",
     "workbench.editor.empty.hint": "hidden",
@@ -47,10 +47,10 @@
     },
     "editor.accessibilitySupport": "off",
     "github.copilot.editor.enableAutoCompletions": true,
-    "C_Cpp.inlayHints.autoDeclarationTypes.enabled": true,
-    "C_Cpp.inlayHints.autoDeclarationTypes.showOnLeft": true,
-    "C_Cpp.inlayHints.referenceOperator.enabled": true,
-    "C_Cpp.inlayHints.parameterNames.enabled": true,
+    "C_Cpp.inlayHints.autoDeclarationTypes.enabled": false,
+    "C_Cpp.inlayHints.autoDeclarationTypes.showOnLeft": false,
+    "C_Cpp.inlayHints.referenceOperator.enabled": false,
+    "C_Cpp.inlayHints.parameterNames.enabled": false,
     "cmake.pinnedCommands": [
         "workbench.action.tasks.configureTaskRunner",
         "workbench.action.tasks.runTask"
@@ -69,7 +69,7 @@
     },
     "astro.content-intellisense": true,
     "python.defaultInterpreterPath": "python3",
-    "python.analysis.typeCheckingMode": "standard",
+    "python.analysis.typeCheckingMode": "off",
     "python.analysis.autoImportCompletions": true,
     "terminal.integrated.shellIntegration.suggestEnabled": true,
     "terminal.integrated.shellIntegration.history": 1024,
@@ -79,7 +79,7 @@
     },
     "window.zoomLevel": 1,
     "C_Cpp.loggingLevel": "Debug",
-    "C_Cpp.codeAnalysis.clangTidy.enabled": true,
+    "C_Cpp.codeAnalysis.clangTidy.enabled": false,
     "cmake.skipConfigureIfCachePresent": true,
     "github.copilot.nextEditSuggestions.enabled": true,
     "workbench.colorTheme": "SynthWave '84",
