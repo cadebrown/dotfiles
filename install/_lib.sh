@@ -147,6 +147,10 @@ UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
 # nvm: per-PLAT so arch-specific node binaries don't collide on shared homes
 NVM_DIR="$LOCAL_PLAT/nvm"
 
+# conan: per-PLAT — cache has compiled binaries, default profile is machine-specific,
+# and the cache is not concurrency-safe (multiple NFS clients would corrupt it).
+CONAN_HOME="$LOCAL_PLAT/conan2"
+
 # Scratch space for NFS homes with small quotas.
 #
 # When scratch is configured, install/scratch.sh symlinks large home dirs
@@ -179,7 +183,7 @@ export DF_SCRATCH DF_SCRATCH_LINK SCRATCH PATHS
 export OS ARCH DF_ROOT DF_PACKAGES \
        PLAT LOCAL_PLAT RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR \
        UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR \
-       NVM_DIR
+       NVM_DIR CONAN_HOME
 
 # Install scripts clone public repos and must not be affected by the user's
 # gitconfig (which may have url.insteadOf SSH rewrites, breaking clones on
@@ -238,8 +242,9 @@ _re_derive_plat_vars() {
     UV_TOOL_DIR="$LOCAL_PLAT/uv/tools"
     UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
     NVM_DIR="$LOCAL_PLAT/nvm"
+    CONAN_HOME="$LOCAL_PLAT/conan2"
     export PLAT LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR \
-           UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR NVM_DIR
+           UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR NVM_DIR CONAN_HOME
 }
 
 # Read a package list file, skipping blank lines and comments.

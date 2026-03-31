@@ -19,3 +19,6 @@ rich-cli
 # Local LLM inference + coding agents
 mlx-lm  # macos-only (Apple MLX framework requires Metal GPU)
 aider-chat  # python=3.12 (scipy has no wheels for python 3.14+)
+
+# C/C++ package manager
+conan

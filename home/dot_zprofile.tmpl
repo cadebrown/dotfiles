@@ -143,6 +143,11 @@ export UV_TOOL_BIN_DIR="$_LOCAL_PLAT/bin"
 export UV_TOOL_DIR="$_LOCAL_PLAT/uv/tools"
 export UV_PYTHON_INSTALL_DIR="$_LOCAL_PLAT/uv/python"
 
+### CONAN (C/C++ packages) ###
+# Per-PLAT: cache has compiled binaries, default profile is machine-specific,
+# and the cache is not concurrency-safe across NFS clients.
+export CONAN_HOME="$_LOCAL_PLAT/conan2"
+
 ### LOCAL LLM ###
 # HuggingFace: keep MLX/safetensors weights on PLAT-isolated storage.
 # Ollama models use their default location (~/.ollama/models) — managed by the app.
