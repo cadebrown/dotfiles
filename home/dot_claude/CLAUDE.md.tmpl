@@ -73,3 +73,7 @@ Prefer integration tests that exercise real behavior over unit tests with heavy 
 - For complex systems, document *why* not just *what*: data flow, ownership, key invariants
 - Prefer editing existing files over creating new ones
 - Delete dead code rather than commenting it out
+{{- range glob (joinPath .chezmoi.workingTree "dotfiles-*/home/dot_claude/CLAUDE.md") }}
+
+{{ include . }}
+{{- end }}

@@ -198,6 +198,35 @@ for _envfile in "$HOME"/.*.env; do
 done
 unset _envfile
 
+### OVERLAYS ###
+
+# Discover overlay repos (dotfiles-*/). Each overlay can provide its own
+# packages/ dir mirroring the parent layout (e.g. claude-mcp.txt, cargo.txt).
+# Install scripts use overlay_package_files() to iterate over all copies of a
+# given package list — base first, then each overlay in sorted order.
+#
+# Example:
+#   while IFS= read -r _file; do
+#       _process_entries_from "$_file"
+#   done < <(overlay_package_files "claude-mcp.txt")
+
+DF_OVERLAYS=()
+for _overlay_dir in "$DF_ROOT"/dotfiles-*/; do
+    [[ -d "$_overlay_dir" ]] && DF_OVERLAYS+=("${_overlay_dir%/}")
+done
+unset _overlay_dir
+
+# Print paths to every copy of a package file: $DF_PACKAGES/<name> first,
+# then $overlay/packages/<name> for each overlay that has it.
+overlay_package_files() {
+    local name="$1" _dir
+    [[ -f "$DF_PACKAGES/$name" ]] && printf '%s\n' "$DF_PACKAGES/$name"
+    for _dir in "${DF_OVERLAYS[@]}"; do
+        [[ -f "$_dir/packages/$name" ]] && printf '%s\n' "$_dir/packages/$name"
+    done
+    return 0
+}
+
 ### UTILITIES ###
 
 has() {

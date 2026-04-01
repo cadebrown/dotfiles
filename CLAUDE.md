@@ -32,6 +32,40 @@ These are non-negotiable and shape every decision in the repo:
 | Docs | `docs/` | mdBook → auto-deployed to dotfiles.cade.io |
 | Infra | `infra/cloudflare/` | OpenTofu for Cloudflare Pages hosting |
 | Tests | `tests/` | Docker-based bats suite |
+| Overlays | `dotfiles-*/` | Private repos that extend the parent (e.g. `dotfiles-nvidia/`) |
+
+## Overlays
+
+Overlays are private repos at `$DF_ROOT/dotfiles-*/` that extend the public dotfiles
+without modifying them. Each overlay can provide:
+
+- `packages/` — package list files mirroring the parent format (e.g. `claude-mcp.txt`,
+  `claude-plugins.txt`). Install scripts discover these via `overlay_package_files()`.
+- `home/dot_claude/CLAUDE.md` — appended to `~/.claude/CLAUDE.md` via chezmoi template.
+- `home/dot_claude/skills/` — deployed to `~/.claude/skills/` by `install/claude.sh`.
+- `install/` — install scripts sourcing the parent `_lib.sh`.
+- `bootstrap.sh` — run automatically by the parent bootstrap (step 8).
+
+### How overlay package files work
+
+`_lib.sh` defines `DF_OVERLAYS` (array of overlay root paths) and `overlay_package_files()`.
+Install scripts call `overlay_package_files "filename.txt"` to get a list of all copies
+of that file — base first, then each overlay in sorted order:
+
+```bash
+while IFS= read -r _file; do
+    _process_entries_from "$_file"
+done < <(overlay_package_files "claude-mcp.txt")
+```
+
+Currently used by: `install/claude.sh` (MCP servers + plugins). Overlay skills use
+`DF_OVERLAYS` directly to scan `home/dot_claude/skills/` in each overlay.
+
+### Chezmoi integration
+
+`run_onchange_*.sh.tmpl` scripts use `{{ glob (joinPath .chezmoi.workingTree "dotfiles-*/packages/...") }}`
+to hash overlay files. When an overlay file changes, chezmoi detects the hash change and
+re-runs the install script.
 
 ## Install scripts
 
@@ -48,7 +82,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `node.sh` | nvm + Node.js + global npm packages from `npm.txt` | Lazy-loaded in zsh for fast startup |
 | `rust.sh` | rustup + cargo-binstall + tools from `cargo.txt` | macOS: Homebrew rustup (code-signed); Linux: sh.rustup.rs |
 | `python.sh` | uv + CLI tools from `pip.txt` via `uv tool install` | Each tool gets isolated venv under `$LOCAL_PLAT/uv/tools/`; no monolithic venv |
-| `claude.sh` | Claude Code binary + plugins + MCP servers | Downloads from Anthropic's GCS bucket |
+| `claude.sh` | Claude Code binary + plugins + MCP servers + overlay skills | Downloads from Anthropic's GCS bucket; overlay discovery via `DF_OVERLAYS` |
 | `codex.sh` | Codex CLI binary from GitHub releases | Platform detection + checksum |
 | `cursor.sh` | Cursor settings symlinks + extension install; `sync-extensions` subcommand captures new extensions back | Union-only (never removes); app updated via Brewfile cask |
 | `vscode.sh` | VS Code extension install; `sync-extensions` subcommand captures new extensions back | Extensions only — settings.json NOT tracked (contains embedded credentials) |

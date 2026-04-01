@@ -2,6 +2,16 @@
 # Chezmoi re-runs this script whenever Claude plugin/MCP lists change.
 # claude-plugins.txt hash: {{ include "../packages/claude-plugins.txt" | sha256sum }}
 # claude-mcp.txt hash:     {{ include "../packages/claude-mcp.txt" | sha256sum }}
+# overlay hashes:
+{{- range glob (joinPath .chezmoi.workingTree "dotfiles-*/packages/claude-mcp.txt") }}
+#   {{ . | include | sha256sum }} {{ . }}
+{{- end }}
+{{- range glob (joinPath .chezmoi.workingTree "dotfiles-*/packages/claude-plugins.txt") }}
+#   {{ . | include | sha256sum }} {{ . }}
+{{- end }}
+{{- range glob (joinPath .chezmoi.workingTree "dotfiles-*/home/dot_claude/skills/*/SKILL.md") }}
+#   {{ . | include | sha256sum }} {{ . }}
+{{- end }}
 
 set -euo pipefail
 DOTFILES="$CHEZMOI_SOURCE_DIR/.."

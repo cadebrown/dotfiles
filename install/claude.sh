@@ -94,29 +94,34 @@ log_section "Claude Code plugins"
 
 has claude || { log_warn "claude not found — skipping plugins"; exit 0; }
 
-PLUGINS_TXT="$DF_PACKAGES/claude-plugins.txt"
-[[ -f "$PLUGINS_TXT" ]] || { log_warn "No claude-plugins.txt at $PLUGINS_TXT — skipping"; exit 0; }
+_install_plugins_from() {
+    local file="$1"
+    log_info "Reading plugins from $file"
+    while IFS= read -r line; do
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        plugin="${line%% *}"
+
+        log_info "  $plugin"
+        output=$(claude plugin install "$plugin" 2>&1) && status=0 || status=$?
+
+        if [[ $status -eq 0 ]]; then
+            log_okay "  installed $plugin"
+            (( _ok++ )) || true
+        elif echo "$output" | grep -qi "already installed\|already enabled"; then
+            log_info "  skip  $plugin (already installed)"
+            (( _skip++ )) || true
+        else
+            log_warn "  fail  $plugin: $output"
+            (( _fail++ )) || true
+        fi
+    done < "$file"
+}
 
 _ok=0 _skip=0 _fail=0
 
-while IFS= read -r line; do
-    [[ -z "$line" || "$line" == \#* ]] && continue
-    plugin="${line%% *}"
-
-    log_info "  $plugin"
-    output=$(claude plugin install "$plugin" 2>&1) && status=0 || status=$?
-
-    if [[ $status -eq 0 ]]; then
-        log_okay "  installed $plugin"
-        (( _ok++ )) || true
-    elif echo "$output" | grep -qi "already installed\|already enabled"; then
-        log_info "  skip  $plugin (already installed)"
-        (( _skip++ )) || true
-    else
-        log_warn "  fail  $plugin: $output"
-        (( _fail++ )) || true
-    fi
-done < "$PLUGINS_TXT"
+while IFS= read -r _file; do
+    _install_plugins_from "$_file"
+done < <(overlay_package_files "claude-plugins.txt")
 
 log_okay "Claude plugins: ${_ok} installed, ${_skip} already present, ${_fail} failed"
 
@@ -124,48 +129,86 @@ log_okay "Claude plugins: ${_ok} installed, ${_skip} already present, ${_fail} f
 
 log_section "Claude Code MCP servers"
 
-MCP_TXT="$DF_PACKAGES/claude-mcp.txt"
-[[ -f "$MCP_TXT" ]] || { log_warn "No claude-mcp.txt at $MCP_TXT — skipping"; exit 0; }
+_register_mcps_from() {
+    local file="$1"
+    log_info "Reading MCP servers from $file"
+    while IFS= read -r line; do
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        # Parse: <name> <transport> <url>  OR  <name> stdio cmd: <command...>
+        _name="${line%% *}"; _rest="${line#* }"
+        _transport="${_rest%% *}"
+
+        if claude mcp list 2>/dev/null | grep -qE "^$_name\b"; then
+            log_info "  skip  $_name (already registered)"
+            (( _skip++ )) || true
+            continue
+        fi
+
+        if [[ "$_transport" == "stdio" && "$_rest" == *"cmd: "* ]]; then
+            # Stdio format: <name> stdio cmd: <command...>
+            _cmd="${_rest#*cmd: }"
+            log_info "  $_name (stdio) → $_cmd"
+            # Split $_cmd into words for proper argument passing
+            # shellcheck disable=SC2086
+            if claude mcp add --scope user "$_name" -- $_cmd 2>/dev/null; then
+                log_okay "  registered $_name"
+                (( _ok++ )) || true
+            else
+                log_warn "  fail  $_name"
+                (( _fail++ )) || true
+            fi
+        else
+            # HTTP/SSE format: <name> <transport> <url>
+            _url="${_rest#* }"
+            log_info "  $_name ($_transport) → $_url"
+            if claude mcp add --transport "$_transport" --scope user "$_name" "$_url" 2>/dev/null; then
+                log_okay "  registered $_name"
+                (( _ok++ )) || true
+            else
+                log_warn "  fail  $_name"
+                (( _fail++ )) || true
+            fi
+        fi
+    done < "$file"
+}
 
 _ok=0 _skip=0 _fail=0
 
-while IFS= read -r line; do
-    [[ -z "$line" || "$line" == \#* ]] && continue
-    # Parse: <name> <transport> <url>  OR  <name> stdio cmd: <command...>
-    _name="${line%% *}"; _rest="${line#* }"
-    _transport="${_rest%% *}"
-
-    if claude mcp list 2>/dev/null | grep -qE "^$_name\b"; then
-        log_info "  skip  $_name (already registered)"
-        (( _skip++ )) || true
-        continue
-    fi
-
-    if [[ "$_transport" == "stdio" && "$_rest" == *"cmd: "* ]]; then
-        # Stdio format: <name> stdio cmd: <command...>
-        _cmd="${_rest#*cmd: }"
-        log_info "  $_name (stdio) → $_cmd"
-        # Split $_cmd into words for proper argument passing
-        # shellcheck disable=SC2086
-        if claude mcp add --scope user "$_name" -- $_cmd 2>/dev/null; then
-            log_okay "  registered $_name"
-            (( _ok++ )) || true
-        else
-            log_warn "  fail  $_name"
-            (( _fail++ )) || true
-        fi
-    else
-        # HTTP/SSE format: <name> <transport> <url>
-        _url="${_rest#* }"
-        log_info "  $_name ($_transport) → $_url"
-        if claude mcp add --transport "$_transport" --scope user "$_name" "$_url" 2>/dev/null; then
-            log_okay "  registered $_name"
-            (( _ok++ )) || true
-        else
-            log_warn "  fail  $_name"
-            (( _fail++ )) || true
-        fi
-    fi
-done < "$MCP_TXT"
+while IFS= read -r _file; do
+    _register_mcps_from "$_file"
+done < <(overlay_package_files "claude-mcp.txt")
 
 log_okay "MCP servers: ${_ok} registered, ${_skip} already present, ${_fail} failed"
+
+### OVERLAY SKILLS ###
+
+log_section "Claude Code overlay skills"
+
+_SKILLS_DEST="$HOME/.claude/skills"
+_ok=0 _skip=0
+
+for _dir in "${DF_OVERLAYS[@]}"; do
+    _skills_src="$_dir/home/dot_claude/skills"
+    [[ -d "$_skills_src" ]] || continue
+    log_info "Scanning overlay skills in $_dir"
+
+    for _skill_dir in "$_skills_src"/*/; do
+        [[ -f "$_skill_dir/SKILL.md" ]] || continue
+        _skill_name="$(basename "$_skill_dir")"
+        _dest_dir="$_SKILLS_DEST/$_skill_name"
+
+        # Skip if identical
+        if [[ -f "$_dest_dir/SKILL.md" ]] && diff -q "$_skill_dir/SKILL.md" "$_dest_dir/SKILL.md" >/dev/null 2>&1; then
+            log_info "  skip  $_skill_name (unchanged)"
+            (( _skip++ )) || true
+            continue
+        fi
+
+        ensure_dir "$_dest_dir"
+        cp "$_skill_dir/SKILL.md" "$_dest_dir/SKILL.md"
+        log_okay "  deployed $_skill_name"
+        (( _ok++ )) || true
+    done
+done
+
+log_okay "Overlay skills: ${_ok} deployed, ${_skip} unchanged"
