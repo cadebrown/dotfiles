@@ -20,6 +20,7 @@ brew "openssh"  # must precede system ssh in PATH; avoids OpenSSL version mismat
 brew "git"
 brew "git-lfs"
 brew "gh"
+brew "glab"
 
 ### Search & Files ###
 brew "tree"
