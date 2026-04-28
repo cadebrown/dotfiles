@@ -36,6 +36,7 @@
 #   DF_DO_CLAUDE        — set to 0 to skip Claude Code install
 #   DF_DO_CODEX         — set to 0 to skip Codex CLI install
 #   DF_DO_MACOS_SETTINGS — set to 0 to skip macOS settings
+#   DF_DO_MACOS_QUICK_ACTIONS — set to 0 to skip Finder Quick Actions install
 #   DF_DO_AUTH          — set to 1 to run interactive API token setup
 #   DF_DO_CURSOR        — set to 0 to skip Cursor settings sync
 #   DF_DO_VSCODE        — set to 0 to skip VS Code extension install
@@ -410,6 +411,16 @@ if [[ "${DF_DO_MACOS_SETTINGS:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/macos-settings.sh" || die "macos-settings.sh failed"
 else
     log_info "Skipping macOS settings (DF_DO_MACOS_SETTINGS=0)"
+fi
+
+### 5.6. macOS Finder Quick Actions ###
+
+log_section "5.6 — macOS Finder Quick Actions"
+
+if [[ "${DF_DO_MACOS_QUICK_ACTIONS:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/macos-quick-actions.sh" || die "macos-quick-actions.sh failed"
+else
+    log_info "Skipping macOS Quick Actions (DF_DO_MACOS_QUICK_ACTIONS=0)"
 fi
 
 ### 6. language runtimes ###

@@ -79,6 +79,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `linux-packages.sh` | Linux: Homebrew + glibc + `brew bundle` | Custom prefix, compiler symlinks, upgrades off by default |
 | `macos-services.sh` | Colima + Ollama login services (rootless Docker + local LLM server) | macOS only, skips on Linux |
 | `macos-settings.sh` | System prefs via `defaults write` (Dock, Finder, keyboard, trackpad, Safari, iTerm2) | macOS only |
+| `macos-quick-actions.sh` | Deploys `*.workflow` bundles to `~/Library/Services/` (right-click Finder → "Open in Cursor") | macOS only; source bundles under `install/macos-quick-actions/`; flushes `pbs -flush` after changes |
 | `node.sh` | nvm + Node.js + global npm packages from `npm.txt` | Lazy-loaded in zsh for fast startup |
 | `rust.sh` | rustup + cargo-binstall + tools from `cargo.txt` | macOS: Homebrew rustup (code-signed); Linux: sh.rustup.rs |
 | `python.sh` | uv + CLI tools from `pip.txt` via `uv tool install` | Each tool gets isolated venv under `$LOCAL_PLAT/uv/tools/`; no monolithic venv |
@@ -155,6 +156,7 @@ Note: `$LOCAL_PLAT/venv/bin` was removed — Python CLI tools now use `uv tool i
 4.   packages         DF_DO_PACKAGES
 5.   macOS services   DF_DO_MACOS_SERVICES
 5.5  macOS settings   DF_DO_MACOS_SETTINGS
+5.6  Quick Actions    DF_DO_MACOS_QUICK_ACTIONS
 6.   runtimes         DF_DO_NODE, DF_DO_RUST, DF_DO_PYTHON, DF_DO_CLAUDE, DF_DO_CODEX, DF_DO_CURSOR, DF_DO_VSCODE, DF_DO_CMAKE
 6.5  local LLM        DF_DO_LOCAL_LLM (local-llm.sh + opencode.sh)
 7.   auth             DF_DO_AUTH (off by default)

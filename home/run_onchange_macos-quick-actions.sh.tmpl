@@ -1,0 +1,17 @@
+{{- if eq .chezmoi.os "darwin" -}}
+#!/bin/bash
+# Chezmoi re-runs this script whenever any Quick Action bundle file changes.
+{{ range (glob (joinPath .chezmoi.workingTree "install/macos-quick-actions/*.workflow/Contents/*.plist")) -}}
+# {{ . }} hash: {{ include . | sha256sum }}
+{{ end -}}
+{{ range (glob (joinPath .chezmoi.workingTree "install/macos-quick-actions/*.workflow/Contents/*.wflow")) -}}
+# {{ . }} hash: {{ include . | sha256sum }}
+{{ end }}
+set -euo pipefail
+DOTFILES="$CHEZMOI_SOURCE_DIR/.."
+bash "$DOTFILES/install/macos-quick-actions.sh"
+{{- else -}}
+#!/bin/bash
+# Non-darwin: nothing to do. This template renders to a no-op on Linux.
+exit 0
+{{- end }}
