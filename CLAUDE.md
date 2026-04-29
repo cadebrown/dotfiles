@@ -309,6 +309,10 @@ These are non-obvious things that have caused real bugs:
   export `LOCPATH` pointing there. Test: `bash tests/test-locale.sh`.
 - **Homebrew upgrades are off by default on Linux** (`DF_BREW_UPGRADE=0`) because glibc
   upgrades can break every installed binary. Use `bootstrap.sh upgrade` deliberately.
+- **`brew bundle` skips `auto_updates: true` casks** — Cursor, VS Code, iTerm2, etc.
+  self-update in place, so `brew bundle install --upgrade` leaves their cask metadata
+  stale. `homebrew.sh` runs `brew upgrade --cask --greedy` after the bundle when
+  `DF_BREW_UPGRADE=1` to keep the records in sync with the running apps.
 - **Python@3.14 formula is patched on Linux** — `install/patch-homebrew-python.sh` fixes uuid
   and test_datetime build issues. `HOMEBREW_NO_AUTO_UPDATE=1` prevents Homebrew from
   overwriting patches. Formulas depending on python@3.14 (vim, imagemagick, graphviz, ffmpeg,

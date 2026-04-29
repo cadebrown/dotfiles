@@ -52,4 +52,13 @@ fi
 # shellcheck disable=SC2086
 run_logged brew bundle install $_bundle_flags --file="$BREWFILE" || log_warn "Some Brewfile packages failed — re-run homebrew.sh to retry"
 
+# brew bundle skips casks marked `auto_updates: true` (Cursor, VS Code, iTerm2,
+# etc.) even with upgrades enabled — those casks self-update in place, leaving
+# Homebrew's metadata stale. When upgrades are on, sweep them with --greedy so
+# the cask record matches the running app version.
+if [[ "$_brew_upgrade" != "0" ]]; then
+    log_info "Upgrading auto-updating casks (--greedy)"
+    run_logged brew upgrade --cask --greedy || log_warn "Some greedy cask upgrades failed"
+fi
+
 log_okay "Homebrew packages up to date"
