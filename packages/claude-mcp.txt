@@ -16,3 +16,6 @@ github http https://api.githubcopilot.com/mcp/
 
 # Context7: up-to-date library documentation for any dependency
 context7 stdio cmd: npx -y @upstash/context7-mcp@latest
+
+# Blender: control Blender via MCP (requires addon.py installed in Blender — see github.com/ahujasid/blender-mcp)
+blender stdio cmd: uvx blender-mcp

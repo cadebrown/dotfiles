@@ -91,6 +91,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `opencode.sh` | Creates Ollama context-boosted model aliases via Modelfile | Skips if source model not installed; omits gpt-oss:120b (confirmed hang bug) |
 | `local-llm.sh` | Creates PLAT-isolated dirs for Ollama + HuggingFace model storage; verifies mlx-lm and aider binaries | macOS primary; dirs also created on Linux |
 | `opencode.sh` | Creates context-boosted Ollama model aliases for OpenCode (256K for qwen3-coder, 128K for others) | Requires ollama server running; skips missing source models |
+| `blender-mcp.sh` | Installs the `blender-mcp` Blender addon (`addon.py` from github.com/ahujasid/blender-mcp) and enables it via headless Blender | MCP server side is separate — see `packages/claude-mcp.txt`. Skips if Blender not installed. |
 | `auth.sh` | Interactive API token setup (GitHub, Anthropic, OpenAI) | Creates `~/.{service}.env` files, chmod 600 |
 | `dirs.sh` | Creates `~/dev`, `~/bones`, `~/misc` | Symlinks to scratch when available |
 | `scratch.sh` | Symlinks `~/.local`, `~/.cache`, etc. to scratch space | NFS quota relief |
@@ -159,6 +160,7 @@ Note: `$LOCAL_PLAT/venv/bin` was removed — Python CLI tools now use `uv tool i
 5.6  Quick Actions    DF_DO_MACOS_QUICK_ACTIONS
 6.   runtimes         DF_DO_NODE, DF_DO_RUST, DF_DO_PYTHON, DF_DO_CLAUDE, DF_DO_CODEX, DF_DO_CURSOR, DF_DO_VSCODE, DF_DO_CMAKE
 6.5  local LLM        DF_DO_LOCAL_LLM (local-llm.sh + opencode.sh)
+6.6  blender-mcp      DF_DO_BLENDER_MCP (skips if Blender not installed)
 7.   auth             DF_DO_AUTH (off by default)
 ```
 

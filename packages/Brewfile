@@ -153,6 +153,7 @@ if OS.mac?
   cask "obs"
   cask "blender"
   cask "kdenlive"
+  cask "touchdesigner"
 
   ### Documents ###
   cask "libreoffice"

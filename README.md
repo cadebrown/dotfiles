@@ -61,6 +61,7 @@ Rust tools are installed via `cargo-binstall` -- pre-built binaries from GitHub 
 
 - **Claude Code** -- native binary + plugins (`packages/claude-plugins.txt`) + MCP servers (`packages/claude-mcp.txt`)
 - **Codex CLI** -- native binary from GitHub releases
+- **Blender MCP** -- `install/blender-mcp.sh` installs the [blender-mcp](https://github.com/ahujasid/blender-mcp) addon into Blender's scripts/addons dir and enables it headlessly (skips if Blender isn't installed). Server side: `blender stdio cmd: uvx blender-mcp` in `packages/claude-mcp.txt`.
 
 ### macOS-specific
 

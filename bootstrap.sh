@@ -42,6 +42,7 @@
 #   DF_DO_VSCODE        — set to 0 to skip VS Code extension install
 #   DF_DO_CMAKE         — set to 0 to skip CMake toolchain file install
 #   DF_DO_LOCAL_LLM     — set to 0 to skip local LLM tooling setup
+#   DF_DO_BLENDER_MCP   — set to 0 to skip blender-mcp addon install
 #   DF_DO_OVERLAYS      — set to 0 to skip all overlay bootstraps
 
 set -euo pipefail
@@ -484,6 +485,16 @@ if [[ "${DF_DO_LOCAL_LLM:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/opencode.sh" || die "opencode.sh failed"
 else
     log_info "Skipping local LLM tooling (DF_DO_LOCAL_LLM=0)"
+fi
+
+### 6.6. blender-mcp addon ###
+
+log_section "6.6 — blender-mcp addon"
+
+if [[ "${DF_DO_BLENDER_MCP:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/blender-mcp.sh" || die "blender-mcp.sh failed"
+else
+    log_info "Skipping blender-mcp addon (DF_DO_BLENDER_MCP=0)"
 fi
 
 ### 7. auth ###
