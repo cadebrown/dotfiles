@@ -104,5 +104,13 @@
     "cursor.cpp.disabledLanguages": [
         "yaml"
     ],
-    "cursor.composer.shouldAllowCustomModes": true
+    "cursor.composer.shouldAllowCustomModes": true,
+    "remote.SSH.remotePlatform": {
+        "ssh g492-ha0-0001": "linux"
+    },
+    "claudeCode.allowDangerouslySkipPermissions": true,
+    "claudeCode.initialPermissionMode": "bypassPermissions",
+    "terminal.integrated.defaultProfile.linux": "zsh",
+    "claudeCode.preferredLocation": "sidebar",
+    "remote.autoForwardPortsSource": "hybrid"
 }
