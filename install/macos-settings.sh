@@ -96,6 +96,27 @@ defaults write com.apple.Safari IncludeDevelopMenu -bool true 2>/dev/null || tru
 defaults write com.apple.Safari WebKitDeveloperExtrasEnabledPreferenceKey -bool true 2>/dev/null || true
 log_okay "Safari configured (some settings may require Safari to be open)"
 
+### Security: screen lock ###
+
+log_info "Screen lock"
+# Lock immediately when display sleeps (not after a grace period)
+defaults write com.apple.screensaver askForPassword -int 1
+defaults write com.apple.screensaver askForPasswordDelay -int 0
+log_okay "Screen lock configured"
+
+### Power management ###
+
+log_info "Power management (requires sudo)"
+if sudo -v 2>/dev/null; then
+    # AC: never auto-sleep — display sleeps, network stays alive
+    sudo pmset -c sleep 0 displaysleep 60 networkoversleep 1 tcpkeepalive 1 ttyskeepawake 1 powernap 1
+    # Battery: sleep aggressively to preserve charge
+    sudo pmset -b sleep 20 displaysleep 5 networkoversleep 0 tcpkeepalive 1 ttyskeepawake 1 powernap 0
+    log_okay "Power management configured"
+else
+    log_warn "sudo not available — skipping power management settings"
+fi
+
 ### iTerm2 ###
 
 if [[ -d "/Applications/iTerm.app" ]]; then
