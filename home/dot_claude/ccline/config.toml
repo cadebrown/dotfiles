@@ -4,6 +4,13 @@ theme = "default"
 mode = "plain"
 separator = " │ "
 
+# Color palette — each segment gets a distinct hue (bright variants on c16):
+#   11 yellow → directory         (path / where I am)
+#   10 green  → git                (branch / matches git's identity)
+#   14 cyan   → model              (capability)
+#    9 red    → context window     (signals fill state, draws eye when high)
+#    8 gray   → session activity   (supplementary; dim by design)
+
 [[segments]]
 id = "directory"
 enabled = true
@@ -16,7 +23,7 @@ nerd_font = "󰉋"
 c16 = 11
 
 [segments.colors.text]
-c16 = 10
+c16 = 11
 
 [segments.styles]
 text_bold = false
@@ -32,10 +39,10 @@ plain = "※"
 nerd_font = "󰊢"
 
 [segments.colors.icon]
-c16 = 12
+c16 = 10
 
 [segments.colors.text]
-c16 = 12
+c16 = 10
 
 [segments.styles]
 text_bold = false
@@ -71,10 +78,10 @@ plain = "◐"
 nerd_font = ""
 
 [segments.colors.icon]
-c16 = 13
+c16 = 9
 
 [segments.colors.text]
-c16 = 13
+c16 = 9
 
 [segments.styles]
 text_bold = false
@@ -90,10 +97,10 @@ plain = "#"
 nerd_font = "󰮳"
 
 [segments.colors.icon]
-c16 = 7
+c16 = 8
 
 [segments.colors.text]
-c16 = 7
+c16 = 8
 
 [segments.styles]
 text_bold = false
