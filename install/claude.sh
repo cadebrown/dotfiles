@@ -158,10 +158,12 @@ _register_mcps_from() {
                 (( _fail++ )) || true
             fi
         else
-            # HTTP/SSE format: <name> <transport> <url>
-            _url="${_rest#* }"
-            log_info "  $_name ($_transport) → $_url"
-            if claude mcp add --transport "$_transport" --scope user "$_name" "$_url" 2>/dev/null; then
+            # HTTP/SSE format: <name> <transport> <url> [extra args...]
+            # Extra args (e.g. --client-id <id>, --header "K: V") pass through to claude mcp add.
+            read -r _ _ _url _extra <<< "$line"
+            log_info "  $_name ($_transport) → $_url${_extra:+ [$_extra]}"
+            # shellcheck disable=SC2086
+            if claude mcp add --transport "$_transport" --scope user $_extra "$_name" "$_url" 2>/dev/null; then
                 log_okay "  registered $_name"
                 (( _ok++ )) || true
             else
