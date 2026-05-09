@@ -83,7 +83,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `node.sh` | nvm + Node.js + global npm packages from `npm.txt` | Lazy-loaded in zsh for fast startup |
 | `rust.sh` | rustup + cargo-binstall + tools from `cargo.txt` | macOS: Homebrew rustup (code-signed); Linux: sh.rustup.rs |
 | `python.sh` | uv + CLI tools from `pip.txt` via `uv tool install` | Each tool gets isolated venv under `$LOCAL_PLAT/uv/tools/`; no monolithic venv |
-| `claude.sh` | Claude Code binary + plugins + MCP servers + overlay skills | Downloads from Anthropic's GCS bucket; overlay discovery via `DF_OVERLAYS` |
+| `claude.sh` | Claude Code binary + plugins + MCP servers + overlay skills | Downloads from Anthropic's GCS bucket; overlay discovery via `DF_OVERLAYS`. MCP entries can declare `auth=<source>` (e.g. `auth=gh`) — install reconciles the Authorization header on every run. |
 | `codex.sh` | Codex CLI binary from GitHub releases | Platform detection + checksum |
 | `cursor.sh` | Cursor settings symlinks + extension install; `sync-extensions` subcommand captures new extensions back | Union-only (never removes); app updated via Brewfile cask |
 | `vscode.sh` | VS Code extension install; `sync-extensions` subcommand captures new extensions back | Extensions only — settings.json NOT tracked (contains embedded credentials) |
@@ -358,6 +358,12 @@ These are non-obvious things that have caused real bugs:
   `-Wincompatible-pointer-types` and `-Wimplicit-function-declaration` from warnings to
   errors. Per-formula patches (`netpbm`, etc.) add `-std=gnu17` and the relevant `-Wno-*`
   flags on Linux.
+- **GitHub MCP can't use OAuth** — `api.githubcopilot.com/mcp` advertises OAuth, but
+  GitHub's IdP doesn't implement Dynamic Client Registration (RFC 7591), so Claude
+  Code's `/mcp` Authenticate flow fails with "Incompatible auth server". `claude-mcp.txt`
+  uses `auth=gh` to inject `Authorization: Bearer $(gh auth token)` instead. Run
+  `gh auth login` before bootstrapping; `install/claude.sh` refreshes the header on
+  every run, so token rotation auto-heals.
 - **`~/.claude` must not be in scratch links** — chezmoi manages `home/dot_claude/` as a
   real directory. If `scratch.sh` symlinks `~/.claude` to scratch, `chezmoi apply` replaces
   the symlink with a directory containing only managed files, orphaning all conversation

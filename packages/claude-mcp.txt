@@ -1,11 +1,16 @@
 # claude-mcp.txt - MCP servers for Claude Code
 # Usage: install/claude.sh reads this file
 #
-# HTTP/SSE format: <name> <transport> <url> [extra args...]
+# HTTP/SSE format: <name> <transport> <url> [auth=<source>] [extra args...]
 # Stdio format:    <name> stdio cmd: <command...>
 #
 # Extra args on HTTP/SSE entries pass through to `claude mcp add`
 # (e.g. --client-id <id>, --header "K: V").
+#
+# auth=<source> is a managed Authorization header. install/claude.sh resolves
+# it on every run and refreshes the stored header on drift. Sources:
+#   auth=gh   — uses `gh auth token` (requires `gh auth login` first)
+# Auth-managed entries cannot also pass --header / --client-id extras.
 #
 # Install manually:
 #   claude mcp add --transport <transport> --scope user <name> <url> [extra args...]
@@ -14,8 +19,10 @@
 # Cloudflare: full API access (Pages, DNS, Workers, R2, Zero Trust, etc.)
 cloudflare http https://mcp.cloudflare.com/mcp
 
-# GitHub: PRs, issues, repo search, code review (authenticate via /mcp after install)
-github http https://api.githubcopilot.com/mcp/
+# GitHub: PRs, issues, repo search, code review.
+# OAuth/DCR is unsupported by GitHub's IdP, so we authenticate via gh CLI.
+# Run `gh auth login` once; install/claude.sh refreshes the bearer token.
+github http https://api.githubcopilot.com/mcp auth=gh
 
 # Context7: up-to-date library documentation for any dependency
 context7 stdio cmd: npx -y @upstash/context7-mcp@latest

@@ -129,26 +129,44 @@ log_okay "Claude plugins: ${_ok} installed, ${_skip} already present, ${_fail} f
 
 log_section "Claude Code MCP servers"
 
+# Resolve an `auth=<source>` directive to the value of an HTTP Authorization
+# header (e.g. "Bearer ghp_..."). Returns 0 with the value on stdout on success,
+# non-zero (and empty stdout) when the source is unavailable. Adding a new
+# source means adding a case branch.
+_resolve_auth_header() {
+    local spec="$1" token=""
+    case "$spec" in
+        gh)
+            has gh || return 1
+            token="$(gh auth token 2>/dev/null)" || return 1
+            [[ -n "$token" ]] || return 1
+            printf 'Bearer %s' "$token"
+            ;;
+        *)
+            log_warn "  unknown auth source: $spec"
+            return 1
+            ;;
+    esac
+}
+
 _register_mcps_from() {
     local file="$1"
     log_info "Reading MCP servers from $file"
     while IFS= read -r line; do
         [[ -z "$line" || "$line" == \#* ]] && continue
-        # Parse: <name> <transport> <url>  OR  <name> stdio cmd: <command...>
+        # Parse: <name> <transport> <rest...>
         _name="${line%% *}"; _rest="${line#* }"
         _transport="${_rest%% *}"
 
-        if claude mcp list 2>/dev/null | grep -qE "^$_name\b"; then
-            log_info "  skip  $_name (already registered)"
-            (( _skip++ )) || true
-            continue
-        fi
-
+        # --- stdio: <name> stdio cmd: <command...> ---
         if [[ "$_transport" == "stdio" && "$_rest" == *"cmd: "* ]]; then
-            # Stdio format: <name> stdio cmd: <command...>
+            if claude mcp list 2>/dev/null | grep -qE "^$_name\b"; then
+                log_info "  skip  $_name (already registered)"
+                (( _skip++ )) || true
+                continue
+            fi
             _cmd="${_rest#*cmd: }"
             log_info "  $_name (stdio) → $_cmd"
-            # Split $_cmd into words for proper argument passing
             # shellcheck disable=SC2086
             if claude mcp add --scope user "$_name" -- $_cmd 2>/dev/null; then
                 log_okay "  registered $_name"
@@ -157,10 +175,30 @@ _register_mcps_from() {
                 log_warn "  fail  $_name"
                 (( _fail++ )) || true
             fi
-        else
-            # HTTP/SSE format: <name> <transport> <url> [extra args...]
-            # Extra args (e.g. --client-id <id>, --header "K: V") pass through to claude mcp add.
-            read -r _ _ _url _extra <<< "$line"
+            continue
+        fi
+
+        # --- HTTP/SSE: <name> <transport> <url> [auth=<source>] [extra...] ---
+        # Extras (e.g. --client-id <id>, --header "K: V") pass through to
+        # `claude mcp add`. The `auth=<source>` directive is consumed here and
+        # converted into a managed Authorization header (see _resolve_auth_header).
+        read -r _ _ _url _rest_extras <<< "$line"
+        _auth_source="" _extra=""
+        for _tok in $_rest_extras; do
+            if [[ "$_tok" == auth=* ]]; then
+                _auth_source="${_tok#auth=}"
+            else
+                _extra="${_extra:+$_extra }$_tok"
+            fi
+        done
+
+        # --- plain HTTP/SSE: skip if registered, else pass extras through ---
+        if [[ -z "$_auth_source" ]]; then
+            if claude mcp list 2>/dev/null | grep -qE "^$_name\b"; then
+                log_info "  skip  $_name (already registered)"
+                (( _skip++ )) || true
+                continue
+            fi
             log_info "  $_name ($_transport) → $_url${_extra:+ [$_extra]}"
             # shellcheck disable=SC2086
             if claude mcp add --transport "$_transport" --scope user $_extra "$_name" "$_url" 2>/dev/null; then
@@ -170,6 +208,46 @@ _register_mcps_from() {
                 log_warn "  fail  $_name"
                 (( _fail++ )) || true
             fi
+            continue
+        fi
+
+        # --- auth-managed HTTP/SSE: reconcile token on every run ---
+        if [[ -n "$_extra" ]]; then
+            log_warn "  $_name: ignoring extras (not supported with auth=): $_extra"
+        fi
+        _auth_value=""
+        if ! _auth_value="$(_resolve_auth_header "$_auth_source")"; then
+            log_warn "  $_name: auth=$_auth_source unavailable (e.g. run 'gh auth login') — skipping"
+            (( _fail++ )) || true
+            continue
+        fi
+        # Compare against the stored Authorization header to avoid churn.
+        _stored=""
+        if [[ -f "$HOME/.claude.json" ]] && has jq; then
+            _stored="$(jq -r --arg n "$_name" \
+                '.mcpServers[$n].headers.Authorization // ""' \
+                "$HOME/.claude.json" 2>/dev/null || true)"
+        fi
+        if [[ "$_stored" == "$_auth_value" ]]; then
+            log_info "  skip  $_name (auth=$_auth_source unchanged)"
+            (( _skip++ )) || true
+            continue
+        fi
+        # Drift (or new entry): remove + re-add via add-json so the JSON shape
+        # matches GitHub's recommended form (type/url/headers).
+        claude mcp remove "$_name" -s user >/dev/null 2>&1 || true
+        _json="$(jq -nc \
+            --arg type "$_transport" \
+            --arg url "$_url" \
+            --arg auth "$_auth_value" \
+            '{type: $type, url: $url, headers: {Authorization: $auth}}')"
+        log_info "  $_name ($_transport) → $_url [auth=$_auth_source]"
+        if claude mcp add-json -s user "$_name" "$_json" >/dev/null 2>&1; then
+            log_okay "  registered $_name (refreshed auth)"
+            (( _ok++ )) || true
+        else
+            log_warn "  fail  $_name"
+            (( _fail++ )) || true
         fi
     done < "$file"
 }
