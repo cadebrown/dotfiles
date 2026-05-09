@@ -6,10 +6,10 @@
 #
 # No-ops if gcc-15 is absent.
 
-set(_brew "$ENV{_LOCAL_PLAT}/brew")
+include("${CMAKE_CURRENT_LIST_DIR}/_brew.cmake")
 
 if(NOT EXISTS "${_brew}/bin/gcc-15")
-    message(STATUS "gcc.cmake: ${_brew}/bin/gcc-15 not found — toolchain inactive")
+    message(WARNING "gcc-15.cmake: gcc-15 not found in ${_brew}/bin — toolchain inactive (HOMEBREW_PREFIX=$ENV{HOMEBREW_PREFIX})")
     unset(_brew)
     return()
 endif()
@@ -42,7 +42,7 @@ set(CMAKE_CUDA_HOST_COMPILER "${_brew}/bin/g++-15"        CACHE FILEPATH "CUDA h
 
 # System library search path — Linux only. See llvm.cmake for rationale.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    list(APPEND CMAKE_LIBRARY_PATH "$ENV{_LOCAL_PLAT}/brew/lib")
+    list(APPEND CMAKE_LIBRARY_PATH "${_brew}/lib")
 endif()
 
 # Linker — Linux only. GCC links through compiler driver; use CMAKE_LINKER_TYPE (3.29+)

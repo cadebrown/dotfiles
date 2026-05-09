@@ -7,16 +7,19 @@
 # Per-project override (takes precedence over CACHE):
 #   cmake -DCMAKE_C_COMPILER=...
 
+include("${CMAKE_CURRENT_LIST_DIR}/_brew.cmake")
+
 # Prefer the pinned opt/llvm@22 dir; fall back to the unversioned opt/llvm symlink
 # so the file still works on machines where only the latter is present.
-set(_llvm "$ENV{_LOCAL_PLAT}/brew/opt/llvm@22")
+set(_llvm "${_brew}/opt/llvm@22")
 if(NOT IS_DIRECTORY "${_llvm}/bin")
-    set(_llvm "$ENV{_LOCAL_PLAT}/brew/opt/llvm")
+    set(_llvm "${_brew}/opt/llvm")
 endif()
 
 if(NOT IS_DIRECTORY "${_llvm}/bin")
-    message(STATUS "llvm-22.cmake: ${_llvm}/bin not found — toolchain inactive")
+    message(WARNING "llvm-22.cmake: LLVM 22 not found under ${_brew}/opt — toolchain inactive (HOMEBREW_PREFIX=$ENV{HOMEBREW_PREFIX})")
     unset(_llvm)
+    unset(_brew)
     return()
 endif()
 
@@ -48,7 +51,7 @@ set(CMAKE_CUDA_HOST_COMPILER "${_llvm}/bin/clang++"    CACHE FILEPATH "CUDA host
 # librt was merged into libc; the .so dev symlink may not exist in the Homebrew prefix.
 # Adding brew/lib here lets FindCUDAToolkit (and others) find librt without warnings.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    list(APPEND CMAKE_LIBRARY_PATH "$ENV{_LOCAL_PLAT}/brew/lib")
+    list(APPEND CMAKE_LIBRARY_PATH "${_brew}/lib")
 endif()
 
 # Linker — Linux only. macOS requires Apple ld for code signing / Mach-O.
@@ -74,3 +77,4 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 unset(_llvm)
+unset(_brew)
