@@ -13,6 +13,18 @@ ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh-custom}"
 
 if [[ -f "$ZSH_DIR/oh-my-zsh.sh" ]]; then
     log_okay "oh-my-zsh already installed"
+    if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+        # Resolve through any scratch symlink to the real git checkout.
+        _omz_git="$ZSH_DIR"
+        [[ -L "$_omz_git" ]] && _omz_git="$(readlink -f "$_omz_git")"
+        if [[ -d "$_omz_git/.git" ]]; then
+            log_info "Updating oh-my-zsh core..."
+            git -C "$_omz_git" pull --ff-only --quiet \
+                && log_okay "oh-my-zsh core updated" \
+                || log_warn "oh-my-zsh core git pull failed"
+        fi
+        unset _omz_git
+    fi
 else
     log_info "Installing oh-my-zsh → $ZSH_DIR"
     # If ZSH_DIR is a symlink to an empty dir (scratch.sh creates this),

@@ -17,6 +17,10 @@ log_section "Python (uv)"
 
 if has uv; then
     log_okay "uv already installed: $(uv --version)"
+    if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+        log_info "Self-updating uv..."
+        run_logged uv self update || log_warn "uv self update failed"
+    fi
 else
     log_info "Installing uv → $ARCH_BIN"
     ensure_dir "$ARCH_BIN"
@@ -72,3 +76,8 @@ while IFS= read -r _line; do
 done < "$PIP_TXT"
 
 log_okay "Python tools: $_installed installed, $_skipped already present, $_failed failed"
+
+if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+    log_info "Upgrading all uv tools to latest..."
+    run_logged uv tool upgrade --all || log_warn "uv tool upgrade --all reported failures"
+fi

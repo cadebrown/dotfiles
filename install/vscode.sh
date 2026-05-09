@@ -78,15 +78,27 @@ EXT_TXT="$DF_PACKAGES/vscode-extensions.txt"
 # Get currently installed extensions once
 _installed="$(code --list-extensions 2>/dev/null || true)"
 
-_ok=0 _skip=0 _fail=0
+_ok=0 _skip=0 _fail=0 _upg=0
+_is_upgrade=0
+[[ "${DF_MODE:-}" == "upgrade" ]] && _is_upgrade=1
 
 while IFS= read -r line; do
     [[ -z "$line" || "$line" == \#* ]] && continue
     ext="${line%% *}"
 
     if echo "$_installed" | grep -qxF "$ext"; then
-        log_debug "  skip  $ext (already installed)"
-        (( _skip++ )) || true
+        if [[ "$_is_upgrade" == "1" ]]; then
+            log_info "  upgrading $ext"
+            if code --install-extension "$ext" --force >/dev/null 2>&1; then
+                (( _upg++ )) || true
+            else
+                log_warn "  fail  $ext"
+                (( _fail++ )) || true
+            fi
+        else
+            log_debug "  skip  $ext (already installed)"
+            (( _skip++ )) || true
+        fi
         continue
     fi
 
@@ -100,4 +112,4 @@ while IFS= read -r line; do
     fi
 done < "$EXT_TXT"
 
-log_okay "VS Code extensions: ${_ok} installed, ${_skip} already present, ${_fail} failed"
+log_okay "VS Code extensions: ${_ok} installed, ${_upg} upgraded, ${_skip} already present, ${_fail} failed"

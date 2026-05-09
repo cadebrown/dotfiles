@@ -27,7 +27,11 @@ if [[ "$OS" == "darwin" ]]; then
     if [[ -x "$CARGO_HOME/bin/rustc" ]]; then
         log_okay "Rust toolchain already in PLAT dir: $("$CARGO_HOME/bin/rustc" --version 2>/dev/null)"
         log_info "Updating stable toolchain"
-        run_logged "$RUSTUP_BIN" update stable --no-self-update
+        # In upgrade mode, also let rustup self-update.
+        _rustup_flags=(--no-self-update)
+        [[ "${DF_MODE:-}" == "upgrade" ]] && _rustup_flags=()
+        run_logged "$RUSTUP_BIN" update stable "${_rustup_flags[@]}"
+        unset _rustup_flags
     else
         log_info "Initializing Rust toolchain (Homebrew rustup) → $RUSTUP_HOME"
         run_logged "$RUSTUP_INIT" -y --no-modify-path --default-toolchain stable
@@ -38,7 +42,10 @@ else
     if [[ -x "$CARGO_HOME/bin/rustup" ]]; then
         log_okay "rustup already installed: $("$CARGO_HOME/bin/rustup" --version 2>&1)"
         log_info "Updating stable toolchain"
-        run_logged "$CARGO_HOME/bin/rustup" update stable --no-self-update
+        _rustup_flags=(--no-self-update)
+        [[ "${DF_MODE:-}" == "upgrade" ]] && _rustup_flags=()
+        run_logged "$CARGO_HOME/bin/rustup" update stable "${_rustup_flags[@]}"
+        unset _rustup_flags
     else
         log_info "Installing rustup → $CARGO_HOME/bin"
         ensure_dir "$CARGO_HOME/bin"

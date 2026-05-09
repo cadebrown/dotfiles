@@ -25,7 +25,12 @@ fi
 source "$NVM_DIR/nvm.sh"
 
 if nvm ls 25 2>/dev/null | grep -qE 'v25\.'; then
-    log_okay "Node v25 already installed"
+    if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+        log_info "Upgrading Node.js v25 to latest 25.x..."
+        run_logged nvm install 25 --reinstall-packages-from=25 --latest-npm
+    else
+        log_okay "Node v25 already installed"
+    fi
 else
     log_info "Installing Node.js v25..."
     run_logged nvm install 25
@@ -46,9 +51,17 @@ if [[ ! -f "$NPM_TXT" ]]; then
 fi
 
 _pkg_count=0
+_upgrade_count=0
 while IFS= read -r pkg; do
     if npm list -g "$pkg" --depth=0 &>/dev/null; then
-        log_okay "  $pkg (already installed)"
+        if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+            log_info "  upgrading $pkg"
+            run_logged npm install -g "$pkg@latest"
+            log_okay "  $pkg (upgraded)"
+            (( _upgrade_count++ )) || true
+        else
+            log_okay "  $pkg (already installed)"
+        fi
     else
         log_info "  installing $pkg"
         run_logged npm install -g "$pkg"
@@ -57,4 +70,6 @@ while IFS= read -r pkg; do
     fi
 done < <(_read_package_list "$NPM_TXT")
 
-if [[ $_pkg_count -eq 0 ]]; then log_info "All npm packages already installed"; fi
+if [[ $_pkg_count -eq 0 && $_upgrade_count -eq 0 ]]; then
+    log_info "All npm packages already installed"
+fi

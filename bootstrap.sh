@@ -11,7 +11,17 @@
 # Modes:
 #   bootstrap.sh              # install (default) — full idempotent setup
 #   bootstrap.sh update       # git pull + chezmoi apply + refresh tools
-#   bootstrap.sh upgrade      # update + brew upgrade + cargo upgrade
+#   bootstrap.sh upgrade      # update + aggressive upgrade across the stack:
+#                             #   - DF_BREW_UPGRADE=1 (brew + greedy casks)
+#                             #   - rustup self-update + toolchain update
+#                             #   - cargo binstall (re-runs all of cargo.txt)
+#                             #   - nvm install 25 (latest 25.x patch)
+#                             #   - npm install -g <pkg>@latest for each pkg
+#                             #   - uv self update + uv tool upgrade --all
+#                             #   - oh-my-zsh core git pull (plus plugins)
+#                             #   - VS Code / Cursor extension --force reinstall
+#                             # Always re-downloaded regardless of mode:
+#                             #   Claude Code, Codex CLI
 #
 # Environment variables (DF_ prefix):
 #   DF_REPO               — override the source repo (default: cadebrown/dotfiles)
@@ -53,6 +63,9 @@ case "$DF_MODE" in
     install|update|upgrade) ;;
     *) echo "Usage: bootstrap.sh [install|update|upgrade]" >&2; exit 1 ;;
 esac
+
+# Export so install scripts can branch on it (upgrade-mode behavior).
+export DF_MODE
 
 # upgrade implies DF_BREW_UPGRADE=1
 if [[ "$DF_MODE" == "upgrade" ]]; then
