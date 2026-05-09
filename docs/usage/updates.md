@@ -115,13 +115,23 @@ Useful Codex commands after updating:
 codex --profile fast
 codex --profile review
 codex --profile deep
-codex --profile theme_neon
-codex --profile theme_sunrise
-codex --profile theme_mint
+codex --profile unrestricted
+codex -c 'tui.theme="neon-noir"'
+codex -c 'tui.theme="sunburst-candy"'
+codex -c 'tui.theme="minty-terminal"'
+codex mcp list
 codex execpolicy check --pretty --rules ~/.codex/rules/default.rules -- git status
 codex '$project-bootstrapper Map this repository and propose the first validation step.'
 codex '$simulation-lab Define state variables and a minimal validation case for this model.'
 ```
+
+Codex schema note: named profiles can set model/sandbox/tooling options, but profile-scoped
+`[profiles.<name>.tui]` only supports session picker layout. Set CLI themes at top level
+or with `-c 'tui.theme="..."'`.
+
+Default Codex mode is intentionally autonomous: `approval_policy = "never"` with
+`sandbox_mode = "workspace-write"`. Use `--profile unrestricted` only when a task truly needs
+unsandboxed filesystem access.
 
 ---
 

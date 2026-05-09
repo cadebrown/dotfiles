@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Block edits to chezmoi-managed deployed dotfiles.
+#
+# Agent hooks should edit the source of truth under ~/dotfiles/home/, not the
+# rendered targets under ~/. This accepts both Claude-style Edit/Write payloads
+# and Codex apply_patch hook payloads.
+set -uo pipefail
+
+command -v jq >/dev/null 2>&1 || exit 0
+command -v chezmoi >/dev/null 2>&1 || exit 0
+
+data="$(cat)"
+cwd="$(printf '%s' "$data" | jq -r '.cwd // env.PWD // ""')"
+
+resolve_path() {
+    local path="$1"
+    [[ -n "$path" ]] || return 0
+
+    case "$path" in
+        "~") path="$HOME" ;;
+        "~/"*) path="$HOME/${path#~/}" ;;
+    esac
+
+    if [[ "$path" != /* ]]; then
+        path="${cwd:-$PWD}/$path"
+    fi
+
+    (cd "$(dirname "$path")" 2>/dev/null && printf '%s/%s\n' "$(pwd)" "$(basename "$path")") \
+        || printf '%s\n' "$path"
+}
+
+emit_candidates() {
+    printf '%s' "$data" | jq -r '
+        .tool_input.file_path?,
+        .tool_input.filePath?,
+        .tool_input.path?
+        | select(type == "string" and length > 0)
+    '
+
+    printf '%s' "$data" | jq -r '.tool_input.command? // empty' \
+        | sed -nE \
+            -e 's/^\*\*\* (Add|Update|Delete) File: (.*)$/\2/p' \
+            -e 's/^\*\*\* Move to: (.*)$/\1/p'
+}
+
+blocked=0
+while IFS= read -r candidate; do
+    [[ -n "$candidate" ]] || continue
+    file="$(resolve_path "$candidate")"
+    src="$(chezmoi source-path "$file" 2>/dev/null)" || continue
+    [[ -n "$src" ]] || continue
+
+    printf 'Blocked: %s is managed by chezmoi.\n' "$file" >&2
+    printf 'Edit the source: %s\n' "$src" >&2
+    printf "(then run 'chezmoi apply' to deploy)\n" >&2
+    blocked=1
+done < <(emit_candidates | awk '!seen[$0]++')
+
+[[ "$blocked" == 0 ]] || exit 2
+exit 0

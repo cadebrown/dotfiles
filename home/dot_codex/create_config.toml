@@ -1,12 +1,13 @@
 #:schema https://developers.openai.com/codex/config-schema.json
 
-model = "gpt-5.3-codex"
-model_reasoning_effort = "high"
-plan_mode_reasoning_effort = "high"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+model_verbosity = "low"
+plan_mode_reasoning_effort = "xhigh"
 
 web_search = "live"
 sandbox_mode = "workspace-write"
-approval_policy = "on-request"
+approval_policy = "never"
 file_opener = "none"
 
 project_doc_max_bytes = 32768
@@ -16,7 +17,8 @@ project_doc_fallback_filenames = ["AGENTS.md", "CLAUDE.md"]
 personality = true
 shell_snapshot = true
 unified_exec = true
-undo = true
+tool_search = true
+tool_suggest = true
 
 [sandbox_workspace_write]
 writable_roots = []
@@ -28,60 +30,74 @@ exclude_slash_tmp = false
 persistence = "save-all"
 max_bytes = 104857600
 
+[tools.web_search]
+context_size = "high"
+
+[mcp_servers.openaiDeveloperDocs]
+url = "https://developers.openai.com/mcp"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp@latest"]
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+
 [tui]
 theme = "neon-noir"
 alternate_screen = "never"
-animations = false
+animations = true
 notifications = ["agent-turn-complete", "approval-requested"]
+notification_condition = "unfocused"
 notification_method = "auto"
 show_tooltips = false
-status_line = ["git-branch", "current-dir", "model-name", "context-remaining"]
+session_picker_view = "dense"
+status_line = ["current-dir", "git-branch", "model-with-reasoning", "context-used", "context-window-size", "thread-title"]
+status_line_use_colors = true
+terminal_title = ["project-name", "activity", "run-state", "model-name"]
 
 [profiles.deep]
-model = "gpt-5.3-codex"
-model_reasoning_effort = "high"
-plan_mode_reasoning_effort = "high"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+model_verbosity = "medium"
+plan_mode_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"
-approval_policy = "on-request"
+approval_policy = "never"
 
 [profiles.review]
-model = "gpt-5-pro"
-model_reasoning_effort = "high"
-plan_mode_reasoning_effort = "high"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+model_verbosity = "low"
+plan_mode_reasoning_effort = "xhigh"
 sandbox_mode = "read-only"
 approval_policy = "never"
 
 [profiles.bootstrap]
-model = "gpt-5.3-codex"
-model_reasoning_effort = "high"
-plan_mode_reasoning_effort = "high"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+model_verbosity = "low"
+plan_mode_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"
-approval_policy = "on-request"
+approval_policy = "never"
 
 [profiles.fast]
-model = "gpt-5.3-codex"
+model = "gpt-5.5"
 model_reasoning_effort = "low"
+model_verbosity = "low"
 plan_mode_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
-approval_policy = "on-request"
+approval_policy = "never"
 
-[profiles.theme_neon.tui]
-theme = "neon-noir"
-animations = true
-show_tooltips = false
-status_line = ["git-branch", "current-dir", "model-name", "context-remaining"]
-
-[profiles.theme_sunrise.tui]
-theme = "sunburst-candy"
-animations = true
-show_tooltips = false
-status_line = ["git-branch", "current-dir", "model-name", "context-remaining"]
-
-[profiles.theme_mint.tui]
-theme = "minty-terminal"
-animations = true
-show_tooltips = false
-status_line = ["git-branch", "current-dir", "model-name", "context-remaining"]
+[profiles.unrestricted]
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+model_verbosity = "low"
+plan_mode_reasoning_effort = "xhigh"
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
 
 # Project trust levels are added here by codex at runtime — not managed by chezmoi.
 # (chezmoi uses create_ prefix for this file: written once, never overwritten)

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/bin/df-chezmoi-guard",
+            "statusMessage": "Checking chezmoi-managed paths"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -12,6 +12,7 @@ Every package layer has a declarative text file and an idempotent install script
 | Global npm | `packages/npm.txt` | `install/node.sh` | All |
 | Claude plugins | `packages/claude-plugins.txt` | `install/claude.sh` | All |
 | Claude MCP servers | `packages/claude-mcp.txt` | `install/claude.sh` | All |
+| Codex CLI/config | `home/dot_codex/` | `install/codex.sh` | All |
 | VS Code extensions | `packages/vscode-extensions.txt` | `install/vscode.sh` | All |
 
 ---
@@ -53,6 +54,10 @@ the same pre-built binary that Homebrew bottles provide — same quality, faster
 Re-run: `bash ~/dotfiles/install/node.sh`
 
 Currently ships [`@cometix/ccline`](https://github.com/Haleclipse/CCometixLine) — a Rust-based status line for Claude Code with themes and TUI config (`ccline --config`).
+
+Codex CLI config, rules, skills, themes, and MCP servers are managed from `home/dot_codex/`.
+`install/codex.sh sync-config` preserves runtime trust/plugin sections while refreshing the
+managed config. Chezmoi also runs this sync when `home/dot_codex/create_config.toml` changes.
 
 ### 3. pip — Python packages
 

@@ -32,6 +32,8 @@ prefix_rule(pattern=["make", "test-web"], decision="allow")
 prefix_rule(pattern=["set", "-a"], decision="allow")
 prefix_rule(pattern=["source", ".env"], decision="allow")
 prefix_rule(pattern=["curl", "-L", "--fail"], decision="allow")
+prefix_rule(pattern=["bash", "install/codex.sh", "sync-config"], decision="allow")
+prefix_rule(pattern=["bash", "install/codex.sh", "check"], decision="allow")
 
 prefix_rule(
     pattern=["rm"],

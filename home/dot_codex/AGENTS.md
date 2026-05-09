@@ -36,6 +36,22 @@ Common project types:
 - Delete dead code instead of commenting it out.
 - Complexity should earn documentation. For nontrivial systems, explain invariants, ownership, and why the design is structured that way.
 
+## Quality Bar
+
+- Fix root causes, not symptoms. If a failure is unclear, reproduce it and trace the data/control flow before editing.
+- Do not silence signals: no skipped tests, broad `any`, ignored type errors, empty catches, disabled lint rules, or `--no-verify` unless the user explicitly accepts the tradeoff.
+- Search the codebase for existing helpers, patterns, and dependencies before introducing a new abstraction or package.
+- Read nearby code before adding files. Idiomatic means both language-idiomatic and repo-idiomatic; when they conflict, repo wins.
+- Prefer small, behavior-preserving changes. Broaden scope only when the local evidence shows the current boundary is wrong.
+- Push back when the requested path conflicts with correctness, safety, or maintainability. Offer the smallest better alternative.
+
+## Verification
+
+- For behavior changes, prefer a failing or targeted test first when practical.
+- If tests are unavailable or too expensive, state the concrete manual validation used.
+- Never claim a change is verified unless a command, test, or direct inspection supports it.
+- If validation fails, debug the failure instead of weakening the check.
+
 ## Tooling Preferences
 
 - Rust for new systems work
@@ -51,4 +67,5 @@ See `~/dotfiles` for environment conventions.
 - Use skills for repeatable workflows instead of expanding this file with long runbooks.
 - Reach for the bootstrapping skills early when entering an unfamiliar repository, reconciling toolchains, or mapping how to validate a project.
 - For source-grounded research, prefer primary documentation and concrete local evidence.
+- Use MCPs and web search for current external APIs, libraries, standards, and product docs; cite sources when research informs the answer.
 - Keep repo-specific behavior in project `AGENTS.md` or `CLAUDE.md`, not in this global file.
