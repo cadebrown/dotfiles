@@ -3,6 +3,8 @@
 # settings hash: {{ include "dot_config/cursor/settings.json" | sha256sum }}
 # keybindings hash: {{ include "dot_config/cursor/keybindings.json" | sha256sum }}
 # extensions hash: {{ include "../packages/cursor-extensions.txt" | sha256sum }}
+# cursor hooks hash: {{ include "dot_cursor/hooks.json" | sha256sum }}
+# cursor hooks script hash: {{ include "dot_cursor/hooks/executable_sync-dotfiles-cursor.sh.tmpl" | sha256sum }}
 
 set -euo pipefail
 DOTFILES="$CHEZMOI_SOURCE_DIR/.."

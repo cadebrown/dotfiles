@@ -11,8 +11,14 @@
 # On macOS: symlinks from ~/Library/Application Support/Cursor/User/
 # On Linux: symlinks from ~/.config/Cursor/User/
 #
-# Edits made in Cursor's UI go through the symlink and land directly in
-# the dotfiles-managed copy — no manual sync needed.
+# Edits made in Cursor's UI go through the symlink into ~/.config/cursor/.
+# User hooks (~/.cursor/hooks.json from chezmoi) run `chezmoi add` on composer
+# session start/end and before each agent prompt so edits propagate into
+# home/dot_config/cursor/
+# in the repo; commit when ready.
+#
+# Hooks prepend ~/.local/bin, plat bins, and Homebrew to PATH — Dock-launched Cursor
+# otherwise often misses chezmoi/cursor CLI.
 #
 # The Cursor application itself is managed via Brewfile (cask "cursor").
 set -euo pipefail

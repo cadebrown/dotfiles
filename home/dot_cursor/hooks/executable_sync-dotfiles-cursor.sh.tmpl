@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Cursor user hook: copy live ~/.config/cursor JSON into chezmoi source so UI edits are tracked.
+# Triggered from ~/.cursor/hooks.json (sessionStart, sessionEnd, beforeSubmitPrompt).
+#
+# DF_CURSOR_HOOK_SYNC_EXTENSIONS=0  — skip install/cursor.sh sync-extensions
+# DF_CURSOR_HOOK_DEBOUNCE_SECS=N    — skip duplicate syncs within N seconds (default 4)
+
+set -euo pipefail
+
+# Cursor hook processes often inherit a minimal PATH (Dock / Launcher). Prepend the
+# same tiers shell profiles use so chezmoi + cursor CLI resolve reliably.
+_df_prepend_path() {
+  case ":${PATH:-}:" in *:"$1":*) return 0 ;; esac
+  [[ -d "$1" ]] || return 0
+  PATH="$1${PATH:+:$PATH}"
+}
+_df_prepend_path "$HOME/.local/bin"
+for _plat_bin in "$HOME/.local"/plat_*/bin; do
+  [[ -e "$_plat_bin" ]] && _df_prepend_path "$_plat_bin"
+done
+unset _plat_bin
+_df_prepend_path "/opt/homebrew/bin"
+_df_prepend_path "/usr/local/bin"
+export PATH
+
+DF_ROOT="{{ .chezmoi.workingTree }}"
+export DF_ROOT
+
+_before_submit=0
+[[ "${1:-}" == "--before-submit" ]] && _before_submit=1
+
+_DEBOUNCE="${DF_CURSOR_HOOK_DEBOUNCE_SECS:-4}"
+_STAMP="${TMPDIR:-/tmp}/df-cursor-hook-sync.timestamp"
+_now="$(date +%s)"
+_skip_sync=0
+if [[ -f "$_STAMP" ]] && [[ "$_DEBOUNCE" =~ ^[0-9]+$ ]] && ((_DEBOUNCE > 0)); then
+  _last="$(cat "$_STAMP" 2>/dev/null || echo 0)"
+  if ((_now - _last < _DEBOUNCE)); then
+    _skip_sync=1
+  fi
+fi
+
+_sync() {
+  if [[ "$_skip_sync" == 1 ]]; then
+    return 0
+  fi
+  if ! command -v chezmoi >/dev/null 2>&1; then
+    printf '%s\n' "[df-cursor-hook] chezmoi not on PATH; skipping source sync" >&2
+    return 0
+  fi
+
+  local f _any=0 _err
+  for f in "${HOME}/.config/cursor/settings.json" "${HOME}/.config/cursor/keybindings.json"; do
+    [[ -f "$f" ]] || continue
+    _any=1
+    if ! _err="$(chezmoi add "$f" 2>&1)"; then
+      printf '%s\n' "[df-cursor-hook] chezmoi add failed ($f): ${_err//$'\n'/ }" >&2
+    fi
+  done
+
+  if [[ "$_any" == 1 ]]; then
+    printf '%s\n' "[df-cursor-hook] chezmoi add (cursor JSON) → ${DF_ROOT}/home/dot_config/cursor/" >&2
+  fi
+
+  if [[ "${DF_CURSOR_HOOK_SYNC_EXTENSIONS:-1}" == "1" ]] && command -v cursor >/dev/null 2>&1; then
+    bash "${DF_ROOT}/install/cursor.sh" sync-extensions >/dev/null 2>&1 || true
+  fi
+
+  echo "$_now" > "$_STAMP"
+}
+
+_sync
+
+if [[ "$_before_submit" == 1 ]]; then
+  printf '%s\n' '{"continue":true}'
+else
+  printf '%s\n' '{}'
+fi

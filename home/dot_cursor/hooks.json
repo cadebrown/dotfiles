@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "bash ./hooks/sync-dotfiles-cursor.sh"
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "bash ./hooks/sync-dotfiles-cursor.sh"
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "bash ./hooks/sync-dotfiles-cursor.sh --before-submit"
+      }
+    ]
+  }
+}
