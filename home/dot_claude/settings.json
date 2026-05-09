@@ -1,7 +1,8 @@
 {
   "env": {
     "DISABLE_AUTOUPDATER": "1",
-    "CLAUDE_CODE_EFFORT_LEVEL": "max"
+    "CLAUDE_CODE_EFFORT_LEVEL": "max",
+    "ENABLE_PROMPT_CACHING_1H": "1"
   },
   "model": "opus[1m]",
   "effortLevel": "max",
