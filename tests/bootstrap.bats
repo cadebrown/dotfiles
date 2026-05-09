@@ -88,9 +88,14 @@ setup() {
     [[ -f "$HOME/.pythonrc" ]]
 }
 
-@test "pip.txt packages are installed in venv" {
-    run uv pip list --python "$LOCAL_PLAT/venv/bin/python"
+@test "pip.txt tools are installed via uv tool" {
+    # The monolithic ~/venv was removed; each pip.txt entry now lives in its
+    # own venv under $UV_TOOL_DIR (per `uv tool install`).
+    run uv tool list
     [ "$status" -eq 0 ]
+    # Sanity: at least one cross-platform pip.txt entry should be present.
+    # (mlx-lm is macos-only, aider-chat needs python 3.12, so we skip those.)
+    [[ "$output" == *"ipython"* ]] || [[ "$output" == *"conan"* ]]
 }
 
 # --- Local LLM config files ---

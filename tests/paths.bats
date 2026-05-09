@@ -102,17 +102,21 @@
     [[ ! -d "$HOME/.cargo" ]]
 }
 
-# --- Python (venv) ---
+# --- Python (uv tool install) ---
+#
+# pip.txt CLI tools each get their own venv under $UV_TOOL_DIR — no monolithic
+# user-level Python environment. Per-project library work uses `uv init` /
+# `uv sync` against pyproject.toml, not these.
 
-@test "venv is under PLAT" {
-    [[ -d "$LOCAL_PLAT/venv" ]]
+@test "uv tool dir has at least one installed tool" {
+    [[ -d "$UV_TOOL_DIR" ]]
+    # ipython is cross-platform and not python-version-pinned in pip.txt.
+    [[ -d "$UV_TOOL_DIR/ipython" ]]
 }
 
-@test "venv has a working python binary" {
-    [[ -x "$LOCAL_PLAT/venv/bin/python" ]]
-}
-
-@test "venv is NOT at legacy ~/.venv path" {
+@test "no monolithic Python venv (legacy paths absent)" {
+    # Anti-regression: confirms the old design is gone and not creeping back.
+    [[ ! -d "$LOCAL_PLAT/venv" ]]
     [[ ! -d "$HOME/.venv" ]]
 }
 

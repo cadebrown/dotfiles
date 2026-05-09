@@ -133,10 +133,12 @@ BASH_SOURCE_CMD='export SSH_AUTH_SOCK=already_running; source ~/.bash_profile'
     [[ "$output" =~ ^v[0-9] ]]
 }
 
-@test "python is callable via venv after sourcing zprofile" {
-    run zsh --no-rcs -c "$ZSH_SOURCE; python --version"
+@test "uv is callable after sourcing zprofile and tools resolve" {
+    # `python` is no longer a global command — each pip.txt tool has its own
+    # venv. The right invariant is: uv on PATH + at least one tool resolved.
+    run zsh --no-rcs -c "$ZSH_SOURCE; uv tool list"
     [ "$status" -eq 0 ]
-    [[ "$output" =~ ^Python\ 3 ]]
+    [[ "$output" == *"ipython"* ]] || [[ "$output" == *"conan"* ]]
 }
 
 # --- Homebrew stability env vars ---
