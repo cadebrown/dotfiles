@@ -8,6 +8,11 @@ set -euo pipefail
 
 DOTFILES="$HOME/dotfiles"
 
+# The Docker test image specifically exercises PLAT-on isolation — that's the
+# layout that needs the most verification (NFS-shared-home invariants). The
+# default for normal users is the flat layout (DF_USE_PLAT=0).
+export DF_USE_PLAT=1
+
 # Source _lib.sh to get all PLAT vars (LOCAL_PLAT, RUSTUP_HOME, CARGO_HOME,
 # VENV, UV_*) — these are inherited by bats tests.
 # This also sets GIT_CONFIG_GLOBAL=/dev/null which prevents SSH URL rewrites

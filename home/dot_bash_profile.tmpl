@@ -1,45 +1,54 @@
+{{/* See dot_zprofile.tmpl for the rationale on this guard. */ -}}
+{{- $use_plat := false -}}
+{{- if hasKey . "use_plat" -}}{{ $use_plat = .use_plat }}{{- end -}}
 # .bash_profile - Bash login shell configuration
 # For bash-specific interactive config, use ~/.bashrc
 # This file mirrors the structure of ~/.zprofile for consistency
 
 ### PLATFORM ###
 
-# _PLAT detection — identical logic to .zprofile.
-# See .zprofile for detailed comments on PLAT format and NFS shared homes.
-# Runs first so PATH is fully built before the zsh handoff below.
+# Mirrors .zprofile — see that file for detailed comments on _PLAT, _LOCAL_PLAT,
+# and the use_plat / DF_USE_PLAT toggle. Runs first so PATH is fully built
+# before the zsh handoff below.
 _plat_detect() {
     local _os _scan _dir _check
     _os="$(uname -s)"
     _scan="$HOME/dotfiles/install/plat"
-    if [[ -d "$_scan" ]]; then
-        for _dir in $(ls -1d "$_scan"/plat_"${_os}"_*/ 2>/dev/null | sort -r); do
-            _check="$_dir/.plat_check.sh"
-            if [[ -f "$_check" ]] && /bin/sh "$_check" 2>/dev/null; then
-                printf '%s' "$(basename "$_dir")"
-                # Source compile flags for this PLAT level
-                [[ -f "$_dir/.plat_env.sh" ]] && source "$_dir/.plat_env.sh"
-                return 0
-            fi
-        done
-    fi
-    echo "ERROR: no matching plat spec in ~/dotfiles/install/plat/" >&2
-    printf '%s' "unknown"
-}
-export _PLAT="$(_plat_detect)"
-unset -f _plat_detect
-# Abort profile loading if PLAT detection failed — continuing with _PLAT=unknown
-# silently corrupts all tool paths with no visible error to the user.
-if [[ "$_PLAT" == "unknown" ]]; then
-    echo "ERROR: PLAT detection failed — run ~/dotfiles/bootstrap.sh to set up install/plat/" >&2
+    [[ -d "$_scan" ]] || return 1
+    for _dir in $(ls -1d "$_scan"/plat_"${_os}"_*/ 2>/dev/null | sort -r); do
+        _check="$_dir/.plat_check.sh"
+        if [[ -f "$_check" ]] && /bin/sh "$_check" 2>/dev/null; then
+            printf '%s' "$(basename "$_dir")"
+            return 0
+        fi
+    done
     return 1
+}
+_PLAT_DETECTED="$(_plat_detect 2>/dev/null)" || _PLAT_DETECTED=""
+unset -f _plat_detect
+
+# Source the matching .plat_env.sh in the parent shell so its exports stick.
+if [[ -n "$_PLAT_DETECTED" ]]; then
+    _plat_env_sh="$HOME/dotfiles/install/plat/$_PLAT_DETECTED/.plat_env.sh"
+    [[ -f "$_plat_env_sh" ]] && source "$_plat_env_sh"
+    unset _plat_env_sh
 fi
-# Resolve symlinks so all PATH entries use the same physical path.
-# This prevents duplicate entries when ~/.local is a symlink to scratch space.
+export _PLAT="$_PLAT_DETECTED"
+unset _PLAT_DETECTED
+
 _local_root="$HOME/.local"
 if [[ -L "$_local_root" ]]; then
     _local_root="$(readlink -f "$_local_root")"
 fi
+{{ if $use_plat -}}
+if [[ -z "$_PLAT" ]]; then
+    echo "ERROR: use_plat=true but no matching plat spec — run ~/dotfiles/bootstrap.sh" >&2
+    return 1
+fi
 export _LOCAL_PLAT="$_local_root/$_PLAT"
+{{- else -}}
+export _LOCAL_PLAT="$_local_root"
+{{- end }}
 unset _local_root
 
 ### HOMEBREW (early — needed so zsh handoff finds the right zsh) ###
@@ -85,7 +94,11 @@ if [[ -z "$ZSH_VERSION" ]]; then
 fi
 
 # Reached only when staying in bash (no tty or zsh unavailable).
+{{ if $use_plat -}}
 export PATH="$_LOCAL_PLAT/bin:$HOME/.local/bin:$PATH"
+{{- else -}}
+export PATH="$HOME/.local/bin:$PATH"
+{{- end }}
 
 ### GENERAL ###
 

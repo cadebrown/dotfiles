@@ -1,11 +1,20 @@
 #!/usr/bin/env bats
-# tests/paths.bats - verify all PLAT-specific tools landed in the right place
+# tests/paths.bats - verify all per-PLAT tools landed in the right place
 #
-# The critical invariant: every compiled binary lives under ~/.local/$PLAT/
-# so that machines sharing an NFS home directory don't clobber each other.
+# The critical invariant (PLAT-on mode): every compiled binary lives under
+# ~/.local/$PLAT/ so that machines sharing an NFS home don't clobber each other.
+# This suite asserts that invariant and the "no legacy paths" anti-regressions.
+#
+# Skipped when DF_USE_PLAT=0 (flat layout) — the assertions about ~/.local/bin
+# being arch-neutral don't apply when ~/.local IS the install root.
 #
 # PLAT, LOCAL_PLAT, NVM_DIR, RUSTUP_HOME, CARGO_HOME, etc. are inherited
 # from entrypoint.sh which sources _lib.sh before running bats.
+
+setup() {
+    [[ "${DF_USE_PLAT:-0}" == "1" ]] \
+        || skip "PLAT path tests require DF_USE_PLAT=1 (set in tests/entrypoint.sh)"
+}
 
 # --- PLAT sanity ---
 

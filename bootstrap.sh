@@ -29,6 +29,10 @@
 #   DF_EMAIL              — pre-seed email (skips interactive prompt)
 #   DF_PATH               — dotfiles repo location (default: auto-detect / $HOME/dotfiles)
 #   DF_LINK               — ~/dotfiles symlink target (default: $HOME/dotfiles)
+#   DF_USE_PLAT           — 1 = per-PLAT directory isolation (~/.local/plat_*/...);
+#                           0 = flat ~/.local layout (default).
+#                           Only set 1 if sharing $HOME across machines with
+#                           different CPU architectures (NFS shared homes).
 #   DF_SCRATCH            — scratch root on local disk (enables scratch mode)
 #   DF_SCRATCH_LINK       — ~/scratch symlink (default: $HOME/scratch)
 #   DF_LINKS              — colon-separated paths to redirect to scratch (default: ~/.local:~/.cache)
@@ -143,11 +147,8 @@ if [[ "${DF_DO_SCRATCH:-1}" != "0" ]]; then
     # Re-resolve LOCAL_PLAT and derived vars now that ~/.local may be a symlink to scratch.
     # Each install script re-sources _lib.sh, but steps 1–2 in this script need the
     # correct ARCH_BIN before they re-source.
-    _LOCAL_ROOT="$HOME/.local"
-    [[ -L "$_LOCAL_ROOT" ]] && _LOCAL_ROOT="$(readlink -f "$_LOCAL_ROOT")"
-    LOCAL_PLAT="$_LOCAL_ROOT/$PLAT"
+    _resolve_local_plat
     _re_derive_plat_vars
-    unset _LOCAL_ROOT
     log_okay "Re-resolved: LOCAL_PLAT=$LOCAL_PLAT"
 else
     log_info "Skipping scratch setup (DF_DO_SCRATCH=0)"
@@ -252,26 +253,22 @@ unset _PLAT_SCAN
 
 if [[ -n "$_PLAT_NEW" && "$_PLAT_NEW" != "$PLAT" ]]; then
     log_info "PLAT upgraded: $PLAT → $_PLAT_NEW"
-    _OLD_LOCAL_PLAT="$LOCAL_PLAT"
     PLAT="$_PLAT_NEW"
-
-    # Re-resolve LOCAL_PLAT using the real (scratch-resolved) root
-    _LR="$(readlink -f "$HOME/.local")"
-    LOCAL_PLAT="$_LR/$PLAT"
-    _re_derive_plat_vars
     export PLAT
-    unset _LR
 
-    # Source compile flags for the new PLAT
+    # Re-resolve LOCAL_PLAT (honors DF_USE_PLAT) using the real, symlink-resolved root.
+    _resolve_local_plat
+    _re_derive_plat_vars
+
+    # Source compile flags for the new PLAT (always relevant — they're orthogonal
+    # to whether we directory-isolate by PLAT).
     _PLAT_ENV_SH="$DF_INSTALL_DIR/plat/$PLAT/.plat_env.sh"
     [[ -f "$_PLAT_ENV_SH" ]] && source "$_PLAT_ENV_SH"
     unset _PLAT_ENV_SH
-
-    unset _OLD_LOCAL_PLAT
 fi
 unset _PLAT_NEW
 
-log_okay "PLAT=$PLAT"
+log_okay "PLAT=${PLAT:-<none>} (DF_USE_PLAT=$DF_USE_PLAT)"
 log_okay "LOCAL_PLAT=$LOCAL_PLAT"
 
 ### 1. chezmoi ###
@@ -281,10 +278,9 @@ log_section "1 — chezmoi"
 CHEZMOI_BIN="$ARCH_BIN/chezmoi"
 ensure_dir "$ARCH_BIN"
 
-if has chezmoi; then
-    CHEZMOI_BIN="$(command -v chezmoi)"
-    log_okay "chezmoi already available: $(chezmoi --version)"
-elif [[ -x "$CHEZMOI_BIN" ]]; then
+# Check the install location specifically. A `has chezmoi` would also accept
+# Homebrew or system installs, which then run with the wrong sourceDir / data.
+if [[ -x "$CHEZMOI_BIN" ]]; then
     log_okay "chezmoi already installed: $("$CHEZMOI_BIN" --version)"
 else
     log_info "Installing chezmoi → $ARCH_BIN"

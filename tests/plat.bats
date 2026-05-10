@@ -1,7 +1,17 @@
 #!/usr/bin/env bats
-# tests/plat.bats - verify PLAT detection logic
+# tests/plat.bats - verify PLAT-on directory isolation logic
+#
+# These tests exercise DF_USE_PLAT=1 (per-PLAT directory isolation). The flat
+# layout (DF_USE_PLAT=0, the default for end users) makes most of these
+# assertions vacuous since LOCAL_PLAT collapses to ~/.local. The Docker test
+# entrypoint sets DF_USE_PLAT=1 so this suite always runs in the right mode.
 #
 # PLAT, LOCAL_PLAT, etc. are inherited from entrypoint.sh (which sources _lib.sh).
+
+setup() {
+    [[ "${DF_USE_PLAT:-0}" == "1" ]] \
+        || skip "PLAT isolation tests require DF_USE_PLAT=1 (set in tests/entrypoint.sh)"
+}
 
 # --- PLAT format ---
 

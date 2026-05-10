@@ -1,6 +1,20 @@
 {{- $name  := or (env "DF_NAME")  (promptStringOnce . "name"  "Display name") -}}
 {{- $email := or (env "DF_EMAIL") (promptStringOnce . "email" "Email") -}}
+{{/*
+  use_plat: per-architecture directory isolation. Default: false (single machine).
+  Only relevant if you share $HOME across machines with different CPU architectures
+  (e.g. NFS-mounted home with both x86_64 and aarch64 hosts).
+  Override at init time with env DF_USE_PLAT=1, or edit ~/.config/chezmoi/chezmoi.toml.
+*/ -}}
+{{- $envPlat := env "DF_USE_PLAT" -}}
+{{- $usePlat := false -}}
+{{- if $envPlat -}}
+  {{- $usePlat = (or (eq $envPlat "1") (eq $envPlat "true")) -}}
+{{- else if hasKey . "use_plat" -}}
+  {{- $usePlat = .use_plat -}}
+{{- end }}
 
 [data]
-  name  = {{ $name  | quote }}
-  email = {{ $email | quote }}
+  name     = {{ $name  | quote }}
+  email    = {{ $email | quote }}
+  use_plat = {{ $usePlat }}

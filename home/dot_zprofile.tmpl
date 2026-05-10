@@ -1,16 +1,28 @@
+{{/* use_plat may be absent on existing installs whose chezmoi.toml predates the
+     prompt — treat missing as false (the new default). Set $use_plat once here
+     so the rest of the template can reference it without the hasKey ceremony. */ -}}
+{{- $use_plat := false -}}
+{{- if hasKey . "use_plat" -}}{{ $use_plat = .use_plat }}{{- end -}}
 # .zprofile - ZSH login shell configuration
 
 ### PLATFORM ###
 
-# _PLAT identifies the platform and CPU capability level for this machine.
-# Format: plat_{OS}_{cpu-target} — e.g. plat_Linux_x86-64-v3, plat_Darwin_arm64
-# Scans ~/dotfiles/install/plat/plat_${OS}_*/ (highest level first), runs
-# .plat_check.sh, picks the first that exits 0. Also sources .plat_env.sh
-# to set CFLAGS, RUSTFLAGS, HOMEBREW_OPTFLAGS, etc.
+# _PLAT identifies the CPU capability level for this machine
+# (e.g. plat_Linux_x86-64-v3, plat_Darwin_arm64). Detection scans
+# ~/dotfiles/install/plat/plat_${OS}_*/ (highest level first), runs
+# .plat_check.sh, picks the first that exits 0, then sources .plat_env.sh
+# (CFLAGS, RUSTFLAGS, HOMEBREW_OPTFLAGS, etc.).
 #
-# NFS shared homes: each machine auto-detects its own PLAT and installs to
-# ~/.local/$_PLAT/ — x86-64-v4 and x86-64-v3 machines share the same home
-# but use separate binary dirs and never see each other's builds.
+# _LOCAL_PLAT is the install root for compiled tools.
+{{ if $use_plat -}}
+# use_plat=true: per-PLAT isolation enabled — _LOCAL_PLAT=$HOME/.local/$_PLAT.
+#   For NFS shared homes across architectures (each machine installs into its
+#   own dir, none of them clobber each other).
+{{- else -}}
+# use_plat=false: flat layout — _LOCAL_PLAT=$HOME/.local. Single-machine setup.
+#   Set up via chezmoi data; flip with `chezmoi edit ~/.config/chezmoi/chezmoi.toml`
+#   (use_plat = true) and re-apply.
+{{- end }}
 
 # Deduplicate PATH entries immediately — must be set before any PATH modification.
 # Cursor IDE (and similar tools) open login shells that inherit the server's PATH,
@@ -22,40 +34,52 @@ typeset -U path
 # TODO: consider caching PLAT detection result, lazy-loading oh-my-zsh,
 # and profiling startup with zsh/zprof if shell init becomes slow.
 
+# Capability detection (no env-var side effects — those happen below in the
+# parent shell so they actually propagate).
 _plat_detect() {
     local _os _scan _dir _check
     _os="$(uname -s)"
     _scan="$HOME/dotfiles/install/plat"
-    if [[ -d "$_scan" ]]; then
-        for _dir in $(ls -1d "$_scan"/plat_"${_os}"_*/ 2>/dev/null | sort -r); do
-            _check="$_dir/.plat_check.sh"
-            if [[ -f "$_check" ]] && /bin/sh "$_check" 2>/dev/null; then
-                printf '%s' "$(basename "$_dir")"
-                # Source compile flags for this PLAT level
-                [[ -f "$_dir/.plat_env.sh" ]] && source "$_dir/.plat_env.sh"
-                return 0
-            fi
-        done
-    fi
-    # No matching plat spec — fatal. Run bootstrap.sh to set up install/plat/.
-    echo "ERROR: no matching plat spec in ~/dotfiles/install/plat/" >&2
-    printf '%s' "unknown"
-}
-export _PLAT="$(_plat_detect)"
-unset -f _plat_detect
-# Abort profile loading if PLAT detection failed — continuing with _PLAT=unknown
-# silently corrupts all tool paths with no visible error to the user.
-if [[ "$_PLAT" == "unknown" ]]; then
-    echo "ERROR: PLAT detection failed — run ~/dotfiles/bootstrap.sh to set up install/plat/" >&2
+    [[ -d "$_scan" ]] || return 1
+    for _dir in $(ls -1d "$_scan"/plat_"${_os}"_*/ 2>/dev/null | sort -r); do
+        _check="$_dir/.plat_check.sh"
+        if [[ -f "$_check" ]] && /bin/sh "$_check" 2>/dev/null; then
+            printf '%s' "$(basename "$_dir")"
+            return 0
+        fi
+    done
     return 1
+}
+_PLAT_DETECTED="$(_plat_detect 2>/dev/null)" || _PLAT_DETECTED=""
+unset -f _plat_detect
+
+# Source the matching .plat_env.sh in the parent shell so its exports stick.
+if [[ -n "$_PLAT_DETECTED" ]]; then
+    _plat_env_sh="$HOME/dotfiles/install/plat/$_PLAT_DETECTED/.plat_env.sh"
+    [[ -f "$_plat_env_sh" ]] && source "$_plat_env_sh"
+    unset _plat_env_sh
 fi
+export _PLAT="$_PLAT_DETECTED"
+unset _PLAT_DETECTED
+
 # Resolve symlinks so all PATH entries use the same physical path.
 # This prevents duplicate entries when ~/.local is a symlink to scratch space.
 _local_root="$HOME/.local"
 if [[ -L "$_local_root" ]]; then
     _local_root="$(readlink -f "$_local_root")"
 fi
+{{ if $use_plat -}}
+# Per-PLAT isolation: spec must have matched. Continuing with _PLAT empty would
+# silently corrupt all tool paths.
+if [[ -z "$_PLAT" ]]; then
+    echo "ERROR: use_plat=true but no matching plat spec — run ~/dotfiles/bootstrap.sh" >&2
+    return 1
+fi
 export _LOCAL_PLAT="$_local_root/$_PLAT"
+{{- else -}}
+# Flat layout: missing PLAT spec is fine, _LOCAL_PLAT is just $HOME/.local.
+export _LOCAL_PLAT="$_local_root"
+{{- end }}
 unset _local_root
 
 ### GENERAL ###
@@ -99,9 +123,15 @@ fi
 . "$HOME/.profile"
 
 ### PLAT PATHS ###
-# These go after Homebrew so PLAT-installed tools take priority.
+# These go after Homebrew so installed tools take priority.
 
+{{ if $use_plat -}}
+# PLAT-isolated bin first, then arch-neutral ~/.local/bin for shell scripts.
 path=("$_LOCAL_PLAT/bin" "$HOME/.local/bin" $path)
+{{- else -}}
+# Flat layout: $_LOCAL_PLAT/bin == $HOME/.local/bin, only one entry needed.
+path=("$HOME/.local/bin" $path)
+{{- end }}
 
 {{ if eq .chezmoi.os "linux" -}}
 # Prefer brew binutils on Linux — system assembler (gas) may be too old for newer

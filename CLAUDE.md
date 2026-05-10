@@ -9,9 +9,13 @@ CPU architectures. Full docs at [dotfiles.cade.io](https://dotfiles.cade.io).
 These are non-negotiable and shape every decision in the repo:
 
 1. **Cross-platform.** Everything works on both macOS and Linux, on both ARM and x86.
-2. **PLAT isolation.** Compiled binaries live under `~/.local/$PLAT/` where `PLAT` encodes
-   OS + CPU level (e.g. `plat_Linux_x86-64-v3`, `plat_Darwin_arm64`). Two machines sharing
-   an NFS home install into separate PLAT dirs — no conflicts. Text configs are shared.
+2. **Optional PLAT isolation (off by default).** When `DF_USE_PLAT=1` (or
+   `use_plat=true` in chezmoi data), compiled binaries live under `~/.local/$PLAT/`
+   where `PLAT` encodes OS + CPU level (e.g. `plat_Linux_x86-64-v3`, `plat_Darwin_arm64`),
+   so two machines sharing an NFS home install into separate dirs without conflict.
+   Default is `DF_USE_PLAT=0` — flat `~/.local/` layout. PLAT *detection* still runs
+   in flat mode so `.plat_env.sh` capability flags (CFLAGS/RUSTFLAGS/HOMEBREW_OPTFLAGS)
+   are tuned for the host CPU.
 3. **No sudo on Linux.** Homebrew installs to a user-owned prefix with its own glibc.
 4. **Idempotent.** Every script is safe to re-run. Check before installing, skip if done.
 5. **Single source of truth.** One `Brewfile` for both platforms (`if OS.mac?` for differences).
@@ -74,6 +78,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | Script | What it does | Key details |
 |---|---|---|
 | `chezmoi.sh` | chezmoi binary → `$ARCH_BIN` | Official installer with checksum |
+| `plat-decommission.sh` | Removes leftover `~/.local/plat_*/` dirs after switching to flat layout | Standalone only — never invoked by `bootstrap.sh` (including upgrade). Refuses if `DF_USE_PLAT=1`. |
 | `zsh.sh` | oh-my-zsh + plugins (pure, autosuggestions, fsh, completions) | Clones or updates via git |
 | `homebrew.sh` | macOS: Homebrew + `brew bundle` from Brewfile | Upgrades enabled by default |
 | `linux-packages.sh` | Linux: Homebrew + glibc + `brew bundle` | Custom prefix, compiler symlinks, upgrades off by default |
@@ -92,7 +97,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `local-llm.sh` | Creates PLAT-isolated dirs for Ollama + HuggingFace model storage; verifies mlx-lm and aider binaries | macOS primary; dirs also created on Linux |
 | `opencode.sh` | Creates context-boosted Ollama model aliases for OpenCode (256K for qwen3-coder, 128K for others) | Requires ollama server running; skips missing source models |
 | `blender-mcp.sh` | Installs the `blender-mcp` Blender addon (`addon.py` from github.com/ahujasid/blender-mcp) and enables it via headless Blender | MCP server side is separate — see `packages/claude-mcp.txt`. Skips if Blender not installed. |
-| `auth.sh` | Interactive API token setup (GitHub, Anthropic, OpenAI) | Creates `~/.{service}.env` files, chmod 600 |
+| `auth.sh` | Guided API token setup with service registry | Creates `~/.{service}.env` files (chmod 600). Built-in services: GitHub, Anthropic, OpenAI, Cloudflare, HuggingFace, plus `gh auth login`. Run `bash auth.sh status` for state, `bash auth.sh <service>` for a single one. Add a service by appending to `_SERVICE_DEFS` in the script. |
 | `dirs.sh` | Creates `~/dev`, `~/bones`, `~/misc` | Symlinks to scratch when available |
 | `scratch.sh` | Symlinks `~/.local`, `~/.cache`, etc. to scratch space | NFS quota relief |
 | `verify-path.sh` | Diagnostic: arch check, library check, duplicates, stale symlinks | Not called by bootstrap |
@@ -127,13 +132,15 @@ Defined in `_lib.sh`. Use these in install scripts — 4-char label symmetry:
 
 ## PATH priority
 
-Shell profiles prepend PLAT paths on top of Homebrew. Highest priority first:
+Shell profiles prepend tool paths on top of Homebrew. Highest priority first.
+`$_LOCAL_PLAT` resolves to either `$HOME/.local/$_PLAT` (when `use_plat=true`)
+or `$HOME/.local` (default).
 
 ```
-$LOCAL_PLAT/cargo/bin         Rust tools (fd, sd, zoxide, etc.)
-$LOCAL_PLAT/nvm/.../bin       Node.js via nvm
-$LOCAL_PLAT/bin               chezmoi, uv, claude
-~/.local/bin                  arch-neutral scripts only
+$_LOCAL_PLAT/cargo/bin        Rust tools (fd, sd, zoxide, etc.)
+$_LOCAL_PLAT/nvm/.../bin      Node.js via nvm
+$_LOCAL_PLAT/bin              chezmoi, uv, claude
+~/.local/bin                  arch-neutral scripts only (collapses to $_LOCAL_PLAT/bin in flat mode — deduped via typeset -U)
 /opt/homebrew/bin             Homebrew (macOS)
 /usr/bin                      system
 ```
@@ -141,7 +148,9 @@ $LOCAL_PLAT/bin               chezmoi, uv, claude
 Note: `$LOCAL_PLAT/venv/bin` was removed — Python CLI tools now use `uv tool install`
 (isolated venvs under `$LOCAL_PLAT/uv/tools/`).
 
-**Never install the same tool in two layers** — PLAT paths win, but duplicates waste time.
+**Never install the same tool in two layers** — installed-location paths win,
+but duplicates waste time and break `*-self-update` flows that compare argv[0]
+against a recorded install dir (uv was the canonical example of this footgun).
 
 ## Bootstrap step order
 
@@ -252,6 +261,7 @@ All user-facing env vars use the `DF_` prefix:
 
 - Config: `DF_NAME`, `DF_EMAIL`, `DF_REPO`, `DF_PATH`, `DF_SCRATCH`, `DF_LINKS`, `DF_DIRS`, etc.
 - Flags: `DF_DO_PACKAGES`, `DF_DO_RUST`, `DF_DO_AUTH`, etc. (set to `0` to skip, `1` to enable)
+- Behavior: `DF_USE_PLAT=1` opts in to per-PLAT directory isolation (default 0, flat layout)
 - Debug: `DF_DEBUG=1` for verbose output with timing
 
 Internal vars: `DF_ROOT` (repo root), `DF_PACKAGES` (packages dir), `DF_INSTALL_DIR` (install dir).

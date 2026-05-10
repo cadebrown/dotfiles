@@ -65,28 +65,25 @@ DF_PACKAGES="$DF_ROOT/packages"
 
 ### PLATFORM ###
 
-# PLAT identifies the current platform, used to isolate compiled binaries
-# in shared home directories (e.g. NFS mounts across x86_64 and aarch64).
-# All per-machine tool paths live under ~/.local/$PLAT/:
-#   ~/.local/$PLAT/bin/         chezmoi, uv, uvx, and other compiled tools
-#   ~/.local/$PLAT/nvm/         nvm install + node versions — NVM_DIR
-#   ~/.local/$PLAT/rustup/      Rust toolchain — RUSTUP_HOME
-#   ~/.local/$PLAT/cargo/       Cargo home — CARGO_HOME (bins at cargo/bin/)
-#   ~/.local/$PLAT/uv/tools/    uv tool venvs (ipython, jupyter, etc.)
-#   ~/.local/$PLAT/uv/python/   uv-managed Python installs (on-demand)
+# DF_USE_PLAT controls per-architecture directory isolation. Default: off.
 #
-# ~/.local/bin/ stays on PATH for arch-neutral shell scripts only.
+# DF_USE_PLAT=0 (default): flat ~/.local/ layout — single-machine setup.
+#   Compiled tools live at ~/.local/bin/. Cargo/nvm/uv/rustup state lives at
+#   ~/.local/{cargo,nvm,uv,rustup}/. Capability-tuned compiler flags from
+#   .plat_env.sh (CFLAGS, RUSTFLAGS, HOMEBREW_OPTFLAGS) are still loaded —
+#   PLAT detection is independent of directory layout.
 #
-# PLAT format: plat_{OS}_{cpu-target} (e.g. plat_Linux_x86-64-v3, plat_Darwin_arm64)
-# Detection: scan install/plat/plat_${OS}_*/ dirs (highest level first), run
-# .plat_check.sh, pick the first that exits 0. Also sources .plat_env.sh to
-# set CFLAGS, RUSTFLAGS, HOMEBREW_OPTFLAGS, etc. for that CPU target.
+# DF_USE_PLAT=1: per-PLAT directory isolation — for shared NFS homes only.
+#   Compiled tools live at ~/.local/$PLAT/bin/, etc. Two machines on the same
+#   NFS home with different architectures install side-by-side without
+#   clobbering each other.
 #
-# If no spec matches, _lib.sh dies — add a new spec for unsupported platforms.
+# Set DF_USE_PLAT=1 only if you actually share $HOME across machines with
+# different CPU architectures (rare). Most users want the default.
 #
-# On a new machine sharing a home directory, simply re-run bootstrap.sh.
-# chezmoi finds the cached config (no prompts), dotfiles are already applied,
-# and only the PLAT-specific tool installs run.
+# PLAT format: plat_{OS}_{cpu-target} (e.g. plat_Linux_x86-64-v3, plat_Darwin_arm64).
+# Detection scans install/plat/plat_${OS}_*/ (highest level first), runs
+# .plat_check.sh, picks the first that exits 0, then sources .plat_env.sh.
 
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 [[ "$OS" == "darwin" ]] && OS="darwin" || OS="linux"
@@ -96,16 +93,18 @@ ARCH="$(uname -m)"
 # Using aarch64 everywhere avoids per-OS conditionals in install scripts.
 [[ "$ARCH" == "arm64" ]] && ARCH="aarch64"
 
-# Resolve LOCAL_PLAT through any symlink so tool configs (rustup, cargo, nvm)
-# store the real physical path. This prevents stale config entries if ~/.local
-# is ever re-pointed (e.g. scratch remount or layout change).
-_LOCAL_ROOT="$HOME/.local"
-if [[ -L "$_LOCAL_ROOT" ]]; then
-    _LOCAL_ROOT="$(readlink -f "$_LOCAL_ROOT")"
-fi
+# Normalize DF_USE_PLAT: accept 1/true/yes/on as enabled (matches the chezmoi
+# template, which writes use_plat=true|false). Without this, `DF_USE_PLAT=true`
+# would silently render profiles PLAT-on while install scripts go flat.
+case "${DF_USE_PLAT:-0}" in
+    1|true|yes|on|TRUE|YES|ON) DF_USE_PLAT=1 ;;
+    *) DF_USE_PLAT=0 ;;
+esac
 
-# PLAT detection: scan install/plat/ for .plat_check.sh scripts.
-# Sorted reverse = highest level first (v4 > v3 > v2).
+# PLAT detection: scan install/plat/ for .plat_check.sh scripts (highest level first).
+# Always run regardless of DF_USE_PLAT — capability flags from .plat_env.sh
+# (RUSTFLAGS=-Ctarget-cpu=..., HOMEBREW_OPTFLAGS=-march=..., etc.) are still
+# useful in flat mode for binaries this machine actually compiles.
 PLAT=""
 _PLAT_SCRIPT_DIR="$DF_ROOT/install/plat"
 if [[ -d "$_PLAT_SCRIPT_DIR" ]]; then
@@ -122,12 +121,25 @@ if [[ -d "$_PLAT_SCRIPT_DIR" ]]; then
 fi
 unset _PLAT_SCRIPT_DIR
 
-# No matching plat spec — fatal. Ensure install/plat/ has a spec for this machine.
-if [[ -z "$PLAT" ]]; then
-    die "No matching plat spec in $DF_ROOT/install/plat/ for $(uname -s) $(uname -m)"
+# When PLAT isolation is on, a matching spec is required (the directory name
+# embeds $PLAT). When off, missing spec is fine — capability flags just don't
+# get tuned. Both cases are non-fatal in flat mode.
+if [[ "$DF_USE_PLAT" == "1" && -z "$PLAT" ]]; then
+    die "DF_USE_PLAT=1 but no matching plat spec in $DF_ROOT/install/plat/ for $(uname -s) $(uname -m)"
 fi
 
-LOCAL_PLAT="$_LOCAL_ROOT/$PLAT"
+# Resolve ~/.local through any symlink so tool configs (rustup, cargo, nvm)
+# store the real physical path. Prevents stale entries if ~/.local moves.
+_LOCAL_ROOT="$HOME/.local"
+if [[ -L "$_LOCAL_ROOT" ]]; then
+    _LOCAL_ROOT="$(readlink -f "$_LOCAL_ROOT")"
+fi
+
+if [[ "$DF_USE_PLAT" == "1" ]]; then
+    LOCAL_PLAT="$_LOCAL_ROOT/$PLAT"
+else
+    LOCAL_PLAT="$_LOCAL_ROOT"
+fi
 unset _LOCAL_ROOT
 ARCH_BIN="$LOCAL_PLAT/bin"
 
@@ -180,8 +192,8 @@ SCRATCH="${DF_SCRATCH:-}"
 PATHS="${SCRATCH:+$SCRATCH/.paths}"
 export DF_SCRATCH DF_SCRATCH_LINK SCRATCH PATHS
 
-export OS ARCH DF_ROOT DF_PACKAGES \
-       PLAT LOCAL_PLAT RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR \
+export OS ARCH DF_ROOT DF_PACKAGES DF_USE_PLAT \
+       PLAT LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR \
        UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR \
        NVM_DIR CONAN_HOME
 
@@ -257,6 +269,19 @@ run_logged() {
         log_debug "exit=$_rc elapsed=$(( SECONDS - _start ))s"
     fi
     return "$_rc"
+}
+
+# Resolve LOCAL_PLAT from current $HOME/.local (handling symlinks) and the
+# DF_USE_PLAT flag. Sets LOCAL_PLAT but does NOT touch derived vars — call
+# _re_derive_plat_vars after this if anything else has changed.
+_resolve_local_plat() {
+    local _root="$HOME/.local"
+    [[ -L "$_root" ]] && _root="$(readlink -f "$_root")"
+    if [[ "${DF_USE_PLAT:-0}" == "1" ]]; then
+        LOCAL_PLAT="$_root/$PLAT"
+    else
+        LOCAL_PLAT="$_root"
+    fi
 }
 
 # Re-derive all PLAT-dependent variables from the current LOCAL_PLAT.

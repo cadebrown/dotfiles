@@ -15,19 +15,23 @@ log_section "Python (uv)"
 
 ### uv ###
 
-if has uv; then
-    log_okay "uv already installed: $(uv --version)"
+# Check the install location ($ARCH_BIN/uv), NOT just `has uv`. A stray
+# ~/.local/bin/uv from before this dotfiles repo was on PLAT (or in the
+# wrong PATH slot) would otherwise short-circuit the install AND break
+# `uv self update`, which compares argv[0] against the recorded install dir.
+if [[ -x "$ARCH_BIN/uv" ]]; then
+    log_okay "uv already installed: $("$ARCH_BIN/uv" --version)"
     if [[ "${DF_MODE:-}" == "upgrade" ]]; then
         log_info "Self-updating uv..."
-        run_logged uv self update || log_warn "uv self update failed"
+        run_logged "$ARCH_BIN/uv" self update || log_warn "uv self update failed"
     fi
 else
     log_info "Installing uv → $ARCH_BIN"
     ensure_dir "$ARCH_BIN"
-    # UV_INSTALL_DIR redirects the compiled uv+uvx binaries to our PLAT-specific bin
+    # UV_INSTALL_DIR redirects the compiled uv+uvx binaries to our install bin.
     UV_INSTALL_DIR="$ARCH_BIN" run_logged bash <(curl -LsSf https://astral.sh/uv/install.sh)
     export PATH="$ARCH_BIN:$PATH"
-    log_okay "Installed: $(uv --version)"
+    log_okay "Installed: $("$ARCH_BIN/uv" --version)"
 fi
 
 ### CLI tools ###
