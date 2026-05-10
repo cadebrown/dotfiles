@@ -183,6 +183,15 @@ alias timestamp='date +"%Y%m%d%H%M%S"'
 alias verify-path='bash ~/dotfiles/install/verify-path.sh'
 alias cursor-sync='bash ~/dotfiles/install/cursor.sh sync-extensions'
 
+# Codex profile shortcuts. The default sandbox (workspace-write) blocks writes
+# inside .git/ — there's no config knob to unlock that, it's a hardcoded safety
+# boundary. Use codexu when you want Codex to commit/stage/push.
+#   codex   = default workspace-write sandbox (read+edit, no .git writes)
+#   codexu  = unrestricted profile (danger-full-access; .git writes work)
+#   codexr  = review profile (read-only sandbox)
+alias codexu='codex -p unrestricted'
+alias codexr='codex -p review'
+
 {{ if eq .chezmoi.os "linux" -}}
 alias open='xdg-open'
 {{ end -}}

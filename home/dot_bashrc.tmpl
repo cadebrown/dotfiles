@@ -134,6 +134,10 @@ alias datestamp='date +"%Y%m%d"'
 alias timestamp='date +"%Y%m%d%H%M%S"'
 alias verify-path='bash ~/dotfiles/install/verify-path.sh'
 
+# Codex profile shortcuts (default sandbox blocks .git writes — use codexu to commit)
+alias codexu='codex -p unrestricted'
+alias codexr='codex -p review'
+
 {{ if eq .chezmoi.os "linux" -}}
 alias open='xdg-open'
 {{ end -}}
