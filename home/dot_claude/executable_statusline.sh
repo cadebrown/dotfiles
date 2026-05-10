@@ -6,7 +6,7 @@
 #     <age>/<T>t/<C>c · <In>/<Out> (<cache>% cached) · $<cost> (+$<last>) · <tags>
 #
 # Each segment renders independently — if any piece errors, the others still
-# show. ccline is no longer in the chain; transcript parsing is jq-direct.
+# show. Pure bash + jq + git CLI (no external statusline binary).
 #
 # Reads JSON via stdin (Claude Code's contract):
 #   .workspace.current_dir     string  cwd of the agent

@@ -78,7 +78,7 @@ chezmoi edit ~/.codex/AGENTS.md
 
 Use `~/.claude/CLAUDE.md` for Claude-specific memory and `~/.codex/AGENTS.md` for Codex-specific guidance. Keep only genuinely shared preferences aligned.
 
-Claude Code's status line is powered by [CCometixLine](https://github.com/Haleclipse/CCometixLine) (`@cometix/ccline` in `npm.txt`). To pick a theme: `ccline --config`.
+Claude Code's status line is a custom bash script at `home/dot_claude/executable_statusline.sh` (no npm dependency). Edit it with `chezmoi edit ~/.claude/statusline.sh`. The header comment documents the shape; `DEBUG=1` env var dumps parsed input + intermediate values to stderr.
 
 Codex also has global skills and rules (edit source-of-truth in the repo):
 

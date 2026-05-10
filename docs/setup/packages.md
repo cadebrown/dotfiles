@@ -50,12 +50,12 @@ the same pre-built binary that Homebrew bottles provide — same quality, faster
 
 ```sh
 # packages/npm.txt
-@cometix/ccline
+# (one global npm package per line)
 ```
 
 Re-run: `bash ~/dotfiles/install/node.sh`
 
-Currently ships [`@cometix/ccline`](https://github.com/Haleclipse/CCometixLine) — a Rust-based status line for Claude Code with themes and TUI config (`ccline --config`).
+Currently empty. Claude Code's statusline lives in `home/dot_claude/executable_statusline.sh` (pure bash + jq, no npm dependency). Add globals here only when there isn't a native binary or cargo equivalent.
 
 Codex CLI config, rules, skills, themes, and MCP servers are managed from `home/dot_codex/`.
 `install/codex.sh sync-config` preserves runtime trust/plugin sections while refreshing the
