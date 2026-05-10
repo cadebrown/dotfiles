@@ -2,6 +2,31 @@
 
 [chezmoi](https://chezmoi.io) manages the files in `home/` and applies them to `~/`, resolving templates along the way.
 
+## Data flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant B as bootstrap.sh
+    participant CZ as chezmoi
+    participant T as ~/.config/chezmoi/<br/>chezmoi.toml
+    participant S as home/dot_X.tmpl<br/>(repo source)
+    participant H as ~/.X<br/>(target)
+    U->>B: curl | bash
+    B->>CZ: chezmoi init (first run only)
+    CZ->>U: prompt name + email (skipped if DF_NAME / DF_EMAIL pre-set)
+    U-->>CZ: "Cade", "brown.cade@..."
+    CZ->>T: cache values
+    B->>CZ: chezmoi apply
+    CZ->>T: read .name, .email, .use_plat
+    CZ->>S: read template
+    Note over CZ: render Go template — {{ .name }} expands,<br/>{{ if eq .chezmoi.os "linux" }} branches, etc.
+    CZ->>H: write rendered file (overwrites!)
+    Note over H: never edit ~/.X directly —<br/>next apply overwrites it
+```
+
+Templates render at **apply time** using the values in `~/.config/chezmoi/chezmoi.toml`. The prompt only fires if a value is missing — re-runs read from cache.
+
 ## The quick version
 
 ```sh
