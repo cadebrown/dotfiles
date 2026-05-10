@@ -31,6 +31,7 @@ ms-vscode.cpptools-themes
 ms-vscode.theme-tomorrowkit
 myriad-dreamin.tinymist
 nvidia.nsight-vscode-edition
+openai.chatgpt
 platformio.platformio-ide
 polymeilex.wgsl
 redhat.vscode-yaml
