@@ -131,19 +131,19 @@ _timed() {
     return $rc
 }
 
-# Color a cache-hit % — high cache is GOOD, so green at top:
-#   ≥90  DarkSeaGreen3 (115) — healthy, cache working
-#   ≥70  Gold1         (220) — notice, leaking some
-#   ≥40  DarkOrange    (208) — warning, cache eroding
-#   <40  Red1          (196) — broken, cost spiking
-_cache_color() {
+# Color a context % by 4-tier range (model segment's "(max, ctx%)"):
+#   <50  DarkSeaGreen3 (115) — most sessions stay here (sage, calm)
+#   <75  Gold1         (220) — noticeable fill, halfway
+#   <90  DarkOrange    (208) — warning, consider wrapping
+#   ≥90  Red1          (196) — critical, compaction imminent
+_ctx_color() {
     local pct="$1"
     [[ -z "$pct" ]] && { printf '%s' "$_DIM"; return; }
     local pct_int="${pct%.*}"
-    if   (( pct_int >= 90 )); then printf '\e[38;5;115m'
-    elif (( pct_int >= 70 )); then printf '\e[38;5;220m'
-    elif (( pct_int >= 40 )); then printf '\e[38;5;208m'
-    else                            printf '\e[38;5;196m'
+    if   (( pct_int >= 90 )); then printf '\e[38;5;196m'
+    elif (( pct_int >= 75 )); then printf '\e[38;5;208m'
+    elif (( pct_int >= 50 )); then printf '\e[38;5;220m'
+    else                            printf '\e[38;5;115m'
     fi
 }
 
@@ -411,7 +411,7 @@ _model_segment() {
     local out="${_MODEL}λ ${pretty}${_R}"
 
     # Build "(effort, ctx%)" suffix — only if at least one piece is present.
-    # Effort keeps its pink color; ctx% is uniform grey (no tier coloring).
+    # Effort keeps its pink color; ctx% is tier-colored (sage→gold→orange→red).
     if [[ -n "$EFFORT" || -n "$PCT" ]]; then
         local body=""
         if [[ -n "$EFFORT" ]]; then
@@ -419,7 +419,7 @@ _model_segment() {
         fi
         if [[ -n "$PCT" ]]; then
             [[ -n "$body" ]] && body+="${_DIM}, ${_R}"
-            body+="${_SESS}${PCT}%${_R}"
+            body+="$(_ctx_color "$PCT")${PCT}%${_R}"
         fi
         out+=" ${_DIM}(${_R}${body}${_DIM})${_R}"
     fi
@@ -482,10 +482,10 @@ _session_segment() {
     local sep="${_DIM} · ${_R}"
     local out="${_SESS}${g1}${_R}"
 
-    # Group 2: tokens with optional tiered cache%
+    # Group 2: tokens with optional cache% (uniform grey, no tier coloring)
     out+="${sep}${_SESS}${g2_pre}"
     if [[ -n "$cache_pct" ]]; then
-        out+=" ${_DIM}(${_R}$(_cache_color "$cache_pct")${cache_pct}%${_R}${_DIM})${_R}"
+        out+=" ${_DIM}(${_R}${_SESS}${cache_pct}%${_R}${_DIM})${_R}"
     else
         out+="${_R}"
     fi
