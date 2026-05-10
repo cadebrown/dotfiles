@@ -3,12 +3,21 @@ title = "cade's setup"
 authors = ["Cade Brown"]
 language = "en"
 src = "."
+description = "Personal dotfiles for macOS and Linux — chezmoi-managed, no-sudo Homebrew on Linux, optional per-architecture isolation for shared NFS homes. One bootstrap.sh away from a complete dev environment."
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
+# mdbook-admonish 1.20 has a parse-error incompatibility with mdbook 0.5.2;
+# re-enable when versions align. Add the [preprocessor.admonish] block back
+# along with mdbook-admonish.css in additional-css.
 
 [output.html]
 default-theme = "navy"
 preferred-dark-theme = "navy"
 git-repository-url = "https://github.com/cadebrown/dotfiles"
 edit-url-template = "https://github.com/cadebrown/dotfiles/edit/main/docs/{path}"
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
 
 [output.html.search]
 enable = true

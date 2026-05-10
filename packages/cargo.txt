@@ -53,3 +53,7 @@ just
 
 # Markup-based typesetting (LaTeX alternative, pre-built: github.com/typst/typst)
 typst-cli
+
+# mdBook diagram preprocessor (pre-built: github.com/badboy/mdbook-mermaid)
+# mdbook itself comes from the Brewfile (Homebrew has it; this plugin doesn't).
+mdbook-mermaid

@@ -17,8 +17,10 @@ curl -L --proto '=https' --tlsv1.2 -sSf \
 # binstall self-installs into $CARGO_HOME/bin — re-export to pick it up
 export PATH="/opt/buildhome/.cargo/bin:$PATH"
 
-echo "[info] Installing mdbook..."
-cargo-binstall mdbook --no-confirm || cargo install mdbook --locked
+echo "[info] Installing mdbook + plugins..."
+cargo-binstall --no-confirm mdbook mdbook-mermaid \
+    || { cargo install mdbook         --locked \
+      && cargo install mdbook-mermaid --locked; }
 
 echo "[info] Building docs..."
 mdbook build docs
