@@ -50,3 +50,6 @@ xan
 
 # Command runner / Makefile alternative (pre-built: github.com/casey/just)
 just
+
+# Markup-based typesetting (LaTeX alternative, pre-built: github.com/typst/typst)
+typst-cli

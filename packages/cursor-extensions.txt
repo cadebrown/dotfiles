@@ -29,6 +29,7 @@ ms-vscode.cpptools
 ms-vscode.cpptools-extension-pack
 ms-vscode.cpptools-themes
 ms-vscode.theme-tomorrowkit
+myriad-dreamin.tinymist
 nvidia.nsight-vscode-edition
 platformio.platformio-ide
 polymeilex.wgsl
