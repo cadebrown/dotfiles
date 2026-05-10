@@ -31,10 +31,10 @@ setopt CHASE_LINKS          # resolve symlinks in cd/pwd so $PWD shows the real 
 
 ### HISTORY ###
 
-# XDG state dir — keeps history out of $HOME clutter.
-: "${XDG_STATE_HOME:=$HOME/.local/state}"
-[[ -d $XDG_STATE_HOME/zsh ]] || mkdir -p "$XDG_STATE_HOME/zsh" 2>/dev/null
-HISTFILE="$XDG_STATE_HOME/zsh/history"
+# Use the conventional ~/.zsh_history. Lives at $HOME (precious by default,
+# survives any ~/.local/{cache,bin,plat_*} cleanup), and matches what every
+# zsh tutorial assumes — tools that grep history find it where they expect.
+HISTFILE="$HOME/.zsh_history"
 HISTSIZE=500000
 SAVEHIST=500000
 

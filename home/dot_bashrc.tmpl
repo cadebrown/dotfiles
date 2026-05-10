@@ -35,10 +35,8 @@ HISTIGNORE='ls:ll:la:cd:cd -:pwd:exit:clear:history:bg:fg'
 
 shopt -s histappend  # append to HISTFILE on exit, never overwrite
 
-# XDG state dir for history — keeps history out of $HOME clutter.
-_BASH_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/bash"
-[[ -d $_BASH_STATE ]] || mkdir -p "$_BASH_STATE" 2>/dev/null
-HISTFILE="$_BASH_STATE/history"
+# HISTFILE intentionally unset — bash defaults to ~/.bash_history, which lives
+# at $HOME (precious, survives any ~/.local cleanup) and matches every tutorial.
 
 ### SIDECAR LOG ###
 
@@ -47,7 +45,7 @@ HISTFILE="$_BASH_STATE/history"
 #
 #   iso_timestamp  host  shell_pid  exit_code  pwd  command
 #
-# Stored at ~/.local/state/bash/log. Search it with bash_log_search().
+# Stored at ~/.bash_log. Search it with bash_log_search().
 #
 # Implementation notes:
 #   - trap DEBUG fires in the CURRENT shell before each simple command (not a subshell),
@@ -56,7 +54,7 @@ HISTFILE="$_BASH_STATE/history"
 #   - _BASH_IN_PROMPT suppresses re-capture while PROMPT_COMMAND runs its own commands.
 #   - The trap is set last (after all rc setup) so sourcing .bashrc isn't logged.
 
-_BASH_LOG="$_BASH_STATE/log"
+_BASH_LOG="$HOME/.bash_log"
 _BASH_LOGCMD=''
 _BASH_IN_PROMPT=0
 
@@ -171,7 +169,7 @@ extract() {
 # bash_log_search — search the sidecar command log
 # Usage: bash_log_search <pattern> [grep options]
 bash_log_search() {
-    local log="${XDG_STATE_HOME:-$HOME/.local/state}/bash/log"
+    local log="$HOME/.bash_log"
     [[ -f $log ]] || { printf 'no log at %s\n' "$log" >&2; return 1; }
     grep --color=auto -i -- "$@" "$log"
 }
