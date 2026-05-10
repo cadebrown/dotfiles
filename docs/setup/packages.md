@@ -13,6 +13,7 @@ Every package layer has a declarative text file and an idempotent install script
 | Claude plugins | `packages/claude-plugins.txt` | `install/claude.sh` | All |
 | Claude MCP servers | `packages/claude-mcp.txt` | `install/claude.sh` | All |
 | Codex CLI/config | `home/dot_codex/` | `install/codex.sh` | All |
+| Cursor extensions | `packages/cursor-extensions.txt` | `install/cursor.sh` | All |
 | VS Code extensions | `packages/vscode-extensions.txt` | `install/vscode.sh` | All |
 
 ---
@@ -28,6 +29,7 @@ Choose the first layer that applies. Native installers first, Homebrew as fallba
 fd-find
 ripgrep
 bat
+typst-cli
 my-new-tool
 ```
 
@@ -98,24 +100,28 @@ Re-run: `brew bundle --file=~/dotfiles/packages/Brewfile`
 Prefer Homebrew for tools that aren't available via cargo/npm/pip, have complex C dependencies, or are
 macOS-specific (casks, GUI apps).
 
-### 5. VS Code extensions
+### 5. VS Code / Cursor extensions
+
+Both editors have separate extension lists since marketplace availability differs (Cursor uses OpenVSX, which doesn't carry every Microsoft-restricted extension).
 
 ```sh
-# Add to packages/vscode-extensions.txt
+# packages/vscode-extensions.txt   (VS Code marketplace)
+# packages/cursor-extensions.txt   (OpenVSX, Cursor)
 ms-python.python
 charliermarsh.ruff
+myriad-dreamin.tinymist     # Typst LSP — works in both
 ```
 
-Re-run: `bash ~/dotfiles/install/vscode.sh`
+Re-run: `bash ~/dotfiles/install/vscode.sh` and/or `bash ~/dotfiles/install/cursor.sh`
 
 To capture newly installed extensions back into the file (union — never removes):
 
 ```sh
 bash ~/dotfiles/install/vscode.sh sync-extensions
+bash ~/dotfiles/install/cursor.sh sync-extensions
 ```
 
-> **Note:** `settings.json` is **not tracked** — it contains an embedded GitLab token
-> (`cmake.configureEnvironment`). Extensions only.
+> **Note:** VS Code `settings.json` is **not tracked** (contains embedded credentials in some setups). Cursor's settings ARE tracked via symlinks under `home/dot_cursor/`.
 
 ### 6. Custom install script
 
@@ -204,44 +210,54 @@ stay in sync with the repo).
 
 ### Default: LLVM (Homebrew clang)
 
-When Homebrew LLVM is present, `~/.profile` automatically sets:
+Toolchain files are versioned: `llvm-21.cmake`, `llvm-22.cmake`, `gcc-13.cmake`, `gcc-15.cmake`, plus a shared `_brew.cmake` helper.
+
+When Homebrew LLVM is present, `~/.profile` auto-sets:
 
 ```sh
-export CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/llvm.cmake"
+export CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/llvm-22.cmake"
+# (highest installed LLVM version wins; falls back to llvm-21)
 ```
 
 The toolchain configures:
 
 | CMake variable | Value |
 |---|---|
-| `CMAKE_C_COMPILER` | `$LOCAL_PLAT/brew/opt/llvm/bin/clang` |
-| `CMAKE_CXX_COMPILER` | `$LOCAL_PLAT/brew/opt/llvm/bin/clang++` |
-| `CMAKE_AR` / `RANLIB` / `NM` | `llvm-ar`, `llvm-ranlib`, `llvm-nm` |
-| `CMAKE_LINKER_TYPE` | `LLD` (Linux only; macOS requires Apple ld) |
-| `CMAKE_CUDA_HOST_COMPILER` | `clang++` |
+| `CMAKE_C_COMPILER` | `$_LOCAL_PLAT/brew/opt/llvm@22/bin/clang` (or unversioned `opt/llvm/`) |
+| `CMAKE_CXX_COMPILER` | `$_LOCAL_PLAT/brew/opt/llvm@22/bin/clang++` |
+| `CMAKE_AR` / `CMAKE_RANLIB` | `llvm-ar`, `llvm-ranlib` (LTO needs the matching tool) |
+| `CMAKE_LINKER_TYPE` | `MOLD` > `LLD` (Linux only; macOS uses Apple's ld) |
+| `CMAKE_CUDA_COMPILER` | `$_LOCAL_PLAT/.cuda/bin/nvcc` (only if symlink set up) |
+| `CMAKE_CUDA_HOST_COMPILER` | `clang++` (when CUDA available) |
 
-### Switching to GCC 15
+CMake auto-detects `nm`/`objcopy`/`objdump`/`strip` from `CC`, so the toolchain files only override what actually matters.
+
+### Switching toolchains
 
 Per-invocation:
 
 ```sh
-CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/gcc.cmake" cmake -B build
+CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/gcc-15.cmake" cmake -B build
 ```
 
-Per-session:
+Per-session via the `tc` shell function:
 
 ```sh
-export CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/gcc.cmake"
+tc            # show active
+tc list       # list available
+tc gcc-15     # GCC 15
+tc gcc-13     # GCC 13
+tc llvm-22    # LLVM 22
+tc llvm-21    # LLVM 21
 ```
 
 Per-project (`CMakePresets.json`):
 
 ```json
-{ "cacheVariables": { "CMAKE_TOOLCHAIN_FILE": "/absolute/path/to/gcc.cmake" } }
+{ "cacheVariables": { "CMAKE_TOOLCHAIN_FILE": "/absolute/path/to/gcc-15.cmake" } }
 ```
 
-The GCC toolchain uses versioned binaries (`gcc-15`, `g++-15`, etc.) because Homebrew
-does not create unversioned `gcc` symlinks on macOS. Linker priority: mold → lld → gold → system ld.
+The GCC toolchains use versioned binaries (`gcc-15`, `g++-15`, etc.) because Homebrew doesn't create unversioned `gcc` symlinks on macOS. Linux gets unversioned symlinks via `linux-packages.sh`, but the versioned files work on both. Linker priority on Linux: **mold → lld → gold → system ld**.
 
 ### Disabling the toolchain
 

@@ -7,13 +7,13 @@ Quick reference for when things go wrong. Check here before digging into scripts
 ## Tool not found after bootstrap
 
 ```sh
-echo "$_PLAT"                         # confirm which platform the shell resolved
-ls ~/.local/$_PLAT/bin/               # chezmoi, uv, claude should be here
-ls ~/.local/$_PLAT/cargo/bin/         # fd, sd, zoxide, etc.
-which fd                              # should point into ~/.local/$_PLAT/
+echo "$_PLAT" "$_LOCAL_PLAT"          # capability + install root
+ls "$_LOCAL_PLAT/bin/"                # chezmoi, uv, claude should be here
+ls "$_LOCAL_PLAT/cargo/bin/"          # fd, sd, zoxide, etc.
+which fd                              # should point under $_LOCAL_PLAT
 ```
 
-If `$_PLAT` is empty or wrong, `.zprofile` wasn't sourced. Open a new login shell (`zsh -l`) or source it:
+`$_LOCAL_PLAT` is `$HOME/.local` by default (flat layout) or `$HOME/.local/$_PLAT` when [PLAT isolation](../setup/plat.md) is enabled. If `$_PLAT` or `$_LOCAL_PLAT` is empty, `.zprofile` wasn't sourced. Open a new login shell (`zsh -l`) or source it:
 
 ```sh
 source ~/.zprofile
@@ -76,15 +76,15 @@ For shell configs (`.zshrc`, `.zprofile`, `.bash_profile`), always use `chezmoi 
 
 ## PATH order is wrong — wrong binary is resolving
 
-Expected priority (highest to lowest):
+Expected priority (highest to lowest). `$_LOCAL_PLAT` collapses to `$HOME/.local` in flat-mode (default).
 
 ```
-~/.local/$PLAT/venv/bin      Python venv
-~/.local/$PLAT/cargo/bin     Rust tools (fd, sd, zoxide, etc.)
-~/.local/$PLAT/nvm/.../bin   Node.js
-~/.local/$PLAT/bin           chezmoi, uv, claude (Linux)
-~/.local/bin                 arch-neutral scripts
-/opt/homebrew/bin            Homebrew (macOS)
+$_LOCAL_PLAT/cargo/bin       Rust tools (fd, sd, zoxide, bat, rg, etc.)
+$_LOCAL_PLAT/nvm/.../bin     Node.js (highest installed version)
+$_LOCAL_PLAT/bin             chezmoi, uv, claude, codex, uv-tool entrypoints
+~/.local/bin                 arch-neutral scripts (collapses to $_LOCAL_PLAT/bin in flat mode — deduped via typeset -U)
+/opt/homebrew/bin            Homebrew (macOS) — also where rustup lives
+/opt/homebrew/sbin           Homebrew sbin
 /usr/bin                     system
 ```
 
@@ -97,6 +97,8 @@ echo $PATH | tr ':' '\n'      # full PATH in order
 ```
 
 If a Homebrew tool is shadowing a cargo tool, check `packages/cargo.txt` and `packages/Brewfile` for duplicates — remove the one you don't want.
+
+The other classic shadowing footgun: legacy binaries at `~/.local/bin/<tool>` from before a layout migration. The `[[ -x "$ARCH_BIN/<tool>" ]]` install checks in current scripts catch most of these, but if `<tool> --version` shows an unexpectedly old version, check `ls ~/.local/bin/<tool>*` for backups (`*.preplat-bak.*` or stale binaries) and delete them.
 
 ---
 
@@ -143,23 +145,44 @@ The fix is almost always to replace a template variable with a shell runtime exp
 
 ## Duplicate PLAT paths in PATH (both v3 and v4 showing up)
 
-This is fixed in current versions. Both `.zprofile` (zsh) and `.bash_profile` (bash) now resolve `~/.local` symlinks before setting `_LOCAL_PLAT`, ensuring all PATH entries use consistent physical paths.
+Only relevant with `DF_USE_PLAT=1`. Fixed in current versions — `.zprofile`/`.bash_profile` resolve `~/.local` symlinks before setting `_LOCAL_PLAT` so PATH entries use the same physical path.
 
-If you installed before this fix was added:
+If you upgraded from before that fix:
 
 ```sh
-# Apply updated shell profiles
 chezmoi apply ~/.zprofile ~/.bash_profile
-
-# Open a new shell
-exec zsh -l   # or: exec bash -l
-
-# Verify only one PLAT appears
-echo "$_PLAT"                           # should show only the detected PLAT
-echo "$PATH" | tr ':' '\n' | grep plat  # all paths should have the same PLAT prefix
+exec zsh -l                                # or: exec bash -l
+echo "$PATH" | tr ':' '\n' | grep plat     # all entries should share the same PLAT prefix
 ```
 
-On a shared NFS home with scratch space, `~/.local` is a symlink to `/scratch/$USER/.paths/.local`. The shell profiles now resolve this symlink so Homebrew, cargo, nvm, and other tools all add the same physical path to PATH (no duplicates).
+In flat mode (`DF_USE_PLAT=0`, the default), this failure mode doesn't apply — there's no `$PLAT` segment in `$_LOCAL_PLAT`.
+
+---
+
+## Lost shell history
+
+Zsh history lives at `~/.zsh_history` (the conventional default; survives any `~/.local` cleanup). Bash history at `~/.bash_history`. The bash sidecar command log (richer: timestamps, exit codes, cwd) at `~/.bash_log` — search via `bash_log_search <pattern>`.
+
+If you have history under the old location (`~/.local/state/{zsh,bash}/`), one-time migrate:
+
+```sh
+[ -f ~/.local/state/zsh/history  ] && mv ~/.local/state/zsh/history  ~/.zsh_history
+[ -f ~/.local/state/bash/history ] && mv ~/.local/state/bash/history ~/.bash_history
+[ -f ~/.local/state/bash/log     ] && mv ~/.local/state/bash/log     ~/.bash_log
+```
+
+---
+
+## Migrating off PLAT isolation
+
+If you set up with `DF_USE_PLAT=1` and want to switch to flat (or vice-versa), the layout in `~/.local/` is stable as long as one mode is active — but switching strands GBs in the unused tree. Decommission tool:
+
+```sh
+# After setting DF_USE_PLAT=0 (or removing use_plat=true from chezmoi data):
+bash ~/dotfiles/install/plat-decommission.sh
+```
+
+Refuses to run if `DF_USE_PLAT=1` is currently set (won't nuke the active install). See [PLAT isolation](../setup/plat.md) for the full migration story.
 
 ---
 

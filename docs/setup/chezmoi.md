@@ -38,11 +38,12 @@ Files in `home/` map to `~/` by chezmoi's naming rules:
 
 Use these in any `.tmpl` file:
 
-```
+```text
 {{ .name }}              display name (prompted on first run)
 {{ .email }}             email (prompted on first run)
+{{ .use_plat }}          PLAT directory isolation flag (default false; see PLAT page)
 {{ .chezmoi.os }}        "darwin" or "linux"
-{{ .chezmoi.arch }}      "amd64" or "arm64"
+{{ .chezmoi.arch }}      "amd64" or "arm64"  ← do NOT use in shared-NFS templates
 {{ .chezmoi.username }}  system login name (auto-detected)
 {{ .chezmoi.homeDir }}   home directory path
 ```
