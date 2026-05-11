@@ -408,10 +408,11 @@ function docker() { /usr/bin/docker "$@"; }
 
 ### CREDENTIALS ###
 
-# Private credential files (e.g. ~/.nvidia.env, ~/.work.env)
-# (N): zsh null glob — expands to empty instead of erroring if no files match
+# Per-service env files (~/.<service>.env, chmod 600) written by install/auth.sh.
+# Sourcing them here gives every CLI tool a single source of truth for API tokens.
+# (N): zsh null glob — expands to empty instead of erroring if no matches.
 for f in "$HOME"/.*.env(N); do
-    . "$f"
+    [ -r "$f" ] && . "$f"
 done
 
 ### SSH AGENT ###
