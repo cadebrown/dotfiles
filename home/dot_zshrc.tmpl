@@ -192,6 +192,26 @@ alias cursor-sync='bash ~/dotfiles/install/cursor.sh sync-extensions'
 alias codexs='codex -p deep'
 alias codexr='codex -p review'
 
+# mlxserve — start the MLX server on localhost:8080 with the chosen model.
+# Defaults to Qwen3-Coder-30B-A3B (256K ctx, ~25GB), our primary local coder.
+# Used by aider/opencode/pi when configured to point at http://localhost:8080/v1.
+# Run in a dedicated terminal; Ctrl+C to stop.
+#   mlxserve                   # start with default model
+#   mlxserve qwen2.5-coder:7b  # alias → mlx-community/Qwen2.5-Coder-7B-Instruct-4bit
+#   mlxserve mlx-community/<full-id>
+mlxserve() {
+    local model="${1:-qwen3-coder:30b}"
+    case "$model" in
+        qwen3-coder:30b)  model="mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit" ;;
+        qwen2.5-coder:7b) model="mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"   ;;
+        gpt-oss:20b)      model="mlx-community/gpt-oss-20b-MLX-4bit"              ;;
+    esac
+    local port="${MLX_PORT:-8080}"
+    echo "▸ MLX server starting on http://localhost:$port  (model: $model)"
+    echo "  Use http://localhost:$port/v1 as OpenAI-compatible base URL."
+    mlx_lm.server --model "$model" --host 127.0.0.1 --port "$port"
+}
+
 {{ if eq .chezmoi.os "linux" -}}
 alias open='xdg-open'
 {{ end -}}

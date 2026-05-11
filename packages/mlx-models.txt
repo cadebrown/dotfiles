@@ -1,0 +1,15 @@
+# mlx-models.txt — MLX-formatted models pre-pulled by install/local-llm.sh pull-models
+# One Hugging Face model ID per line. Comments + blank lines OK.
+# Re-run: bash install/local-llm.sh pull-models
+#
+# Sizes are ~ disk; loaded model RAM is similar plus KV cache.
+# All from mlx-community on Hugging Face — pre-converted, ready for Apple Silicon.
+
+# Primary coding model — Qwen3-Coder-30B-A3B (MoE, 256K context native, ~25GB)
+mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit
+
+# Fast fallback — Qwen2.5-Coder-7B (~4GB)
+mlx-community/Qwen2.5-Coder-7B-Instruct-4bit
+
+# Reasoning-focused — gpt-oss-20b (~12GB)
+mlx-community/gpt-oss-20b-MLX-4bit

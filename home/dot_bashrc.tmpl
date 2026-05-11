@@ -138,6 +138,19 @@ alias verify-path='bash ~/dotfiles/install/verify-path.sh'
 alias codexs='codex -p deep'        # opt-in workspace-write sandbox
 alias codexr='codex -p review'      # read-only sandbox
 
+# mlxserve — start MLX server on localhost:8080 (default qwen3-coder:30b)
+mlxserve() {
+    local model="${1:-qwen3-coder:30b}"
+    case "$model" in
+        qwen3-coder:30b)  model="mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit" ;;
+        qwen2.5-coder:7b) model="mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"   ;;
+        gpt-oss:20b)      model="mlx-community/gpt-oss-20b-MLX-4bit"              ;;
+    esac
+    local port="${MLX_PORT:-8080}"
+    echo "▸ MLX server starting on http://localhost:$port  (model: $model)"
+    mlx_lm.server --model "$model" --host 127.0.0.1 --port "$port"
+}
+
 {{ if eq .chezmoi.os "linux" -}}
 alias open='xdg-open'
 {{ end -}}
