@@ -42,12 +42,24 @@ auto-commits: false
 dirty-commits: false
 gitignore: true
 
-# UX
+# UX — colors mirror the dotfiles palette (matches Claude statusline + pi theme):
+#   #5fafd7 steel  primary   #5fffff sky    accent  #af5fff purple   thinking
+#   #d787af pink   warning   #87d787 green  success #ff5f5f red      error
 dark-mode: true
 stream: true
 pretty: true
 cache-prompts: true       # Anthropic prompt cache; harmless for non-cache providers
 show-model-warnings: true
+code-theme: monokai       # syntax highlighting in code blocks
+user-input-color:                 "#5fffff"
+assistant-output-color:           "#5fafd7"
+tool-output-color:                "#9e9e9e"
+tool-error-color:                 "#ff5f5f"
+tool-warning-color:               "#d787af"
+completion-menu-color:            "#5fafd7"
+completion-menu-bg-color:         "#1a1a1a"
+completion-menu-current-color:    "#1a1a1a"
+completion-menu-current-bg-color: "#5fafd7"
 
 # Hygiene
 analytics-disable: true

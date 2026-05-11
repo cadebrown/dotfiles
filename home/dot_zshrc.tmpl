@@ -221,6 +221,13 @@ mlxserve() {
         --port "$port"
 }
 
+# mlxstart / mlxstop / mlxstatus — control the LaunchAgent (dev.cade.mlxserve).
+# Battery: an idle MLX server holds ~25GB in unified memory but burns very
+# little CPU/GPU power. Stop it when on battery + not coding for hours.
+alias mlxstart='launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/dev.cade.mlxserve.plist"'
+alias mlxstop='launchctl bootout "gui/$(id -u)/dev.cade.mlxserve"'
+alias mlxstatus='launchctl print "gui/$(id -u)/dev.cade.mlxserve" 2>/dev/null | head -20 || echo "mlxserve LaunchAgent not loaded"'
+
 {{ if eq .chezmoi.os "linux" -}}
 alias open='xdg-open'
 {{ end -}}

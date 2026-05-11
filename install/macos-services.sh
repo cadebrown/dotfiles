@@ -58,6 +58,39 @@ else
     log_warn "ollama not found — skipping (run install/homebrew.sh first)"
 fi
 
+### mlxserve (mlx-openai-server) ###
+# Local LLM server on :8080 used as the default backend by aider/opencode/pi.
+# Without this LaunchAgent, those tools fail to connect on first launch unless
+# the user remembered to start mlxserve manually.
+#
+# The plist itself (deployed by chezmoi) holds the model + parser config.
+# This block loads it into the user's launchd domain (idempotent: bootstraps
+# once, then no-ops on subsequent runs).
+
+_MLX_PLIST="$HOME/Library/LaunchAgents/dev.cade.mlxserve.plist"
+_MLX_LABEL="dev.cade.mlxserve"
+
+if [[ -f "$_MLX_PLIST" ]]; then
+    if ! has mlx-openai-server; then
+        log_warn "mlx-openai-server not installed — LaunchAgent will fail to start"
+        log_warn "  fix: uv tool install mlx-openai-server"
+    fi
+    mkdir -p "$HOME/.local/share/mlxserve"
+    if launchctl print "gui/$(id -u)/$_MLX_LABEL" &>/dev/null; then
+        log_okay "mlxserve LaunchAgent already loaded ($_MLX_LABEL)"
+    else
+        log_info "Loading mlxserve LaunchAgent (auto-start at login)"
+        if launchctl bootstrap "gui/$(id -u)" "$_MLX_PLIST" 2>/dev/null; then
+            log_okay "mlxserve LaunchAgent loaded — first run downloads ~25GB Qwen weights"
+        else
+            log_warn "launchctl bootstrap failed — try manually: launchctl bootstrap gui/\$UID $_MLX_PLIST"
+        fi
+    fi
+else
+    log_warn "mlxserve plist missing — chezmoi apply may not have run yet"
+fi
+unset _MLX_PLIST _MLX_LABEL
+
 ### docker CLI plugins ###
 # docker-compose and docker-buildx are installed by Homebrew but must be
 # symlinked into ~/.docker/cli-plugins/ to work as `docker compose` / `docker buildx`.
