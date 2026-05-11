@@ -60,9 +60,29 @@ notification_condition = "unfocused"
 notification_method = "auto"
 show_tooltips = false
 session_picker_view = "dense"
-status_line = ["current-dir", "git-branch", "model-with-reasoning", "context-used", "context-window-size", "thread-title"]
+
+# Status line: matches the Claude statusline's left-to-right narrative as
+# closely as Codex's declarative vocabulary allows.
+#   dir → branch → model+reasoning → ctx/token visual bars → rate-limits → fast-mode
+# Codex's status_line is component-list (no script support) so we lose:
+#   - per-piece colors (theme drives all colors)
+#   - custom glyphs (Δ, λ — components render as their own labels)
+#   - git diff/status counts (only branch name available)
+#   - turns/tools/cost (no analog in Codex vocabulary)
+# Invalid component names are silently skipped — verify with interactive launch.
+status_line = [
+    "current-dir",
+    "git-branch",
+    "model-with-reasoning",
+    "usage-bars",
+    "rate-limits",
+    "fast-mode",
+]
 status_line_use_colors = true
-terminal_title = ["project-name", "activity", "run-state", "model-name"]
+
+# Tab/window title: project + model only (Claude doesn't customize this; we
+# drop activity/run-state for a quieter tab bar).
+terminal_title = ["project", "model"]
 
 [profiles.deep]
 model = "gpt-5.5"
