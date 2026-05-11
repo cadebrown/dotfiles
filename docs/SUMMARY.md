@@ -15,6 +15,7 @@
 - [Day-to-day workflow](usage/updates.md)
 - [AeroSpace window management](usage/aerospace.md)
 - [Local AI coding](usage/local-llm.md)
+- [Agent guidance (CLAUDE.md / AGENTS.md)](usage/agents.md)
 - [Troubleshooting](usage/troubleshooting.md)
 
 # Reference

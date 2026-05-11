@@ -26,7 +26,8 @@ These are non-negotiable and shape every decision in the repo:
 | What | Where | Notes |
 |---|---|---|
 | Dotfile sources | `home/` | chezmoi templates → applied to `~/` |
-| Package lists | `packages/` | `Brewfile`, `cargo.txt`, `pip.txt`, `npm.txt`, `claude-*.txt` |
+| Package lists | `packages/` | `Brewfile`, `cargo.txt`, `pip.txt`, `npm.txt`, `mlx-models.txt`, `claude-*.txt` |
+| Shared template partials | `home/.chezmoitemplates/` | `agents-common.md` shared by Claude/Codex/aider/opencode/pi guidance files |
 | Install scripts | `install/` | Each sources `_lib.sh`, each is idempotent |
 | Path vars + helpers | `install/_lib.sh` | **Read this first** — defines `PLAT`, `LOCAL_PLAT`, all tool paths, logging |
 | PLAT detection | `install/plat/` | `.plat_check.sh` (capability test) + `.plat_env.sh` (compiler flags) per target |
@@ -92,10 +93,8 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `codex.sh` | Codex CLI binary from GitHub releases + managed config sync | Platform detection + checksum + profile validation |
 | `cursor.sh` | Cursor settings symlinks + extension install; `sync-extensions` subcommand captures new extensions back | Union-only (never removes); app updated via Brewfile cask |
 | `vscode.sh` | VS Code extension install; `sync-extensions` subcommand captures new extensions back | Extensions only — settings.json NOT tracked (contains embedded credentials) |
-| `local-llm.sh` | Creates PLAT-isolated HuggingFace cache dir, verifies ollama/mlx-lm/aider binaries | Warns but does not fail if tools are absent |
-| `opencode.sh` | Creates Ollama context-boosted model aliases via Modelfile | Skips if source model not installed; omits gpt-oss:120b (confirmed hang bug) |
-| `local-llm.sh` | Creates PLAT-isolated dirs for Ollama + HuggingFace model storage; verifies mlx-lm and aider binaries | macOS primary; dirs also created on Linux |
-| `opencode.sh` | Creates context-boosted Ollama model aliases for OpenCode (256K for qwen3-coder, 128K for others) | Requires ollama server running; skips missing source models |
+| `local-llm.sh` | Verifies ollama/mlx-lm/mlx-openai-server/aider binaries; creates HF cache dir; `pull-models` subcommand pre-pulls MLX models from `packages/mlx-models.txt` | Warns (does not fail) if tools missing. MLX is the primary local backend (started via `mlxserve`); Ollama remains as fallback. |
+| `opencode.sh` | OpenCode binary check + creates Ollama context-boosted model aliases (fallback path; primary is MLX in `opencode.json`) | Skips cleanly if Ollama not installed/running; omits gpt-oss:120b (confirmed hang bug) |
 | `blender-mcp.sh` | Installs the `blender-mcp` Blender addon (`addon.py` from github.com/ahujasid/blender-mcp) and enables it via headless Blender | MCP server side is separate — see `packages/claude-mcp.txt`. Skips if Blender not installed. |
 | `auth.sh` | Guided API token setup with service registry | Creates `~/.{service}.env` files (chmod 600). Built-in services: GitHub, Anthropic, OpenAI, Cloudflare, HuggingFace, plus `gh auth login`. Run `bash auth.sh status` for state, `bash auth.sh <service>` for a single one. Add a service by appending to `_SERVICE_DEFS` in the script. |
 | `dirs.sh` | Creates `~/dev`, `~/bones`, `~/misc` | Symlinks to scratch when available |
@@ -217,6 +216,19 @@ must render identically on every machine** — otherwise machines overwrite each
 - **Use `{{ .chezmoi.os }}`** (darwin/linux) for platform branching — this is stable across shared homes
 - **Never use `{{ .chezmoi.arch }}`** or per-machine values in templates — use shell runtime detection instead
 - Template variables: `{{ .name }}`, `{{ .email }}` (from chezmoi data), `{{ .chezmoi.os }}`, `{{ .chezmoi.homeDir }}`
+
+### Shared partials
+
+`home/.chezmoitemplates/` holds reusable template fragments. The first one in
+the tree is `agents-common.md` — shared content across Claude/Codex/aider/
+opencode/pi guidance files. Reference from any `.tmpl` with:
+
+```gotmpl
+{{ template "agents-common.md" . }}
+```
+
+Edit `agents-common.md` once and all five tools' AGENTS/CLAUDE/CONVENTIONS files
+update on the next `chezmoi apply`. See [docs/usage/agents.md](docs/usage/agents.md).
 
 ## Rules for agents
 

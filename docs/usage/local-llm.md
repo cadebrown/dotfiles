@@ -1,161 +1,143 @@
 # Local AI coding
 
-Local LLM inference on macOS Apple Silicon (M-series) — no API keys, no rate limits, no cloud.
+Local LLM inference on macOS Apple Silicon (M-series) — no API keys, no rate
+limits, no cloud — used as the default backend for **aider**, **opencode**,
+and **pi**.
 
 ## Overview
 
-Two inference backends, one coding agent layer:
+| Layer | Tool | Where it lives |
+|---|---|---|
+| **Server** | `mlxserve` (mlx-openai-server) | Foreground process, port 8080, OpenAI-compat + tool calling |
+| **Server (fallback)** | Ollama | LaunchAgent, port 11434, OpenAI-compat |
+| **Client** | aider, opencode, pi | All point at `localhost:8080/v1` by default on macOS |
+| **Cloud** | Anthropic, OpenAI | Available everywhere via `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` |
 
-| Tool | Format | Server | When to use |
-|---|---|---|---|
-| **Ollama** | GGUF | `localhost:11434/v1` (OpenAI-compatible) | Primary backend — always-on LaunchAgent, large models, multi-client |
-| **mlx-lm** | MLX | `localhost:8080/v1` (OpenAI-compatible) | On-demand — faster on Apple Silicon Metal, but tool calling broken (PR #1027) |
-| **OpenCode** | — | TUI client | Primary coding agent (full agentic loop with tools) |
-| **aider** | — | CLI client | Quick edits, one-shot diffs, git integration |
-
-Ollama and mlx-lm use **different model formats** (GGUF vs MLX) and store files separately. They cannot share downloads.
-
----
+MLX is the **primary backend** because it's roughly 2-3× faster than Ollama
+(llama.cpp) on the M3 Max for the same 4-bit quants, and `mlx-openai-server`
+adds OpenAI tool-call parsing on top — which `mlx_lm.server` upstream still
+lacks. Ollama remains installed as a fallback for backend comparison and for
+non-Apple-Silicon users.
 
 ## Quick start
 
-Pull a model and run OpenCode:
-
 ```sh
-# Pull a model (GGUF, stored at ~/.ollama/models)
-ollama pull qwen3-coder:30b
+# Start the local server (one terminal — leave it running)
+mlxserve                          # default: Qwen3-Coder-30B-A3B (256K ctx)
 
-# Start OpenCode (auto-connects to Ollama at localhost:11434)
-opencode
+# Then in another terminal, launch any of:
+aider                             # CLI, whole-format edits
+opencode                          # TUI agent, full tool-calling loop
+pi                                # TUI agent, full tool-calling loop
 
-# Or use aider
-aider
+# Switch model in the running server
+mlxserve qwen2.5-coder:7b         # smaller/faster
+mlxserve gpt-oss:20b              # reasoning
 ```
 
----
+## `mlxserve` and `mlx-openai-server`
 
-## Ollama
-
-Installed via Homebrew (`brew "ollama"` in `packages/Brewfile`). On macOS, managed as a
-LaunchAgent — starts at login, accessible at `http://127.0.0.1:11434`.
-
-```sh
-# Check running models
-ollama list
-
-# Pull a model
-ollama pull llama3.3:70b
-
-# Run a quick test
-ollama run qwen3-coder:30b "hello"
-
-# API endpoint (OpenAI-compatible)
-curl http://localhost:11434/v1/models
-```
-
-### Context windows
-
-Ollama's default context window (4096 tokens) is too small for agentic tool-use loops — the system
-prompt + tool schemas + conversation history fill the window immediately.
-
-`install/opencode.sh` creates context-boosted model aliases automatically:
-
-| Alias | Base model | Context | Memory (weights + KV) |
-|---|---|---|---|
-| `qwen3-coder:30b-ctx256k` | `qwen3-coder:30b` | 256K | ~78 GB |
-| `llama3.3:70b-ctx128k` | `llama3.3:70b` | 128K | ~83 GB |
-| `gpt-oss:20b-ctx128k` | `gpt-oss:20b` | 128K | ~39 GB |
-| `qwen2.5-coder:7b-ctx128k` | `qwen2.5-coder:7b` | 128K | ~20 GB |
-
-These fit comfortably on an M3 Max 128 GB (unified memory — no CPU/GPU split, Metal accesses all of it).
-
-`gpt-oss:120b` is excluded — confirmed Ollama hang bug with large `num_ctx` for that model.
-
-To recreate aliases after pulling new models:
+`mlxserve` is a shell function (defined in both `.zshrc` and `.bashrc`) that
+starts `mlx-openai-server` with the right tool-call parser for the chosen
+model:
 
 ```sh
-bash ~/dotfiles/install/opencode.sh
+mlx-openai-server launch \
+    --model-type lm \
+    --model-path mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit \
+    --tool-call-parser qwen3_coder \
+    --enable-auto-tool-choice \
+    --host 127.0.0.1 \
+    --port 8080
 ```
 
-### Model storage
+The parser flag is critical: opencode and pi are tool-call-heavy, and the
+upstream `mlx_lm.server` does not emit `tool_calls[]` in OpenAI format
+([ml-explore/mlx-lm#1096](https://github.com/ml-explore/mlx-lm/issues/1096)).
+`mlx-openai-server` adds parser layers (`qwen3_coder`, `harmony`, etc.) that
+translate model output into the standard format.
 
-Ollama stores models at `~/.ollama/models` (managed by the Ollama app — not redirected by dotfiles).
-On a shared NFS home, point it at scratch if needed:
+Override the port with `MLX_PORT=9000 mlxserve`.
+
+## Pre-pulled models
+
+Models live in `packages/mlx-models.txt`:
+
+```
+mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit   # primary (~25 GB, 256K ctx)
+mlx-community/Qwen2.5-Coder-7B-Instruct-4bit      # fast fallback (~4 GB)
+mlx-community/gpt-oss-20b-MLX-4bit                # reasoning (~12 GB)
+```
+
+Pre-pull all of them in one shot:
 
 ```sh
-OLLAMA_MODELS=/scratch/$USER/ollama/models ollama pull qwen3-coder:30b
+bash ~/dotfiles/install/local-llm.sh pull-models
 ```
 
----
+This is opt-in (the default `local-llm.sh` run only verifies binaries —
+pulling ~40 GB of models on every bootstrap would be unfriendly).
 
-## mlx-lm
+`HF_HOME` is set by `.zprofile` to `$_LOCAL_PLAT/.cache/huggingface`, so
+weights live on scratch when scratch is configured.
 
-Installed via pip (`mlx-lm` in `packages/pip.txt`, tagged `# macos-only`). Apple Silicon only —
-runs on Metal, skips CPU. Skipped automatically on Linux by `install/python.sh`.
-Not started automatically — launch on demand.
+## Per-tool config
+
+All three coding agents are configured to use `localhost:8080/v1` as their
+default backend on macOS. Each one lives under chezmoi:
+
+| Tool | Default config | AGENTS / conventions |
+|---|---|---|
+| **aider** | `~/.aider.conf.yml`, `~/.aider.model.settings.yml`, `~/.aider.model.metadata.json` | `~/.config/aider/CONVENTIONS.md` |
+| **opencode** | `~/.config/opencode/opencode.json` (+ `plugin/git-context.ts`) | `~/.config/opencode/AGENTS.md` |
+| **pi** | `~/.pi/agent/{settings,models}.json` (+ `themes/dotfiles.json`) | `~/.pi/agent/AGENTS.md` |
+
+All three AGENTS/CONVENTIONS files (plus Claude's `CLAUDE.md` and Codex's
+`AGENTS.md`) include a shared partial — see [Agent guidance](agents.md).
+
+### Switching to cloud
+
+All three tools have cloud aliases preconfigured:
 
 ```sh
-# Start the server on localhost:8080
-mlx_lm.server --model mlx-community/Qwen3-30B-A3B-4bit --port 8080
+# aider
+aider --model sonnet            # claude-sonnet-4-6
+aider --model opus              # claude-opus-4-7
+aider --model gpt5              # gpt-5
 
-# Models are stored at $HF_HOME (~/.local/$PLAT/.cache/huggingface)
+# opencode — switch agent or model in the TUI
+/agent plan                     # plan agent runs Opus
+/model anthropic/claude-sonnet-4-6
+
+# pi — Ctrl+L (or /model)
+/model anthropic/claude-sonnet-4-6
 ```
 
-> **Note:** Tool calling in `mlx_lm.server` is currently broken upstream (draft fix in PR #1027).
-> Until that merges, use Ollama for agentic workflows. mlx-lm is useful for fast one-shot generation.
+API keys come from `~/.<service>.env` files (written by `bash auth.sh`),
+sourced into the shell by `~/.zprofile`.
 
-`HF_HOME` is set by `.zprofile` to `$_LOCAL_PLAT/.cache/huggingface` — model weights go to scratch
-if scratch is configured, never polluting NFS home quotas.
+## Ollama (fallback)
 
----
+Installed via Homebrew (`brew "ollama"`). Managed as a LaunchAgent on macOS
+— starts at login at `http://127.0.0.1:11434`.
 
-## OpenCode
+`install/opencode.sh` creates context-boosted Ollama model aliases for
+backend comparison:
 
-Installed via Homebrew (`brew "opencode"` in `packages/Brewfile`). TUI coding agent that runs a
-full agentic loop with file read/write/edit tools. Config at `~/.config/opencode/opencode.json`
-(deployed by chezmoi).
+| Alias | Base | Context |
+|---|---|---|
+| `qwen3-coder:30b-ctx256k` | `qwen3-coder:30b` | 256K |
+| `llama3.3:70b-ctx128k` | `llama3.3:70b` | 128K |
+| `gpt-oss:20b-ctx128k` | `gpt-oss:20b` | 128K |
+| `qwen2.5-coder:7b-ctx128k` | `qwen2.5-coder:7b` | 128K |
 
-```sh
-opencode          # launch in current directory
-opencode --help   # options
-```
-
-The default model is `qwen3-coder:30b-ctx256k` (Ollama). Switch models inside the TUI with `/model`.
-
-OpenCode does **not** auto-detect `OLLAMA_HOST` — the provider is configured explicitly in
-`opencode.json` with `baseURL: "http://127.0.0.1:11434/v1"`.
-
-To add a new model to the OpenCode model list, edit `home/dot_config/opencode/opencode.json`
-and run `chezmoi apply`. If the model needs a context-boosted alias, add it to
-`install/opencode.sh` and re-run it.
-
----
-
-## aider
-
-Installed via pip (`aider-chat` in `packages/pip.txt`, tagged `# python=3.12` because `scipy` has
-no wheels for Python 3.14+). Config at `~/.aider.conf.yml` (deployed by chezmoi as a template):
-- **macOS**: defaults to `ollama/qwen3-coder:30b-ctx256k` (local inference)
-- **Linux**: empty config — falls through to `ANTHROPIC_API_KEY` or an explicit `--model` flag
-
-```sh
-aider                                    # use default model from ~/.aider.conf.yml
-aider --model ollama/llama3.3:70b-ctx128k  # override model
-aider --model anthropic/claude-opus-4   # use Anthropic API (needs ANTHROPIC_API_KEY)
-```
-
-aider has git integration built in — it commits changes automatically with descriptive messages.
-
----
+`gpt-oss:120b` is excluded — confirmed Ollama hang bug with large `num_ctx`.
 
 ## run_onchange hooks
 
-chezmoi re-runs the relevant install scripts automatically when tracked files change:
-
 | Trigger file | Script re-run |
 |---|---|
-| `packages/pip.txt` | `install/local-llm.sh` (verifies mlx-lm/aider binaries) |
-| `home/dot_config/opencode/opencode.json` | `install/opencode.sh` (recreates context aliases) |
+| `packages/pip.txt` | `install/local-llm.sh` (verifies binaries) |
+| `home/dot_config/opencode/opencode.json.tmpl` | `install/opencode.sh` (Ollama fallback aliases) |
 
-This means `chezmoi update` after pulling dotfile changes will re-verify the local LLM setup
-and recreate any missing model aliases.
+`chezmoi update` after pulling dotfile changes re-verifies the setup.
