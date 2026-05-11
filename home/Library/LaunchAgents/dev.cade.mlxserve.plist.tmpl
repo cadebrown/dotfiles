@@ -5,11 +5,19 @@ This is what makes aider/opencode/pi "just work" when opened — without it,
 each tool would fail to connect on first launch unless the user remembered
 to run `mlxserve` first. Loaded by install/macos-services.sh.
 
-Cost: ~25GB RAM permanently allocated for Qwen3-Coder-30B-A3B (4-bit MoE).
-On a 128GB M3 Max that's 20%. To disable temporarily:
-  launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/dev.cade.mlxserve.plist
-To re-enable:
-  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.cade.mlxserve.plist
+Model: unsloth/Qwen3.6-27B-MLX-8bit (Apr 2026 release, 27B dense VLM,
+reasoning-tuned, 256K native context). Served as "qwen3.6-27b" so configs
+can reference a clean short name.
+
+Quant: 8-bit weights + 8-bit KV cache (--kv-bits 8 == GGUF q8_0 attention).
+8-bit weights recover ~99.9% of FP vs ~98.9% for 4-bit, important for
+diff-edit accuracy in agent loops. 8-bit KV halves cache memory at <0.1%
+quality cost.
+
+Cost: ~35GB RAM for weights + KV cache. On 128GB M3 Max that's tight when
+running heavy apps alongside but headroom for typical use. To disable:
+  launchctl bootout gui/$(id -u)/dev.cade.mlxserve
+  # or: mlxstop (alias)
 */ -}}
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTD/PropertyList-1.0.dtd">
@@ -23,12 +31,20 @@ To re-enable:
         <string>{{ .chezmoi.homeDir }}/.local/bin/mlx-openai-server</string>
         <string>launch</string>
         <string>--model-type</string>
-        <string>lm</string>
+        <string>multimodal</string>
         <string>--model-path</string>
-        <string>mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit</string>
+        <string>unsloth/Qwen3.6-27B-MLX-8bit</string>
+        <string>--served-model-name</string>
+        <string>qwen3.6-27b</string>
         <string>--tool-call-parser</string>
-        <string>qwen3_coder</string>
+        <string>qwen3_vl</string>
         <string>--enable-auto-tool-choice</string>
+        <string>--reasoning-parser</string>
+        <string>qwen3_vl</string>
+        <string>--kv-bits</string>
+        <string>8</string>
+        <string>--kv-group-size</string>
+        <string>64</string>
         <string>--host</string>
         <string>127.0.0.1</string>
         <string>--port</string>

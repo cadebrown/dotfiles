@@ -11,9 +11,9 @@
 # Switch models per-session with `--model <alias>` or in-chat `/model <alias>`.
 
 {{ if eq .chezmoi.os "darwin" -}}
-model: openai/qwen3-coder-mlx
-weak-model: openai/qwen3-coder-mlx     # commit msgs / summaries — keep local + free
-editor-model: openai/qwen3-coder-mlx   # architect-mode editor — keep local + free
+model: openai/qwen3.6-27b
+weak-model: openai/qwen3.6-27b     # commit msgs / summaries — keep local + free
+editor-model: openai/qwen3.6-27b   # architect-mode editor — keep local + free
 {{- else -}}
 # No local default on Linux — pass --model at startup (e.g. --model sonnet).
 # weak-model/editor-model intentionally unset; they'll inherit from --model.
@@ -25,8 +25,9 @@ model-metadata-file: ~/.aider.model.metadata.json
 # `alias:` is singular (aider quirk). Format: short:full-litellm-id.
 alias:
 {{- if eq .chezmoi.os "darwin" }}
-  - "mlx:openai/qwen3-coder-mlx"
-  - "qwen:openai/qwen3-coder-mlx"
+  - "mlx:openai/qwen3.6-27b"
+  - "qwen:openai/qwen3.6-27b"
+  - "q:openai/qwen3.6-27b"
 {{- end }}
   - "sonnet:anthropic/claude-sonnet-4-6"
   - "opus:anthropic/claude-opus-4-7"

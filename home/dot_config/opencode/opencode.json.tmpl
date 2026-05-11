@@ -19,7 +19,7 @@ Hooks live in plugin/ (TS files using Bun shell), not here — see
   "instructions": ["~/.config/opencode/AGENTS.md"],
 
 {{ if eq .chezmoi.os "darwin" -}}
-  "model": "mlx/mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",
+  "model": "mlx/qwen3.6-27b",
   "small_model": "anthropic/claude-haiku-4-5",
   "default_agent": "build",
 
@@ -32,17 +32,9 @@ Hooks live in plugin/ (TS files using Bun shell), not here — see
         "apiKey": "not-needed"
       },
       "models": {
-        "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit": {
-          "name": "Qwen3-Coder 30B A3B (MLX)",
+        "qwen3.6-27b": {
+          "name": "Qwen3.6-27B 8-bit (MLX, q8 KV)",
           "limit": { "context": 262144, "output": 32768 }
-        },
-        "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit": {
-          "name": "Qwen2.5-Coder 7B (MLX)",
-          "limit": { "context": 131072, "output": 16384 }
-        },
-        "mlx-community/gpt-oss-20b-MLX-4bit": {
-          "name": "GPT-OSS 20B (MLX)",
-          "limit": { "context": 131072, "output": 16384 }
         }
       }
     }
@@ -50,7 +42,7 @@ Hooks live in plugin/ (TS files using Bun shell), not here — see
 
   "agent": {
     "plan":   { "model": "anthropic/claude-opus-4-7" },
-    "build":  { "model": "mlx/mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit" },
+    "build":  { "model": "mlx/qwen3.6-27b" },
     "review": { "model": "anthropic/claude-sonnet-4-6" }
   },
 {{- else -}}

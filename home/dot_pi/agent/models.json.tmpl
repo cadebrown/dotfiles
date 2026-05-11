@@ -1,15 +1,21 @@
 {{/*
 pi custom-provider registry.
 
-macOS-only: declares the local MLX provider (Qwen3-Coder-30B). Cloud providers
-(anthropic, openai) are built-in to pi and don't need a block here.
+macOS-only: declares the local MLX provider serving Qwen3.6-27B 8-bit + q8 KV
+cache via mlxserve on :8080. The model is exposed via served-model-name
+"qwen3.6-27b" so this id stays stable even if you swap which physical model
+mlxserve is loading.
 
-Linux: empty providers map — pi falls back to the built-in cloud providers only.
+Cloud providers (anthropic, openai) are built-in to pi — no block here.
 
-compat flags worth knowing:
-  - supportsDeveloperRole: false  — Qwen3-Coder isn't a reasoning model and
-    rejects OpenAI's "developer" role on incoming messages
-  - supportsReasoningEffort: false — same reason
+Linux: empty providers map — pi uses built-in cloud providers only.
+
+compat flags:
+  - supportsDeveloperRole: false  — Qwen rejects OpenAI's "developer" role
+  - supportsReasoningEffort: true — 3.6 IS reasoning-tuned; pi can pass
+    reasoning effort hints. The mlx-openai-server reasoning_parser strips
+    <think> blocks before the assistant message lands, so pi receives clean
+    output and the user controls visibility via hideThinkingBlock.
 */ -}}
 {
   "providers": {
@@ -21,26 +27,17 @@ compat flags worth knowing:
       "apiKey": "local",
       "compat": {
         "supportsDeveloperRole": false,
-        "supportsReasoningEffort": false,
+        "supportsReasoningEffort": true,
         "maxTokensField": "max_tokens"
       },
       "models": [
         {
-          "id": "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",
-          "name": "Qwen3-Coder 30B A3B (MLX)",
-          "reasoning": false,
+          "id": "qwen3.6-27b",
+          "name": "Qwen3.6-27B 8bit (MLX, q8 KV)",
+          "reasoning": true,
           "input": ["text"],
           "contextWindow": 262144,
-          "maxTokens": 65536,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        },
-        {
-          "id": "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
-          "name": "Qwen2.5-Coder 7B (MLX)",
-          "reasoning": false,
-          "input": ["text"],
-          "contextWindow": 131072,
-          "maxTokens": 16384,
+          "maxTokens": 32768,
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
         }
       ]

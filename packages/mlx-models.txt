@@ -3,13 +3,17 @@
 # Re-run: bash install/local-llm.sh pull-models
 #
 # Sizes are ~ disk; loaded model RAM is similar plus KV cache.
-# All from mlx-community on Hugging Face — pre-converted, ready for Apple Silicon.
+# Default 8-bit per quant tradeoffs (8-bit recovers ~99.9% of FP vs ~98.9% for 4-bit
+# — meaningful for diff-edit accuracy in agent loops).
+# Per-tool default served as "qwen3.6-27b" (see mlxserve / LaunchAgent).
 
-# Primary coding model — Qwen3-Coder-30B-A3B (MoE, 256K context native, ~25GB)
-mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit
+# Primary — Qwen3.6-27B dense, reasoning-tuned VLM (Apr 2026, ~35GB)
+# SWE-Bench Verified 77.2%, LiveCodeBench v6 83.9%
+unsloth/Qwen3.6-27B-MLX-8bit
 
-# Fast fallback — Qwen2.5-Coder-7B (~4GB)
-mlx-community/Qwen2.5-Coder-7B-Instruct-4bit
+# MoE alternative — fast tokens (3B active), better for quick iteration (~38GB)
+mlx-community/Qwen3.6-35B-A3B-8bit
 
-# Reasoning-focused — gpt-oss-20b (~12GB)
-mlx-community/gpt-oss-20b-MLX-4bit
+# Code-specialized — Qwen3-Coder-Next, no thinking (~85GB; tight on 128GB)
+# Use only if you need maximum tool-call throughput and don't want reasoning latency
+# mlx-community/Qwen3-Coder-Next-8bit

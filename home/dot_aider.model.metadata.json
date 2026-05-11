@@ -1,5 +1,5 @@
 {
-  "openai/qwen3-coder-mlx": {
+  "openai/qwen3.6-27b": {
     "max_tokens": 32000,
     "max_input_tokens": 262144,
     "max_output_tokens": 32000,

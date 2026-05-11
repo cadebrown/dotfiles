@@ -193,40 +193,71 @@ alias codexs='codex -p deep'
 alias codexr='codex -p review'
 
 # mlxserve — start the MLX OpenAI-compat server on localhost:8080.
-# Uses mlx-openai-server (NOT mlx_lm.server) because we need OpenAI-format
-# tool/function calling — opencode/pi are tool-call-heavy and would fail
-# with upstream mlx_lm.server. Aider's whole-format also works fine here.
+# Uses mlx-openai-server (NOT mlx_lm.server) for tool/function calling.
 #
-# Default model: Qwen3-Coder-30B-A3B (256K ctx, ~25GB). Run in a dedicated
-# terminal; Ctrl+C to stop. Set MLX_PORT to override the port.
-#   mlxserve                   # default model (qwen3-coder:30b)
-#   mlxserve qwen2.5-coder:7b  # → mlx-community/Qwen2.5-Coder-7B-Instruct-4bit
-#   mlxserve mlx-community/<full-id>
+# Default model: Qwen3.6-27B-MLX-8bit (Apr 2026, dense VLM, reasoning-tuned).
+# Quant: 8-bit weights + 8-bit KV cache (--kv-bits 8 == GGUF q8_0 attn).
+# All requests use served-model-name "qwen3.6-27b" regardless of which
+# physical model is loaded — keeps aider/opencode/pi configs stable when
+# you swap models.
+#
+#   mlxserve                  # default (qwen3.6-27b)
+#   mlxserve coder-next       # mlx-community/Qwen3-Coder-Next-8bit (80B/3B MoE)
+#   mlxserve qwen3.6-35b-a3b  # mlx-community/Qwen3.6-35B-A3B-8bit (35B/3B MoE, fast)
+#   mlxserve <full-hf-id>     # arbitrary model
 mlxserve() {
-    local model="${1:-qwen3-coder:30b}" parser=qwen3_coder
-    case "$model" in
-        qwen3-coder:30b)  model="mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit" ;;
-        qwen2.5-coder:7b) model="mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"    ;;
-        gpt-oss:20b)      model="mlx-community/gpt-oss-20b-MLX-4bit"; parser=harmony ;;
+    local arg="${1:-qwen3.6-27b}" model parser=qwen3_vl rparser=qwen3_vl mtype=multimodal
+    case "$arg" in
+        qwen3.6-27b)
+            model="unsloth/Qwen3.6-27B-MLX-8bit" ;;
+        qwen3.6-35b-a3b)
+            model="mlx-community/Qwen3.6-35B-A3B-8bit"
+            parser=qwen3_moe; rparser=qwen3_moe ;;
+        coder-next|qwen3-coder-next)
+            model="mlx-community/Qwen3-Coder-Next-8bit"
+            parser=qwen3_coder; rparser=""; mtype=lm ;;
+        qwen3-coder:30b)
+            model="mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit"
+            parser=qwen3_coder; rparser=""; mtype=lm ;;
+        *)  model="$arg" ;;
     esac
     local port="${MLX_PORT:-8080}"
-    echo "▸ MLX server starting on http://localhost:$port  (model: $model, parser: $parser)"
-    echo "  OpenAI-compatible base URL: http://localhost:$port/v1"
-    mlx-openai-server launch \
-        --model-type lm \
-        --model-path "$model" \
-        --tool-call-parser "$parser" \
-        --enable-auto-tool-choice \
-        --host 127.0.0.1 \
-        --port "$port"
+    echo "▸ MLX server starting on http://localhost:$port"
+    echo "  model: $model  (served as 'qwen3.6-27b')"
+    echo "  type: $mtype  parser: $parser  reasoning: ${rparser:-none}  kv-bits: 8"
+    local args=(launch
+        --model-type "$mtype"
+        --model-path "$model"
+        --served-model-name qwen3.6-27b
+        --tool-call-parser "$parser"
+        --enable-auto-tool-choice
+        --kv-bits 8 --kv-group-size 64
+        --host 127.0.0.1 --port "$port")
+    [[ -n "$rparser" ]] && args+=(--reasoning-parser "$rparser")
+    mlx-openai-server "${args[@]}"
 }
 
 # mlxstart / mlxstop / mlxstatus — control the LaunchAgent (dev.cade.mlxserve).
-# Battery: an idle MLX server holds ~25GB in unified memory but burns very
+# Battery: an idle MLX server holds the model in unified memory but burns very
 # little CPU/GPU power. Stop it when on battery + not coding for hours.
 alias mlxstart='launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/dev.cade.mlxserve.plist"'
 alias mlxstop='launchctl bootout "gui/$(id -u)/dev.cade.mlxserve"'
 alias mlxstatus='launchctl print "gui/$(id -u)/dev.cade.mlxserve" 2>/dev/null | head -20 || echo "mlxserve LaunchAgent not loaded"'
+
+# mlxpull — pre-download a model without starting a server. Same alias map as mlxserve.
+# `mlxserve <name>` already auto-downloads on first request; use this when you want
+# to fill the cache ahead of time (e.g. before a flight).
+mlxpull() {
+    local arg="${1:?usage: mlxpull <alias|hf-id>}" model
+    case "$arg" in
+        qwen3.6-27b)            model="unsloth/Qwen3.6-27B-MLX-8bit" ;;
+        qwen3.6-35b-a3b)        model="mlx-community/Qwen3.6-35B-A3B-8bit" ;;
+        coder-next|qwen3-coder-next) model="mlx-community/Qwen3-Coder-Next-8bit" ;;
+        *)                       model="$arg" ;;
+    esac
+    echo "▸ pulling $model into HF cache ($HF_HOME)"
+    python3 -c "from huggingface_hub import snapshot_download; snapshot_download('$model')"
+}
 
 {{ if eq .chezmoi.os "linux" -}}
 alias open='xdg-open'

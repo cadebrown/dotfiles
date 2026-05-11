@@ -2,13 +2,16 @@
 # Only models that need non-default behavior live here. Cloud models use aider's
 # built-in litellm metadata.
 
-# Local Qwen3-Coder via mlxserve (mlx-openai-server on :8080). Two key choices:
-#   - edit_format: whole — aider's May 2025 Qwen3 benchmark showed `whole` beats
-#     `diff` on locally-served Qwen models (correctness, not infra). Qwen3-Coder's
-#     256K context absorbs the full-file resends fine.
-#   - extra_params.api_base — routes ONLY this model to localhost; cloud aliases
-#     keep their real endpoints. Cleaner than a global openai-api-base.
-- name: openai/qwen3-coder-mlx
+# Local Qwen3.6-27B 8-bit via mlxserve (mlx-openai-server on :8080).
+#   - edit_format: whole — Ivan Fioravanti's MLX Qwen aider benchmarks show
+#     `whole` produces fewer malformed edits than `diff` on locally-served Qwen.
+#     27B's native 256K context absorbs full-file resends comfortably.
+#   - extra_params.api_base — routes ONLY this model to localhost; cloud
+#     aliases (sonnet/opus/gpt5) keep their real endpoints.
+#   - Qwen3.6 is reasoning-tuned (thinks in <think> blocks); the
+#     mlx-openai-server reasoning_parser strips them so they don't leak into
+#     diff output.
+- name: openai/qwen3.6-27b
   edit_format: whole
   editor_edit_format: whole
   use_repo_map: true
