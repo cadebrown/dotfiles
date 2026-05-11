@@ -1,0 +1,45 @@
+{{/*
+pi (https://pi.dev) settings — global config at ~/.pi/agent/settings.json.
+
+macOS: defaults to local MLX (Qwen3-Coder-30B via mlxserve on :8080).
+       MLX provider declared in models.json.
+Linux: no MLX — defaults to anthropic/claude-haiku-4-5.
+
+Anthropic + OpenAI are auto-detected from ANTHROPIC_API_KEY / OPENAI_API_KEY
+env vars. /login is available for Claude Pro / ChatGPT Plus / Copilot
+subscriptions if I want to swap from API-key billing.
+*/ -}}
+{
+{{- if eq .chezmoi.os "darwin" }}
+  "defaultProvider": "mlx",
+  "defaultModel": "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",
+{{- else }}
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-haiku-4-5",
+{{- end }}
+  "theme": "dotfiles",
+  "defaultThinkingLevel": "off",
+  "hideThinkingBlock": false,
+  "quietStartup": true,
+  "collapseChangelog": true,
+  "enableInstallTelemetry": false,
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 20000
+  },
+  "retry": {
+    "enabled": true,
+    "maxRetries": 3,
+    "baseDelayMs": 2000
+  },
+  "enabledModels": [
+{{- if eq .chezmoi.os "darwin" }}
+    "mlx/*",
+{{- end }}
+    "anthropic/claude-sonnet-4-6*",
+    "anthropic/claude-opus-4-7*",
+    "anthropic/claude-haiku-4-5*",
+    "openai/gpt-5*"
+  ]
+}

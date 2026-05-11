@@ -1,0 +1,50 @@
+{{/*
+pi custom-provider registry.
+
+macOS-only: declares the local MLX provider (Qwen3-Coder-30B). Cloud providers
+(anthropic, openai) are built-in to pi and don't need a block here.
+
+Linux: empty providers map — pi falls back to the built-in cloud providers only.
+
+compat flags worth knowing:
+  - supportsDeveloperRole: false  — Qwen3-Coder isn't a reasoning model and
+    rejects OpenAI's "developer" role on incoming messages
+  - supportsReasoningEffort: false — same reason
+*/ -}}
+{
+  "providers": {
+{{- if eq .chezmoi.os "darwin" }}
+    "mlx": {
+      "name": "MLX (local)",
+      "baseUrl": "http://localhost:8080/v1",
+      "api": "openai-completions",
+      "apiKey": "local",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false,
+        "maxTokensField": "max_tokens"
+      },
+      "models": [
+        {
+          "id": "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",
+          "name": "Qwen3-Coder 30B A3B (MLX)",
+          "reasoning": false,
+          "input": ["text"],
+          "contextWindow": 262144,
+          "maxTokens": 65536,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
+          "name": "Qwen2.5-Coder 7B (MLX)",
+          "reasoning": false,
+          "input": ["text"],
+          "contextWindow": 131072,
+          "maxTokens": 16384,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
+    }
+{{- end }}
+  }
+}
