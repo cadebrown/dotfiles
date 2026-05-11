@@ -53,6 +53,13 @@ export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_ENV_HINTS=1
 [[ -n "$_GIT_PATH" ]] && export HOMEBREW_GIT_PATH="$_GIT_PATH"
 unset _GIT_PATH
 
+# Temporarily allow the JSON API for initial formula lookups (glibc, gcc@13).
+# ~/.profile exports HOMEBREW_NO_INSTALL_FROM_API=1 so that the patches block
+# later can edit local formula files in-place — but at this point in the script
+# the homebrew/core tap hasn't been cloned yet, so without the API brew can't
+# resolve ANY formula name. Re-exported below right before brew tap + patches.
+unset HOMEBREW_NO_INSTALL_FROM_API
+
 ### Install glibc first ###
 #
 # Homebrew's glibc (2.35) makes all bottles self-contained — binaries use
