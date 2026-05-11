@@ -74,8 +74,10 @@ status_line = [
     "current-dir",
     "git-branch",
     "model-with-reasoning",
-    "usage-bars",
-    "rate-limits",
+    "context-used",
+    "total-input-tokens",
+    "total-output-tokens",
+    "five-hour-limit",
     "fast-mode",
 ]
 status_line_use_colors = true
