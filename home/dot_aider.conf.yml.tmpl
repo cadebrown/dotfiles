@@ -1,16 +1,54 @@
-# ~/.aider.conf.yml — aider defaults
-# Docs: https://aider.chat/docs/config/aider_conf.html
+# aider config — docs: https://aider.chat/docs/config/aider_conf.html
 #
+# macOS: defaults to local MLX (Qwen3-Coder-30B via mlxserve on :8080).
+# Linux: no local default — set per-session with `--model <alias>` (cloud aliases
+#        below; Linux has no MLX). Aider reads ANTHROPIC_API_KEY / OPENAI_API_KEY
+#        from the env (sourced by ~/.zprofile from ~/.<service>.env).
+#
+# api_base for the local model lives in model-settings extra_params (NOT here)
+# so cloud aliases keep routing to their real endpoints.
+#
+# Switch models per-session with `--model <alias>` or in-chat `/model <alias>`.
+
 {{ if eq .chezmoi.os "darwin" -}}
-# macOS: default to local Ollama inference.
-# Context-boosted aliases are created by install/opencode.sh.
-# Switch model at runtime: aider --model ollama/llama3.3:70b-ctx128k
+model: openai/qwen3-coder-mlx
+weak-model: openai/qwen3-coder-mlx     # commit msgs / summaries — keep local + free
+editor-model: openai/qwen3-coder-mlx   # architect-mode editor — keep local + free
+{{- else -}}
+# No local default on Linux — pass --model at startup (e.g. --model sonnet).
+# weak-model/editor-model intentionally unset; they'll inherit from --model.
+{{- end }}
 
-model: ollama/qwen3-coder:30b-ctx256k
-openai-api-base: http://127.0.0.1:11434/v1
-openai-api-key: ollama
-{{ else -}}
-# Linux: no local Ollama — use ANTHROPIC_API_KEY or set --model at runtime.
-# Example: aider --model anthropic/claude-sonnet-4-6
+model-settings-file: ~/.aider.model.settings.yml
+model-metadata-file: ~/.aider.model.metadata.json
 
-{{ end -}}
+# `alias:` is singular (aider quirk). Format: short:full-litellm-id.
+alias:
+{{- if eq .chezmoi.os "darwin" }}
+  - "mlx:openai/qwen3-coder-mlx"
+  - "qwen:openai/qwen3-coder-mlx"
+{{- end }}
+  - "sonnet:anthropic/claude-sonnet-4-6"
+  - "opus:anthropic/claude-opus-4-7"
+  - "haiku:anthropic/claude-haiku-4-5"
+  - "gpt5:openai/gpt-5"
+
+# Auto-load coding conventions every session (read-only context).
+read:
+  - ~/.config/aider/CONVENTIONS.md
+
+# I drive commits manually — let aider stage but never commit/push on its own.
+auto-commits: false
+dirty-commits: false
+gitignore: true
+
+# UX
+dark-mode: true
+stream: true
+pretty: true
+cache-prompts: true       # Anthropic prompt cache; harmless for non-cache providers
+show-model-warnings: true
+
+# Hygiene
+analytics-disable: true
+check-update: false       # chezmoi/bootstrap.sh owns updates

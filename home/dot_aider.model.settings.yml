@@ -1,0 +1,23 @@
+# aider model behavior settings — schema: https://aider.chat/docs/config/adv-model-settings.html
+# Only models that need non-default behavior live here. Cloud models use aider's
+# built-in litellm metadata.
+
+# Local Qwen3-Coder via mlx_lm.server. Two key choices:
+#   - edit_format: whole — mlx_lm.server has no OpenAI tool-calling support yet, and
+#     aider's May 2025 Qwen3 benchmark showed `whole` beats `diff` on locally-served
+#     Qwen (256K context absorbs the resends fine).
+#   - extra_params.api_base — routes ONLY this model to localhost; cloud aliases keep
+#     their real endpoints. Cleaner than a global openai-api-base.
+- name: openai/qwen3-coder-mlx
+  edit_format: whole
+  editor_edit_format: whole
+  use_repo_map: true
+  use_temperature: 0.7
+  streaming: true
+  use_system_prompt: true
+  extra_params:
+    api_base: http://localhost:8080/v1
+    api_key: not-needed       # litellm refuses empty key; mlx server ignores
+    max_tokens: 32000
+    top_p: 0.8
+    top_k: 20
