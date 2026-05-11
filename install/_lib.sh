@@ -251,10 +251,39 @@ ensure_dir() {
 
 download() {
     local url="$1" dest="$2"
+    local _auth_header=""
+
+    # GitHub API + asset downloads benefit from authentication: unauthenticated
+    # limit is 60 req/hr per IP, authenticated is 5000/hr. Several install
+    # scripts (codex, claude, cargo-binstall fallbacks) hit api.github.com or
+    # release assets on github.com, and on shared NAT'd networks (CI, NVIDIA
+    # GPU clusters) 60/hr is exhausted quickly. Inject Authorization for
+    # GitHub-owned hosts only when GITHUB_TOKEN is set. The redirect chain
+    # api.github.com → objects.githubusercontent.com stays within GitHub, so
+    # forwarding the header on redirect (curl's default) is safe.
+    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+        case "$url" in
+            https://api.github.com/*|\
+            https://github.com/*|\
+            https://*.github.com/*|\
+            https://*.githubusercontent.com/*)
+                _auth_header="Authorization: Bearer $GITHUB_TOKEN"
+                ;;
+        esac
+    fi
+
     if has curl; then
-        curl -fsSL "$url" -o "$dest"
+        if [[ -n "$_auth_header" ]]; then
+            curl -fsSL -H "$_auth_header" "$url" -o "$dest"
+        else
+            curl -fsSL "$url" -o "$dest"
+        fi
     elif has wget; then
-        wget -q "$url" -O "$dest"
+        if [[ -n "$_auth_header" ]]; then
+            wget -q --header="$_auth_header" "$url" -O "$dest"
+        else
+            wget -q "$url" -O "$dest"
+        fi
     else
         die "Neither curl nor wget found — cannot download files"
     fi
