@@ -1,16 +1,26 @@
 #!/usr/bin/env bash
-# install/codex.sh - install OpenAI Codex CLI
+# install/codex.sh - manage OpenAI Codex CLI configuration
 #
-# Downloads the native binary from GitHub releases, verifies the release asset
-# SHA256 digest when available, and places it in $ARCH_BIN (PLAT-isolated for
-# shared home directory safety).
-# Works on both macOS and Linux — no Homebrew cask needed.
+# The Codex binary itself is installed via npm (@openai/codex in packages/npm.txt),
+# which is just a thin wrapper around the same Rust binary published on
+# github.com/openai/codex/releases. We let npm own the install/upgrade story so
+# this script doesn't have to maintain a hand-rolled release fetcher (auth
+# headers, SHA verification, redirect handling, etc.).
+#
+# What this script DOES handle:
+#   - sync-config: write managed ~/.codex/config.toml from the chezmoi template,
+#                  preserving runtime sections (projects, notice, plugins,
+#                  hooks.state) that codex itself maintains
+#   - sync-hooks:  write ~/.codex/hooks.json + ~/.local/bin/df-chezmoi-guard,
+#                  then update the trusted_hash so codex accepts the hook
+#   - check:       healthcheck (codex on PATH, config sections, profiles parse,
+#                  guard blocks managed paths)
 #
 # Modes:
-#   install      -> binary install only
-#   sync-config  -> sync managed config/hooks while preserving runtime trust blocks
-#   check        -> run codex health checks
-#   upgrade      -> install + sync-config + check (default)
+#   install      -> verify codex is on PATH; complain if missing
+#   sync-config  -> sync managed config + hooks
+#   check        -> run codex healthcheck
+#   upgrade      -> sync-config + check (default; install is a no-op verify)
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
@@ -19,10 +29,10 @@ _usage() {
     cat <<'EOF'
 Usage: codex.sh [install|sync-config|check|upgrade]
 
-  install      Install/update the Codex binary only
+  install      Verify codex is on PATH (npm-installed via packages/npm.txt)
   sync-config  Sync managed ~/.codex config/hooks while preserving runtime blocks
   check        Validate codex binary/config/rules
-  upgrade      Run install + sync-config + check (default)
+  upgrade      Run sync-config + check (default)
 EOF
 }
 
@@ -33,40 +43,13 @@ case "$_mode" in
     *) _usage; die "Unknown mode: $_mode" ;;
 esac
 
-_get_asset() {
-    case "$OS" in
-        darwin)
-            case "$ARCH" in
-                aarch64) printf '%s\n' "codex-aarch64-apple-darwin" ;;
-                x86_64)  printf '%s\n' "codex-x86_64-apple-darwin" ;;
-                *) die "Unsupported architecture: $ARCH" ;;
-            esac
-            ;;
-        linux)
-            # Current Codex releases ship Linux tarballs as musl assets.
-            case "$ARCH" in
-                aarch64) printf '%s\n' "codex-aarch64-unknown-linux-musl" ;;
-                x86_64)  printf '%s\n' "codex-x86_64-unknown-linux-musl" ;;
-                *) die "Unsupported architecture: $ARCH" ;;
-            esac
-            ;;
-        *) die "Unsupported OS: $OS" ;;
-    esac
-}
-
-_release_asset_field() {
-    local _json="$1" _asset="$2" _field="$3"
-    has jq || return 0
-    jq -r --arg asset "$_asset" --arg field "$_field" \
-        '.assets[] | select(.name == $asset) | .[$field] // empty' "$_json"
-}
-
-_sha256_file() {
-    if has sha256sum; then
-        sha256sum "$1" | awk '{print $1}'
-    elif has shasum; then
-        shasum -a 256 "$1" | awk '{print $1}'
+_verify_codex_present() {
+    log_section "Codex CLI"
+    if has codex; then
+        log_okay "codex: $(codex --version 2>&1 | grep -v '^WARNING' | head -1)"
     else
+        log_warn "codex not on PATH — install with: npm install -g @openai/codex"
+        log_warn "  (or re-run install/node.sh, which reads packages/npm.txt)"
         return 1
     fi
 }
@@ -98,77 +81,6 @@ _json_escape_simple() {
         *[\\\"]*) return 1 ;;
     esac
     printf '%s' "$1"
-}
-
-_install_binary() {
-    local _asset _asset_tgz _release_json _version _semver _dest _tmp _url
-    local _digest _expected_sha _actual_sha
-
-    log_section "Codex CLI"
-    _asset="$(_get_asset)"
-    _asset_tgz="${_asset}.tar.gz"
-
-    _tmp="$(mktemp -d)"
-    trap 'rm -rf "$_tmp"' RETURN
-
-    log_info "Fetching latest release metadata..."
-    _release_json="$_tmp/release.json"
-    download "https://api.github.com/repos/openai/codex/releases/latest" "$_release_json"
-
-    if has jq; then
-        _version="$(jq -r '.tag_name // empty' "$_release_json")"  # e.g. rust-v0.130.0
-    else
-        _version="$(sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$_release_json" | head -1)"
-    fi
-    [[ -n "$_version" ]] || die "Could not determine latest Codex release"
-    _semver="${_version#rust-v}"    # e.g. 0.114.0
-    log_info "Latest: $_semver"
-
-    _dest="$ARCH_BIN/codex"
-    if [[ -x "$_dest" ]] && "$_dest" --version 2>/dev/null | grep -qF "$_semver"; then
-        log_okay "codex $_semver already installed at $_dest"
-        return 0
-    fi
-
-    log_info "Downloading codex $_semver ($_asset)..."
-    ensure_dir "$ARCH_BIN"
-
-    _url="$(_release_asset_field "$_release_json" "$_asset_tgz" "browser_download_url")"
-    if [[ -z "$_url" ]]; then
-        _url="https://github.com/openai/codex/releases/download/${_version}/${_asset_tgz}"
-        log_warn "Could not parse release asset URL; falling back to $_url"
-    fi
-    download "$_url" "$_tmp/codex.tar.gz"
-
-    _digest="$(_release_asset_field "$_release_json" "$_asset_tgz" "digest")"
-    _expected_sha="${_digest#sha256:}"
-    if [[ -n "$_digest" && "$_expected_sha" != "$_digest" ]]; then
-        if _actual_sha="$(_sha256_file "$_tmp/codex.tar.gz")"; then
-            [[ "$_actual_sha" == "$_expected_sha" ]] \
-                || die "Checksum mismatch for codex $_semver ($_asset)"
-            log_okay "Verified SHA256 for $_asset_tgz"
-        else
-            log_warn "No SHA256 tool found; skipped checksum verification"
-        fi
-    else
-        log_warn "Release metadata had no SHA256 digest for $_asset_tgz"
-    fi
-
-    tar xzf "$_tmp/codex.tar.gz" -C "$_tmp"
-
-    if [[ ! -s "$_tmp/$_asset" ]]; then
-        die "Downloaded codex binary is empty — possible corrupt download"
-    fi
-
-    mv "$_tmp/$_asset" "$_dest"
-    chmod +x "$_dest"
-
-    if ! "$_dest" --version &>/dev/null; then
-        rm -f "$_dest"
-        die "codex binary smoke test failed — removed $_dest"
-    fi
-
-    log_okay "Installed codex $_semver → $_dest"
 }
 
 _sync_config() {
@@ -372,7 +284,7 @@ _check_setup() {
 
 case "$_mode" in
     install)
-        _install_binary
+        _verify_codex_present
         ;;
     sync-config)
         _sync_config
@@ -382,7 +294,7 @@ case "$_mode" in
         _check_setup
         ;;
     upgrade)
-        _install_binary
+        _verify_codex_present || die "codex not installed — run install/node.sh first"
         _sync_config
         _sync_hooks
         _check_setup
