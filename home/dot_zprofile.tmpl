@@ -62,6 +62,11 @@ fi
 export _PLAT="$_PLAT_DETECTED"
 unset _PLAT_DETECTED
 
+# Propagate use_plat to child processes (bootstrap.sh, install/*.sh) so they
+# don't silently fall back to flat mode. chezmoi data is the source of truth;
+# install/_lib.sh reads DF_USE_PLAT env var (defaults to 0 if unset).
+export DF_USE_PLAT={{ if $use_plat }}1{{ else }}0{{ end }}
+
 # Resolve symlinks so all PATH entries use the same physical path.
 # This prevents duplicate entries when ~/.local is a symlink to scratch space.
 _local_root="$HOME/.local"

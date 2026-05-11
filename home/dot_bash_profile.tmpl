@@ -36,6 +36,10 @@ fi
 export _PLAT="$_PLAT_DETECTED"
 unset _PLAT_DETECTED
 
+# Propagate use_plat to child processes (bootstrap.sh, install/*.sh) — see
+# dot_zprofile.tmpl for rationale. chezmoi data is the source of truth.
+export DF_USE_PLAT={{ if $use_plat }}1{{ else }}0{{ end }}
+
 _local_root="$HOME/.local"
 if [[ -L "$_local_root" ]]; then
     _local_root="$(readlink -f "$_local_root")"

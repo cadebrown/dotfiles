@@ -2,6 +2,8 @@
 .aerospace.toml
 Library
 Library/**
+.local
+.local/**
 {{ end }}
 
 AGENTS.md
