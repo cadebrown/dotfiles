@@ -79,6 +79,7 @@ status_line = [
     "total-output-tokens",
     "five-hour-limit",
     "fast-mode",
+    "thread-title",
 ]
 status_line_use_colors = true
 
