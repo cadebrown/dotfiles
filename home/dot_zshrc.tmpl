@@ -196,44 +196,53 @@ alias codexr='codex -p review'
 # Uses mlx-openai-server (NOT mlx_lm.server) for tool/function calling.
 #
 # Default model: Qwen3.6-27B-MLX-8bit (Apr 2026, dense VLM, reasoning-tuned).
-# Quant: 8-bit weights + 8-bit KV cache (--kv-bits 8 == GGUF q8_0 attn).
 # All requests use served-model-name "qwen3.6-27b" regardless of which
 # physical model is loaded — keeps aider/opencode/pi configs stable when
 # you swap models.
 #
+# KV cache quantization (--kv-bits 8) is enabled ONLY for lm-mode models;
+# the VLM batch scheduler in mlx-openai-server doesn't accept kv_bits yet
+# (TypeError on BatchGenerator). Multimodal models run with full-precision KV.
+#
 #   mlxserve                  # default (qwen3.6-27b)
 #   mlxserve coder-next       # mlx-community/Qwen3-Coder-Next-8bit (80B/3B MoE)
-#   mlxserve qwen3.6-35b-a3b  # mlx-community/Qwen3.6-35B-A3B-8bit (35B/3B MoE, fast)
+#   mlxserve qwen3.6-35b-a3b  # mlx-community/Qwen3.6-35B-A3B-8bit (35B/3B MoE)
 #   mlxserve <full-hf-id>     # arbitrary model
 mlxserve() {
-    local arg="${1:-qwen3.6-27b}" model parser=qwen3_vl rparser=qwen3_vl mtype=multimodal
+    # Notes:
+    # - --model-type lm everywhere: mlx-openai-server v1.8.1's VLM batch
+    #   scheduler is broken (always passes kv_bits to BatchGenerator which
+    #   rejects the kwarg, fails on first request). lm path works for text-only
+    #   use of VLM weights — all we need for coding.
+    # - Qwen3.6 emits Coder-style XML tool calls (verified via raw probe), so
+    #   tool parser is qwen3_coder even on non-Coder variants.
+    # - Reasoning parser is qwen3_5 (model arch is "Qwen3.5 ForConditionalGeneration").
+    local arg="${1:-qwen3.6-27b}" model parser=qwen3_coder rparser=qwen3_5
     case "$arg" in
         qwen3.6-27b)
             model="unsloth/Qwen3.6-27B-MLX-8bit" ;;
         qwen3.6-35b-a3b)
             model="mlx-community/Qwen3.6-35B-A3B-8bit"
-            parser=qwen3_moe; rparser=qwen3_moe ;;
+            rparser=qwen3_moe ;;
         coder-next|qwen3-coder-next)
             model="mlx-community/Qwen3-Coder-Next-8bit"
-            parser=qwen3_coder; rparser=""; mtype=lm ;;
-        qwen3-coder:30b)
-            model="mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit"
-            parser=qwen3_coder; rparser=""; mtype=lm ;;
+            rparser="" ;;
         *)  model="$arg" ;;
     esac
+    local mtype=lm
     local port="${MLX_PORT:-8080}"
     echo "▸ MLX server starting on http://localhost:$port"
     echo "  model: $model  (served as 'qwen3.6-27b')"
-    echo "  type: $mtype  parser: $parser  reasoning: ${rparser:-none}  kv-bits: 8"
+    echo "  type: $mtype  parser: $parser  reasoning: ${rparser:-none}"
     local args=(launch
         --model-type "$mtype"
         --model-path "$model"
         --served-model-name qwen3.6-27b
         --tool-call-parser "$parser"
         --enable-auto-tool-choice
-        --kv-bits 8 --kv-group-size 64
         --host 127.0.0.1 --port "$port")
     [[ -n "$rparser" ]] && args+=(--reasoning-parser "$rparser")
+    args+=(--kv-bits 8 --kv-group-size 64)   # 8-bit KV cache (q8_0 attn)
     mlx-openai-server "${args[@]}"
 }
 

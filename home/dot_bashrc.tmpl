@@ -138,23 +138,24 @@ alias verify-path='bash ~/dotfiles/install/verify-path.sh'
 alias codexs='codex -p deep'        # opt-in workspace-write sandbox
 alias codexr='codex -p review'      # read-only sandbox
 
-# mlxserve — MLX OpenAI-compat server on :8080 (default Qwen3.6-27B 8bit + q8 KV)
+# mlxserve — MLX OpenAI-compat server on :8080 (default Qwen3.6-27B 8bit)
 mlxserve() {
-    local arg="${1:-qwen3.6-27b}" model parser=qwen3_vl rparser=qwen3_vl mtype=multimodal
+    # Always --model-type lm — mlx-openai-server v1.8.1 VLM scheduler is broken
+    local arg="${1:-qwen3.6-27b}" model parser=qwen3_coder rparser=qwen3_5
     case "$arg" in
         qwen3.6-27b)
             model="unsloth/Qwen3.6-27B-MLX-8bit" ;;
         qwen3.6-35b-a3b)
             model="mlx-community/Qwen3.6-35B-A3B-8bit"
-            parser=qwen3_moe; rparser=qwen3_moe ;;
+            rparser=qwen3_moe ;;
         coder-next|qwen3-coder-next)
             model="mlx-community/Qwen3-Coder-Next-8bit"
-            parser=qwen3_coder; rparser=""; mtype=lm ;;
+            rparser="" ;;
         *)  model="$arg" ;;
     esac
     local port="${MLX_PORT:-8080}"
-    echo "▸ MLX server: $model (served as qwen3.6-27b, kv-bits 8) on :$port"
-    local args=(launch --model-type "$mtype" --model-path "$model"
+    echo "▸ MLX server: $model (served as qwen3.6-27b) on :$port"
+    local args=(launch --model-type lm --model-path "$model"
         --served-model-name qwen3.6-27b
         --tool-call-parser "$parser" --enable-auto-tool-choice
         --kv-bits 8 --kv-group-size 64

@@ -9,15 +9,19 @@ Model: unsloth/Qwen3.6-27B-MLX-8bit (Apr 2026 release, 27B dense VLM,
 reasoning-tuned, 256K native context). Served as "qwen3.6-27b" so configs
 can reference a clean short name.
 
-Quant: 8-bit weights + 8-bit KV cache (--kv-bits 8 == GGUF q8_0 attention).
-8-bit weights recover ~99.9% of FP vs ~98.9% for 4-bit, important for
-diff-edit accuracy in agent loops. 8-bit KV halves cache memory at <0.1%
-quality cost.
+Quant: 8-bit weights. Recovers ~99.9% of FP vs ~98.9% for 4-bit —
+important for diff-edit accuracy in agent loops.
 
-Cost: ~35GB RAM for weights + KV cache. On 128GB M3 Max that's tight when
-running heavy apps alongside but headroom for typical use. To disable:
-  launchctl bootout gui/$(id -u)/dev.cade.mlxserve
-  # or: mlxstop (alias)
+Model-type note: Qwen3.6-27B is a VLM, but mlx-openai-server v1.8.1's VLM
+batch scheduler is broken (always tries to pass kv_bits to BatchGenerator
+which doesn't accept the kwarg — fails immediately on first request). Loading
+the model under --model-type lm sidesteps the broken scheduler and uses the
+LM batch path, which works for text-only requests (we don't need image input
+for coding). Re-enable multimodal + kv-bits 8 once the VLM scheduler is fixed.
+
+Cost: ~35GB RAM for weights + ~10-20GB KV at typical context lengths. On
+128GB M3 Max that's plenty of headroom. To disable temporarily:
+  launchctl bootout gui/$(id -u)/dev.cade.mlxserve   # or: mlxstop
 */ -}}
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTD/PropertyList-1.0.dtd">
@@ -31,16 +35,16 @@ running heavy apps alongside but headroom for typical use. To disable:
         <string>{{ .chezmoi.homeDir }}/.local/bin/mlx-openai-server</string>
         <string>launch</string>
         <string>--model-type</string>
-        <string>multimodal</string>
+        <string>lm</string>
         <string>--model-path</string>
         <string>unsloth/Qwen3.6-27B-MLX-8bit</string>
         <string>--served-model-name</string>
         <string>qwen3.6-27b</string>
         <string>--tool-call-parser</string>
-        <string>qwen3_vl</string>
+        <string>qwen3_coder</string>
         <string>--enable-auto-tool-choice</string>
         <string>--reasoning-parser</string>
-        <string>qwen3_vl</string>
+        <string>qwen3_5</string>
         <string>--kv-bits</string>
         <string>8</string>
         <string>--kv-group-size</string>
