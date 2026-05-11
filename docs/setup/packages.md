@@ -50,12 +50,18 @@ the same pre-built binary that Homebrew bottles provide — same quality, faster
 
 ```sh
 # packages/npm.txt
-# (one global npm package per line)
+@earendil-works/pi-coding-agent
 ```
 
 Re-run: `bash ~/dotfiles/install/node.sh`
 
-Currently empty. Claude Code's statusline lives in `home/dot_claude/executable_statusline.sh` (pure bash + jq, no npm dependency). Add globals here only when there isn't a native binary or cargo equivalent.
+Currently ships [`pi`](https://pi.dev) — a multi-provider coding agent (Claude / OpenAI / Gemini / etc.). The official `pi.dev/install.sh` ultimately runs `npm install -g @earendil-works/pi-coding-agent`, so we list it here directly.
+
+Other CLI agents are installed via their native packagers:
+- `claude-code` → `install/claude.sh` (Anthropic GCS binary)
+- `codex` → `install/codex.sh` (GitHub release binary)
+- `opencode` → `brew "opencode"` (`packages/Brewfile`)
+- `aider` → `aider-chat` in `packages/pip.txt` (uv tool install)
 
 Codex CLI config, rules, skills, themes, and MCP servers are managed from `home/dot_codex/`.
 `install/codex.sh sync-config` preserves runtime trust/plugin sections while refreshing the
