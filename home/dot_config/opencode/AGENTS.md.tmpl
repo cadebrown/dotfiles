@@ -1,0 +1,18 @@
+# AGENTS.md
+
+Loaded by opencode (referenced from `instructions` in `~/.config/opencode/opencode.json`).
+Common guidance lives in the shared partial; opencode-specific notes follow.
+
+{{ template "agents-common.md" . }}
+
+## OpenCode-specific
+
+- **Agents**: `plan` runs Opus, `build` runs local MLX (Qwen3-Coder), `review` runs Sonnet.
+  Switch with `/agent <name>` in the TUI.
+- **Permissions matter**: `.git/**`, `node_modules/**`, `.env*`, and `**/secrets/**` are
+  edit-denied at the config level. `git push` and destructive bash commands prompt
+  before running. Don't try to circumvent these — surface the need instead.
+- **MCP**: configured in `mcp` block of opencode.json. None enabled by default.
+- **Plugin events** (for reference, when adding new plugins): `session.created`,
+  `session.idle`, `tool.execute.before`/`.after`, `file.edited`, `permission.asked`.
+  Plugins live in `~/.config/opencode/plugin/*.ts` (Bun-executed; `$` is Bun shell).

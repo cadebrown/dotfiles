@@ -1,0 +1,87 @@
+{{/*
+opencode config — schema: https://opencode.ai/config.json
+
+macOS: defaults to local MLX (Qwen3-Coder-30B via mlxserve on :8080).
+Linux: no MLX — defaults to anthropic/claude-haiku-4-5 (cheap + tool calling).
+
+Anthropic / OpenAI providers are auto-discovered from ANTHROPIC_API_KEY /
+OPENAI_API_KEY env vars (sourced by ~/.zprofile from ~/.<service>.env).
+Only the local mlx provider needs an explicit block.
+
+Hooks live in plugin/ (TS files using Bun shell), not here — see
+~/.config/opencode/plugin/git-context.ts.
+*/ -}}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "username": {{ .name | quote }},
+  "autoupdate": false,
+  "share": "disabled",
+  "instructions": ["~/.config/opencode/AGENTS.md"],
+
+{{ if eq .chezmoi.os "darwin" -}}
+  "model": "mlx/mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit",
+  "small_model": "anthropic/claude-haiku-4-5",
+  "default_agent": "build",
+
+  "provider": {
+    "mlx": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "MLX (local)",
+      "options": {
+        "baseURL": "http://localhost:8080/v1",
+        "apiKey": "not-needed"
+      },
+      "models": {
+        "mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit": {
+          "name": "Qwen3-Coder 30B A3B (MLX)",
+          "limit": { "context": 262144, "output": 32768 }
+        },
+        "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit": {
+          "name": "Qwen2.5-Coder 7B (MLX)",
+          "limit": { "context": 131072, "output": 16384 }
+        },
+        "mlx-community/gpt-oss-20b-MLX-4bit": {
+          "name": "GPT-OSS 20B (MLX)",
+          "limit": { "context": 131072, "output": 16384 }
+        }
+      }
+    }
+  },
+
+  "agent": {
+    "plan":   { "model": "anthropic/claude-opus-4-7" },
+    "build":  { "model": "mlx/mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit" },
+    "review": { "model": "anthropic/claude-sonnet-4-6" }
+  },
+{{- else -}}
+  "model": "anthropic/claude-haiku-4-5",
+  "small_model": "anthropic/claude-haiku-4-5",
+  "default_agent": "build",
+
+  "agent": {
+    "plan":   { "model": "anthropic/claude-opus-4-7" },
+    "build":  { "model": "anthropic/claude-haiku-4-5" },
+    "review": { "model": "anthropic/claude-sonnet-4-6" }
+  },
+{{- end }}
+
+  "permission": {
+    "edit": {
+      "*": "allow",
+      ".git/**": "deny",
+      "node_modules/**": "deny",
+      ".env*": "deny",
+      "**/secrets/**": "deny"
+    },
+    "bash": {
+      "*": "ask",
+      "ls*": "allow", "cat*": "allow", "rg*": "allow", "fd*": "allow",
+      "git status*": "allow", "git diff*": "allow", "git log*": "allow",
+      "git branch*": "allow", "git show*": "allow",
+      "rm -rf*": "deny",
+      "git push*": "ask", "git reset --hard*": "ask"
+    }
+  },
+
+  "mcp": {}
+}

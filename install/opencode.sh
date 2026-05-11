@@ -1,28 +1,26 @@
 #!/usr/bin/env bash
-# install/opencode.sh - configure OpenCode with context-boosted Ollama model aliases
+# install/opencode.sh - opencode setup: verify binary + create Ollama fallback aliases
 #
-# Ollama's default num_ctx (4096) is too small for agentic tool-use loops —
-# the system prompt + tool schemas + conversation fill the window immediately.
-# This script creates aliased model entries with larger context windows.
+# Primary backend for opencode is MLX (mlx-openai-server, started via `mlxserve`),
+# configured in home/dot_config/opencode/opencode.json.tmpl. This script handles
+# the *fallback* path: context-boosted Ollama model aliases for when MLX isn't
+# running or the user wants to compare backends.
 #
-# Context choices (tuned for M3 Max 128GB unified memory):
-# Apple Silicon unified memory means no CPU/GPU split — Metal accesses all 128GB.
-# KV cache cost at 128K: ~30GB (qwen3-coder:30b), ~43GB (70b), ~26GB (20b), ~15GB (7b)
-# All fit comfortably; 128K is the right default here, not the 32K NVIDIA sweet spot.
+# Ollama's default num_ctx (4096) is too small for agentic tool-use loops — the
+# system prompt + tool schemas + conversation fill the window immediately. The
+# aliases below clone each source model with a larger num_ctx.
 #
-#   qwen3-coder:30b  → 256K (18GB weights + 60GB KV = 78GB; trained on 256K — use full window)
+# Context choices (tuned for M3 Max 128GB unified memory; Metal sees all RAM):
+#   qwen3-coder:30b  → 256K (18GB weights + 60GB KV = 78GB; native 256K window)
 #   qwen2.5-coder:7b → 128K (5GB weights  + 15GB KV = 20GB)
 #   gpt-oss:20b      → 128K (13GB weights + 26GB KV = 39GB)
-#   llama3.3:70b     → 128K (40GB weights + 43GB KV = 83GB; trained on 128K)
+#   llama3.3:70b     → 128K (40GB weights + 43GB KV = 83GB; native 128K)
 #   gpt-oss:120b     → skip (confirmed Ollama hang with large num_ctx; known bug)
-#
-# mlx-lm integration: mlx_lm.server tool calling is currently broken upstream
-# (draft fix in PR #1027). Config will be added here once the fix lands.
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
-log_section "OpenCode (Ollama context windows)"
+log_section "OpenCode (binary check + Ollama fallback aliases)"
 
 if ! has opencode; then
     log_warn "opencode not found — skipping (run: brew install opencode)"
@@ -30,14 +28,14 @@ if ! has opencode; then
 fi
 log_okay "opencode: $(opencode --version 2>/dev/null | head -1)"
 
+# MLX is the primary backend (config in opencode.json points at :8080).
+# Ollama aliases below are a fallback — skip cleanly if Ollama isn't around.
 if ! has ollama; then
-    log_warn "ollama not found — skipping model context setup"
+    log_okay "ollama not installed — MLX-only setup, skipping fallback aliases"
     exit 0
 fi
-
-# Ensure ollama server is reachable
 if ! ollama list &>/dev/null 2>&1; then
-    log_warn "ollama server not responding — skipping model context setup"
+    log_okay "ollama server not running — skipping fallback alias creation"
     exit 0
 fi
 

@@ -55,6 +55,13 @@ else
     (( _missing++ )) || true
 fi
 
+if has mlx-openai-server; then
+    log_okay "mlx-openai-server: present (tool-calling MLX server)"
+else
+    log_warn "mlx-openai-server not found — run: uv tool install mlx-openai-server"
+    (( _missing++ )) || true
+fi
+
 if has aider; then
     log_okay "aider: $(aider --version 2>/dev/null | head -1)"
 else
