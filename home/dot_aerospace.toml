@@ -86,11 +86,13 @@ on-focused-monitor-changed = []
     cmd-alt-8 = 'move-node-to-workspace 8'
     cmd-alt-9 = 'move-node-to-workspace 9'
 
-    # Monitor focus and workspace transport
+    # Monitor focus and node/workspace transport
     alt-pageUp = 'focus-monitor --wrap-around next'
     alt-pageDown = 'focus-monitor --wrap-around prev'
-    alt-shift-pageUp = 'move-workspace-to-monitor --wrap-around next'
-    alt-shift-pageDown = 'move-workspace-to-monitor --wrap-around prev'
+    alt-shift-pageUp = 'move-node-to-monitor --wrap-around next'
+    alt-shift-pageDown = 'move-node-to-monitor --wrap-around prev'
+    alt-shift-ctrl-pageUp = 'move-workspace-to-monitor --wrap-around next'
+    alt-shift-ctrl-pageDown = 'move-workspace-to-monitor --wrap-around prev'
 
     # Service mode
     alt-shift-semicolon = 'mode service'
