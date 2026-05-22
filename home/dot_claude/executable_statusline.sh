@@ -14,12 +14,17 @@
 #   .model.id                  string  slug (e.g. "claude-opus-4-7[1m]")
 #   .model.effort              string|{level: string}  effort tier
 #   .transcript_path           string  path to JSONL transcript for this session
+#   .session_id                string  stable per-session ID (used as cache key)
 #   (additional fields tolerated but ignored)
 #
-# Performance: typical 100-130ms cold (bash + jq + 3 git calls). Pathological
-# huge-diff cases bounded at ~610ms via 500ms cap on `git diff --shortstat`
-# (placeholder `+>100k -<huge>` rendered on timeout). Skipped entirely on clean
-# repos. See the bench harness at: tests/bench-statusline.sh (TODO).
+# Performance:
+#   - Cache hit (~5s TTL, keyed by session_id) — typical 30-50ms.
+#   - Cache miss / cold — 100-130ms baseline.
+#   - Pathological huge-repo cases bounded at ~2.1s via 2s caps on
+#     `git status --porcelain` and `git diff --shortstat`. On timeout the
+#     stale cache values are reused when available, else the placeholder
+#     `+>100k ->100k` renders. Skipped entirely on clean tracked trees.
+#   - Bench harness at: tests/bench-statusline.sh (TODO).
 #
 # DEBUG=1 dumps the parsed input + intermediate values to stderr.
 #
@@ -159,6 +164,7 @@ CWD="$(printf       '%s' "$INPUT" | jq -r '.workspace.current_dir // .cwd // "."
 MODEL_NAME="$(printf '%s' "$INPUT" | jq -r '.model.display_name // ""')"
 MODEL_ID="$(printf   '%s' "$INPUT" | jq -r '.model.id // ""')"
 TRANSCRIPT="$(printf '%s' "$INPUT" | jq -r '.transcript_path // ""')"
+SESSION_ID="$(printf '%s' "$INPUT" | jq -r '.session_id // ""')"
 #  Claude Code wraps effort as {"level":"max"} — extract .level if object, else use as-is.
 EFFORT="$(printf     '%s' "$INPUT" | jq -r '
     (.model.effort // .effort // .effortLevel // "") as $e |
@@ -295,6 +301,99 @@ _dir_segment() {
 #   yellow:   !untracked, ↓behind
 #   bold red: xconflicted
 #   cyan:     ↑ahead
+# Counters populated by either _git_read_cache or _git_compute_state. Declared
+# as locals inside _git_segment; the helpers rely on bash's dynamic scoping to
+# write back into the caller's frame. Schema is also the cache file format:
+#   branch|staged|unstaged|untracked|conflicts|ahead|behind|diff_added|diff_removed|diff_huge
+
+# Return mtime-age of $1 in whole seconds, or a huge number if missing.
+_file_age_s() {
+    local mtime
+    mtime="$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0)"
+    [[ "$mtime" == 0 ]] && { printf '999999'; return; }
+    printf '%d' $(( $(date +%s) - mtime ))
+}
+
+# Populate counter globals from cache file $1. Returns 0 on a usable read
+# (cache exists, parses, and is for branch $2), 1 otherwise. Crucially, the
+# branch is checked BEFORE the IFS-read so a mismatch doesn't clobber the
+# caller's globals — otherwise a stale cache would poison the fall-through
+# to live compute, which uses (( var++ )) to accumulate counters.
+_git_read_cache() {
+    local file="$1" want_branch="$2" line cache_branch
+    [[ -f "$file" ]] || return 1
+    line="$(cat "$file" 2>/dev/null)" || return 1
+    [[ -n "$line" ]] || return 1
+    cache_branch="${line%%|*}"
+    [[ "$cache_branch" == "$want_branch" ]] || return 1
+    IFS='|' read -r cache_branch staged unstaged untracked conflicts ahead behind diff_added diff_removed diff_huge <<<"$line"
+    # Coerce any blanks (truncated cache) to 0 so later arithmetic doesn't error.
+    staged="${staged:-0}"; unstaged="${unstaged:-0}"; untracked="${untracked:-0}"
+    conflicts="${conflicts:-0}"; ahead="${ahead:-0}"; behind="${behind:-0}"
+    diff_added="${diff_added:-0}"; diff_removed="${diff_removed:-0}"; diff_huge="${diff_huge:-0}"
+    return 0
+}
+
+# Atomically write counter globals to cache file $1 for branch $2.
+_git_write_cache() {
+    local file="$1" branch="$2" tmp="$1.tmp.$$"
+    {
+        umask 077
+        printf '%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' \
+            "$branch" "$staged" "$unstaged" "$untracked" "$conflicts" \
+            "$ahead" "$behind" "$diff_added" "$diff_removed" "$diff_huge" > "$tmp"
+    } 2>/dev/null && mv -f "$tmp" "$file" 2>/dev/null || rm -f "$tmp" 2>/dev/null
+}
+
+# Run the two expensive git calls and populate counter globals. Returns 0 on
+# success, 1 if porcelain timed out (caller should fall back to stale cache).
+# Conflict patterns are the standard set from `git status` docs: DD AU UD UA DU AA UU.
+_git_compute_state() {
+    local porc rc shortstat head_line tmp line xy x y
+    porc="$(_timed 2 git -C "$CWD" status --porcelain=v1 --branch --untracked-files=normal 2>/dev/null)"
+    rc=$?
+    [[ $rc -eq 124 ]] && return 1
+
+    head_line="$(printf '%s\n' "$porc" | head -1)"
+    if [[ "$head_line" == *"[ahead "* ]]; then
+        tmp="${head_line#*[ahead }"
+        ahead="${tmp%%,*}"; ahead="${ahead%]*}"
+    fi
+    if [[ "$head_line" == *"behind "* ]]; then
+        tmp="${head_line#*behind }"
+        behind="${tmp%]*}"
+    fi
+
+    while IFS= read -r line; do
+        [[ -z "$line" || "$line" == "##"* ]] && continue
+        xy="${line:0:2}"
+        case "$xy" in
+            "??") (( untracked++ )) ;;
+            "DD"|"AU"|"UD"|"UA"|"DU"|"AA"|"UU") (( conflicts++ )) ;;
+            *)
+                x="${line:0:1}" y="${line:1:1}"
+                [[ "$x" != " " ]] && (( staged++ ))
+                [[ "$y" != " " ]] && (( unstaged++ ))
+                ;;
+        esac
+    done <<<"$porc"
+
+    # Line-diff vs HEAD: tracked changes only. Skip entirely on clean tracked tree.
+    if (( staged > 0 || unstaged > 0 )); then
+        shortstat="$(_timed 2 git -C "$CWD" diff --shortstat HEAD 2>/dev/null)"
+        rc=$?
+        if [[ $rc -eq 124 ]]; then
+            diff_huge=1
+        elif [[ -n "$shortstat" ]]; then
+            diff_added="$(  printf '%s' "$shortstat" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)"
+            diff_removed="$(printf '%s' "$shortstat" | grep -oE '[0-9]+ deletion'  | grep -oE '[0-9]+' || echo 0)"
+            diff_added="${diff_added:-0}"
+            diff_removed="${diff_removed:-0}"
+        fi
+    fi
+    return 0
+}
+
 _git_segment() {
     local branch
     if ! branch="$(git -C "$CWD" symbolic-ref --short HEAD 2>/dev/null)"; then
@@ -303,54 +402,28 @@ _git_segment() {
         return
     fi
 
-    # Single porcelain pass — captures branch tracking + every file's status code.
-    local porc; porc="$(git -C "$CWD" status --porcelain=v1 --branch --untracked-files=normal 2>/dev/null)"
+    # Counter state — read from cache OR computed live below.
+    local staged=0 unstaged=0 untracked=0 conflicts=0 ahead=0 behind=0
+    local diff_added=0 diff_removed=0 diff_huge=0
 
-    # Parse upstream "## main...origin/main [ahead 2, behind 1]" header
-    local ahead=0 behind=0 head_line
-    head_line="$(printf '%s\n' "$porc" | head -1)"
-    if [[ "$head_line" == *"[ahead "* ]]; then
-        local tmp="${head_line#*[ahead }"
-        ahead="${tmp%%,*}"; ahead="${ahead%]*}"
-    fi
-    if [[ "$head_line" == *"behind "* ]]; then
-        local tmp="${head_line#*behind }"
-        behind="${tmp%]*}"
+    # Cache file (per-session). Skipped when session_id is unavailable.
+    local cache="" cache_age=999999
+    if [[ -n "$SESSION_ID" ]]; then
+        cache="${TMPDIR:-/tmp}/statusline-git-${SESSION_ID}"
+        cache_age="$(_file_age_s "$cache")"
     fi
 
-    # Per-file counts. Conflict patterns from `git status` docs:
-    #   DD AU UD UA DU AA UU
-    local staged=0 unstaged=0 untracked=0 conflicts=0
-    while IFS= read -r line; do
-        [[ -z "$line" || "$line" == "##"* ]] && continue
-        local xy="${line:0:2}"
-        case "$xy" in
-            "??") (( untracked++ )) ;;
-            "DD"|"AU"|"UD"|"UA"|"DU"|"AA"|"UU") (( conflicts++ )) ;;
-            *)
-                local x="${line:0:1}" y="${line:1:1}"
-                [[ "$x" != " " ]] && (( staged++ ))
-                [[ "$y" != " " ]] && (( unstaged++ ))
-                ;;
-        esac
-    done <<<"$porc"
-
-    # Line-diff (vs HEAD): includes staged + unstaged TRACKED changes only.
-    # Untracked files are not in HEAD, so `git diff HEAD` already ignores them.
-    # - Skip entirely when no tracked changes (saves ~20ms on clean repos).
-    # - Hard-cap at 500ms; on timeout, render `+>100k` placeholder so a huge
-    #   uncommitted diff doesn't block the prompt.
-    local diff_added=0 diff_removed=0 diff_huge=0 shortstat
-    if (( staged > 0 || unstaged > 0 )); then
-        shortstat="$(_timed 0.5 git -C "$CWD" diff --shortstat HEAD 2>/dev/null)"
-        if [[ $? -eq 124 ]]; then
-            diff_huge=1
-        elif [[ -n "$shortstat" ]]; then
-            diff_added="$(  printf '%s' "$shortstat" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)"
-            diff_removed="$(printf '%s' "$shortstat" | grep -oE '[0-9]+ deletion'  | grep -oE '[0-9]+' || echo 0)"
-            diff_added="${diff_added:-0}"
-            diff_removed="${diff_removed:-0}"
-        fi
+    # Resolution policy:
+    #   1. Fresh cache (< 5s) for current branch  → use as-is.
+    #   2. Live compute succeeds                  → use it + refresh cache.
+    #   3. Live compute timed out, stale cache    → fall back to stale values.
+    #   4. Live compute timed out, no cache       → render branch alone.
+    if (( cache_age < 5 )) && _git_read_cache "$cache" "$branch"; then
+        :
+    elif _git_compute_state; then
+        [[ -n "$cache" ]] && _git_write_cache "$cache" "$branch"
+    else
+        _git_read_cache "$cache" "$branch" || true
     fi
 
     # Compose — order: branch → +/- diffs → file counts → conflicts → upstream
