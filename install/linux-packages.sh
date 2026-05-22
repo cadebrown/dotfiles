@@ -67,11 +67,32 @@ unset HOMEBREW_NO_INSTALL_FROM_API
 # libc from the Cellar rather than the host system. Without this step, machines
 # whose system glibc is already ≥ 2.35 would skip glibc and binaries would
 # silently depend on the host glibc — breaking portability to older systems.
+#
+# Exception: Homebrew refuses to source-build glibc when host glibc is strictly
+# newer than its own (e.g. Ubuntu 24.04 / Debian 13 aarch64 ship glibc 2.39 vs
+# Homebrew's 2.35). The safety check fires because any future source-built
+# formula on that host would link against host symbols and crash at runtime
+# trying to load Homebrew's older loader. Bottle pour fallback can't save us
+# either — bottles are not relocatable, /home/linuxbrew/... paths are baked in.
+# On those hosts we skip glibc entirely; bottles will link against the host
+# loader. Portability to older hosts is lost — acceptable on a host whose
+# daily driver is itself a newer host.
 if brew list glibc &>/dev/null; then
     log_okay "glibc already installed"
 else
-    log_info "Installing glibc (builds from source, ~2 min)..."
-    brew install glibc 2>&1
+    _sys_glibc="$(ldd --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+$' || true)"
+    _brew_glibc="$(brew info glibc 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 || true)"
+    # Strictly older: brew refuses; skip with warning. Equal or newer: proceed.
+    if [[ -n "$_sys_glibc" && -n "$_brew_glibc" \
+          && "$_brew_glibc" != "$_sys_glibc" \
+          && "$(printf '%s\n%s\n' "$_brew_glibc" "$_sys_glibc" | sort -V | head -1)" == "$_brew_glibc" ]]; then
+        log_warn "Host glibc $_sys_glibc > Homebrew glibc $_brew_glibc — skipping brew glibc install"
+        log_warn "  Bottles will link against the host loader. Binaries are not portable to hosts with glibc < $_sys_glibc."
+    else
+        log_info "Installing glibc (builds from source, ~2 min)..."
+        brew install glibc 2>&1
+    fi
+    unset _sys_glibc _brew_glibc
 fi
 
 ### Pre-install gcc@13 and pin source-build compiler ###
