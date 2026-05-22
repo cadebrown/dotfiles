@@ -339,3 +339,92 @@ _read_package_list() {
         printf '%s\n' "${line%% *}"
     done < "$file"
 }
+
+### AUTH HELPERS (NETRC / CURLRC) ###
+#
+# Generic block-level upsert/remove for ~/.netrc and option-level upsert for
+# ~/.curlrc. Service definitions (which hosts use which credentials) live in
+# the caller — these helpers are host-agnostic so overlays can wire their
+# own hosts (e.g. dotfiles-nvidia plugs in urm.nvidia.com + artifactory.nvidia.com).
+#
+# netrc semantics handled: `machine <host>` blocks with indented `login` /
+# `password` continuation lines, plus a top-level `default` block left alone.
+# `macdef` blocks are not specifically handled — don't mix them with managed
+# entries.
+
+# Strip any existing `machine $host` block from the netrc body on stdin.
+# Continuation lines (indented login/password) are dropped along with the
+# `machine` header. Other `machine`/`default` blocks pass through verbatim.
+_netrc_strip_host() {
+    awk -v target="$1" '
+        BEGIN { skip = 0 }
+        /^machine[[:space:]]+/ {
+            if ($2 == target) { skip = 1; next }
+            skip = 0
+            print
+            next
+        }
+        /^default([[:space:]]|$)/ { skip = 0; print; next }
+        !skip { print }
+    '
+}
+
+# Upsert a netrc entry for host $1 with login $2 / password $3. Preserves
+# every other block. Atomic via tmpfile + rename. File ends up at chmod 600.
+_netrc_upsert() {
+    local host="$1" user="$2" token="$3"
+    local file="$HOME/.netrc"
+    local tmp="${file}.tmp.$$"
+
+    [[ -n "$host" && -n "$user" && -n "$token" ]] || return 1
+
+    if [[ -f "$file" ]]; then
+        _netrc_strip_host "$host" < "$file" > "$tmp" || { rm -f "$tmp"; return 1; }
+    else
+        : > "$tmp"
+    fi
+
+    {
+        printf 'machine %s\n' "$host"
+        printf '  login %s\n' "$user"
+        printf '  password %s\n' "$token"
+    } >> "$tmp"
+
+    chmod 600 "$tmp"
+    mv -f "$tmp" "$file"
+}
+
+# Remove the netrc entry for host $1. No-op if file or entry is absent.
+# If only whitespace remains afterwards, deletes the file.
+_netrc_remove() {
+    local host="$1"
+    local file="$HOME/.netrc"
+    local tmp="${file}.tmp.$$"
+
+    [[ -n "$host" ]] || return 1
+    [[ -f "$file" ]] || return 0
+
+    _netrc_strip_host "$host" < "$file" > "$tmp" || { rm -f "$tmp"; return 1; }
+    chmod 600 "$tmp"
+    mv -f "$tmp" "$file"
+
+    if ! grep -q '[^[:space:]]' "$file" 2>/dev/null; then
+        rm -f "$file"
+    fi
+}
+
+# Idempotently add option $1 (e.g. "--netrc", "--location") to ~/.curlrc.
+# Other options pass through untouched. Creates the file at chmod 600 if
+# missing. Match is anchored — `--netrc` will not be confused with
+# `--netrc-file` or `--netrc-optional`.
+_curlrc_ensure() {
+    local opt="$1"
+    local file="$HOME/.curlrc"
+
+    [[ -n "$opt" ]] || return 1
+    if [[ -f "$file" ]] && grep -qE "^${opt}([[:space:]]|$)" "$file"; then
+        return 0
+    fi
+    printf '%s\n' "$opt" >> "$file"
+    chmod 600 "$file"
+}
