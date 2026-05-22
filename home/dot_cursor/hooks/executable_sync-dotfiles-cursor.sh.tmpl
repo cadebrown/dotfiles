@@ -58,6 +58,16 @@ _sync() {
     fi
   done
 
+  # Strip per-machine keys from the synced source so they don't pollute the repo.
+  local _settings_src="${DF_ROOT}/home/dot_config/cursor/settings.json"
+  if [[ -f "$_settings_src" ]] && command -v jq >/dev/null 2>&1; then
+    if ! jq 'del(."remote.SSH.remotePlatform")' "$_settings_src" > "$_settings_src.tmp"; then
+      rm -f "$_settings_src.tmp"
+    else
+      mv "$_settings_src.tmp" "$_settings_src"
+    fi
+  fi
+
   if [[ "$_any" == 1 ]]; then
     printf '%s\n' "[df-cursor-hook] chezmoi add (cursor JSON) → ${DF_ROOT}/home/dot_config/cursor/" >&2
   fi
