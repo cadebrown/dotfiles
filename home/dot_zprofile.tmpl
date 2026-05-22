@@ -168,6 +168,16 @@ export RUSTUP_HOME="$_LOCAL_PLAT/rustup"
 export CARGO_HOME="$_LOCAL_PLAT/cargo"
 path=("$CARGO_HOME/bin" $path)
 
+### GO ###
+
+# GOBIN equals $_LOCAL_PLAT/bin (already on PATH), so `go install` binaries
+# land alongside cargo/uv ones without a second PATH entry. GOPATH (module +
+# workspace) and GOCACHE (build cache) are PLAT-isolated — both hold compiled
+# artifacts that aren't portable across architectures.
+export GOPATH="$_LOCAL_PLAT/go"
+export GOBIN="$_LOCAL_PLAT/bin"
+export GOCACHE="$_LOCAL_PLAT/go-build"
+
 ### PYTHON (uv) ###
 
 # Keep all arch-specific uv state under _LOCAL_PLAT so shared homes stay clean.

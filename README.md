@@ -118,6 +118,7 @@ dotfiles/
 │   ├── cargo.txt              # Rust tools (cargo-binstall)
 │   ├── pip.txt                # Python packages (uv)
 │   ├── npm.txt                # Global npm packages
+│   ├── go.txt                 # Go CLI tools (`go install`)
 │   ├── claude-plugins.txt     # Claude Code plugins
 │   └── mcp-servers.txt        # MCP servers (shared by Claude + Codex)
 │

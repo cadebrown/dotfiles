@@ -1,0 +1,22 @@
+# go.txt - Go CLI tools installed via `go install`
+# Usage: install/go.sh reads this file
+#
+# Format: <module-path>@<version> [# linux-only | # macos-only]
+# Examples:
+#   github.com/entireio/cli/cmd/entire@latest
+#   golang.org/x/tools/gopls@latest
+#   github.com/jesseduffield/lazygit@latest
+#
+# Platform markers (same convention as pip.txt):
+#   # linux-only — skip on macOS (use Brewfile cask/formula instead)
+#   # macos-only — skip on Linux
+# Lines without a marker install on both platforms.
+#
+# Idempotency: `go install` uses GOCACHE; unchanged versions short-circuit.
+# Binaries land in $GOBIN (= $LOCAL_PLAT/bin), so they sit alongside the
+# uv- and cargo-installed CLIs.
+
+# Entire CLI — captures AI agent sessions into git commits (entire.io).
+# macOS uses the Brewfile cask `entire` (Homebrew tracks updates better than
+# go install @latest); Linux installs from source here.
+github.com/entireio/cli/cmd/entire@latest  # linux-only

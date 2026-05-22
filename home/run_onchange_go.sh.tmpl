@@ -1,0 +1,11 @@
+#!/bin/bash
+# Chezmoi re-runs this script whenever packages/go.txt (or any overlay copy) changes.
+# go.txt hash:       {{ include "../packages/go.txt" | sha256sum }}
+# overlay hashes:
+{{- range glob (joinPath .chezmoi.workingTree "dotfiles-*/packages/go.txt") }}
+#   {{ . | include | sha256sum }} {{ . }}
+{{- end }}
+
+set -euo pipefail
+DOTFILES="$CHEZMOI_SOURCE_DIR/.."
+bash "$DOTFILES/install/go.sh"

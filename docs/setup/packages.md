@@ -10,6 +10,7 @@ Every package layer has a declarative text file and an idempotent install script
 | Rust tools | `packages/cargo.txt` | `install/rust.sh` | All |
 | Python packages | `packages/pip.txt` | `install/python.sh` | All |
 | Global npm | `packages/npm.txt` | `install/node.sh` | All |
+| Go CLI tools | `packages/go.txt` | `install/go.sh` | All (respects `# linux-only` / `# macos-only`) |
 | Claude plugins | `packages/claude-plugins.txt` | `install/claude.sh` | All |
 | MCP servers (Claude + Codex) | `packages/mcp-servers.txt` | `install/claude.sh`, `install/codex.sh` | All |
 | Codex CLI/config | `home/dot_codex/` | `install/codex.sh` | All |

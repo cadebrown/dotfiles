@@ -85,6 +85,7 @@ brew "glfw"
 ### Languages ###
 brew "python@3.14"  # patched on Linux (see patch-homebrew-python.sh); provides dev headers
 brew "zig"
+brew "go"  # Go toolchain; packages/go.txt drives `go install` via install/go.sh
 
 ### AI Coding Agents ###
 brew "opencode"
@@ -129,6 +130,11 @@ if OS.mac?
   ### Editors & IDEs ###
   cask "visual-studio-code"
   cask "cursor"
+
+  ### AI Agent Tooling (macOS) ###
+  # Linux gets these via go install — see packages/go.txt.
+  tap "entireio/tap"
+  cask "entire"  # captures AI agent sessions alongside git commits
 
   ### Window Management ###
   cask "nikitabobko/tap/aerospace"

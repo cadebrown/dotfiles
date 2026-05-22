@@ -46,6 +46,7 @@
 #   DF_DO_ZSH           — set to 0 to skip oh-my-zsh + plugins install
 #   DF_DO_NODE          — set to 0 to skip Node install + global npm packages
 #   DF_DO_RUST          — set to 0 to skip Rust install
+#   DF_DO_GO            — set to 0 to skip Go-installed CLI tools (packages/go.txt)
 #   DF_DO_PYTHON        — set to 0 to skip Python install
 #   DF_DO_CLAUDE        — set to 0 to skip Claude Code install
 #   DF_DO_CODEX         — set to 0 to skip Codex CLI install
@@ -447,6 +448,12 @@ if [[ "${DF_DO_RUST:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/rust.sh" || die "rust.sh failed"
 else
     log_info "Skipping Rust (DF_DO_RUST=0)"
+fi
+
+if [[ "${DF_DO_GO:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/go.sh" || die "go.sh failed"
+else
+    log_info "Skipping Go (DF_DO_GO=0)"
 fi
 
 if [[ "${DF_DO_PYTHON:-1}" != "0" ]]; then

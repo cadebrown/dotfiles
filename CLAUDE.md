@@ -89,6 +89,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `macos-quick-actions.sh` | Deploys `*.workflow` bundles to `~/Library/Services/` (right-click Finder → "Open in Cursor") | macOS only; source bundles under `install/macos-quick-actions/`; flushes `pbs -flush` after changes |
 | `node.sh` | nvm + Node.js + global npm packages from `npm.txt` | Lazy-loaded in zsh for fast startup |
 | `rust.sh` | rustup + cargo-binstall + tools from `cargo.txt` | macOS: Homebrew rustup (code-signed); Linux: sh.rustup.rs |
+| `go.sh` | `go install` CLI tools from `packages/go.txt` | Go itself via Brewfile (`brew "go"`). `GOBIN=$ARCH_BIN` so binaries land alongside cargo/uv ones. Respects `# linux-only` / `# macos-only` markers (same as `pip.txt`). |
 | `python.sh` | uv + CLI tools from `pip.txt` via `uv tool install` | Each tool gets isolated venv under `$LOCAL_PLAT/uv/tools/`; no monolithic venv |
 | `claude.sh` | Claude Code binary + plugins + MCP servers + overlay skills | Downloads from Anthropic's GCS bucket; overlay discovery via `DF_OVERLAYS`. MCP entries can declare `auth=<source>` (e.g. `auth=gh`) — install reconciles the Authorization header on every run. |
 | `codex.sh` | Manages `~/.codex/config.toml` (incl. generated `[mcp_servers.*]` from `packages/mcp-servers.txt`), hooks, and chezmoi guard | Codex binary itself is installed via npm (`@openai/codex` in `npm.txt`). MCP list is shared with `install/claude.sh`. |
@@ -139,11 +140,15 @@ or `$HOME/.local` (default).
 ```
 $_LOCAL_PLAT/cargo/bin        Rust tools (fd, sd, zoxide, etc.)
 $_LOCAL_PLAT/nvm/.../bin      Node.js via nvm
-$_LOCAL_PLAT/bin              chezmoi, uv, claude
+$_LOCAL_PLAT/bin              chezmoi, uv, claude, plus go-installed binaries (GOBIN=here)
 ~/.local/bin                  arch-neutral scripts only (collapses to $_LOCAL_PLAT/bin in flat mode — deduped via typeset -U)
 /opt/homebrew/bin             Homebrew (macOS)
 /usr/bin                      system
 ```
+
+Go env: `GOPATH=$LOCAL_PLAT/go` (module cache + workspace), `GOBIN=$ARCH_BIN`
+(binary install target — same dir as cargo/uv outputs, so no second PATH entry),
+`GOCACHE=$LOCAL_PLAT/go-build` (build cache, parallel to `CARGO_TARGET_DIR`).
 
 Note: `$LOCAL_PLAT/venv/bin` was removed — Python CLI tools now use `uv tool install`
 (isolated venvs under `$LOCAL_PLAT/uv/tools/`).
@@ -167,7 +172,7 @@ against a recorded install dir (uv was the canonical example of this footgun).
 5.   macOS services   DF_DO_MACOS_SERVICES
 5.5  macOS settings   DF_DO_MACOS_SETTINGS
 5.6  Quick Actions    DF_DO_MACOS_QUICK_ACTIONS
-6.   runtimes         DF_DO_NODE, DF_DO_RUST, DF_DO_PYTHON, DF_DO_CLAUDE, DF_DO_CODEX, DF_DO_CURSOR, DF_DO_VSCODE, DF_DO_CMAKE
+6.   runtimes         DF_DO_NODE, DF_DO_RUST, DF_DO_GO, DF_DO_PYTHON, DF_DO_CLAUDE, DF_DO_CODEX, DF_DO_CURSOR, DF_DO_VSCODE, DF_DO_CMAKE
 6.5  local LLM        DF_DO_LOCAL_LLM (local-llm.sh + opencode.sh)
 6.6  blender-mcp      DF_DO_BLENDER_MCP (skips if Blender not installed)
 7.   auth             DF_DO_AUTH (off by default)
@@ -250,8 +255,10 @@ Priority order — native installer first, Homebrew as fallback:
 3. `packages/pip.txt` — Python packages (installed via `uv tool install`)
    - `# macos-only` — skip on Linux (e.g. `mlx-lm` requires Apple Metal)
    - `# python=X.Y` — pin to a specific Python version (e.g. `aider-chat` needs 3.12 because scipy has no wheels for 3.14+)
-4. `packages/Brewfile` — everything else (C libraries, GUI apps, tools without native installers)
-5. New `install/*.sh` script — source `_lib.sh`, add `DF_DO_*` flag to `bootstrap.sh`, add tests
+4. `packages/go.txt` — Go CLI tools (installed via `go install`)
+   - `# linux-only` / `# macos-only` — same parser shape as `pip.txt`. Useful when macOS gets the tool via a Brewfile cask/formula and only Linux needs the source build (e.g. `entire`).
+5. `packages/Brewfile` — everything else (C libraries, GUI apps, tools without native installers)
+6. New `install/*.sh` script — source `_lib.sh`, add `DF_DO_*` flag to `bootstrap.sh`, add tests
 
 macOS-only things go in `if OS.mac?` blocks in the Brewfile.
 

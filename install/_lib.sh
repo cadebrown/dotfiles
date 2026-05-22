@@ -163,6 +163,14 @@ NVM_DIR="$LOCAL_PLAT/nvm"
 # and the cache is not concurrency-safe (multiple NFS clients would corrupt it).
 CONAN_HOME="$LOCAL_PLAT/conan2"
 
+# Go: GOBIN=ARCH_BIN lands `go install` binaries alongside cargo/uv ones, so
+# packages/go.txt entries don't need a second bin dir on PATH. GOPATH (module
+# cache + workspace) and GOCACHE (build cache) are PLAT-isolated by necessity —
+# both contain compiled artifacts that aren't portable across architectures.
+GOPATH="$LOCAL_PLAT/go"
+GOBIN="$ARCH_BIN"
+GOCACHE="$LOCAL_PLAT/go-build"
+
 # Scratch space for NFS homes with small quotas.
 #
 # When scratch is configured, install/scratch.sh symlinks large home dirs
@@ -195,7 +203,8 @@ export DF_SCRATCH DF_SCRATCH_LINK SCRATCH PATHS
 export OS ARCH DF_ROOT DF_PACKAGES DF_USE_PLAT \
        PLAT LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR \
        UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR \
-       NVM_DIR CONAN_HOME
+       NVM_DIR CONAN_HOME \
+       GOPATH GOBIN GOCACHE
 
 # Install scripts clone public repos and must not be affected by the user's
 # gitconfig (which may have url.insteadOf SSH rewrites, breaking clones on
@@ -326,8 +335,15 @@ _re_derive_plat_vars() {
     UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
     NVM_DIR="$LOCAL_PLAT/nvm"
     CONAN_HOME="$LOCAL_PLAT/conan2"
+    # Go: GOBIN=ARCH_BIN lands `go install` binaries alongside cargo/uv ones
+    # (no second bin dir on PATH). GOPATH + GOCACHE are PLAT-isolated so NFS-shared
+    # homes don't collide; the build cache is per-arch by necessity.
+    GOPATH="$LOCAL_PLAT/go"
+    GOBIN="$ARCH_BIN"
+    GOCACHE="$LOCAL_PLAT/go-build"
     export PLAT LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR \
-           UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR NVM_DIR CONAN_HOME
+           UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR NVM_DIR CONAN_HOME \
+           GOPATH GOBIN GOCACHE
 }
 
 # Read a package list file, skipping blank lines and comments.
