@@ -38,18 +38,8 @@ max_bytes = 104857600
 [tools.web_search]
 context_size = "high"
 
-[mcp_servers.openaiDeveloperDocs]
-url = "https://developers.openai.com/mcp"
-startup_timeout_sec = 20
-tool_timeout_sec = 60
-required = false
-
-[mcp_servers.context7]
-command = "npx"
-args = ["-y", "@upstash/context7-mcp@latest"]
-startup_timeout_sec = 20
-tool_timeout_sec = 60
-required = false
+# [mcp_servers.*] blocks are generated at sync time from packages/mcp-servers.txt
+# (shared with install/claude.sh). See install/codex.sh:_emit_mcp_blocks_to.
 
 [tui]
 theme = "neon-noir"

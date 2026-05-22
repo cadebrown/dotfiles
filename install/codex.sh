@@ -9,8 +9,10 @@
 #
 # What this script DOES handle:
 #   - sync-config: write managed ~/.codex/config.toml from the chezmoi template,
-#                  preserving runtime sections (projects, notice, plugins,
-#                  hooks.state) that codex itself maintains
+#                  generate [mcp_servers.*] blocks from packages/mcp-servers.txt
+#                  (shared with install/claude.sh — same format), and preserve
+#                  runtime sections (projects, notice, plugins, hooks.state)
+#                  that codex itself maintains
 #   - sync-hooks:  write ~/.codex/hooks.json + ~/.local/bin/df-chezmoi-guard,
 #                  then update the trusted_hash so codex accepts the hook
 #   - check:       healthcheck (codex on PATH, config sections, profiles parse,
@@ -83,8 +85,115 @@ _json_escape_simple() {
     printf '%s' "$1"
 }
 
+# Resolve an `auth=<source>` directive to an HTTP Authorization header value
+# (e.g. "Bearer ghp_..."). Mirrors the helper in install/claude.sh so both
+# agents consume the same auth contract from packages/mcp-servers.txt.
+_resolve_auth_header() {
+    local spec="$1" token=""
+    case "$spec" in
+        gh)
+            has gh || return 1
+            token="$(gh auth token 2>/dev/null)" || return 1
+            [[ -n "$token" ]] || return 1
+            printf 'Bearer %s' "$token"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+_toml_escape() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    printf '%s' "$s"
+}
+
+# Translate packages/mcp-servers.txt (+ overlays) into [mcp_servers.<name>]
+# TOML blocks, written to $1. Logs go to stdout via log_*; only TOML hits $1.
+_emit_mcp_blocks_to() {
+    local out="$1" _file _line _name _rest _transport _cmd _head _tail _url
+    local _rest_extras _auth_source _client_id _arg _first _val
+
+    : > "$out"
+
+    while IFS= read -r _file; do
+        log_info "  Reading MCP servers from $_file"
+        while IFS= read -r _line; do
+            [[ -z "$_line" || "$_line" == \#* ]] && continue
+            _name="${_line%% *}"; _rest="${_line#* }"
+            _transport="${_rest%% *}"
+
+            printf '\n[mcp_servers.%s]\n' "$_name" >> "$out"
+
+            if [[ "$_transport" == "stdio" && "$_rest" == *"cmd: "* ]]; then
+                _cmd="${_rest#*cmd: }"
+                _head="${_cmd%% *}"
+                if [[ "$_cmd" == *" "* ]]; then
+                    _tail="${_cmd#* }"
+                else
+                    _tail=""
+                fi
+                printf 'command = "%s"\n' "$(_toml_escape "$_head")" >> "$out"
+                if [[ -n "$_tail" ]]; then
+                    {
+                        printf 'args = ['
+                        _first=1
+                        # shellcheck disable=SC2086
+                        for _arg in $_tail; do
+                            if (( _first )); then _first=0; else printf ', '; fi
+                            printf '"%s"' "$(_toml_escape "$_arg")"
+                        done
+                        printf ']\n'
+                    } >> "$out"
+                fi
+                log_info "    $_name (stdio)"
+            else
+                # HTTP/SSE: <name> <transport> <url> [auth=<source>] [extras...]
+                read -r _ _ _url _rest_extras <<< "$_line"
+                _auth_source=""
+                _client_id=""
+                # shellcheck disable=SC2086
+                set -- $_rest_extras
+                while (( $# )); do
+                    case "$1" in
+                        auth=*)      _auth_source="${1#auth=}"; shift ;;
+                        --client-id) _client_id="${2:-}"; shift 2 ;;
+                        *)           shift ;;
+                    esac
+                done
+
+                printf 'url = "%s"\n' "$(_toml_escape "$_url")" >> "$out"
+
+                if [[ -n "$_auth_source" ]]; then
+                    if _val="$(_resolve_auth_header "$_auth_source")" && [[ -n "$_val" ]]; then
+                        printf 'http_headers = { Authorization = "%s" }\n' "$(_toml_escape "$_val")" >> "$out"
+                        log_info "    $_name ($_transport, auth=$_auth_source)"
+                    else
+                        log_warn "    $_name: auth=$_auth_source unavailable (e.g. run 'gh auth login'); emitting without Authorization header"
+                    fi
+                fi
+
+                if [[ -n "$_client_id" ]]; then
+                    log_warn "    $_name: Codex has no --client-id analog; interactive OAuth may be required on first use"
+                    printf '# NOTE: Claude registers with --client-id %s; Codex falls back to interactive OAuth.\n' "$_client_id" >> "$out"
+                fi
+
+                [[ -z "$_auth_source" && -z "$_client_id" ]] && log_info "    $_name ($_transport)"
+            fi
+
+            {
+                printf 'startup_timeout_sec = 20\n'
+                printf 'tool_timeout_sec = 60\n'
+                printf 'required = false\n'
+            } >> "$out"
+        done < "$_file"
+    done < <(overlay_package_files "mcp-servers.txt")
+}
+
 _sync_config() {
-    local _tmpl _dest _tmp _managed _runtime _merged
+    local _tmpl _dest _tmp _managed _runtime _merged _mcp
     log_section "Codex Config Sync"
 
     _tmpl="$DF_ROOT/home/dot_codex/create_config.toml"
@@ -98,8 +207,19 @@ _sync_config() {
     _managed="$_tmp/managed.toml"
     _runtime="$_tmp/runtime.toml"
     _merged="$_tmp/merged.toml"
+    _mcp="$_tmp/mcp.toml"
 
     cp "$_tmpl" "$_managed"
+
+    # Append generated [mcp_servers.*] blocks from the shared MCP list. Any
+    # [mcp_servers.*] sections in the destination get dropped (the runtime
+    # awk below does not preserve them), so the list is the source of truth.
+    _emit_mcp_blocks_to "$_mcp"
+    if [[ -s "$_mcp" ]]; then
+        printf '\n# === Managed MCP servers (generated from packages/mcp-servers.txt) ===\n' >> "$_managed"
+        cat "$_mcp" >> "$_managed"
+    fi
+
     : > "$_runtime"
     if [[ -f "$_dest" ]]; then
         awk 'BEGIN{keep=0} /^\[(projects|notice|marketplaces|plugins)\./ || /^\[hooks\.state\]/{keep=1} keep{print}' "$_dest" > "$_runtime"
@@ -253,6 +373,8 @@ _check_setup() {
     grep -q '^\[profiles\.unrestricted\]$' "$_config" || die "Missing [profiles.unrestricted] in $_config"
     grep -q '^\[mcp_servers\.openaiDeveloperDocs\]$' "$_config" \
         || die "Missing OpenAI docs MCP in $_config"
+    grep -q '^\[mcp_servers\.context7\]$' "$_config" \
+        || die "Missing context7 MCP in $_config (generated from packages/mcp-servers.txt)"
     grep -q '"command": "~/.local/bin/df-chezmoi-guard"' "$_hooks" \
         || die "Codex hook does not use shared chezmoi guard"
     ! grep -q 'format-hook' "$_hooks" \

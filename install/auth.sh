@@ -287,7 +287,7 @@ _walk_all() {
     done
 
     printf "\n${_BOLD}gh CLI (browser login)${_RESET}\n"
-    printf "  ${_DIM}Required for the GitHub MCP server (auth=gh in claude-mcp.txt).${_RESET}\n"
+    printf "  ${_DIM}Required for the GitHub MCP server (auth=gh in mcp-servers.txt).${_RESET}\n"
     if has gh && gh auth status >/dev/null 2>&1; then
         printf "  status: ${_GREEN}logged in${_RESET}  (skipping; use \`bash %s gh\` to re-login)\n" "$0"
     else

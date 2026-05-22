@@ -213,14 +213,14 @@ unset _envfile
 ### OVERLAYS ###
 
 # Discover overlay repos (dotfiles-*/). Each overlay can provide its own
-# packages/ dir mirroring the parent layout (e.g. claude-mcp.txt, cargo.txt).
+# packages/ dir mirroring the parent layout (e.g. mcp-servers.txt, cargo.txt).
 # Install scripts use overlay_package_files() to iterate over all copies of a
 # given package list — base first, then each overlay in sorted order.
 #
 # Example:
 #   while IFS= read -r _file; do
 #       _process_entries_from "$_file"
-#   done < <(overlay_package_files "claude-mcp.txt")
+#   done < <(overlay_package_files "mcp-servers.txt")
 
 DF_OVERLAYS=()
 for _overlay_dir in "$DF_ROOT"/dotfiles-*/; do

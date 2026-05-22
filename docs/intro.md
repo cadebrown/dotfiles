@@ -52,8 +52,8 @@ Rust tools install via `cargo-binstall` (downloads pre-built binaries from GitHu
 
 ### AI tools
 
-- **Claude Code** — native binary from Anthropic's release bucket, plus plugins (`packages/claude-plugins.txt`) and MCP servers (`packages/claude-mcp.txt`)
-- **Codex CLI** — native binary from GitHub releases, with managed config + hooks under `home/dot_codex/`
+- **Claude Code** — native binary from Anthropic's release bucket, plus plugins (`packages/claude-plugins.txt`) and MCP servers (`packages/mcp-servers.txt`)
+- **Codex CLI** — npm-installed binary (`@openai/codex` in `npm.txt`), with managed config + hooks under `home/dot_codex/` and `[mcp_servers.*]` blocks generated from the shared `packages/mcp-servers.txt`
 - **Cursor / VS Code** — extension lists in `packages/{cursor,vscode}-extensions.txt`; Cursor settings symlinked from `home/dot_cursor/`
 
 ### macOS-specific

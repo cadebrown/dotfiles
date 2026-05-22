@@ -25,7 +25,7 @@ DF_DO_AUTH=1 ~/dotfiles/bootstrap.sh
 | **cloudflare** | `CLOUDFLARE_API_TOKEN` | `~/.cloudflare.env` | OpenTofu in `infra/`, Cloudflare MCP via API, R2/Pages | you don't deploy infra/ via OpenTofu (the Cloudflare MCP can use OAuth) |
 | **huggingface** | `HF_TOKEN` | `~/.huggingface.env` | mlx-lm gated models, aider HF, transformers | you don't pull gated models or private repos |
 
-Plus `gh auth login` (browser flow) — required for the **Claude GitHub MCP server** (`auth=gh` in `claude-mcp.txt`). gh stores its token in macOS keychain / Linux secret service, not in an env file.
+Plus `gh auth login` (browser flow) — required for the **GitHub MCP server** consumed by both Claude and Codex (`auth=gh` in `mcp-servers.txt`). gh stores its token in macOS keychain / Linux secret service, not in an env file.
 
 ## How tokens get loaded
 

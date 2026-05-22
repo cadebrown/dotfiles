@@ -1,8 +1,14 @@
 #!/bin/bash
-# Chezmoi re-runs this script whenever managed Codex config or hooks change.
-# codex config hash: {{ include "dot_codex/create_config.toml" | sha256sum }}
-# codex hooks hash:  {{ include "dot_codex/hooks.json" | sha256sum }}
-# guard script hash: {{ include "dot_local/bin/executable_df-chezmoi-guard" | sha256sum }}
+# Chezmoi re-runs this script whenever managed Codex config, hooks, or the
+# shared MCP server list change.
+# codex config hash:  {{ include "dot_codex/create_config.toml" | sha256sum }}
+# codex hooks hash:   {{ include "dot_codex/hooks.json" | sha256sum }}
+# guard script hash:  {{ include "dot_local/bin/executable_df-chezmoi-guard" | sha256sum }}
+# mcp-servers.txt:    {{ include "../packages/mcp-servers.txt" | sha256sum }}
+# overlay mcp hashes:
+{{- range glob (joinPath .chezmoi.workingTree "dotfiles-*/packages/mcp-servers.txt") }}
+#   {{ . | include | sha256sum }} {{ . }}
+{{- end }}
 
 set -euo pipefail
 DOTFILES="$CHEZMOI_SOURCE_DIR/.."

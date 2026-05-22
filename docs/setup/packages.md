@@ -11,7 +11,7 @@ Every package layer has a declarative text file and an idempotent install script
 | Python packages | `packages/pip.txt` | `install/python.sh` | All |
 | Global npm | `packages/npm.txt` | `install/node.sh` | All |
 | Claude plugins | `packages/claude-plugins.txt` | `install/claude.sh` | All |
-| Claude MCP servers | `packages/claude-mcp.txt` | `install/claude.sh` | All |
+| MCP servers (Claude + Codex) | `packages/mcp-servers.txt` | `install/claude.sh`, `install/codex.sh` | All |
 | Codex CLI/config | `home/dot_codex/` | `install/codex.sh` | All |
 | Cursor extensions | `packages/cursor-extensions.txt` | `install/cursor.sh` | All |
 | VS Code extensions | `packages/vscode-extensions.txt` | `install/vscode.sh` | All |

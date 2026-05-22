@@ -1,14 +1,16 @@
-# claude-mcp.txt - MCP servers for Claude Code
-# Usage: install/claude.sh reads this file
+# mcp-servers.txt - MCP servers for Claude Code and Codex CLI
+# Usage: install/claude.sh + install/codex.sh both read this file
 #
 # HTTP/SSE format: <name> <transport> <url> [auth=<source>] [extra args...]
 # Stdio format:    <name> stdio cmd: <command...>
 #
 # Extra args on HTTP/SSE entries pass through to `claude mcp add`
-# (e.g. --client-id <id>, --header "K: V").
+# (e.g. --client-id <id>, --header "K: V"). Codex does not support these
+# extras — install/codex.sh ignores them with a warning (servers using
+# --client-id fall back to interactive OAuth on first Codex use).
 #
-# auth=<source> is a managed Authorization header. install/claude.sh resolves
-# it on every run and refreshes the stored header on drift. Sources:
+# auth=<source> is a managed Authorization header. Both Claude and Codex
+# resolve it on every sync and refresh the stored header on drift. Sources:
 #   auth=gh   — uses `gh auth token` (requires `gh auth login` first)
 # Auth-managed entries cannot also pass --header / --client-id extras.
 #
@@ -21,8 +23,11 @@ cloudflare http https://mcp.cloudflare.com/mcp
 
 # GitHub: PRs, issues, repo search, code review.
 # OAuth/DCR is unsupported by GitHub's IdP, so we authenticate via gh CLI.
-# Run `gh auth login` once; install/claude.sh refreshes the bearer token.
+# Run `gh auth login` once; install/{claude,codex}.sh refresh the bearer token.
 github http https://api.githubcopilot.com/mcp auth=gh
+
+# OpenAI developer docs: API reference and guides for the OpenAI platform.
+openaiDeveloperDocs http https://developers.openai.com/mcp
 
 # Context7: up-to-date library documentation for any dependency
 context7 stdio cmd: npx -y @upstash/context7-mcp@latest

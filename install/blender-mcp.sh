@@ -5,7 +5,7 @@
 # user's Blender scripts/addons directory, and enables it via a headless
 # Blender invocation. Skips gracefully if Blender is not installed.
 #
-# The MCP *server* side is wired up separately via packages/claude-mcp.txt
+# The MCP *server* side is wired up separately via packages/mcp-servers.txt
 # (`blender stdio cmd: uvx blender-mcp`). This script handles only the
 # Blender-side addon, which must live inside Blender's own scripts/addons
 # directory and be toggled on in user preferences.

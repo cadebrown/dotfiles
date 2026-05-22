@@ -14,19 +14,20 @@ The base `_lib.sh` defines `DF_OVERLAYS` (an array of paths to overlay roots) an
 
 ```text
    ~/dotfiles/                        ← base, public
-   └── packages/claude-mcp.txt        (3 entries: github, context7, blender)
+   └── packages/mcp-servers.txt       (5 entries: cloudflare, github, openaiDeveloperDocs, context7, blender)
 
    ~/dotfiles-nvidia/                 ← overlay, private
-   └── packages/claude-mcp.txt        (2 entries: cuda-docs, nvidia-internal)
+   └── packages/mcp-servers.txt       (NVIDIA-internal MaaS entries)
                        │
-                       │  install/claude.sh:
+                       │  install/claude.sh + install/codex.sh:
                        │    while IFS= read -r f; do
-                       │        _register_mcps_from "$f"
-                       │    done < <(overlay_package_files "claude-mcp.txt")
+                       │        _register_mcps_from "$f"   # claude.sh
+                       │        _emit_mcp_blocks_to ...    # codex.sh
+                       │    done < <(overlay_package_files "mcp-servers.txt")
                        │
                        ▼
-   Effective merged list (base first, then each overlay sorted):
-   github, context7, blender, cuda-docs, nvidia-internal
+   Effective merged list (base first, then each overlay sorted) — same list
+   consumed by both Claude (`claude mcp add`) and Codex (`[mcp_servers.*]`).
 ```
 
 The merge is **append-only** — overlays add to the base, they don't replace it. Order is base, then overlays in lexicographic path order.
@@ -36,7 +37,7 @@ The merge is **append-only** — overlays add to the base, they don't replace it
 | Path in overlay | Effect |
 |---|---|
 | `packages/cargo.txt` | additional Rust crates installed by `install/rust.sh` |
-| `packages/claude-mcp.txt` | additional Claude MCP servers registered by `install/claude.sh` |
+| `packages/mcp-servers.txt` | additional MCP servers registered by `install/claude.sh` and `install/codex.sh` |
 | `packages/claude-plugins.txt` | additional Claude plugins installed |
 | `packages/<other>.txt` | discovered via `overlay_package_files()` — pattern works for any list-style file |
 | `home/dot_claude/CLAUDE.md` | appended to `~/.claude/CLAUDE.md` via the chezmoi template |
@@ -88,7 +89,7 @@ The directory name **must start with `dotfiles-`** for the glob to find it. Comm
 Overlays don't usually own their own chezmoi root — instead, the base `home/` template references overlay files via `glob`:
 
 ```gotmpl
-{{ glob (joinPath .chezmoi.workingTree "dotfiles-*/packages/claude-mcp.txt") }}
+{{ glob (joinPath .chezmoi.workingTree "dotfiles-*/packages/mcp-servers.txt") }}
 ```
 
 This pattern is used by `home/run_onchange_*.sh.tmpl` scripts, so chezmoi notices when *any* overlay's package file changes (not just the base) and re-fires the install script.

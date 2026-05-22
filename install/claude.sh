@@ -256,7 +256,7 @@ _ok=0 _skip=0 _fail=0
 
 while IFS= read -r _file; do
     _register_mcps_from "$_file"
-done < <(overlay_package_files "claude-mcp.txt")
+done < <(overlay_package_files "mcp-servers.txt")
 
 log_okay "MCP servers: ${_ok} registered, ${_skip} already present, ${_fail} failed"
 

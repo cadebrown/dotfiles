@@ -44,7 +44,7 @@ These are non-negotiable and shape every decision in the repo:
 Overlays are private repos at `$DF_ROOT/dotfiles-*/` that extend the public dotfiles
 without modifying them. Each overlay can provide:
 
-- `packages/` — package list files mirroring the parent format (e.g. `claude-mcp.txt`,
+- `packages/` — package list files mirroring the parent format (e.g. `mcp-servers.txt`,
   `claude-plugins.txt`). Install scripts discover these via `overlay_package_files()`.
 - `home/dot_claude/CLAUDE.md` — appended to `~/.claude/CLAUDE.md` via chezmoi template.
 - `home/dot_claude/skills/` — deployed to `~/.claude/skills/` by `install/claude.sh`.
@@ -60,11 +60,12 @@ of that file — base first, then each overlay in sorted order:
 ```bash
 while IFS= read -r _file; do
     _process_entries_from "$_file"
-done < <(overlay_package_files "claude-mcp.txt")
+done < <(overlay_package_files "mcp-servers.txt")
 ```
 
-Currently used by: `install/claude.sh` (MCP servers + plugins). Overlay skills use
-`DF_OVERLAYS` directly to scan `home/dot_claude/skills/` in each overlay.
+Currently used by: `install/claude.sh` (MCP servers + plugins) and `install/codex.sh`
+(MCP servers). Overlay skills use `DF_OVERLAYS` directly to scan
+`home/dot_claude/skills/` in each overlay.
 
 ### Chezmoi integration
 
@@ -90,12 +91,12 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `rust.sh` | rustup + cargo-binstall + tools from `cargo.txt` | macOS: Homebrew rustup (code-signed); Linux: sh.rustup.rs |
 | `python.sh` | uv + CLI tools from `pip.txt` via `uv tool install` | Each tool gets isolated venv under `$LOCAL_PLAT/uv/tools/`; no monolithic venv |
 | `claude.sh` | Claude Code binary + plugins + MCP servers + overlay skills | Downloads from Anthropic's GCS bucket; overlay discovery via `DF_OVERLAYS`. MCP entries can declare `auth=<source>` (e.g. `auth=gh`) — install reconciles the Authorization header on every run. |
-| `codex.sh` | Codex CLI binary from GitHub releases + managed config sync | Platform detection + checksum + profile validation |
+| `codex.sh` | Manages `~/.codex/config.toml` (incl. generated `[mcp_servers.*]` from `packages/mcp-servers.txt`), hooks, and chezmoi guard | Codex binary itself is installed via npm (`@openai/codex` in `npm.txt`). MCP list is shared with `install/claude.sh`. |
 | `cursor.sh` | Cursor settings symlinks + extension install; `sync-extensions` subcommand captures new extensions back | Union-only (never removes); app updated via Brewfile cask |
 | `vscode.sh` | VS Code extension install; `sync-extensions` subcommand captures new extensions back | Extensions only — settings.json NOT tracked (contains embedded credentials) |
 | `local-llm.sh` | Verifies ollama/mlx-lm/mlx-openai-server/aider binaries; creates HF cache dir; `pull-models` subcommand pre-pulls MLX models from `packages/mlx-models.txt` | Warns (does not fail) if tools missing. MLX is the primary local backend (started via `mlxserve`); Ollama remains as fallback. |
 | `opencode.sh` | OpenCode binary check + creates Ollama context-boosted model aliases (fallback path; primary is MLX in `opencode.json`) | Skips cleanly if Ollama not installed/running; omits gpt-oss:120b (confirmed hang bug) |
-| `blender-mcp.sh` | Installs the `blender-mcp` Blender addon (`addon.py` from github.com/ahujasid/blender-mcp) and enables it via headless Blender | MCP server side is separate — see `packages/claude-mcp.txt`. Skips if Blender not installed. |
+| `blender-mcp.sh` | Installs the `blender-mcp` Blender addon (`addon.py` from github.com/ahujasid/blender-mcp) and enables it via headless Blender | MCP server side is separate — see `packages/mcp-servers.txt`. Skips if Blender not installed. |
 | `auth.sh` | Guided API token setup with service registry | Creates `~/.{service}.env` files (chmod 600). Built-in services: GitHub, Anthropic, OpenAI, Cloudflare, HuggingFace, plus `gh auth login`. Run `bash auth.sh status` for state, `bash auth.sh <service>` for a single one. Add a service by appending to `_SERVICE_DEFS` in the script. |
 | `dirs.sh` | Creates `~/dev`, `~/bones`, `~/misc` | Symlinks to scratch when available |
 | `scratch.sh` | Symlinks `~/.local`, `~/.cache`, etc. to scratch space | NFS quota relief |
@@ -382,10 +383,10 @@ These are non-obvious things that have caused real bugs:
   flags on Linux.
 - **GitHub MCP can't use OAuth** — `api.githubcopilot.com/mcp` advertises OAuth, but
   GitHub's IdP doesn't implement Dynamic Client Registration (RFC 7591), so Claude
-  Code's `/mcp` Authenticate flow fails with "Incompatible auth server". `claude-mcp.txt`
+  Code's `/mcp` Authenticate flow fails with "Incompatible auth server". `mcp-servers.txt`
   uses `auth=gh` to inject `Authorization: Bearer $(gh auth token)` instead. Run
-  `gh auth login` before bootstrapping; `install/claude.sh` refreshes the header on
-  every run, so token rotation auto-heals.
+  `gh auth login` before bootstrapping; both `install/claude.sh` and `install/codex.sh`
+  refresh the header on every run, so token rotation auto-heals.
 - **Codex profile TUI settings are narrow** — `[profiles.<name>.tui]` currently only
   supports `session_picker_view`. Keep `theme`, `animations`, `status_line`, and other
   TUI aesthetics at top-level `[tui]` or pass them with `codex -c 'tui.theme="..."'`.
