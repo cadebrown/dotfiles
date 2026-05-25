@@ -1,5 +1,5 @@
 {
-  "$schema" : "https:\/\/schema.linearmouse.app\/0.10.4",
+  "$schema" : "https:\/\/schema.linearmouse.app\/0.11.2",
   "schemes" : [
     {
       "if" : {
@@ -16,7 +16,7 @@
       },
       "scrolling" : {
         "reverse" : {
-          "vertical" : true
+          "vertical" : false
         }
       }
     },
@@ -30,6 +30,18 @@
         "acceleration" : 1,
         "disableAcceleration" : true,
         "speed" : 0.6474
+      }
+    },
+    {
+      "if" : {
+        "device" : {
+          "category" : "trackpad"
+        }
+      },
+      "scrolling" : {
+        "reverse" : {
+          "vertical" : false
+        }
       }
     }
   ]
