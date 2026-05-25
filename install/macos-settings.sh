@@ -108,10 +108,10 @@ log_okay "Screen lock configured"
 
 log_info "Power management (requires sudo)"
 if sudo -v 2>/dev/null; then
-    # AC: never auto-sleep — display sleeps, network stays alive
-    sudo pmset -c sleep 0 displaysleep 60 networkoversleep 1 tcpkeepalive 1 ttyskeepawake 1 powernap 1
-    # Battery: sleep aggressively to preserve charge
-    sudo pmset -b sleep 20 displaysleep 5 networkoversleep 0 tcpkeepalive 1 ttyskeepawake 1 powernap 0
+    # AC: never system-sleep; display off after 2h, network stays alive
+    sudo pmset -c sleep 0 displaysleep 120 networkoversleep 1 tcpkeepalive 1 ttyskeepawake 1 powernap 1
+    # Battery: system-sleep after 30 min idle (display off at 15) to preserve charge
+    sudo pmset -b sleep 30 displaysleep 15 networkoversleep 0 tcpkeepalive 1 ttyskeepawake 1 powernap 0
     log_okay "Power management configured"
 else
     log_warn "sudo not available — skipping power management settings"
