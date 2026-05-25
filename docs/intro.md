@@ -3,10 +3,11 @@
 Personal dotfiles for macOS and Linux. One command bootstraps a complete dev environment — idempotent, no sudo on Linux, and (optionally) safe on shared NFS home directories across CPU architectures.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
+DF_NAME="Your Name" DF_EMAIL="you@example.com" \
+  curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
 ```
 
-Prompts for name and email once. Re-run anytime to converge.
+`DF_NAME` / `DF_EMAIL` are needed when piping into `bash` (the pipe occupies stdin, so chezmoi can't prompt); from a local clone, `~/dotfiles/bootstrap.sh` prompts interactively. Re-run anytime to converge.
 
 **Pick your path:**
 

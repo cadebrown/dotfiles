@@ -3,27 +3,23 @@
 ## One-liner
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
-```
-
-Prompts for name and email once. Everything else runs unattended.
-
-### Skip the prompts
-
-Pre-seed name and email to run fully unattended:
-
-```sh
 DF_NAME="Your Name" DF_EMAIL="you@example.com" \
   curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
 ```
 
-Values are cached in `~/.config/chezmoi/chezmoi.toml`. On re-runs, they're read from the cache — no prompts.
+Runs fully unattended. `DF_NAME` / `DF_EMAIL` are needed here because piping the
+script into `bash` occupies stdin, leaving chezmoi no terminal to prompt on. The
+values are cached in `~/.config/chezmoi/chezmoi.toml`, so re-runs read from the
+cache and need nothing.
 
-### From a local clone
+### Interactive (prompts for name + email)
+
+To be prompted instead of pre-seeding, run from a local clone in a real terminal —
+chezmoi then has a TTY to read from:
 
 ```sh
 git clone https://github.com/cadebrown/dotfiles ~/dotfiles
-DF_NAME="Your Name" DF_EMAIL="you@example.com" ~/dotfiles/bootstrap.sh
+~/dotfiles/bootstrap.sh
 ```
 
 ---

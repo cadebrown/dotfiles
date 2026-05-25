@@ -12,17 +12,15 @@ Fork this repo and modify for your own setup!
 ## Bootstrap
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
-```
-
-Prompts for name and email once (cached in `~/.config/chezmoi/chezmoi.toml`). Re-run anytime to converge -- it installs what's missing, skips what's current.
-
-```sh
-# Unattended (CI, shared systems)
 DF_NAME="Your Name" DF_EMAIL="you@example.com" \
   curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
+```
 
-# From a local clone
+`DF_NAME` / `DF_EMAIL` are needed when piping into `bash` -- the pipe occupies stdin, so chezmoi can't prompt. They're cached in `~/.config/chezmoi/chezmoi.toml`. Re-run anytime to converge -- it installs what's missing, skips what's current.
+
+```sh
+# From a local clone -- prompts for name + email interactively
+git clone https://github.com/cadebrown/dotfiles ~/dotfiles
 ~/dotfiles/bootstrap.sh             # full install
 ~/dotfiles/bootstrap.sh update      # pull + refresh (no brew upgrade)
 ~/dotfiles/bootstrap.sh upgrade     # pull + upgrade everything

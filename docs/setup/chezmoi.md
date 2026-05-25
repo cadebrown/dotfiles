@@ -12,9 +12,9 @@ sequenceDiagram
     participant T as ~/.config/chezmoi/<br/>chezmoi.toml
     participant S as home/dot_X.tmpl<br/>(repo source)
     participant H as ~/.X<br/>(target)
-    U->>B: curl | bash
+    U->>B: run bootstrap.sh
     B->>CZ: chezmoi init (first run only)
-    CZ->>U: prompt name + email (skipped if DF_NAME / DF_EMAIL pre-set)
+    CZ->>U: prompt name + email (needs a TTY; skipped if DF_NAME / DF_EMAIL pre-set)
     U-->>CZ: "Cade", "brown.cade@..."
     CZ->>T: cache values
     B->>CZ: chezmoi apply
