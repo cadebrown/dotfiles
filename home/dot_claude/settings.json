@@ -6,12 +6,10 @@
     "BASH_DEFAULT_TIMEOUT_MS": "300000",
     "BASH_MAX_TIMEOUT_MS": "900000"
   },
-  "model": "opus[1m]",
-  "effortLevel": "max",
-  "outputStyle": "cade",
   "permissions": {
     "defaultMode": "bypassPermissions"
   },
+  "model": "opus[1m]",
   "hooks": {
     "Notification": [
       {
@@ -42,10 +40,11 @@
   },
   "enabledPlugins": {
     "rust-analyzer-lsp@claude-plugins-official": true,
-    "clangd-lsp@claude-plugins-official": false,
-    "pyright-lsp@claude-plugins-official": false,
+    "clangd-lsp@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true
   },
+  "outputStyle": "cade",
   "skipDangerousModePermissionPrompt": true
 }
