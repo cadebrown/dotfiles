@@ -173,7 +173,7 @@ _prompt_token_for() {
         case "${action:-k}" in
             k|K|"")
                 log_info "Keeping $var"
-                (( _TALLY_KEPT++ ))
+                (( ++_TALLY_KEPT ))
                 ;;
             u|U)
                 printf "  New %s (input hidden): " "$var"
@@ -183,21 +183,21 @@ _prompt_token_for() {
                 printf '\n'
                 if [[ -z "$new_value" ]]; then
                     log_warn "No value entered — keeping existing"
-                    (( _TALLY_KEPT++ ))
+                    (( ++_TALLY_KEPT ))
                 else
                     _write_token "$file" "$var" "$new_value"
                     log_okay "Updated $var → $file"
-                    (( _TALLY_UPDATED++ ))
+                    (( ++_TALLY_UPDATED ))
                 fi
                 ;;
             d|D)
                 _unset_token "$file" "$var"
                 log_okay "Removed $var from $file"
-                (( _TALLY_DELETED++ ))
+                (( ++_TALLY_DELETED ))
                 ;;
             *)
                 log_warn "Unrecognized action — keeping"
-                (( _TALLY_KEPT++ ))
+                (( ++_TALLY_KEPT ))
                 ;;
         esac
         return 0
@@ -217,7 +217,7 @@ _prompt_token_for() {
     printf '\n'
     if [[ -z "$new_value" ]]; then
         log_info "Skipped $var"
-        (( _TALLY_SKIPPED++ ))
+        (( ++_TALLY_SKIPPED ))
     elif [[ "$name" == "github" && ( "$new_value" == "G" || "$new_value" == "g" ) ]]; then
         # Write a one-line env file that dynamically pulls from gh on every shell load.
         # No literal token — auto-refreshes with gh's keychain. chmod 600 anyway
@@ -229,11 +229,11 @@ export GITHUB_TOKEN="$(gh auth token 2>/dev/null)"
 EOF
         chmod 600 "$file"
         log_okay "$var derives from \`gh auth token\` → $file"
-        (( _TALLY_SET++ ))
+        (( ++_TALLY_SET ))
     else
         _write_token "$file" "$var" "$new_value"
         log_okay "Set $var → $file"
-        (( _TALLY_SET++ ))
+        (( ++_TALLY_SET ))
     fi
 }
 
