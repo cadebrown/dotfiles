@@ -61,7 +61,7 @@ resource "cloudflare_pages_project" "site" {
   production_branch = var.pages_production_branch
 
   build_config {
-    # build.sh installs mdbook via cargo-binstall then runs `mdbook build docs`
+    # build.sh fetches pinned prebuilt mdbook + mdbook-mermaid, then runs `mdbook build docs`
     build_command   = "bash infra/cloudflare/build.sh"
     destination_dir = "docs/book"
     root_dir        = ""
