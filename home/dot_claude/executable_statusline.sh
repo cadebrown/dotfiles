@@ -35,6 +35,11 @@
 
 set -uo pipefail
 
+# Read-only statusline must never take index.lock — git status/diff rewrite the
+# index by default, racing the user's foreground git (and _timed's SIGKILL can
+# orphan the lock on a slow NFS repo, blocking all git until removed by hand).
+export GIT_OPTIONAL_LOCKS=0
+
 # ─── colors (8-bit, no nerd-font assumptions) ────────────────────────────
 _R=$'\e[0m'
 _DIM=$'\e[2m'
