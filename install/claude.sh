@@ -99,6 +99,7 @@ has claude || { log_warn "claude not found — skipping plugins"; exit 0; }
 _MARKETPLACES=(
     "trailofbits/skills|trailofbits"       # c-review and other ToB security skills
     "openai/codex-plugin-cc|openai-codex"  # official Codex-as-delegate bridge
+    "AlmogBaku/debug-skill|debug-skill-marketplace"  # dap stateful DAP debugging
 )
 for _mp_entry in "${_MARKETPLACES[@]}"; do
     IFS='|' read -r _mp_repo _mp_name <<< "$_mp_entry"

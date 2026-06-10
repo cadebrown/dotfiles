@@ -115,6 +115,12 @@ brew "opencode"
 # NOT cargo.txt: the crates.io `rtk` crate is an unrelated project.
 brew "rtk"
 
+### Debugging ###
+# dap: daemonized Debug Adapter Protocol sessions — agents debug statefully
+# via Bash (used by the debugging-code plugin)
+tap "AlmogBaku/tap"
+brew "AlmogBaku/tap/dap"
+
 ### Memory stack (see install/memory.sh + docs/usage/agents.md) ###
 # cass (session-history search) is installed by install/memory.sh directly
 # from GitHub releases with checksum verification — its brew tap lags asset

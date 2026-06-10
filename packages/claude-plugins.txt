@@ -32,3 +32,14 @@ mcp-server-dev
 hookify
 # Claude Agent SDK development (Anthropic official)
 agent-sdk-dev
+
+# Fuzzing + sanitizers from ToB's Testing Handbook (12 namespaced sub-skills:
+# cargo-fuzz, libfuzzer, aflpp, libafl, address-sanitizer, harness-writing,
+# fuzzing-obstacles, fuzzing-dictionary, coverage-analysis, ossfuzz, ruzzy,
+# atheris). Plugin route keeps the names namespaced.
+testing-handbook-skills@trailofbits
+
+# Stateful DAP debugging for agents: the `dap` CLI daemonizes a Debug Adapter
+# session (Python/Go/Node/Rust/C++ backends) so debugging happens via plain
+# Bash — no TTY, no tmux. Binary: brew AlmogBaku/tap/dap (Brewfile).
+debugging-code@debug-skill-marketplace

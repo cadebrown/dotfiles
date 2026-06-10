@@ -115,3 +115,13 @@ writing-skills npx obra/superpowers writing-skills
 # find-skills (vercel-labs): discover/install registry skills from inside a
 # session — the discovery half of this very file's workflow.
 find-skills npx vercel-labs/skills find-skills
+
+### Debugging / toolchain internals ###
+
+# DWARF format + dwarfdump/llvm-dwarfdump workflows (user-requested — partly
+# reference-style, kept for the format internals)
+dwarf-debug-format npx mohitmishra786/low-level-dev-skills dwarf-debug-format
+
+# Emitting debug info from LLVM (DIBuilder, locations, LLVM 22) — pairs with
+# dwarf-debug-format from the consumer side
+add-debug-info npx hbarve1/tessl-llvm add-debug-info
