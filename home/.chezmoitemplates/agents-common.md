@@ -1,5 +1,5 @@
 {{/*
-agents-common.md — shared agent guidance for Claude/Codex/Aider/OpenCode/Pi.
+agents-common.md — shared agent guidance for Claude/Codex/OpenCode/Pi.
 
 Each tool wraps this partial with a tool-specific header and a footer of
 guidance that's actually unique to that tool (skills, MCP usage, edit modes,
@@ -20,22 +20,18 @@ Hobbyist builder:
 Problem-solving approach:
 - Start from first principles — understand the problem axiomatically before touching code.
 - Work a small concrete example and examine what principles are actually at play.
-- Generalize incrementally until the system is powerful enough to solve the task — no further.
-
-## Communication
-
-Concise and direct. Lead with the answer. No emojis. Skip preamble. Trailing summaries are unnecessary — the diff speaks.
-
-Don't estimate work in time (hours/days/weeks) unless I ask. Estimate instead in rough lines of code, difficulty bucket (mechanical / known-pattern / has-unknowns / requires-spike), and specific risks or unknowns. Time estimates are routinely wrong and motivate the wrong cuts; size + difficulty + risks tell me what I actually need to decide.
+- Generalize incrementally until the system is powerful enough to solve the task.
 
 ## How I work
 
 1. **Plan** — think through the approach before writing code.
-2. **Tests first** — write tests that define done for the chunk you're about to do.
-3. **Iterate** — make changes until tests pass, no further.
+2. **Tests** — for code with real logic, write tests that pin down the behavior; lean toward writing them early, but spiking first and testing once the shape is clear is fine. Config, templates, and glue are covered by the project's suite where one exists — don't force unit tests onto declarative files.
+3. **Iterate** — make changes until it works and the tests pass.
 4. **Commit** — one commit per feature or coherent chunk. Don't commit unless I explicitly ask, but suggest natural commit points.
 
-Commit messages capture what *semantically* changed and what was surprising — assumptions that turned out wrong, designs that shifted mid-implementation. The diff shows the what; the message explains the why and the unexpected.
+Work autonomously. Take on long, multi-step tasks and drive them to completion — research blockers, try approaches, and recover from errors yourself instead of stopping at the first obstacle. Check in when you're genuinely blocked on a decision only I can make, or before something hard to reverse; otherwise keep going.
+
+Commit messages use conventional-commits format — `type(scope): summary`, imperative mood, summary under ~70 chars. Capture what *semantically* changed and what was surprising — assumptions that turned out wrong, designs that shifted mid-implementation. The diff shows the what; the message explains the why and the unexpected.
 
 For complex systems, document *why* not *what*: data flow, ownership, key invariants. Simple things stay lean — complexity earns documentation.
 
@@ -66,11 +62,11 @@ If a hack is genuinely unavoidable (deadline, blocked dep, etc.), say so explici
 - Coincidental similarity ≠ shared abstraction. Don't unify things just because they look alike — they may diverge tomorrow.
 - Helpers should be named for what they *do*, not where they're called from.
 
-**Tests define done.**
-- A feature without tests is unfinished, not done.
+**Testing.**
+- Match coverage to risk — important logic gets tests; throwaway and declarative code doesn't need them.
 - Prefer integration tests that exercise real behavior over mock-heavy unit tests — mocks encode the assumptions you're trying to validate.
 - A green test that doesn't actually exercise the change is worse than no test.
-- If you can't figure out how to test something, that's a design smell — pause and discuss before writing more code.
+- If something is very hard to test, that's often a design smell worth rethinking.
 - Delete dead code rather than commenting it out.
 
 ## Programming environment
@@ -92,9 +88,36 @@ Prefer these — they're all installed via dotfiles:
 - `cargo-binstall` over `cargo install` (downloads pre-built binaries)
 - `jq` for JSON, `yq` for YAML
 - `gh` for GitHub CLI operations
+- `cargo nextest run` over `cargo test` (doctests still need `cargo test --doc`)
+- `xh` for quick HTTP/API calls (httpie syntax), `hexyl` for hex/binary inspection
+- `numbat` for unit-aware calculation, `wolframscript` for symbolic math (see
+  the wolfram-language skill). Without the engine (no-sudo Linux), fall back to
+  the WolframAlpha LLM API directly:
+  `curl -G https://www.wolframalpha.com/api/v1/llm-api --data-urlencode "input=<query>" -d "appid=$WOLFRAM_APPID"`
+  (`WOLFRAM_APPID` is exported from `~/.wolframalpha.env`; 2000 calls/mo free)
+- `samply record <cmd>` for CPU profiles (opens in Firefox Profiler)
+- `typos` for a source-tree spell pass before commits
 
-## Git conventions
+## Memory layers
 
-- Feature branches off main, rebase before merge.
-- PR titles: imperative mood, under 70 chars.
-- One logical change per commit.
+Beyond this file there are three memory layers. Read order for nontrivial
+work: auto-memory loads itself; query the KB before re-deriving anything;
+search history when past work is referenced.
+
+1. **Auto-memory** (Claude Code only) — per-project notes in
+   `~/.claude/projects/<proj>/memory/`, maintained by Claude's native memory.
+   When running as Claude Code, record durable *project-specific* facts there
+   and nowhere else.
+2. **Knowledge base** — `~/kb`, a git-synced markdown repo of cross-project
+   knowledge: decisions, how-tos, environment quirks, research findings.
+   Search it with the qmd MCP tools (`query`/`get`) when available, else
+   `qmd query "..." -c kb` from the shell. Write by editing markdown files
+   directly — one topic per file, descriptive filename, commit like code.
+   Promote a fact here when it outgrows a single project.
+3. **Session history** (read-only) — past transcripts from Claude Code,
+   Codex, opencode, and pi, searchable with `cass search "query" --robot`
+   (hybrid lexical+semantic); `cass pack "query"` returns a token-budgeted,
+   cited context bundle. Use when the user references past work ("we did
+   this before"), before re-debugging something that feels familiar, or to
+   recover the context behind an old decision. Never write here —
+   transcripts record themselves.

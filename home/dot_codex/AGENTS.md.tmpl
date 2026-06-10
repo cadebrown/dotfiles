@@ -5,14 +5,17 @@ execution in the current repo and shell environment, not for cross-agent
 portability. Common guidance lives in the shared partial; Codex-specific notes
 follow.
 
+{{ template "voice-common.md" . }}
+
 {{ template "agents-common.md" . }}
 
 ## Codex-specific
 
 - Use skills for repeatable workflows instead of expanding this file with long
-  runbooks.
-- Reach for the bootstrapping skills early when entering an unfamiliar
-  repository, reconciling toolchains, or mapping how to validate a project.
+  runbooks. Skills live in `~/.agents/skills` (a symlink to `~/.claude/skills`,
+  the single source shared with Claude/opencode/pi).
+- Reach for `env-reconciler` early when entering an unfamiliar repository,
+  reconciling toolchains, or mapping how to validate a project.
 - For source-grounded research, prefer primary documentation and concrete local
   evidence.
 - Use MCPs and web search for current external APIs, libraries, standards, and

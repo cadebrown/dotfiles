@@ -3,11 +3,13 @@
 Loaded by opencode (referenced from `instructions` in `~/.config/opencode/opencode.json`).
 Common guidance lives in the shared partial; opencode-specific notes follow.
 
+{{ template "voice-common.md" . }}
+
 {{ template "agents-common.md" . }}
 
 ## OpenCode-specific
 
-- **Agents**: `plan` runs Opus, `build` runs local MLX (Qwen3-Coder), `review` runs Sonnet.
+- **Agents**: `plan` runs Opus, `build` runs local MLX (Qwen3.6-27B), `review` runs Sonnet.
   Switch with `/agent <name>` in the TUI.
 - **Permissions matter**: `.git/**`, `node_modules/**`, `.env*`, and `**/secrets/**` are
   edit-denied at the config level. `git push` and destructive bash commands prompt
