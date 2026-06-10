@@ -1,6 +1,6 @@
 ---
 name: env-reconciler
-description: Reconcile a repository's expected environment with the local machine. Use when build or test commands depend on missing tools, unclear shell state, runtime versions, package managers, secrets, or local services.
+description: Reconcile a repository's expected environment with the local machine and produce a startup plan. Use when entering an unfamiliar repository, or when build/test commands depend on missing tools, unclear shell state, runtime versions, package managers, secrets, or local services.
 ---
 
 # Env Reconciler
@@ -38,4 +38,10 @@ Return:
 - what is missing
 - the next commands to run, in order
 
-Do not expand into general environment tutorials.
+When entering an unfamiliar repository, extend this into a startup plan:
+- first inspection commands and likely entrypoint files
+- first validation command, plus a fallback
+- likely failure points and the shortest path to a safe first edit
+
+Return a short executable sequence, not a long narrative. Do not expand into
+general environment tutorials.

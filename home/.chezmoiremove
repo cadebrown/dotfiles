@@ -1,0 +1,30 @@
+# Stale deployed paths chezmoi should delete on apply.
+#
+# SUNSET: these patterns are permanent while listed — chezmoi re-deletes the
+# paths on every apply, which would shadow a future legitimately-created file
+# of the same name. Drop entries once every machine has applied past the
+# migration that introduced them (skills move + aider removal, June 2026).
+#
+# Skills moved from ~/.codex/skills (legacy Codex location) to the canonical
+# ~/.claude/skills tree, exposed cross-tool via the ~/.agents/skills symlink.
+# Codex's own entries there (.system, migrate-to-codex) are NOT listed — only
+# the dirs this repo used to manage.
+.codex/skills/compiler-workbench
+.codex/skills/debug
+.codex/skills/env-reconciler
+.codex/skills/game-systems
+.codex/skills/project-bootstrapper
+.codex/skills/repo-orienter
+.codex/skills/research
+.codex/skills/research-reader
+.codex/skills/simulation-lab
+.codex/skills/web-shipping
+
+# aider was dropped entirely (June 2026) — clean its deployed config from
+# machines that had it. (~/.codex/rules/default.rules is handled by
+# install/codex.sh _evict_legacy_rules instead: it may contain Codex's own
+# runtime appends, which a blanket remove would destroy.)
+.aider.conf.yml
+.aider.model.metadata.json
+.aider.model.settings.yml
+.config/aider

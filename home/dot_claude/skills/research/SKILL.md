@@ -1,6 +1,6 @@
 ---
 name: research
-description: Research a topic thoroughly using web search before answering. Use when encountering unfamiliar APIs, libraries, frameworks, or domains, or when training data may be stale.
+description: Research a topic thoroughly using web search before answering. Use when encountering unfamiliar APIs, libraries, frameworks, or domains, when training data may be stale, or when a summary must be anchored in primary sources rather than recall.
 disable-model-invocation: true
 user-invocable: true
 allowed-tools: WebSearch, WebFetch, Read, Grep, Glob
