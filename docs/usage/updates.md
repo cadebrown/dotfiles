@@ -84,7 +84,7 @@ Codex also has global skills and rules (edit source-of-truth in the repo):
 
 ```sh
 $EDITOR ~/dotfiles/home/dot_codex/create_config.toml
-$EDITOR ~/dotfiles/home/dot_codex/rules/default.rules
+$EDITOR ~/dotfiles/home/dot_codex/rules/dotfiles.rules
 chezmoi apply
 ~/dotfiles/install/codex.sh sync-config
 ```
@@ -97,7 +97,8 @@ Codex binary/config health commands:
 ~/dotfiles/install/codex.sh check        # verify binary, profiles, and rules
 ```
 
-Skills live under `home/dot_codex/skills/` in the repo and apply to `~/.codex/skills/`.
+Skills live under `home/dot_claude/skills/` in the repo, apply to `~/.claude/skills/`,
+and reach Codex/opencode/pi through the `~/.agents/skills` symlink.
 Custom domain skills included:
 - `web-shipping`
 - `simulation-lab`
@@ -115,23 +116,24 @@ Useful Codex commands after updating:
 codex --profile fast
 codex --profile review
 codex --profile deep
-codex --profile unrestricted
+codex   # default profile is already danger-full-access
 codex -c 'tui.theme="neon-noir"'
 codex -c 'tui.theme="sunburst-candy"'
 codex -c 'tui.theme="minty-terminal"'
 codex mcp list
-codex execpolicy check --pretty --rules ~/.codex/rules/default.rules -- git status
-codex '$project-bootstrapper Map this repository and propose the first validation step.'
+codex execpolicy check --pretty --rules ~/.codex/rules/dotfiles.rules -- git status
+codex '$env-reconciler Map this repository and propose the first validation step.'
 codex '$simulation-lab Define state variables and a minimal validation case for this model.'
 ```
 
-Codex schema note: named profiles can set model/sandbox/tooling options, but profile-scoped
-`[profiles.<name>.tui]` only supports session picker layout. Set CLI themes at top level
-or with `-c 'tui.theme="..."'`.
+Codex schema note: profiles are delta-only overlay files at `~/.codex/<name>.config.toml`
+with top-level keys (Codex 0.134+); the old `[profiles.*]` tables in config.toml are
+ignored. Managed sources: `home/dot_codex/{deep,review,fast}.config.toml`.
 
-Default Codex mode is intentionally autonomous: `approval_policy = "never"` with
-`sandbox_mode = "workspace-write"`. Use `--profile unrestricted` only when a task truly needs
-unsandboxed filesystem access.
+Default Codex mode is intentionally autonomous: `sandbox_mode = "danger-full-access"`
+with granular approvals (`approval_policy = { granular = { rules = true, ... } }`) so the
+execpolicy prompt rules (rm, git reset --hard, git push) stay live. Use `-p deep`
+(workspace-write) or `-p review` (read-only) to opt into tighter sandboxes.
 
 ---
 

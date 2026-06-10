@@ -54,8 +54,9 @@ Each `DF_DO_*` flag defaults to `1` (run). Set to `0` to skip.
 | `DF_DO_CURSOR` | 6 | Cursor settings symlinks + extensions |
 | `DF_DO_VSCODE` | 6 | VS Code extensions |
 | `DF_DO_CMAKE` | 6 | CMake toolchain file deployment |
-| `DF_DO_LOCAL_LLM` | 6.5 | Local LLM tooling (HuggingFace cache, Ollama context aliases) |
-| `DF_DO_BLENDER_MCP` | 6.6 | Blender MCP addon install |
+| `DF_DO_LOCAL_LLM` | 6.5 | Local LLM tooling (HuggingFace cache + binary checks) |
+| `DF_DO_MEMORY` | 6.6 | Agent memory stack (cass + qmd + ~/kb + daemons) |
+| `DF_DO_BLENDER_MCP` | 6.7 | Blender MCP addon install |
 | `DF_DO_AUTH` | 7 | **Default `0`**. Set to `1` to run interactive token setup. |
 | `DF_DO_OVERLAYS` | 8 | Skip all overlay bootstrap scripts |
 

@@ -60,11 +60,11 @@ Currently ships [`pi`](https://pi.dev) — a multi-provider coding agent (Claude
 
 Other CLI agents are installed via their native packagers:
 - `claude-code` → `install/claude.sh` (Anthropic GCS binary)
-- `codex` → `install/codex.sh` (GitHub release binary)
+- `codex` → `@openai/codex` (version-pinned) in `packages/npm.txt`; managed config via `install/codex.sh`
 - `opencode` → `brew "opencode"` (`packages/Brewfile`)
-- `aider` → `aider-chat` in `packages/pip.txt` (uv tool install)
 
-Codex CLI config, rules, skills, themes, and MCP servers are managed from `home/dot_codex/`.
+Codex CLI config, rules, themes, and MCP servers are managed from `home/dot_codex/`
+(skills live in `home/dot_claude/skills/`, shared via the `~/.agents/skills` symlink).
 `install/codex.sh sync-config` preserves runtime trust/plugin sections while refreshing the
 managed config. Chezmoi also runs this sync when `home/dot_codex/create_config.toml` changes.
 
@@ -76,7 +76,6 @@ requests
 black
 numpy
 some-macos-tool  # macos-only (requires Metal / only available on macOS)
-aider-chat       # python=3.12 (scipy has no wheels for python 3.14+)
 ```
 
 Re-run: `bash ~/dotfiles/install/python.sh`
@@ -85,7 +84,7 @@ Each tool gets its own isolated venv via `uv tool install`, with entrypoints in 
 
 **Comment conventions** parsed by `install/python.sh`:
 - `# macos-only` — skipped on Linux (e.g. `mlx-lm` requires Apple Metal/MLX framework)
-- `# python=X.Y` — pins to a specific Python version for that tool (e.g. `aider-chat` needs 3.12 because `scipy` has no wheels for Python 3.14+)
+- `# python=X.Y` — pins to a specific Python version for that tool (e.g. `mlx-openai-server` needs 3.12 because `outlines-core` has no cp313/cp314 wheels)
 
 ### 4. Homebrew — non-language-specific tools and C libraries
 
@@ -145,12 +144,10 @@ Local LLM inference and coding agents are split across three layers:
 | `ollama` | `packages/Brewfile` (macOS only) | Inference server; installed as Homebrew formula, managed as a LaunchAgent |
 | `opencode` | `packages/Brewfile` | TUI coding agent by the SST team |
 | `mlx-lm` | `packages/pip.txt` | Apple Silicon Metal inference; on-demand only |
-| `aider-chat` | `packages/pip.txt` (`# python=3.12`) | CLI coding agent; pinned to Python 3.12 because scipy has no wheels for 3.14+ |
 | `just` | `packages/cargo.txt` | Command runner / Makefile alternative |
 
 `install/local-llm.sh` creates the PLAT-isolated HuggingFace cache directory (`$LOCAL_PLAT/.cache/huggingface`)
-and verifies that the expected binaries are present. `install/opencode.sh` creates context-boosted Ollama
-model aliases so the 4096-token default doesn't starve the agentic tool-use loop.
+and verifies that the expected binaries are present. `install/opencode.sh` verifies the opencode binary; opencode's backend config is pure chezmoi (`opencode.json.tmpl`, MLX primary).
 
 See [Local AI coding](../usage/local-llm.md) for usage details.
 

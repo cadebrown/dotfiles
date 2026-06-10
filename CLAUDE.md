@@ -27,7 +27,8 @@ These are non-negotiable and shape every decision in the repo:
 |---|---|---|
 | Dotfile sources | `home/` | chezmoi templates → applied to `~/` |
 | Package lists | `packages/` | `Brewfile`, `cargo.txt`, `pip.txt`, `npm.txt`, `mlx-models.txt`, `claude-*.txt` |
-| Shared template partials | `home/.chezmoitemplates/` | `agents-common.md` shared by Claude/Codex/aider/opencode/pi guidance files |
+| Agent skills | `home/dot_claude/skills/` | Single source → `~/.claude/skills`; `~/.agents/skills` symlinks there (read by Codex/opencode/pi) |
+| Shared template partials | `home/.chezmoitemplates/` | `agents-common.md` (engineering norms) + `voice-common.md` (tone/estimates), shared by Claude/Codex/opencode/pi guidance files |
 | Install scripts | `install/` | Each sources `_lib.sh`, each is idempotent |
 | Path vars + helpers | `install/_lib.sh` | **Read this first** — defines `PLAT`, `LOCAL_PLAT`, all tool paths, logging |
 | PLAT detection | `install/plat/` | `.plat_check.sh` (capability test) + `.plat_env.sh` (compiler flags) per target |
@@ -91,13 +92,14 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `rust.sh` | rustup + cargo-binstall + tools from `cargo.txt` | macOS: Homebrew rustup (code-signed); Linux: sh.rustup.rs |
 | `go.sh` | `go install` CLI tools from `packages/go.txt` | Go itself via Brewfile (`brew "go"`). `GOBIN=$ARCH_BIN` so binaries land alongside cargo/uv ones. Respects `# linux-only` / `# macos-only` markers (same as `pip.txt`). |
 | `python.sh` | uv + CLI tools from `pip.txt` via `uv tool install` | Each tool gets isolated venv under `$LOCAL_PLAT/uv/tools/`; no monolithic venv |
-| `claude.sh` | Claude Code binary + plugins + MCP servers + overlay skills | Downloads from Anthropic's GCS bucket; overlay discovery via `DF_OVERLAYS`. MCP entries can declare `auth=<source>` (e.g. `auth=gh`) — install reconciles the Authorization header on every run. |
-| `codex.sh` | Manages `~/.codex/config.toml` (incl. generated `[mcp_servers.*]` from `packages/mcp-servers.txt`), hooks, and chezmoi guard | Codex binary itself is installed via npm (`@openai/codex` in `npm.txt`). MCP list is shared with `install/claude.sh`. |
+| `claude.sh` | Claude Code binary + plugins + MCP servers + overlay skills + `~/AGENTS.md` symlink | Downloads from Anthropic's GCS bucket; overlay discovery via `DF_OVERLAYS`. MCP servers reconcile declaratively (URL/command drift re-registers). `auth=gh` uses a connection-time headersHelper (`~/.claude/gh-mcp-headers.sh`); `auth=context7` reads `~/.context7.env` (optional). |
+| `codex.sh` | Manages `~/.codex/config.toml` (incl. generated `[mcp_servers.*]` from `packages/mcp-servers.txt`), hooks, and chezmoi guard | Codex binary via npm — PINNED in `npm.txt` so binary and config move in lockstep (0.134 redesigned profiles). Profiles are delta files `~/.codex/<name>.config.toml` (chezmoi-managed). `auth=gh` emits `bearer_token_env_var = "GH_TOKEN"`, filled by the `codex()` shell wrapper at launch. Rules live in `~/.codex/rules/dotfiles.rules` (managed); `default.rules` is left to Codex's own TUI appends. |
 | `cursor.sh` | Cursor settings symlinks + extension install; `sync-extensions` subcommand captures new extensions back | Union-only (never removes); app updated via Brewfile cask |
 | `vscode.sh` | VS Code extension install; `sync-extensions` subcommand captures new extensions back | Extensions only — settings.json NOT tracked (contains embedded credentials) |
-| `local-llm.sh` | Verifies ollama/mlx-lm/mlx-openai-server/aider binaries; creates HF cache dir; `pull-models` subcommand pre-pulls MLX models from `packages/mlx-models.txt` | Warns (does not fail) if tools missing. MLX is the primary local backend (started via `mlxserve`); Ollama remains as fallback. |
-| `opencode.sh` | OpenCode binary check + creates Ollama context-boosted model aliases (fallback path; primary is MLX in `opencode.json`) | Skips cleanly if Ollama not installed/running; omits gpt-oss:120b (confirmed hang bug) |
+| `local-llm.sh` | Verifies ollama/mlx-lm/mlx-openai-server binaries; creates HF cache dir; `pull-models` subcommand pre-pulls MLX models from `packages/mlx-models.txt` | Warns (does not fail) if tools missing. MLX is the primary local backend (started via `mlxserve`); Ollama remains as fallback. |
+| `opencode.sh` | OpenCode binary check (config is pure chezmoi; primary backend is MLX in `opencode.json`) | The old Ollama context-boost alias machinery was removed — nothing consumed it |
 | `blender-mcp.sh` | Installs the `blender-mcp` Blender addon (`addon.py` from github.com/ahujasid/blender-mcp) and enables it via headless Blender | MCP server side is separate — see `packages/mcp-servers.txt`. Skips if Blender not installed. |
+| `memory.sh` | Agent memory stack: cass binary (GitHub release, checksum-verified) + session-history index, ~/kb knowledge repo, qmd collections + embeddings, memory daemons | qmd MCP daemon on localhost:8181 (LaunchAgent dev.cade.qmd on macOS, lazy-start on Linux); cass watch daemon likewise. `reindex` mode forces re-embedding. Indexes under ~/.cache (scratch), never synced; ~/kb is git-synced. |
 | `auth.sh` | Guided API token setup with service registry | Creates `~/.{service}.env` files (chmod 600). Built-in services: GitHub, Anthropic, OpenAI, Cloudflare, HuggingFace, plus `gh auth login`. Run `bash auth.sh status` for state, `bash auth.sh <service>` for a single one. Add a service by appending to `_SERVICE_DEFS` in the script. |
 | `dirs.sh` | Creates `~/dev`, `~/bones`, `~/misc` | Symlinks to scratch when available |
 | `scratch.sh` | Symlinks `~/.local`, `~/.cache`, etc. to scratch space | NFS quota relief |
@@ -174,7 +176,8 @@ against a recorded install dir (uv was the canonical example of this footgun).
 5.6  Quick Actions    DF_DO_MACOS_QUICK_ACTIONS
 6.   runtimes         DF_DO_NODE, DF_DO_RUST, DF_DO_GO, DF_DO_PYTHON, DF_DO_CLAUDE, DF_DO_CODEX, DF_DO_CURSOR, DF_DO_VSCODE, DF_DO_CMAKE
 6.5  local LLM        DF_DO_LOCAL_LLM (local-llm.sh + opencode.sh)
-6.6  blender-mcp      DF_DO_BLENDER_MCP (skips if Blender not installed)
+6.6  agent memory     DF_DO_MEMORY (memory.sh — cass + qmd + ~/kb + daemons)
+6.7  blender-mcp      DF_DO_BLENDER_MCP (skips if Blender not installed)
 7.   auth             DF_DO_AUTH (off by default)
 ```
 
@@ -225,16 +228,25 @@ must render identically on every machine** — otherwise machines overwrite each
 
 ### Shared partials
 
-`home/.chezmoitemplates/` holds reusable template fragments. The first one in
-the tree is `agents-common.md` — shared content across Claude/Codex/aider/
-opencode/pi guidance files. Reference from any `.tmpl` with:
+`home/.chezmoitemplates/` holds reusable template fragments:
+
+- `agents-common.md` — engineering norms (how-I-work, no-shortcut-fixes, tool
+  preferences, git) shared across all four tools' guidance files.
+- `voice-common.md` — tone/communication + estimate conventions. Single source
+  for "how output should read". Claude loads it via the `cade` output style
+  (`home/dot_claude/output-styles/cade.md.tmpl`, system-prompt level); Codex,
+  opencode, and pi include it directly in their always-on file. It is
+  deliberately **not** in `agents-common.md`, so Claude doesn't load voice twice.
+
+Reference either from a `.tmpl` with:
 
 ```gotmpl
 {{ template "agents-common.md" . }}
+{{ template "voice-common.md" . }}
 ```
 
-Edit `agents-common.md` once and all five tools' AGENTS/CLAUDE/CONVENTIONS files
-update on the next `chezmoi apply`. See [docs/usage/agents.md](docs/usage/agents.md).
+Edit a partial once and every consuming tool updates on the next `chezmoi apply`.
+See [docs/usage/agents.md](docs/usage/agents.md).
 
 ## Rules for agents
 
@@ -254,7 +266,7 @@ Priority order — native installer first, Homebrew as fallback:
 2. `packages/npm.txt` — npm packages
 3. `packages/pip.txt` — Python packages (installed via `uv tool install`)
    - `# macos-only` — skip on Linux (e.g. `mlx-lm` requires Apple Metal)
-   - `# python=X.Y` — pin to a specific Python version (e.g. `aider-chat` needs 3.12 because scipy has no wheels for 3.14+)
+   - `# python=X.Y` — pin to a specific Python version (e.g. `mlx-openai-server` needs 3.12 because outlines-core has no cp313/cp314 wheels)
 4. `packages/go.txt` — Go CLI tools (installed via `go install`)
    - `# linux-only` / `# macos-only` — same parser shape as `pip.txt`. Useful when macOS gets the tool via a Brewfile cask/formula and only Linux needs the source build (e.g. `entire`).
 5. `packages/Brewfile` — everything else (C libraries, GUI apps, tools without native installers)
@@ -391,12 +403,30 @@ These are non-obvious things that have caused real bugs:
 - **GitHub MCP can't use OAuth** — `api.githubcopilot.com/mcp` advertises OAuth, but
   GitHub's IdP doesn't implement Dynamic Client Registration (RFC 7591), so Claude
   Code's `/mcp` Authenticate flow fails with "Incompatible auth server". `mcp-servers.txt`
-  uses `auth=gh` to inject `Authorization: Bearer $(gh auth token)` instead. Run
-  `gh auth login` before bootstrapping; both `install/claude.sh` and `install/codex.sh`
-  refresh the header on every run, so token rotation auto-heals.
-- **Codex profile TUI settings are narrow** — `[profiles.<name>.tui]` currently only
-  supports `session_picker_view`. Keep `theme`, `animations`, `status_line`, and other
-  TUI aesthetics at top-level `[tui]` or pass them with `codex -c 'tui.theme="..."'`.
+  uses `auth=gh` instead: Claude resolves the token at connection time via
+  `~/.claude/gh-mcp-headers.sh` (headersHelper), Codex via `bearer_token_env_var =
+  "GH_TOKEN"` filled by the `codex()` shell wrapper. Run `gh auth login` once;
+  rotation heals itself — no token is stored in either config.
+- **Codex profiles are per-file since 0.134** — `[profiles.*]` tables in config.toml
+  are silently ignored; profiles are delta-only `~/.codex/<name>.config.toml` files
+  with top-level keys. `@openai/codex` is version-pinned in `packages/npm.txt` so the
+  binary can't drift ahead of the config — bump the pin and run
+  `bash install/codex.sh check` together.
+- **Codex `approval_policy` uses the granular form** — a plain `"never"` silently
+  suppresses every `decision=prompt` rule in `rules/dotfiles.rules` (rm, git reset
+  --hard, git push). `{ granular = { rules = true, ... } }` keeps those prompts live
+  while everything else stays autonomous. Watch openai/codex#25312.
+- **Test `~/.homebrew/bin/brew`, never `-e ~/.homebrew`** — Homebrew stores tap-trust
+  state at `~/.homebrew/trust.json` on macOS, so a bare directory test misroutes the
+  shell profiles onto the Linux user-prefix branch (bit us June 2026; both profile
+  templates now guard on the binary).
+- **cass Linux prebuilts need host glibc >= 2.38** — they link system glibc, not the
+  Homebrew one. install/memory.sh falls back to `cargo install --git` on older hosts.
+  Its brew tap is NOT used (formula sha lagged a release-asset re-upload, June 2026).
+- **qmd needs Homebrew sqlite on macOS** — the system libsqlite3 blocks loadable
+  extensions, killing qmd's vector index. `brew "sqlite"` is in the Brewfile.
+- **Memory indexes are per-machine** — qmd (~/.cache/qmd) and cass (~/.cache/cass)
+  rebuild locally; only ~/kb (git) and dotfiles sync across machines.
 - **`~/.claude` must not be in scratch links** — chezmoi manages `home/dot_claude/` as a
   real directory. If `scratch.sh` symlinks `~/.claude` to scratch, `chezmoi apply` replaces
   the symlink with a directory containing only managed files, orphaning all conversation

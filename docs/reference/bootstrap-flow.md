@@ -28,7 +28,8 @@ flowchart TD
         K["cmake.sh<br/>DF_DO_CMAKE"]
     end
     S6 --> S65["6.5  local LLM<br/>DF_DO_LOCAL_LLM"]
-    S65 --> S66["6.6  blender-mcp addon<br/>DF_DO_BLENDER_MCP"]
+    S65 --> S66["6.6  agent memory stack<br/>DF_DO_MEMORY"]
+    S66 --> S67["6.7  blender-mcp addon<br/>DF_DO_BLENDER_MCP"]
     S66 --> S7["7  auth.sh walk<br/>DF_DO_AUTH (default 0)"]
     S7 --> S8["8  overlay bootstraps<br/>DF_DO_OVERLAYS"]
 ```
@@ -50,8 +51,9 @@ flowchart TD
 | 5.5 | `install/macos-settings.sh` | `defaults write` for Dock, Finder, keyboard, trackpad, Safari, iTerm2, screen lock. Power management requires sudo (silently skipped if cache expired). | Yes |
 | 5.6 | `install/macos-quick-actions.sh` | Deploy `*.workflow` bundles to `~/Library/Services/`; flush `pbs`. | Yes |
 | 6 | various | See language-runtime table below. Each script is independent; failures cascade only via `die` (not `log_warn`). | Yes |
-| 6.5 | `install/local-llm.sh` + `install/opencode.sh` | Create `$LOCAL_PLAT/.cache/huggingface`; verify ollama/mlx-lm/aider; create context-boosted Ollama aliases. | Yes |
-| 6.6 | `install/blender-mcp.sh` | Download `addon.py` into Blender's user addons; enable headlessly. Skipped if Blender not installed. | Yes |
+| 6.5 | `install/local-llm.sh` + `install/opencode.sh` | Create `$LOCAL_PLAT/.cache/huggingface`; verify ollama/mlx-lm/mlx-openai-server/opencode binaries. | Yes |
+| 6.6 | `install/memory.sh` | Agent memory stack: cass binary (checksum-verified GitHub release) + session-history index, ~/kb knowledge repo, qmd collections/embeddings, memory daemons. | Yes |
+| 6.7 | `install/blender-mcp.sh` | Download `addon.py` into Blender's user addons; enable headlessly. Skipped if Blender not installed. | Yes |
 | 7 | `install/auth.sh` | Walk every service, prompt `[k]eep / [u]pdate / [d]elete` per service. **Default off** — set `DF_DO_AUTH=1` to enable. | Yes |
 | 8 | overlay scripts | Run `bash $DF_ROOT/dotfiles-*/bootstrap.sh "$DF_MODE"` for each overlay. | Per overlay |
 
@@ -63,7 +65,7 @@ flowchart TD
 | 6b | `install/rust.sh` | Install rustup (Homebrew on macOS, sh.rustup.rs on Linux); install/update stable toolchain; `cargo binstall` every entry in `cargo.txt`. | rustup self-update is `--no-self-update` except in upgrade mode. |
 | 6c | `install/python.sh` | Install uv to `$ARCH_BIN`; `uv tool install` every entry in `pip.txt` (each gets isolated venv). | `# macos-only` and `# python=X.Y` markers parsed from comments. |
 | 6d | `install/claude.sh` | Download Claude Code binary to `$ARCH_BIN/claude` if version differs; install plugins; register MCP servers (with `auth=gh` resolution); deploy overlay skills. | Atomic write via temp file + `mv -f`. |
-| 6e | `install/codex.sh upgrade` | Same shape for Codex; plus sync managed config (`config.toml`, `hooks.json`, `df-chezmoi-guard`); run healthcheck. | Healthcheck `die`s on config drift. |
+| 6e | `install/codex.sh upgrade` | Sync managed Codex config (`config.toml`, `hooks.json`, `df-chezmoi-guard`) + healthcheck (binary comes from the pinned `@openai/codex` in `npm.txt`). | Healthcheck `die`s on config drift. |
 | 6f | `install/cursor.sh` | Symlink Cursor settings; install extensions from `cursor-extensions.txt`. | Extension failures are warnings, not fatal. |
 | 6g | `install/vscode.sh` | Install extensions from `vscode-extensions.txt`. | Same warning-not-fatal pattern. |
 | 6h | `install/cmake.sh` | Copy toolchain files (`llvm-21/22.cmake`, `gcc-13/15.cmake`, `_brew.cmake`) from repo to `$LOCAL_PLAT/cmake/toolchains/`. | Always overwrites — keeps deployed copies in sync with repo. |

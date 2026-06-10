@@ -144,7 +144,7 @@ Any step can be skipped with `DF_DO_*=0` env vars. See [Bootstrap](setup/bootstr
 | --- | --- |
 | [Day-to-day workflow](usage/updates.md) | Updating, adding packages, editing dotfiles |
 | [AeroSpace window management](usage/aerospace.md) | Tiling WM keymap (macOS) |
-| [Local AI coding](usage/local-llm.md) | Ollama, mlx-lm, aider, opencode setup |
+| [Local AI coding](usage/local-llm.md) | Ollama, mlx-lm, opencode, pi setup |
 | [Troubleshooting](usage/troubleshooting.md) | Tools not found, PATH issues, build failures |
 
 **Reference**

@@ -170,4 +170,4 @@ Notable examples:
 - `~/.codex/config.toml` — Codex appends project trust levels at runtime; managed with `create_` prefix so chezmoi writes it once and never overwrites
 
 Codex-specific note:
-- `~/.codex/AGENTS.md`, `~/.codex/skills/`, and `~/.codex/rules/` are intentionally Codex-specific and do not mirror Claude one-for-one
+- `~/.codex/AGENTS.md` and `~/.codex/rules/` are intentionally Codex-specific; skills are shared from `~/.claude/skills` via the `~/.agents/skills` symlink

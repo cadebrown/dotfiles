@@ -42,7 +42,6 @@ The merge is **append-only** — overlays add to the base, they don't replace it
 | `packages/<other>.txt` | discovered via `overlay_package_files()` — pattern works for any list-style file |
 | `home/dot_claude/CLAUDE.md` | appended to `~/.claude/CLAUDE.md` via the chezmoi template |
 | `home/dot_claude/skills/<name>/SKILL.md` | deployed to `~/.claude/skills/<name>/` by `install/claude.sh` |
-| `home/dot_codex/skills/<name>/SKILL.md` | deployed to `~/.codex/skills/<name>/` (when codex sync runs) |
 | `install/auth.sh` | runs alongside the base auth walk during step 7.5 (post-base auth) |
 | `install/<other>.sh` | source `_lib.sh` and use the same conventions; invoked from the overlay's bootstrap |
 | `bootstrap.sh` | runs as the base bootstrap step 8 (after everything else) |

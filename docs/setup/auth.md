@@ -23,7 +23,7 @@ DF_DO_AUTH=1 ~/dotfiles/bootstrap.sh
 | **anthropic** | `ANTHROPIC_API_KEY` | `~/.anthropic.env` | Anthropic SDK, agents using `api.anthropic.com` directly | you only use Claude via Pro / Claude Code OAuth |
 | **openai** | `OPENAI_API_KEY` | `~/.openai.env` | OpenAI SDK, Codex CLI in API mode | you only use Codex via ChatGPT login |
 | **cloudflare** | `CLOUDFLARE_API_TOKEN` | `~/.cloudflare.env` | OpenTofu in `infra/`, Cloudflare MCP via API, R2/Pages | you don't deploy infra/ via OpenTofu (the Cloudflare MCP can use OAuth) |
-| **huggingface** | `HF_TOKEN` | `~/.huggingface.env` | mlx-lm gated models, aider HF, transformers | you don't pull gated models or private repos |
+| **huggingface** | `HF_TOKEN` | `~/.huggingface.env` | mlx-lm gated models, transformers | you don't pull gated models or private repos |
 
 Plus `gh auth login` (browser flow) — required for the **GitHub MCP server** consumed by both Claude and Codex (`auth=gh` in `mcp-servers.txt`). gh stores its token in macOS keychain / Linux secret service, not in an env file.
 
@@ -96,7 +96,7 @@ name|ENV_VAR|.env_file_basename|short description|create_url|scopes hint|skip-if
 Example for adding OpenRouter:
 
 ```text
-"openrouter|OPENROUTER_API_KEY|.openrouter.env|OpenRouter token (aider via openrouter/ models)|https://openrouter.ai/keys|—|you don't use OpenRouter-routed models"
+"openrouter|OPENROUTER_API_KEY|.openrouter.env|OpenRouter token (openrouter/ models)|https://openrouter.ai/keys|—|you don't use OpenRouter-routed models"
 ```
 
 Now `bash auth.sh status`, `bash auth.sh openrouter`, and the walk all include it. No code changes needed.

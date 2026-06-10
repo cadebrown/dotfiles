@@ -77,11 +77,11 @@ Paths below use `$LOCAL_PLAT`, which is `$HOME/.local` by default and `$HOME/.lo
     - Versioned files: `llvm-21.cmake`, `llvm-22.cmake`, `gcc-13.cmake`, `gcc-15.cmake`, plus shared `_brew.cmake`
     - `~/.profile` sets `CMAKE_TOOLCHAIN_FILE` to the highest installed LLVM toolchain automatically
     - Switch at runtime with the `tc` shell function (e.g. `tc gcc-15`, `tc llvm-22`)
-14. **Local LLM tooling** — HuggingFace cache + Ollama context-boosted model aliases
+14. **Local LLM tooling** — HuggingFace cache + binary checks
     - Creates `$LOCAL_PLAT/.cache/huggingface` for mlx-lm weights
-    - Context-boosted aliases (e.g. `qwen3-coder:30b-ctx256k`) created if the base model is pulled
-    - Skipped gracefully if Ollama is not installed
-15. **Blender MCP** addon — installs `addon.py` into the active Blender profile and enables it
+    - Verifies ollama / mlx-lm / mlx-openai-server / opencode binaries
+15. **Agent memory stack** — cass session-history search, ~/kb + qmd knowledge index, memory daemons
+16. **Blender MCP** addon — installs `addon.py` into the active Blender profile and enables it
 16. **Auth** (opt-in: `DF_DO_AUTH=1`) — guided service-token setup; see [Auth](auth.md)
 17. **Overlays** — runs `bootstrap.sh` of any `dotfiles-*/` overlay alongside this repo; see [Overlays](overlays.md)
 
@@ -123,7 +123,8 @@ Paths use `$LOCAL_PLAT`, which is `$HOME/.local` by default (or `$HOME/.local/$P
 11. **CMake toolchain files** → `$LOCAL_PLAT/cmake/toolchains/` (`llvm-21/22.cmake`, `gcc-13/15.cmake`, `_brew.cmake`)
     - `~/.profile` auto-sets `CMAKE_TOOLCHAIN_FILE` to the highest installed LLVM toolchain
     - Switch with the `tc` shell function (e.g. `tc gcc-15`, `tc llvm-22`)
-12. **Local LLM tooling** — HuggingFace cache + Ollama context-boosted model aliases (skipped if Ollama not installed)
+12. **Local LLM tooling** — HuggingFace cache + ollama/mlx-lm/mlx-openai-server/opencode binary checks
+13. **Agent memory stack** — cass session-history search, ~/kb + qmd knowledge index (daemons lazy-start from shell profiles)
 13. **Auth** (opt-in: `DF_DO_AUTH=1`) — guided token setup; see [Auth](auth.md)
 14. **Overlays** — runs `bootstrap.sh` of any `dotfiles-*/` overlay; see [Overlays](overlays.md)
 
@@ -151,7 +152,8 @@ DF_DO_CODEX=0                # skip Codex CLI install
 DF_DO_CURSOR=0               # skip Cursor settings symlinks + extension install
 DF_DO_VSCODE=0               # skip VS Code extension install
 DF_DO_CMAKE=0                # skip CMake toolchain file deployment
-DF_DO_LOCAL_LLM=0            # skip local LLM setup (HuggingFace cache + Ollama context aliases)
+DF_DO_LOCAL_LLM=0            # skip local LLM setup (HuggingFace cache + binary checks)
+DF_DO_MEMORY=0               # skip the agent memory stack (cass + qmd + ~/kb)
 DF_DO_BLENDER_MCP=0          # skip Blender MCP addon install
 DF_DO_AUTH=1                 # run interactive API token setup (default 0)
 DF_DO_OVERLAYS=0             # skip all overlay bootstraps (dotfiles-*/bootstrap.sh)
