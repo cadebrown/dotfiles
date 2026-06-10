@@ -5,10 +5,10 @@
 
 shopt -s checkwinsize   # update LINES/COLUMNS after each command
 shopt -s cdspell        # fix minor typos in cd targets
-shopt -s dirspell       # fix typos during tab completion
-shopt -s autocd         # bare path → cd into it
+shopt -s dirspell 2>/dev/null || true  # bash 4+; macOS /bin/bash is 3.2       # fix typos during tab completion
+shopt -s autocd 2>/dev/null || true  # bash 4+; macOS /bin/bash is 3.2         # bare path → cd into it
 shopt -s cdable_vars    # cd $var expands $var as a directory path
-shopt -s globstar       # ** recursive glob (like zsh)
+shopt -s globstar 2>/dev/null || true  # bash 4+; macOS /bin/bash is 3.2       # ** recursive glob (like zsh)
 shopt -s extglob        # extended patterns: ?(x) *(x) +(x) @(x) !(x)
 shopt -s nocaseglob     # case-insensitive filename globbing
 shopt -s histverify     # load !-expansions into edit buffer, don't execute
@@ -64,7 +64,8 @@ _bash_capture() {
     # Capture only the first simple command per prompt cycle (e.g. for pipelines,
     # we log the first segment; the full command is always in HISTFILE)
     [[ -n $_BASH_LOGCMD ]] && return
-    _BASH_LOGCMD="$BASH_COMMAND"
+    # Via bash-preexec the command arrives as $1; raw DEBUG trap uses $BASH_COMMAND.
+    _BASH_LOGCMD="${1:-$BASH_COMMAND}"
 }
 
 ### PROMPT ###
@@ -137,6 +138,12 @@ alias verify-path='bash ~/dotfiles/install/verify-path.sh'
 # Codex profile shortcuts (default codex = danger-full-access for git ops)
 alias codexs='codex -p deep'        # opt-in workspace-write sandbox
 alias codexr='codex -p review'      # read-only sandbox
+
+# codex launcher — GH_TOKEN resolved at launch for the GitHub MCP server
+# (bearer_token_env_var in config.toml; token never lands on disk).
+codex() {
+    GH_TOKEN="${GH_TOKEN:-$(command gh auth token 2>/dev/null)}" command codex "$@"
+}
 
 # mlxserve — MLX OpenAI-compat server on :8080 (default Qwen3.6-27B 8bit)
 mlxserve() {
@@ -232,5 +239,17 @@ if command -v fzf &>/dev/null; then
     eval "$(fzf --bash)"
 fi
 
-# Set trap last so .bashrc sourcing itself isn't logged as a user command
-trap '_bash_capture' DEBUG
+# bash-preexec owns the DEBUG trap when present (atuin needs it to record
+# history in bash); _bash_capture rides preexec_functions instead of a raw
+# trap. Fallback to the raw trap when bash-preexec is missing. Set last so
+# .bashrc sourcing itself isn't logged as a user command.
+if [[ -r "${HOMEBREW_PREFIX:-/opt/homebrew}/etc/profile.d/bash-preexec.sh" ]]; then
+    . "${HOMEBREW_PREFIX:-/opt/homebrew}/etc/profile.d/bash-preexec.sh"
+    preexec_functions+=(_bash_capture)
+else
+    trap '_bash_capture' DEBUG
+fi
+
+# atuin — history search on ctrl-r. MUST init after fzf (which also binds ^R)
+# and after bash-preexec (recording hooks). Up-arrow stays native.
+command -v atuin >/dev/null 2>&1 && eval "$(atuin init bash --disable-up-arrow)"

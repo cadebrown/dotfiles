@@ -57,3 +57,52 @@ typst-cli
 # mdBook diagram preprocessor (pre-built: github.com/badboy/mdbook-mermaid)
 # mdbook itself comes from the Brewfile (Homebrew has it; this plugin doesn't).
 mdbook-mermaid
+
+# Shell history: SQLite-backed search + optional e2e-encrypted sync (pre-built: github.com/atuinsh/atuin)
+# NOTE: ships aarch64-apple-darwin but no x86_64-apple-darwin asset — Intel Macs
+# would need the Brewfile instead (none in the fleet today).
+atuin
+
+# Rust test runner: parallel, per-test process isolation (pre-built: github.com/nextest-rs/nextest)
+cargo-nextest
+
+# Unit-aware scientific calculator (pre-built: github.com/sharkdp/numbat)
+# Crate is numbat-cli; the bare `numbat` crate is the library and has no binary.
+numbat-cli
+
+# Hex viewer with color-coded byte categories (pre-built: github.com/sharkdp/hexyl)
+hexyl
+
+# Sampling CPU profiler → Firefox Profiler UI, no sudo needed (pre-built: github.com/mstange/samply)
+samply
+
+# httpie-style HTTP client (pre-built: github.com/ducaale/xh)
+xh
+
+# tldr client: example-first command docs, offline cache (pre-built: github.com/tealdeer-rs/tealdeer)
+# Binary is `tldr`.
+tealdeer
+
+# Visual disk usage tree (pre-built: github.com/bootandy/dust). Crate is du-dust; binary `dust`.
+du-dust
+
+# Source-aware spell checker, ultra-low false positives (pre-built: github.com/crate-ci/typos)
+# Crate is typos-cli; binary `typos`.
+typos-cli
+
+# Single-binary static file server with upload/QR (pre-built: github.com/svenstaro/miniserve)
+miniserve
+
+# Gitignore-aware file watcher with process-group restarts (pre-built: github.com/watchexec/watchexec)
+# Crate is watchexec-cli (bare `watchexec` is the library); generic complement to entr/bacon.
+watchexec-cli
+
+# Async terminal file manager with previews; uses fd/rg/fzf/zoxide as backends
+# (pre-built via binstall metadata: github.com/sxyazi/yazi)
+yazi-fm
+yazi-cli
+
+# Jujutsu: git-compatible VCS — working copy is always a commit, first-class
+# conflicts (pre-built: github.com/jj-vcs/jj). Crate jj-cli; binary `jj`.
+# Trial: coexists with git in the same repo; not a git replacement yet.
+jj-cli

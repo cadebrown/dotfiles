@@ -60,6 +60,16 @@ fi
 # Ensure cargo is on PATH for this session
 export PATH="$CARGO_HOME/bin:$PATH"
 
+### rust-analyzer (rustup component) ###
+# Backs the rust-analyzer-lsp Claude Code plugin. A rustup component (not a
+# cargo.txt crate) so it always matches the active toolchain version.
+if "$CARGO_HOME/bin/rustup" component list 2>/dev/null | grep -q '^rust-analyzer.*(installed)'; then
+    log_okay "rust-analyzer component already installed"
+else
+    log_info "Adding rust-analyzer rustup component"
+    run_logged "$CARGO_HOME/bin/rustup" component add rust-analyzer
+fi
+
 ### cargo-binstall ###
 # cargo-binstall downloads pre-compiled binaries from GitHub releases when available,
 # falling back to `cargo install` (source compilation) otherwise.

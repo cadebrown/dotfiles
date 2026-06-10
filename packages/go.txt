@@ -20,3 +20,15 @@
 # macOS uses the Brewfile cask `entire` (Homebrew tracks updates better than
 # go install @latest); Linux installs from source here.
 github.com/entireio/cli/cmd/entire@latest  # linux-only
+
+# Terminal git UI: line-level staging, interactive rebase (uses installed delta as pager)
+github.com/jesseduffield/lazygit@latest
+
+# Interactive JSON viewer/processor TUI (jq stays the scripting tool)
+github.com/antonmedv/fx@latest
+
+# Modern dig: colored + JSON output, DoH/DoT
+github.com/mr-karan/doggo/cmd/doggo@latest
+
+# Terminal markdown renderer (bat shows source; glow renders)
+github.com/charmbracelet/glow@latest

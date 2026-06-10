@@ -192,12 +192,20 @@ alias cursor-sync='bash ~/dotfiles/install/cursor.sh sync-extensions'
 alias codexs='codex -p deep'
 alias codexr='codex -p review'
 
+# codex launcher — resolve GH_TOKEN at launch so the GitHub MCP server can
+# authenticate: config.toml references it via bearer_token_env_var, so the
+# token never lands on disk. Lazy (`gh auth token` runs per codex launch,
+# not per shell startup), and a caller-provided GH_TOKEN wins.
+codex() {
+    GH_TOKEN="${GH_TOKEN:-$(command gh auth token 2>/dev/null)}" command codex "$@"
+}
+
 # mlxserve — start the MLX OpenAI-compat server on localhost:8080.
 # Uses mlx-openai-server (NOT mlx_lm.server) for tool/function calling.
 #
 # Default model: Qwen3.6-27B-MLX-8bit (Apr 2026, dense VLM, reasoning-tuned).
 # All requests use served-model-name "qwen3.6-27b" regardless of which
-# physical model is loaded — keeps aider/opencode/pi configs stable when
+# physical model is loaded — keeps opencode/pi configs stable when
 # you swap models.
 #
 # KV cache quantization (--kv-bits 8) is enabled ONLY for lm-mode models;
@@ -295,6 +303,13 @@ if command -v fzf &>/dev/null; then
     export FZF_DEFAULT_OPTS="--height=40% --reverse --border --info=inline"
     eval "$(fzf --zsh)"
 fi
+
+# atuin — SQLite-backed shell history search on ctrl-r. MUST init after fzf,
+# which also binds ^R — last writer wins. Up-arrow stays native
+# (--disable-up-arrow). Sync is off until configured (atuin register/login);
+# local search works regardless. Data dir: ~/.local/share/atuin (scratch-linked
+# on NFS machines, so the SQLite db stays local).
+command -v atuin >/dev/null 2>&1 && eval "$(atuin init zsh --disable-up-arrow)"
 
 ### TOOLCHAIN ###
 

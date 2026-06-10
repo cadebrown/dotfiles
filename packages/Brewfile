@@ -24,9 +24,14 @@ brew "glab"
 
 ### Search & Files ###
 brew "tree"
+# eza: modern ls (git column, tree mode). Brewfile, not cargo.txt — upstream
+# publishes no darwin release binaries, so binstall would source-compile.
+brew "eza"
 brew "ncdu"
 brew "fzf"
 brew "jq"
+brew "bc"  # statusline.sh arithmetic (ctx%/cost) — not guaranteed on minimal Linux
+brew "bash-preexec"  # preexec/precmd hooks for bash — required by atuin history recording
 brew "direnv"
 brew "entr"
 brew "xdelta"
@@ -49,6 +54,15 @@ brew "graphviz"
 
 ### Documents ###
 brew "pandoc"
+
+### Claude Code sandbox (Linux backend) ###
+# macOS uses the built-in Seatbelt sandbox; Linux needs bubblewrap (user
+# namespaces, no sudo) + socat (network proxy hop). See sandbox block in
+# home/dot_claude/settings.json.
+if OS.linux?
+  brew "bubblewrap"
+  brew "socat"
+end
 
 ### Media ###
 brew "ffmpeg"
@@ -79,6 +93,10 @@ brew "lld"    # LLVM linker (now a separate formula)
 brew "mold"   # fast modern linker
 brew "ccache"  # C/C++ compiler cache
 brew "sccache" # compiler cache with Rust support (RUSTC_WRAPPER)
+# bacon: background cargo check/clippy/test on save (successor to cargo-watch).
+# Brewfile, not cargo.txt — it publishes no prebuilt GitHub release binaries,
+# and cargo.txt entries must binstall without source compilation.
+brew "bacon"
 brew "fftw"
 brew "glfw"
 
@@ -89,6 +107,14 @@ brew "go"  # Go toolchain; packages/go.txt drives `go install` via install/go.sh
 
 ### AI Coding Agents ###
 brew "opencode"
+
+### Memory stack (see install/memory.sh + docs/usage/agents.md) ###
+# cass (session-history search) is installed by install/memory.sh directly
+# from GitHub releases with checksum verification — its brew tap lags asset
+# re-uploads (hit a stale-sha failure June 2026).
+# sqlite: qmd's vector index needs Homebrew SQLite on macOS (system libsqlite3
+# blocks loadable extensions)
+brew "sqlite"
 
 ### Security ###
 brew "gitleaks"  # secret scanning — also used as a global pre-push hook
@@ -105,6 +131,13 @@ brew "cc65"
 if OS.mac?
   ### Languages & Runtimes (macOS) ###
   brew "openjdk"
+  # Free Wolfram Engine (full Mathematica kernel + wolframscript). Free for
+  # personal/dev use; one-time activation with a Wolfram ID on first run:
+  #   wolframscript   (prompts for login; 2 activation keys per account)
+  # Used by the wolfram-language/wolfram-alpha agent skills via Bash — no MCP.
+  # Linux: installer requires sudo, so headless boxes use the WolframAlpha
+  # LLM API fallback documented in agents-common.md (~/.wolframalpha.env).
+  cask "wolfram-engine"
 
   ### Dev Tools - VMs & Containers (macOS) ###
   brew "colima"
