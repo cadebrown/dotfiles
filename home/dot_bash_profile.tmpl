@@ -58,9 +58,12 @@ unset _local_root
 ### HOMEBREW (early — needed so zsh handoff finds the right zsh) ###
 
 {{ if eq .chezmoi.os "darwin" -}}
-if [ -e "$HOME/.homebrew" ]; then
+# Test the brew BINARY, not the directory — Homebrew itself stores tap-trust
+# state at ~/.homebrew/trust.json on macOS, so a bare -e dir test would
+# misfire onto the Linux user-prefix branch (bit us June 2026).
+if [ -x "$HOME/.homebrew/bin/brew" ]; then
     eval "$(~/.homebrew/bin/brew shellenv)"
-elif [ -e "/opt/homebrew" ]; then
+elif [ -x "/opt/homebrew/bin/brew" ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 elif [ -e "/usr/local/bin/brew" ]; then
     # Intel Mac fallback (Homebrew installs to /usr/local on x86-64)
@@ -184,10 +187,19 @@ if [ -d "${HOMEBREW_PREFIX:-}/opt/binutils/bin" ]; then
 fi
 {{ end -}}
 
+# Memory stack (install/memory.sh): cass session-history index lives under
+# ~/.cache (scratch-linked on NFS machines, never synced). cass defaults to
+# its minilm embedder — the override selects the installed nomic-embed model.
+export CASS_DATA_DIR="${CASS_DATA_DIR:-$HOME/.cache/cass}"
+export CASS_SEMANTIC_EMBEDDER="${CASS_SEMANTIC_EMBEDDER:-nomic-embed}"
+# qmd: Qwen3-Embedding-0.6B (MTEB top tier) over the default embeddinggemma.
+# Changing this requires a one-time `qmd embed -f` re-embed.
+export QMD_EMBED_MODEL="${QMD_EMBED_MODEL:-hf:Qwen/Qwen3-Embedding-0.6B-GGUF/Qwen3-Embedding-0.6B-Q8_0.gguf}"
+
 ### PLATFORM-SPECIFIC ###
 {{ if eq .chezmoi.os "darwin" -}}
 
-# Ollama: explicit API endpoint — read by aider, Continue.dev, OpenHands, etc.
+# Ollama: explicit API endpoint — read by Continue.dev, OpenHands, etc.
 # Use :- so overlay dotfiles or .env files can override (e.g. remote Ollama server).
 export OLLAMA_HOST="${OLLAMA_HOST:-http://127.0.0.1:11434}"
 
@@ -196,6 +208,13 @@ if [ -S "$HOME/.colima/default/docker.sock" ]; then
 fi
 
 {{ else -}}
+
+# Memory daemons: no launchd on Linux — lazy-start at login (cheap pgrep
+# guards; macOS uses LaunchAgents dev.cade.qmd / dev.cade.cass-watch).
+command -v qmd >/dev/null 2>&1 && ! pgrep -f "qmd mcp --http" >/dev/null 2>&1 \
+    && (qmd mcp --http --daemon >/dev/null 2>&1 &)
+command -v cass >/dev/null 2>&1 && ! pgrep -f "cass watch" >/dev/null 2>&1 \
+    && (nohup cass watch >/dev/null 2>&1 &)
 
 export SSL_CERT_DIR=/usr/lib/ssl/certs
 

@@ -57,6 +57,7 @@
 #   DF_DO_VSCODE        — set to 0 to skip VS Code extension install
 #   DF_DO_CMAKE         — set to 0 to skip CMake toolchain file install
 #   DF_DO_LOCAL_LLM     — set to 0 to skip local LLM tooling setup
+#   DF_DO_MEMORY        — set to 0 to skip the agent memory stack (qmd/cass/~kb)
 #   DF_DO_BLENDER_MCP   — set to 0 to skip blender-mcp addon install
 #   DF_DO_OVERLAYS      — set to 0 to skip all overlay bootstraps
 
@@ -503,9 +504,19 @@ else
     log_info "Skipping local LLM tooling (DF_DO_LOCAL_LLM=0)"
 fi
 
-### 6.6. blender-mcp addon ###
+### 6.6. agent memory stack ###
 
-log_section "6.6 — blender-mcp addon"
+log_section "6.6 — agent memory stack"
+
+if [[ "${DF_DO_MEMORY:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/memory.sh" || die "memory.sh failed"
+else
+    log_info "Skipping agent memory stack (DF_DO_MEMORY=0)"
+fi
+
+### 6.7. blender-mcp addon ###
+
+log_section "6.7 — blender-mcp addon"
 
 if [[ "${DF_DO_BLENDER_MCP:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/blender-mcp.sh" || die "blender-mcp.sh failed"

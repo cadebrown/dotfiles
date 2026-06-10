@@ -1,0 +1,62 @@
+{{/*
+LaunchAgent: keep `cass watch` running — incremental re-indexing of agent
+session history (Claude Code, Codex, opencode, pi transcripts) into the
+hybrid BM25+vector index as new sessions land. Loaded by install/memory.sh.
+
+cass is installed to ~/.local/bin by install/memory.sh (GitHub release binary,
+checksum-verified). CASS_DATA_DIR keeps the SQLite index under ~/.cache
+(scratch-linked on NFS machines).
+
+Cost: ~100-300MB idle, brief spikes while embedding new sessions. To disable:
+  launchctl bootout gui/$(id -u)/dev.cade.cass-watch
+*/ -}}
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTD/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>dev.cade.cass-watch</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{ .chezmoi.homeDir }}/.local/bin/cass</string>
+        <string>watch</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CASS_DATA_DIR</key>
+        <string>{{ .chezmoi.homeDir }}/.cache/cass</string>
+        <key>CASS_SEMANTIC_EMBEDDER</key>
+        <string>nomic-embed</string>
+        <key>PATH</key>
+        <string>{{ .chezmoi.homeDir }}/.local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>{{ .chezmoi.homeDir }}</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/cass/stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/cass/stderr.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

@@ -1,0 +1,56 @@
+{{/*
+LaunchAgent: keep the qmd MCP daemon warm on localhost:8181.
+
+qmd serves hybrid search (BM25 + local GGUF embeddings + rerank) over the
+markdown knowledge layers (~/kb, Claude auto-memory, dotfiles docs). One warm
+process means the ~2GB of models load once and every agent session (Claude,
+Codex, opencode via MCP) shares it. Loaded by install/memory.sh.
+
+qmd lives in the nvm-managed node bin dir (no stable path), so launch through
+a login bash shell — .bash_profile sets up the PATH the same way zprofile does.
+
+Cost: ~2-3GB RSS with models warm. Index + models live under ~/.cache/qmd
+(scratch-linked on NFS machines). To disable temporarily:
+  launchctl bootout gui/$(id -u)/dev.cade.qmd
+*/ -}}
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTD/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>dev.cade.qmd</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>exec qmd mcp --http</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>{{ .chezmoi.homeDir }}</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/qmd/stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/qmd/stderr.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

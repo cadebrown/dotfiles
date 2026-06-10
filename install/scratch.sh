@@ -13,10 +13,16 @@
 #     ├── .nv/                   ← symlinked from ~/.nv (NVIDIA shader/optix cache)
 #     ├── .npm/                  ← symlinked from ~/.npm (npm cache)
 #     ├── .oh-my-zsh/            ← symlinked from ~/.oh-my-zsh
-#     └── .oh-my-zsh-custom/     ← symlinked from ~/.oh-my-zsh-custom
+#     ├── .oh-my-zsh-custom/     ← symlinked from ~/.oh-my-zsh-custom
+#     └── kb/                    ← symlinked from ~/kb (knowledge base, install/memory.sh)
 #
 # Which dirs are migrated is controlled by DF_LINKS (colon-separated).
-# Default: ~/.local:~/.cache
+# Default: see _DEFAULT_LINKS below
+#
+# Note on ~/kb: on scratch, each machine has its OWN kb working copy — the
+# git remote (not NFS) is the sync mechanism, which is the designed model
+# (memory.sh prompts for a remote). Git on NFS is slow and lock-prone, and
+# kb sits next to the qmd index reads, so local disk is the right home.
 # Note: ~/.config is NOT migrated — chezmoi manages files inside it as a real directory.
 # Note: ~/.claude is NOT migrated — chezmoi manages files inside it as a real directory.
 #
@@ -121,7 +127,7 @@ link_to_scratch() {
 log_info "Scratch: $SCRATCH"
 log_info "Paths:   $PATHS"
 
-_DEFAULT_LINKS="$HOME/.local:$HOME/.cache:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom"
+_DEFAULT_LINKS="$HOME/.local:$HOME/.cache:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom:$HOME/kb"
 DF_LINKS="${DF_LINKS:-$_DEFAULT_LINKS}"
 unset _DEFAULT_LINKS
 
