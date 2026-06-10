@@ -10,6 +10,10 @@ typescript-lsp
 
 # Meta / workflow
 claude-md-management
+# Anthropic's plugin/skill-authoring reference: 7 sub-skills (skill-development,
+# plugin-structure, hook-development, mcp-integration, agent-development,
+# command-development, plugin-settings) — we ship our own skills/plugins.
+plugin-dev
 
 # Security review (Trail of Bits marketplace — added by install/claude.sh).
 # Plugin-only: ships specialized review agents, can't be vendored as a skill.
@@ -19,3 +23,12 @@ c-review@trailofbits
 # /codex:review, /codex:adversarial-review (second-model review!), /codex:rescue,
 # background job status/result/cancel. Uses ~/.openai.env or ChatGPT login.
 codex@openai-codex
+
+# MCP server authoring (Anthropic official): build-mcp-server/build-mcp-app/
+# build-mcpb skills — we maintain MCP entries for two agents.
+mcp-server-dev
+# Hook authoring/generation (Anthropic official): /hookify commands — we ship
+# hooks (chezmoi-guard, rtk) from this repo.
+hookify
+# Claude Agent SDK development (Anthropic official)
+agent-sdk-dev

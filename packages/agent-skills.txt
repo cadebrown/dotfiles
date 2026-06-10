@@ -61,3 +61,57 @@ typst npx lucifer1004/claude-skill-typst typst
 
 # zig: zigcc community org, current-Zig (0.16) idioms
 zig-0.16 npx zigcc/skills zig-0.16
+
+# LLVM: new pass manager surface (-passes='default<O2>', -Rpass-*, llvm-mca),
+# pass debugging — post-dates much training data (mohitmishra786, verified)
+llvm npx mohitmishra786/low-level-dev-skills llvm
+
+### Compiler / GPU stack (June 2026 deep-research batch) ###
+
+# Mojo (Modular official): syntax-churn correction layer + GPU programming.
+# Both are explicit "what pretrained models get wrong" tables — exactly the
+# point of a skill. MLIR-native language, NVIDIA/AMD/Apple-silicon targets.
+mojo-syntax npx modular/skills mojo-syntax
+mojo-gpu-fundamentals npx modular/skills mojo-gpu-fundamentals
+
+# tree-sitter grammar authoring: state-budget engineering, the uint16 action-
+# table ABI limit, precedence ladders — distilled from building a real grammar
+# against 17 reference grammars. Deep content despite the tiny repo.
+tree-sitter-grammar npx corruptmemory/claude-stuff tree-sitter-grammar
+
+# LLVM upstream-developer workflow (dtcxzyw, prolific LLVM contributor):
+# alive-tv verification, llvm-reduce, llubi, lit/FileCheck. Complements `llvm`.
+llvm-howto npx dtcxzyw/llvm-harness llvm-howto
+
+# MLIR reference pack: ODS/DRR/PDLL, dialect conversion, Transform dialect —
+# 37 reference files. CAVEAT: pinned to MLIR 19 APIs; verify against current
+# LLVM when the dialect-conversion driver matters.
+mlir npx jstzwj/ai-infra-plugins mlir
+
+# ORC JIT v2 (LLVM 22) + backend-skeleton walkthroughs — ORC churned hard
+# post-training; the model mixes API eras without this.
+jit-setup npx hbarve1/tessl-llvm jit-setup
+new-target-backend npx hbarve1/tessl-llvm new-target-backend
+
+# Triton kernel traps (NVIDIA official; lives in the TensorRT-LLM repo, so
+# the one-time fetch is heavyweight): C-semantics //%, fp32 transcendental
+# casts, autotune decorator order, TF32 defaults.
+kernel-triton-writing npx NVIDIA/TensorRT-LLM kernel-triton-writing
+
+# CUDA debug/profile workflow + PTX ISA 9.1 vendored as searchable markdown —
+# grounded PTX lookup instead of hallucination.
+cuda npx technillogue/ptx-isa-markdown cuda
+
+### Meta-AI: authoring skills/plugins/agents ###
+
+# skill-creator (Anthropic official): init/validate/package + progressive-
+# disclosure structure guidance — we ship skills from this repo.
+skill-creator npx anthropics/skills skill-creator
+
+# writing-skills (obra): how to write skills that actually steer agents;
+# cherry-picked — the rest of superpowers duplicates our methodology.
+writing-skills npx obra/superpowers writing-skills
+
+# find-skills (vercel-labs): discover/install registry skills from inside a
+# session — the discovery half of this very file's workflow.
+find-skills npx vercel-labs/skills find-skills
