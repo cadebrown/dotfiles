@@ -14,3 +14,8 @@ claude-md-management
 # Security review (Trail of Bits marketplace — added by install/claude.sh).
 # Plugin-only: ships specialized review agents, can't be vendored as a skill.
 c-review@trailofbits
+
+# Codex bridge (OpenAI official): run the installed codex CLI as a delegate —
+# /codex:review, /codex:adversarial-review (second-model review!), /codex:rescue,
+# background job status/result/cancel. Uses ~/.openai.env or ChatGPT login.
+codex@openai-codex

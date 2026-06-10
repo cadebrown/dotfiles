@@ -106,6 +106,12 @@
         "source": "github",
         "repo": "trailofbits/skills"
       }
+    },
+    "openai-codex": {
+      "source": {
+        "source": "github",
+        "repo": "openai/codex-plugin-cc"
+      }
     }
   },
   "enabledPlugins": {
@@ -114,7 +120,8 @@
     "pyright-lsp@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
-    "c-review@trailofbits": true
+    "c-review@trailofbits": true,
+    "codex@openai-codex": true
   },
   "outputStyle": "cade",
   "skipDangerousModePermissionPrompt": true

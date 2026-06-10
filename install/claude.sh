@@ -97,7 +97,8 @@ has claude || { log_warn "claude not found — skipping plugins"; exit 0; }
 # Third-party marketplaces required by claude-plugins.txt entries
 # (<name>@<marketplace> form). Format: "owner/repo|marketplace-name".
 _MARKETPLACES=(
-    "trailofbits/skills|trailofbits"   # c-review and other ToB security skills
+    "trailofbits/skills|trailofbits"       # c-review and other ToB security skills
+    "openai/codex-plugin-cc|openai-codex"  # official Codex-as-delegate bridge
 )
 for _mp_entry in "${_MARKETPLACES[@]}"; do
     IFS='|' read -r _mp_repo _mp_name <<< "$_mp_entry"
