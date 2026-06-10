@@ -10,9 +10,12 @@
 #
 # Reads JSON via stdin (Claude Code's contract):
 #   .workspace.current_dir     string  cwd of the agent
-#   .model.display_name        string  pretty name (e.g. "Claude Opus 4.7")
-#   .model.id                  string  slug (e.g. "claude-opus-4-7[1m]")
-#   .model.effort              string|{level: string}  effort tier
+#   .model.display_name        string  pretty name (e.g. "Fable 5")
+#   .model.id                  string  slug (e.g. "claude-fable-5[1m]")
+#   .model.effort / .effort    string|{level: string}  effort tier
+#   .cost.total_cost_usd       number  session cost so far (computed by Claude Code)
+#   .context_window.used_percentage      number  context fill % (authoritative)
+#   .context_window.context_window_size  number  window size in tokens
 #   .transcript_path           string  path to JSONL transcript for this session
 #   .session_id                string  stable per-session ID (used as cache key)
 #   (additional fields tolerated but ignored)
@@ -24,7 +27,6 @@
 #     `git status --porcelain` and `git diff --shortstat`. On timeout the
 #     stale cache values are reused when available, else the placeholder
 #     `+>100k ->100k` renders. Skipped entirely on clean tracked trees.
-#   - Bench harness at: tests/bench-statusline.sh (TODO).
 #
 # DEBUG=1 dumps the parsed input + intermediate values to stderr.
 #
@@ -102,25 +104,6 @@ _humanize_secs() {
     fi
 }
 
-# Per-model pricing table for cost estimates. $/MTok for {in, out, cache_read, cache_write_5m, cache_write_1h}.
-# Keep in sync with https://www.anthropic.com/pricing#api when models are added.
-_pricing() {
-    case "$1" in
-        claude-opus-4*|*opus-4*)         echo "15 75 1.50 18.75 30.00" ;;
-        claude-sonnet-4*|*sonnet-4*)     echo "3 15 0.30 3.75 6.00"   ;;
-        claude-haiku-4*|*haiku-4*)       echo "1 5 0.10 1.25 2.00"    ;;
-        *)                                echo ""                       ;;
-    esac
-}
-
-_cost_usd() {
-    # Args: model_id in_tok out_tok cache_read_tok cache_write_5m_tok cache_write_1h_tok
-    local price; price="$(_pricing "$1")"
-    [[ -z "$price" ]] && { printf ''; return; }
-    read -r p_in p_out p_cr p_cw5 p_cw1 <<<"$price"
-    echo "scale=2; ($2*$p_in + $3*$p_out + $4*$p_cr + $5*$p_cw5 + $6*$p_cw1) / 1000000" | bc -l
-}
-
 # Bash-native timeout. Runs $@ with a wall-clock cap of $1 seconds (fractional
 # ok). Returns 124 on timeout, else command's exit code. Stdout passes through.
 # macOS doesn't ship `timeout`, so we roll our own — no coreutils dep.
@@ -175,6 +158,10 @@ EFFORT="$(printf     '%s' "$INPUT" | jq -r '
     (.model.effort // .effort // .effortLevel // "") as $e |
     if ($e | type) == "object" then ($e.level // "") else $e end
 ')"
+# Cost + context come straight from Claude Code (no pricing table needed).
+COST_USD="$(printf    '%s' "$INPUT" | jq -r '.cost.total_cost_usd // empty')"
+CTX_PCT_IN="$(printf  '%s' "$INPUT" | jq -r '.context_window.used_percentage // empty')"
+CTX_SIZE_IN="$(printf '%s' "$INPUT" | jq -r '.context_window.context_window_size // empty')"
 
 if [[ "${DEBUG:-0}" == "1" ]]; then
     {
@@ -228,12 +215,20 @@ if [[ -n "$TRANSCRIPT" && -r "$TRANSCRIPT" ]]; then
         HAVE_STATS=1
     fi
 fi
-# Context window: 1M for [1m] variants, otherwise 200k default.
-CTX_MAX=200000
-[[ "$MODEL_ID" == *"[1m]"* ]] && CTX_MAX=1000000
-if (( CTX > 0 )); then
-    PCT="$(echo "scale=1; $CTX * 100 / $CTX_MAX" | bc -l)"
+# Context %: prefer Claude Code's own number (compaction-aware, model-agnostic);
+# fall back to transcript-derived math for older builds.
+if [[ -n "$CTX_PCT_IN" ]]; then
+    PCT="$(echo "scale=1; $CTX_PCT_IN / 1" | bc -l 2>/dev/null)"
+else
+    CTX_MAX=200000
+    [[ "$MODEL_ID" == *"[1m]"* ]] && CTX_MAX=1000000
+    [[ -n "$CTX_SIZE_IN" ]] && CTX_MAX="${CTX_SIZE_IN%.*}"
+    if (( CTX > 0 )); then
+        PCT="$(echo "scale=1; $CTX * 100 / $CTX_MAX" | bc -l)"
+    fi
 fi
+# bc renders sub-1 values as ".5" — pad to "0.5" (same treatment as cost).
+[[ "$PCT" == .* ]] && PCT="0$PCT"
 
 # ─── worktree + subagent detection (cheap; for session-segment tags) ────────
 IN_WORKTREE=0
@@ -332,10 +327,12 @@ _git_read_cache() {
     cache_branch="${line%%|*}"
     [[ "$cache_branch" == "$want_branch" ]] || return 1
     IFS='|' read -r cache_branch staged unstaged untracked conflicts ahead behind diff_added diff_removed diff_huge <<<"$line"
-    # Coerce any blanks (truncated cache) to 0 so later arithmetic doesn't error.
-    staged="${staged:-0}"; unstaged="${unstaged:-0}"; untracked="${untracked:-0}"
-    conflicts="${conflicts:-0}"; ahead="${ahead:-0}"; behind="${behind:-0}"
-    diff_added="${diff_added:-0}"; diff_removed="${diff_removed:-0}"; diff_huge="${diff_huge:-0}"
+    # Coerce blanks AND garbage (truncated/torn cache) to 0 so later
+    # arithmetic can't die on non-numeric content under set -u.
+    local _v
+    for _v in staged unstaged untracked conflicts ahead behind diff_added diff_removed diff_huge; do
+        [[ "${!_v}" =~ ^[0-9]+$ ]] || printf -v "$_v" '0'
+    done
     return 0
 }
 
@@ -452,9 +449,9 @@ _git_segment() {
 # model is a Claude) and the bracketed variant tag (e.g. "[1m]") — context %
 # already reflects the tier.
 #
-#   claude-opus-4-7              → Opus 4.7
-#   claude-opus-4-7[1m]          → Opus 4.7      (1M variant inferred via ctx denominator)
-#   claude-sonnet-4-6            → Sonnet 4.6
+#   claude-fable-5               → Fable 5
+#   claude-fable-5[1m]           → Fable 5       (1M variant inferred via ctx denominator)
+#   claude-opus-4-8              → Opus 4.8
 #   claude-haiku-4-5-20251001    → Haiku 4.5     (date suffix dropped)
 #
 # Suffix "(effort, ctx%)" is a single grouped piece of meta-info:
@@ -468,18 +465,21 @@ _model_segment() {
     [[ "$id" == *"["*"]"* ]] && id="${id%[*}"
     id="${id#claude-}"
 
-    # Match family-X-Y[-extra] where -extra is typically a date stamp
+    # Match family-X-Y[-extra] (-extra is typically a date stamp), or the
+    # single-number form family-X (e.g. fable-5).
     local pretty=""
-    if [[ "$id" =~ ^([a-z]+)-([0-9]+)-([0-9]+) ]]; then
+    if [[ "$id" =~ ^([a-z]+)-([0-9]+)(-([0-9]+))? ]]; then
         local family="${BASH_REMATCH[1]}"
         local major="${BASH_REMATCH[2]}"
-        local minor="${BASH_REMATCH[3]}"
+        local minor="${BASH_REMATCH[4]:-}"
+        # A 6+ digit "minor" is a date stamp on a single-number family — drop it.
+        [[ ${#minor} -ge 6 ]] && minor=""
         if [[ -n "${BASH_VERSION:-}" && "${BASH_VERSINFO[0]}" -ge 4 ]]; then
             family="${family^}"
         else
             family="$(printf '%s%s' "$(printf '%s' "${family:0:1}" | tr '[:lower:]' '[:upper:]')" "${family:1}")"
         fi
-        pretty="${family} ${major}.${minor}"
+        pretty="${family} ${major}${minor:+.$minor}"
     elif [[ -n "$MODEL_NAME" ]]; then
         pretty="${MODEL_NAME#Claude }"
     else
@@ -535,18 +535,38 @@ _session_segment() {
         cache_pct="$(echo "scale=0; $TCR * 100 / $total_in" | bc -l)"
     fi
 
-    # Group 3: cost + last-turn cost (warm tan). bc returns ".76" for sub-1
-    # values, so pad with leading 0 to render "$0.76" instead of "$.76".
-    local cost lastcost have_cost=0
-    cost="$(_cost_usd "$MODEL_ID" "$TIN" "$TOUT" "$TCR" "$TCW5" "$TCW1")"
-    if [[ -n "$cost" ]]; then
-        [[ "$cost" == .* ]] && cost="0$cost"
+    # Group 3: session cost from Claude Code (.cost.total_cost_usd) and the
+    # last turn's delta. The delta is tracked across renders in a per-session
+    # cache keyed on the assistant-turn count: when TURNS advances, the new
+    # total minus the stored total is that turn's cost. bc returns ".76" for
+    # sub-1 values, so pad with leading 0 to render "$0.76" instead of "$.76".
+    local cost="" lastcost="" have_cost=0
+    if [[ -n "$COST_USD" ]] && (( $(echo "$COST_USD > 0" | bc -l 2>/dev/null || echo 0) )); then
         have_cost=1
-        lastcost="$(_cost_usd "$MODEL_ID" "$LIN" "$LOUT" "$LCR" "$LCW5" "$LCW1")"
-        if [[ -n "$lastcost" ]] && (( $(echo "$lastcost > 0.01" | bc -l) )); then
-            [[ "$lastcost" == .* ]] && lastcost="0$lastcost"
-        else
-            lastcost=""
+        cost="$(echo "scale=2; $COST_USD / 1" | bc -l)"
+        [[ "$cost" == .* ]] && cost="0$cost"
+        if [[ -n "$SESSION_ID" ]]; then
+            local ccache="${TMPDIR:-/tmp}/statusline-cost-${SESSION_ID}"
+            local prev_turns=0 prev_total=0 prev_delta=0 delta=""
+            if [[ -f "$ccache" ]]; then
+                IFS='|' read -r prev_turns prev_total prev_delta < "$ccache" 2>/dev/null || true
+                # Coerce anything non-numeric (truncated/torn cache) to 0 so
+                # the arithmetic below can't die on garbage under set -u.
+                [[ "$prev_turns" =~ ^[0-9]+$ ]] || prev_turns=0
+                [[ "$prev_total" =~ ^[0-9]*\.?[0-9]+$ ]] || prev_total=0
+                [[ "$prev_delta" =~ ^[0-9]*\.?[0-9]+$ ]] || prev_delta=0
+            fi
+            if (( TURNS != prev_turns )); then
+                delta="$(echo "scale=2; d = $COST_USD - $prev_total; if (d < 0) d = 0; d / 1" | bc -l 2>/dev/null)"
+                { umask 077; printf '%s|%s|%s\n' "$TURNS" "$COST_USD" "${delta:-0}" > "$ccache.tmp.$$" \
+                    && mv -f "$ccache.tmp.$$" "$ccache"; } 2>/dev/null || rm -f "$ccache.tmp.$$" 2>/dev/null
+            else
+                delta="$prev_delta"
+            fi
+            if [[ -n "$delta" ]] && (( $(echo "$delta > 0.01" | bc -l 2>/dev/null || echo 0) )); then
+                lastcost="$delta"
+                [[ "$lastcost" == .* ]] && lastcost="0$lastcost"
+            fi
         fi
     fi
 

@@ -94,6 +94,23 @@ log_section "Claude Code plugins"
 
 has claude || { log_warn "claude not found — skipping plugins"; exit 0; }
 
+# Third-party marketplaces required by claude-plugins.txt entries
+# (<name>@<marketplace> form). Format: "owner/repo|marketplace-name".
+_MARKETPLACES=(
+    "trailofbits/skills|trailofbits"   # c-review and other ToB security skills
+)
+for _mp_entry in "${_MARKETPLACES[@]}"; do
+    IFS='|' read -r _mp_repo _mp_name <<< "$_mp_entry"
+    if claude plugin marketplace list 2>/dev/null | grep -q "$_mp_name"; then
+        log_info "  marketplace $_mp_name (already known)"
+    elif claude plugin marketplace add "$_mp_repo" >/dev/null 2>&1; then
+        log_okay "  added marketplace $_mp_name ($_mp_repo)"
+    else
+        log_warn "  failed adding marketplace $_mp_repo — its plugins will fail below"
+    fi
+done
+unset _mp_entry _mp_repo _mp_name
+
 _install_plugins_from() {
     local file="$1"
     log_info "Reading plugins from $file"
@@ -104,12 +121,14 @@ _install_plugins_from() {
         log_info "  $plugin"
         output=$(claude plugin install "$plugin" 2>&1) && status=0 || status=$?
 
-        if [[ $status -eq 0 ]]; then
-            log_okay "  installed $plugin"
-            (( _ok++ )) || true
-        elif echo "$output" | grep -qi "already installed\|already enabled"; then
+        # "already installed" exits 0 too — test the output before the status,
+        # or the skip branch is unreachable and every run reports installs.
+        if echo "$output" | grep -qi "already installed\|already enabled"; then
             log_info "  skip  $plugin (already installed)"
             (( _skip++ )) || true
+        elif [[ $status -eq 0 ]]; then
+            log_okay "  installed $plugin"
+            (( _ok++ )) || true
         else
             log_warn "  fail  $plugin: $output"
             (( _fail++ )) || true
@@ -129,24 +148,56 @@ log_okay "Claude plugins: ${_ok} installed, ${_skip} already present, ${_fail} f
 
 log_section "Claude Code MCP servers"
 
-# Resolve an `auth=<source>` directive to the value of an HTTP Authorization
-# header (e.g. "Bearer ghp_..."). Returns 0 with the value on stdout on success,
-# non-zero (and empty stdout) when the source is unavailable. Adding a new
-# source means adding a case branch.
-_resolve_auth_header() {
-    local spec="$1" token=""
+# Servers are reconciled declaratively: build the desired JSON shape for each
+# list entry, compare it field-by-field against what's stored in ~/.claude.json,
+# remove+re-add on drift. URL/command edits in mcp-servers.txt therefore
+# propagate on the next run (they used to be skipped once the name existed).
+#
+# Auth sources (see packages/mcp-servers.txt header):
+#   gh        → headersHelper script resolved at connection time. No stored
+#               token, so rotation needs no reconciliation.
+#   context7  → CONTEXT7_API_KEY header from ~/.context7.env; optional —
+#               registers unauthenticated when the credential is missing.
+
+# Emit "HeaderName<TAB>value" for env-file-backed auth sources. Returns
+# non-zero when the credential is unavailable. Adding a new source means
+# adding a case branch here (and in install/codex.sh's _emit_mcp_blocks_to).
+_resolve_header_source() {
+    local spec="$1" key=""
     case "$spec" in
-        gh)
-            has gh || return 1
-            token="$(gh auth token 2>/dev/null)" || return 1
-            [[ -n "$token" ]] || return 1
-            printf 'Bearer %s' "$token"
+        context7)
+            [[ -f "$HOME/.context7.env" ]] || return 1
+            key="$(. "$HOME/.context7.env" >/dev/null 2>&1 || true; printf '%s' "${CONTEXT7_API_KEY:-}")"
+            [[ -n "$key" ]] || return 1
+            printf 'CONTEXT7_API_KEY\t%s' "$key"
             ;;
         *)
-            log_warn "  unknown auth source: $spec"
             return 1
             ;;
     esac
+}
+
+# True when the stored config for server $1 matches the desired JSON $2 over
+# the full domain of modeled keys — a modeled key absent from desired must
+# also be absent from stored, so removing a credential re-registers (the old
+# subset compare was removal-blind and kept stale headers forever). Keys we
+# don't model but claude adds itself (e.g. env on stdio entries) are tolerated.
+_server_matches() {
+    local name="$1" desired="$2"
+    has jq || return 1
+    [[ -f "$HOME/.claude.json" ]] || return 1
+    jq -e --arg n "$name" --argjson d "$desired" '
+        .mcpServers[$n] as $s
+        | $s != null
+          and (["type","url","command","args","headers","headersHelper"]
+               | map($d[.] == $s[.]) | all)
+    ' "$HOME/.claude.json" >/dev/null 2>&1
+}
+
+# Replace (or create) server $1 with desired JSON $2.
+_register_server() {
+    claude mcp remove "$1" -s user >/dev/null 2>&1 || true
+    claude mcp add-json -s user "$1" "$2" >/dev/null 2>&1
 }
 
 _register_mcps_from() {
@@ -157,93 +208,91 @@ _register_mcps_from() {
         # Parse: <name> <transport> <rest...>
         _name="${line%% *}"; _rest="${line#* }"
         _transport="${_rest%% *}"
+        _json="" _label=""
 
-        # --- stdio: <name> stdio cmd: <command...> ---
         if [[ "$_transport" == "stdio" && "$_rest" == *"cmd: "* ]]; then
-            if claude mcp list 2>/dev/null | grep -qE "^$_name\b"; then
-                log_info "  skip  $_name (already registered)"
-                (( _skip++ )) || true
-                continue
-            fi
+            # --- stdio: <name> stdio cmd: <command...> ---
             _cmd="${_rest#*cmd: }"
-            log_info "  $_name (stdio) → $_cmd"
-            # shellcheck disable=SC2086
-            if claude mcp add --scope user "$_name" -- $_cmd 2>/dev/null; then
-                log_okay "  registered $_name"
-                (( _ok++ )) || true
-            else
-                log_warn "  fail  $_name"
-                (( _fail++ )) || true
-            fi
-            continue
-        fi
+            _json="$(jq -nc --arg cmd "$_cmd" '
+                ($cmd | split(" ")) as $w
+                | {type: "stdio", command: $w[0]}
+                + (if ($w | length) > 1 then {args: $w[1:]} else {} end)')"
+            _label="stdio → $_cmd"
+        else
+            # --- HTTP: <name> <transport> <url> [auth=<source>] [extra...] ---
+            read -r _ _ _url _rest_extras <<< "$line"
+            _auth_source="" _extra=""
+            for _tok in $_rest_extras; do
+                if [[ "$_tok" == auth=* ]]; then
+                    _auth_source="${_tok#auth=}"
+                else
+                    _extra="${_extra:+$_extra }$_tok"
+                fi
+            done
 
-        # --- HTTP/SSE: <name> <transport> <url> [auth=<source>] [extra...] ---
-        # Extras (e.g. --client-id <id>, --header "K: V") pass through to
-        # `claude mcp add`. The `auth=<source>` directive is consumed here and
-        # converted into a managed Authorization header (see _resolve_auth_header).
-        read -r _ _ _url _rest_extras <<< "$line"
-        _auth_source="" _extra=""
-        for _tok in $_rest_extras; do
-            if [[ "$_tok" == auth=* ]]; then
-                _auth_source="${_tok#auth=}"
-            else
-                _extra="${_extra:+$_extra }$_tok"
+            if [[ -n "$_auth_source" && -n "$_extra" ]]; then
+                log_warn "  $_name: ignoring extras (not supported with auth=): $_extra"
+                _extra=""
             fi
-        done
 
-        # --- plain HTTP/SSE: skip if registered, else pass extras through ---
-        if [[ -z "$_auth_source" ]]; then
-            if claude mcp list 2>/dev/null | grep -qE "^$_name\b"; then
-                log_info "  skip  $_name (already registered)"
-                (( _skip++ )) || true
+            # Entries with pass-through extras land in fields we don't model,
+            # so they can't be shape-compared — keep the name-only skip.
+            if [[ -n "$_extra" ]]; then
+                if claude mcp list 2>/dev/null | grep -qE "^$_name\b"; then
+                    log_info "  skip  $_name (already registered)"
+                    (( _skip++ )) || true
+                else
+                    log_info "  $_name ($_transport) → $_url [$_extra]"
+                    # shellcheck disable=SC2086
+                    if claude mcp add --transport "$_transport" --scope user $_extra "$_name" "$_url" 2>/dev/null; then
+                        log_okay "  registered $_name"
+                        (( _ok++ )) || true
+                    else
+                        log_warn "  fail  $_name"
+                        (( _fail++ )) || true
+                    fi
+                fi
                 continue
             fi
-            log_info "  $_name ($_transport) → $_url${_extra:+ [$_extra]}"
-            # shellcheck disable=SC2086
-            if claude mcp add --transport "$_transport" --scope user $_extra "$_name" "$_url" 2>/dev/null; then
-                log_okay "  registered $_name"
-                (( _ok++ )) || true
-            else
-                log_warn "  fail  $_name"
-                (( _fail++ )) || true
-            fi
-            continue
+
+            case "$_auth_source" in
+                "")
+                    _json="$(jq -nc --arg t "$_transport" --arg url "$_url" '{type: $t, url: $url}')"
+                    _label="$_transport → $_url"
+                    ;;
+                gh)
+                    # Connection-time token via headersHelper (deployed by
+                    # chezmoi). Nothing stored; rotation heals itself.
+                    has gh || log_warn "  $_name: gh not installed — helper emits no auth until 'gh auth login'"
+                    _json="$(jq -nc --arg t "$_transport" --arg url "$_url" \
+                        '{type: $t, url: $url, headersHelper: "~/.claude/gh-mcp-headers.sh"}')"
+                    _label="$_transport → $_url [auth=gh via headersHelper]"
+                    ;;
+                *)
+                    if _pair="$(_resolve_header_source "$_auth_source")"; then
+                        _hname="${_pair%%$'\t'*}"; _hval="${_pair#*$'\t'}"
+                        _json="$(jq -nc --arg t "$_transport" --arg url "$_url" \
+                            --arg hn "$_hname" --arg hv "$_hval" \
+                            '{type: $t, url: $url, headers: {($hn): $hv}}')"
+                        _label="$_transport → $_url [auth=$_auth_source]"
+                    else
+                        log_warn "  $_name: auth=$_auth_source unavailable — registering unauthenticated (run 'bash install/auth.sh $_auth_source')"
+                        _json="$(jq -nc --arg t "$_transport" --arg url "$_url" '{type: $t, url: $url}')"
+                        _label="$_transport → $_url [auth=$_auth_source unavailable]"
+                    fi
+                    ;;
+            esac
         fi
 
-        # --- auth-managed HTTP/SSE: reconcile token on every run ---
-        if [[ -n "$_extra" ]]; then
-            log_warn "  $_name: ignoring extras (not supported with auth=): $_extra"
-        fi
-        _auth_value=""
-        if ! _auth_value="$(_resolve_auth_header "$_auth_source")"; then
-            log_warn "  $_name: auth=$_auth_source unavailable (e.g. run 'gh auth login') — skipping"
-            (( _fail++ )) || true
-            continue
-        fi
-        # Compare against the stored Authorization header to avoid churn.
-        _stored=""
-        if [[ -f "$HOME/.claude.json" ]] && has jq; then
-            _stored="$(jq -r --arg n "$_name" \
-                '.mcpServers[$n].headers.Authorization // ""' \
-                "$HOME/.claude.json" 2>/dev/null || true)"
-        fi
-        if [[ "$_stored" == "$_auth_value" ]]; then
-            log_info "  skip  $_name (auth=$_auth_source unchanged)"
+        # Reconcile desired vs stored.
+        if _server_matches "$_name" "$_json"; then
+            log_info "  skip  $_name (unchanged)"
             (( _skip++ )) || true
             continue
         fi
-        # Drift (or new entry): remove + re-add via add-json so the JSON shape
-        # matches GitHub's recommended form (type/url/headers).
-        claude mcp remove "$_name" -s user >/dev/null 2>&1 || true
-        _json="$(jq -nc \
-            --arg type "$_transport" \
-            --arg url "$_url" \
-            --arg auth "$_auth_value" \
-            '{type: $type, url: $url, headers: {Authorization: $auth}}')"
-        log_info "  $_name ($_transport) → $_url [auth=$_auth_source]"
-        if claude mcp add-json -s user "$_name" "$_json" >/dev/null 2>&1; then
-            log_okay "  registered $_name (refreshed auth)"
+        log_info "  $_name ($_label)"
+        if _register_server "$_name" "$_json"; then
+            log_okay "  registered $_name"
             (( _ok++ )) || true
         else
             log_warn "  fail  $_name"
@@ -254,11 +303,14 @@ _register_mcps_from() {
 
 _ok=0 _skip=0 _fail=0
 
-while IFS= read -r _file; do
-    _register_mcps_from "$_file"
-done < <(overlay_package_files "mcp-servers.txt")
-
-log_okay "MCP servers: ${_ok} registered, ${_skip} already present, ${_fail} failed"
+if has jq; then
+    while IFS= read -r _file; do
+        _register_mcps_from "$_file"
+    done < <(overlay_package_files "mcp-servers.txt")
+    log_okay "MCP servers: ${_ok} registered, ${_skip} already present, ${_fail} failed"
+else
+    log_warn "jq not found — skipping MCP server sync (installed via Brewfile step 4; re-run after)"
+fi
 
 ### OVERLAY SKILLS ###
 
@@ -292,3 +344,16 @@ for _dir in "${DF_OVERLAYS[@]}"; do
 done
 
 log_okay "Overlay skills: ${_ok} deployed, ${_skip} unchanged"
+
+### ~/AGENTS.md SYMLINK ###
+
+# agents.md-convention tools launched with CWD=$HOME pick up guidance from
+# ~/AGENTS.md. Point it at the chezmoi-rendered ~/.claude/CLAUDE.md (shared
+# partial + Claude section) instead of leaving a hand-made symlink that fresh
+# machines never get. Skip if the user has placed a real file there.
+if [[ -e "$HOME/AGENTS.md" && ! -L "$HOME/AGENTS.md" ]]; then
+    log_warn "~/AGENTS.md is a real file — leaving it alone"
+else
+    ln -sfn .claude/CLAUDE.md "$HOME/AGENTS.md"
+    log_okay "~/AGENTS.md → .claude/CLAUDE.md"
+fi

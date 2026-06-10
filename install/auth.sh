@@ -36,7 +36,9 @@ _SERVICE_DEFS=(
     "anthropic|ANTHROPIC_API_KEY|.anthropic.env|Anthropic API key (Claude Code w/o Pro, agent SDKs)|https://console.anthropic.com/settings/keys|—|you only use Claude via Pro / Claude Code OAuth"
     "openai|OPENAI_API_KEY|.openai.env|OpenAI API key (Codex CLI, agent SDKs)|https://platform.openai.com/api-keys|—|you only use Codex via ChatGPT login (most users)"
     "cloudflare|CLOUDFLARE_API_TOKEN|.cloudflare.env|Cloudflare API token (OpenTofu in infra/, Pages, R2, MCP via API)|https://dash.cloudflare.com/profile/api-tokens|Edit zone DNS + Pages:Edit + R2:Edit (per project)|you don't deploy infra/ via OpenTofu (Cloudflare MCP can use OAuth instead)"
-    "huggingface|HF_TOKEN|.huggingface.env|HuggingFace token (mlx-lm gated models, aider HF, transformers)|https://huggingface.co/settings/tokens|read|you don't pull gated models or private repos"
+    "huggingface|HF_TOKEN|.huggingface.env|HuggingFace token (mlx-lm gated models, transformers)|https://huggingface.co/settings/tokens|read|you don't pull gated models or private repos"
+    "context7|CONTEXT7_API_KEY|.context7.env|Context7 API key (MCP library-docs lookups at higher rate limits)|https://context7.com/dashboard|—|you're fine with anonymous rate limits"
+    "wolframalpha|WOLFRAM_APPID|.wolframalpha.env|WolframAlpha LLM API AppID (no-sudo Linux fallback for symbolic/computational queries — see agents-common.md; 2000 calls/mo free non-commercial)|https://developer.wolframalpha.com/portal/myapps|LLM API app|you only use Wolfram on macOS (local Wolfram Engine)"
 )
 
 # Tally for the end-of-walk summary. Reset by _walk_all.

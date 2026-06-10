@@ -10,3 +10,7 @@ typescript-lsp
 
 # Meta / workflow
 claude-md-management
+
+# Security review (Trail of Bits marketplace — added by install/claude.sh).
+# Plugin-only: ships specialized review agents, can't be vendored as a skill.
+c-review@trailofbits

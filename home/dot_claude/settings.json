@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
     "DISABLE_AUTOUPDATER": "1",
     "ENABLE_PROMPT_CACHING_1H": "1",
@@ -6,9 +7,47 @@
     "BASH_MAX_TIMEOUT_MS": "900000"
   },
   "permissions": {
-    "defaultMode": "bypassPermissions"
+    "defaultMode": "bypassPermissions",
+    "deny": [
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.github.env)",
+      "Read(~/.anthropic.env)",
+      "Read(~/.openai.env)",
+      "Read(~/.cloudflare.env)",
+      "Read(~/.huggingface.env)",
+      "Read(~/.context7.env)",
+      "Read(~/.wolframalpha.env)"
+    ],
+    "ask": [
+      "mcp__cloudflare__*",
+      "mcp__github__push_files",
+      "mcp__github__create_or_update_file",
+      "mcp__github__delete_file",
+      "mcp__github__merge_pull_request",
+      "mcp__github__create_repository"
+    ]
   },
-  "model": "opus[1m]",
+  "cleanupPeriodDays": 3650,
+  "model": "claude-fable-5[1m]",
+  "fallbackModel": ["opus[1m]"],
+  "sandbox": {
+    "enabled": true,
+    "filesystem": {
+      "denyRead": [
+        "~/.ssh",
+        "~/.aws",
+        "~/.github.env",
+        "~/.anthropic.env",
+        "~/.openai.env",
+        "~/.cloudflare.env",
+        "~/.huggingface.env",
+        "~/.context7.env",
+        "~/.wolframalpha.env"
+      ]
+    },
+    "excludedCommands": ["gh *", "docker *", "colima *", "tofu *", "terraform *"]
+  },
   "hooks": {
     "Notification": [
       {
@@ -16,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "osascript -e 'display notification \"Claude needs attention\" with title \"Claude Code\"' 2>/dev/null; exit 0"
+            "command": "printf '%s' '{\"terminalSequence\":\"\\u001b]9;Claude needs attention\\u0007\"}'"
           }
         ]
       }
@@ -37,14 +76,22 @@
     "type": "command",
     "command": "~/.claude/statusline.sh"
   },
+  "extraKnownMarketplaces": {
+    "trailofbits": {
+      "source": {
+        "source": "github",
+        "repo": "trailofbits/skills"
+      }
+    }
+  },
   "enabledPlugins": {
     "rust-analyzer-lsp@claude-plugins-official": true,
     "clangd-lsp@claude-plugins-official": true,
     "pyright-lsp@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
-    "claude-md-management@claude-plugins-official": true
+    "claude-md-management@claude-plugins-official": true,
+    "c-review@trailofbits": true
   },
   "outputStyle": "cade",
-  "skipDangerousModePermissionPrompt": true,
-  "prefersReducedMotion": true
+  "skipDangerousModePermissionPrompt": true
 }
