@@ -14,12 +14,13 @@ subscriptions if I want to swap from API-key billing.
 {{- if eq .chezmoi.os "darwin" }}
   "defaultProvider": "mlx",
   "defaultModel": "qwen3.6-27b",
+  "defaultThinkingLevel": "medium",
 {{- else }}
   "defaultProvider": "anthropic",
-  "defaultModel": "claude-haiku-4-5",
+  "defaultModel": "{{ .models.haiku }}",
+  "defaultThinkingLevel": "off",
 {{- end }}
   "theme": "dotfiles",
-  "defaultThinkingLevel": "off",
   "hideThinkingBlock": false,
   "quietStartup": true,
   "collapseChangelog": true,
@@ -38,9 +39,9 @@ subscriptions if I want to swap from API-key billing.
 {{- if eq .chezmoi.os "darwin" }}
     "mlx/*",
 {{- end }}
-    "anthropic/claude-sonnet-4-6*",
-    "anthropic/claude-opus-4-7*",
-    "anthropic/claude-haiku-4-5*",
+    "anthropic/{{ .models.sonnet }}*",
+    "anthropic/{{ .models.opus }}*",
+    "anthropic/{{ .models.haiku }}*",
     "openai/gpt-5*"
   ]
 }

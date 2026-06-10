@@ -7,16 +7,15 @@
 # Binary installs handled upstream:
 #   ollama    -> packages/Brewfile  (install/homebrew.sh, step 4)
 #   mlx-lm    -> packages/pip.txt   (install/python.sh,   step 6)
-#   aider     -> packages/pip.txt   (install/python.sh,   step 6)
 #
 # Modes:
 #   default       -> dirs + binary checks (idempotent, fast)
 #   pull-models   -> additionally pre-pull MLX models in packages/mlx-models.txt
-#                    (large download — ~40GB total for the default set)
+#                    (large download — ~35GB for the default set)
 #
 # Manual pulls if you want a specific model:
 #   ollama pull qwen3-coder:30b
-#   mlx_lm.generate --model mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit \
+#   mlx_lm.generate --model unsloth/Qwen3.6-27B-MLX-8bit \
 #       --prompt "x" --max-tokens 1   # downloads + warms cache
 #
 # Run the MLX server (from your shell):
@@ -59,13 +58,6 @@ if has mlx-openai-server; then
     log_okay "mlx-openai-server: present (tool-calling MLX server)"
 else
     log_warn "mlx-openai-server not found — run: uv tool install mlx-openai-server"
-    (( _missing++ )) || true
-fi
-
-if has aider; then
-    log_okay "aider: $(aider --version 2>/dev/null | head -1)"
-else
-    log_warn "aider not found — run: uv tool install aider-chat"
     (( _missing++ )) || true
 fi
 

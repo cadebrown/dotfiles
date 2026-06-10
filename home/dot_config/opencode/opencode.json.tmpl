@@ -1,7 +1,7 @@
 {{/*
 opencode config — schema: https://opencode.ai/config.json
 
-macOS: defaults to local MLX (Qwen3-Coder-30B via mlxserve on :8080).
+macOS: defaults to local MLX (Qwen3.6-27B 8-bit via mlxserve on :8080).
 Linux: no MLX — defaults to anthropic/claude-haiku-4-5 (cheap + tool calling).
 
 Anthropic / OpenAI providers are auto-discovered from ANTHROPIC_API_KEY /
@@ -20,7 +20,7 @@ Hooks live in plugin/ (TS files using Bun shell), not here — see
 
 {{ if eq .chezmoi.os "darwin" -}}
   "model": "mlx/qwen3.6-27b",
-  "small_model": "anthropic/claude-haiku-4-5",
+  "small_model": "anthropic/{{ .models.haiku }}",
   "default_agent": "build",
 
   "provider": {
@@ -41,19 +41,19 @@ Hooks live in plugin/ (TS files using Bun shell), not here — see
   },
 
   "agent": {
-    "plan":   { "model": "anthropic/claude-opus-4-7" },
+    "plan":   { "model": "anthropic/{{ .models.opus }}" },
     "build":  { "model": "mlx/qwen3.6-27b" },
-    "review": { "model": "anthropic/claude-sonnet-4-6" }
+    "review": { "model": "anthropic/{{ .models.sonnet }}" }
   },
 {{- else -}}
-  "model": "anthropic/claude-haiku-4-5",
-  "small_model": "anthropic/claude-haiku-4-5",
+  "model": "anthropic/{{ .models.haiku }}",
+  "small_model": "anthropic/{{ .models.haiku }}",
   "default_agent": "build",
 
   "agent": {
-    "plan":   { "model": "anthropic/claude-opus-4-7" },
-    "build":  { "model": "anthropic/claude-haiku-4-5" },
-    "review": { "model": "anthropic/claude-sonnet-4-6" }
+    "plan":   { "model": "anthropic/{{ .models.opus }}" },
+    "build":  { "model": "anthropic/{{ .models.haiku }}" },
+    "review": { "model": "anthropic/{{ .models.sonnet }}" }
   },
 {{- end }}
 
@@ -75,5 +75,10 @@ Hooks live in plugin/ (TS files using Bun shell), not here — see
     }
   },
 
-  "mcp": {}
+  "mcp": {
+    "qmd": {
+      "type": "remote",
+      "url": "http://localhost:8181/mcp"
+    }
+  }
 }

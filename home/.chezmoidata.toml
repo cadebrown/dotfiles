@@ -1,0 +1,10 @@
+# .chezmoidata.toml — static template data, identical on every machine
+# (NFS-safe, unlike per-machine [data] in chezmoi.toml). Takes effect on plain
+# `chezmoi apply`, no re-init needed.
+#
+# Cloud model pins referenced from templates as {{ .models.opus }} etc.
+# (opencode.json.tmpl, pi settings.json.tmpl). Rotate models here once.
+[models]
+opus = "claude-opus-4-8"
+sonnet = "claude-sonnet-4-6"
+haiku = "claude-haiku-4-5"

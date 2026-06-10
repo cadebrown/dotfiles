@@ -11,8 +11,9 @@
 # SWE-Bench Verified 77.2%, LiveCodeBench v6 83.9%
 unsloth/Qwen3.6-27B-MLX-8bit
 
-# MoE alternative — fast tokens (3B active), better for quick iteration (~38GB)
-mlx-community/Qwen3.6-35B-A3B-8bit
+# MoE alternative — fast tokens (3B active), better for quick iteration (~38GB).
+# Not pulled by default — the zshrc alias map covers it (`mlxpull qwen3.6-35b-a3b`).
+# mlx-community/Qwen3.6-35B-A3B-8bit
 
 # Code-specialized — Qwen3-Coder-Next, no thinking (~85GB; tight on 128GB)
 # Use only if you need maximum tool-call throughput and don't want reasoning latency

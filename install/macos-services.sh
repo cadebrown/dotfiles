@@ -59,7 +59,7 @@ else
 fi
 
 ### mlxserve (mlx-openai-server) ###
-# Local LLM server on :8080 used as the default backend by aider/opencode/pi.
+# Local LLM server on :8080 used as the default backend by opencode/pi.
 # Without this LaunchAgent, those tools fail to connect on first launch unless
 # the user remembered to start mlxserve manually.
 #

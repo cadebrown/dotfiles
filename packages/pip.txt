@@ -16,10 +16,9 @@ glances
 # CLI/output helpers
 rich-cli
 
-# Local LLM inference + coding agents
+# Local LLM inference
 mlx-lm  # macos-only (Apple MLX framework requires Metal GPU)
 mlx-openai-server  # macos-only python=3.12 (outlines-core 0.1.26 has no cp313/cp314 wheels; pinned via outlines<1.2)
-aider-chat  # python=3.12 (scipy has no wheels for python 3.14+)
 
 # C/C++ package manager
 conan

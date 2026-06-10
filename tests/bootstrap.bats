@@ -94,20 +94,18 @@ setup() {
     run uv tool list
     [ "$status" -eq 0 ]
     # Sanity: at least one cross-platform pip.txt entry should be present.
-    # (mlx-lm is macos-only, aider-chat needs python 3.12, so we skip those.)
+    # (mlx-lm is macos-only, so we skip that.)
     [[ "$output" == *"ipython"* ]] || [[ "$output" == *"conan"* ]]
 }
 
 # --- Local LLM config files ---
 
-@test "~/.aider.conf.yml exists (deployed by chezmoi)" {
-    [[ -f "$HOME/.aider.conf.yml" ]]
-}
-
 @test "~/.config/opencode/opencode.json exists (deployed by chezmoi)" {
     [[ -f "$HOME/.config/opencode/opencode.json" ]]
 }
 
-@test "opencode.json references ollama provider" {
-    grep -q '"ollama"' "$HOME/.config/opencode/opencode.json"
+@test "opencode.json references anthropic provider (linux default)" {
+    # Linux renders the anthropic branch of opencode.json.tmpl (MLX is
+    # macos-only); the docker suite always runs the linux render.
+    grep -q '"anthropic/' "$HOME/.config/opencode/opencode.json"
 }
