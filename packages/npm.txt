@@ -1,6 +1,10 @@
 # npm.txt - global npm packages
 # Usage: install/node.sh reads this file
 # Install manually: npm install -g <package>
+#
+# Entries may pin a version: <name>@<version>. Pinned packages are held at
+# that exact version (upgrade mode does not move them) — bump the pin here
+# deliberately.
 
 # pi (https://pi.dev) — multi-provider coding agent. Official installer at
 # pi.dev/install.sh ultimately runs `npm install -g @earendil-works/pi-coding-agent`,
@@ -9,13 +13,28 @@
 
 # OpenAI Codex CLI — the npm tarball is just a thin wrapper around the same
 # Rust binary published on github.com/openai/codex/releases. We use npm so
-# upgrades happen via `npm install -g @openai/codex@latest` (or this list),
-# not a hand-rolled GitHub release fetch. install/codex.sh still handles
-# managed ~/.codex config + hooks + healthcheck — it just no longer installs
-# the binary itself.
-@openai/codex
+# upgrades happen via this list, not a hand-rolled GitHub release fetcher.
+# install/codex.sh still handles managed ~/.codex config + hooks + healthcheck.
+#
+# PINNED: Codex 0.134.0 redesigned profiles (config.toml [profiles.*] tables →
+# per-profile ~/.codex/<name>.config.toml files). Our config tracks the new
+# layout; the pin keeps binary and config moving in lockstep. Bump deliberately
+# and re-run `bash install/codex.sh check` after.
+@openai/codex@0.139.0
+
+# qmd — local hybrid search (BM25+vectors+rerank, all-local GGUF models) over
+# markdown knowledge: ~/kb + auto-memory + dotfiles docs. Serves one warm MCP
+# daemon on :8181 for Claude+Codex+opencode. See install/memory.sh.
+@tobilu/qmd
+
+# LSP servers backing the Claude Code LSP plugins (pyright-lsp, typescript-lsp).
+# The plugins only wrap these binaries — without them the plugins are inert.
+# (rust-analyzer comes from a rustup component in install/rust.sh; clangd from
+# Xcode on macOS / brew llvm on Linux.)
+pyright
+typescript-language-server
+typescript
 
 # claude-code: installed via native binary (install/claude.sh)
 # opencode: installed via brew "opencode" (packages/Brewfile)
-# aider: installed via `uv tool install aider-chat` (packages/pip.txt)
 # claude statusline: pure bash + jq, see home/dot_claude/executable_statusline.sh

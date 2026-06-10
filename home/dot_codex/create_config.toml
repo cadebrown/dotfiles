@@ -9,10 +9,16 @@ web_search = "live"
 # Default to full filesystem access so git commit/push/add work without prompts.
 # The narrower `workspace-write` mode hardcodes a .git/ write block with no
 # config knob to unlock, so any git op silently fails inside Codex. Profiles
-# below opt back into tighter sandboxes when desired (`-p deep` keeps
-# workspace-write; `-p review` is read-only).
+# (~/.codex/<name>.config.toml — see deep/review/fast.config.toml) opt back
+# into tighter sandboxes when desired (`-p deep` keeps workspace-write;
+# `-p review` is read-only).
 sandbox_mode = "danger-full-access"
-approval_policy = "never"
+# Granular approvals: everything autonomous EXCEPT execpolicy prompt rules
+# (rules/dotfiles.rules: rm, git reset --hard, git push). A plain "never"
+# would silently suppress those decision=prompt rules — dead-letter safety
+# config. Known bug to watch: openai/codex#25312 (granular rules=true ignored
+# under danger-full-access in 0.135) — verify `rm` prompts after upgrades.
+approval_policy = { granular = { rules = true, sandbox_approval = false, mcp_elicitations = false, request_permissions = false, skill_approval = false } }
 file_opener = "none"
 
 project_doc_max_bytes = 32768
@@ -24,6 +30,9 @@ shell_snapshot = true
 unified_exec = true
 tool_search = true
 tool_suggest = true
+# Native session-learning memories (markdown under ~/.codex/memories/).
+# Codex-local L1 analog; cross-tool memory lives in ~/kb + cass (memory.sh).
+memories = true
 
 [sandbox_workspace_write]
 writable_roots = []
@@ -77,45 +86,16 @@ status_line_use_colors = true
 # drop activity/run-state for a quieter tab bar).
 terminal_title = ["project", "model"]
 
-[profiles.deep]
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
-model_verbosity = "medium"
-plan_mode_reasoning_effort = "xhigh"
-sandbox_mode = "workspace-write"
-approval_policy = "never"
-
-[profiles.review]
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
-model_verbosity = "low"
-plan_mode_reasoning_effort = "xhigh"
-sandbox_mode = "read-only"
-approval_policy = "never"
-
-[profiles.bootstrap]
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
-model_verbosity = "low"
-plan_mode_reasoning_effort = "xhigh"
-sandbox_mode = "workspace-write"
-approval_policy = "never"
-
-[profiles.fast]
-model = "gpt-5.5"
-model_reasoning_effort = "low"
-model_verbosity = "low"
-plan_mode_reasoning_effort = "medium"
-sandbox_mode = "workspace-write"
-approval_policy = "never"
-
-[profiles.unrestricted]
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
-model_verbosity = "low"
-plan_mode_reasoning_effort = "xhigh"
-sandbox_mode = "danger-full-access"
-approval_policy = "never"
+# Profiles (Codex 0.134+): delta-only overlay files at ~/.codex/<name>.config.toml
+# with TOP-LEVEL keys — the old [profiles.*] tables in this file are no longer
+# read. Managed sources: home/dot_codex/{deep,review,fast}.config.toml.
+#   -p deep    workspace-write sandbox, medium verbosity
+#   -p review  read-only sandbox
+#   -p fast    low effort, workspace-write
+# (The former `bootstrap`/`unrestricted` profiles were deltas of deep/base —
+# dropped rather than migrated.)
 
 # Project trust levels are added here by codex at runtime — not managed by chezmoi.
-# (chezmoi uses create_ prefix for this file: written once, never overwritten)
+# (chezmoi uses create_ prefix for this file: written once; install/codex.sh
+# sync-config regenerates it from this template + packages/mcp-servers.txt,
+# preserving runtime sections.)

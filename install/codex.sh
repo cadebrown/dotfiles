@@ -85,24 +85,6 @@ _json_escape_simple() {
     printf '%s' "$1"
 }
 
-# Resolve an `auth=<source>` directive to an HTTP Authorization header value
-# (e.g. "Bearer ghp_..."). Mirrors the helper in install/claude.sh so both
-# agents consume the same auth contract from packages/mcp-servers.txt.
-_resolve_auth_header() {
-    local spec="$1" token=""
-    case "$spec" in
-        gh)
-            has gh || return 1
-            token="$(gh auth token 2>/dev/null)" || return 1
-            [[ -n "$token" ]] || return 1
-            printf 'Bearer %s' "$token"
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
 _toml_escape() {
     local s="$1"
     s="${s//\\/\\\\}"
@@ -114,7 +96,7 @@ _toml_escape() {
 # TOML blocks, written to $1. Logs go to stdout via log_*; only TOML hits $1.
 _emit_mcp_blocks_to() {
     local out="$1" _file _line _name _rest _transport _cmd _head _tail _url
-    local _rest_extras _auth_source _client_id _arg _first _val
+    local _rest_extras _auth_source _client_id _arg _first
 
     : > "$out"
 
@@ -166,13 +148,31 @@ _emit_mcp_blocks_to() {
 
                 printf 'url = "%s"\n' "$(_toml_escape "$_url")" >> "$out"
 
+                # auth= sources mirror install/claude.sh's contract, but Codex
+                # resolves credentials at launch instead of storing them:
+                #   gh       → bearer_token_env_var, filled by the codex() shell
+                #              wrapper (GH_TOKEN) — token never lands on disk
+                #   context7 → env_http_headers, read from the environment
+                #              (zprofile sources ~/.context7.env)
                 if [[ -n "$_auth_source" ]]; then
-                    if _val="$(_resolve_auth_header "$_auth_source")" && [[ -n "$_val" ]]; then
-                        printf 'http_headers = { Authorization = "%s" }\n' "$(_toml_escape "$_val")" >> "$out"
-                        log_info "    $_name ($_transport, auth=$_auth_source)"
-                    else
-                        log_warn "    $_name: auth=$_auth_source unavailable (e.g. run 'gh auth login'); emitting without Authorization header"
-                    fi
+                    case "$_auth_source" in
+                        gh)
+                            printf 'bearer_token_env_var = "GH_TOKEN"\n' >> "$out"
+                            has gh || log_warn "    $_name: gh not installed — GH_TOKEN stays empty until 'gh auth login'"
+                            log_info "    $_name ($_transport, auth=gh via GH_TOKEN)"
+                            ;;
+                        context7)
+                            if [[ -f "$HOME/.context7.env" ]]; then
+                                printf 'env_http_headers = { CONTEXT7_API_KEY = "CONTEXT7_API_KEY" }\n' >> "$out"
+                                log_info "    $_name ($_transport, auth=context7 via env)"
+                            else
+                                log_warn "    $_name: ~/.context7.env missing — unauthenticated (run 'bash install/auth.sh context7')"
+                            fi
+                            ;;
+                        *)
+                            log_warn "    $_name: unknown auth source '$_auth_source' — emitting without auth"
+                            ;;
+                    esac
                 fi
 
                 if [[ -n "$_client_id" ]]; then
@@ -192,6 +192,28 @@ _emit_mcp_blocks_to() {
     done < <(overlay_package_files "mcp-servers.txt")
 }
 
+# One-time eviction of the retired managed rules file. Managed rules moved
+# from ~/.codex/rules/default.rules to dotfiles.rules (June 2026) so Codex's
+# own TUI-approval appends never share a file with chezmoi-managed content.
+# chezmoi does not delete targets whose source disappeared, so on machines
+# that haven't been cleaned the old file would stay loaded forever (including
+# the since-evicted `source .env` / project-specific allows). Delete it only
+# when it is byte-identical to the retired managed content — any deviation
+# means Codex appended runtime approvals, which we must not destroy.
+_evict_legacy_rules() {
+    local _legacy="$HOME/.codex/rules/default.rules" _hash
+    # sha256 of the retired content (git show <pre-move>:home/dot_codex/rules/default.rules)
+    local _retired="42873ce7d512934850fc072d26e180e5e21c2cd324ef5d8b4edd9d162db95e46"
+    [[ -f "$_legacy" ]] || return 0
+    _hash="$(_sha256_stdin < "$_legacy")" || return 0
+    if [[ "$_hash" == "$_retired" ]]; then
+        rm -f "$_legacy"
+        log_warn "Removed retired managed rules: $_legacy (managed rules now in dotfiles.rules)"
+    else
+        log_warn "$_legacy deviates from the retired managed content — review manually; managed rules live in dotfiles.rules"
+    fi
+}
+
 _sync_config() {
     local _tmpl _dest _tmp _managed _runtime _merged _mcp
     log_section "Codex Config Sync"
@@ -201,6 +223,8 @@ _sync_config() {
 
     [[ -f "$_tmpl" ]] || die "Missing managed config template: $_tmpl"
     ensure_dir "$HOME/.codex"
+
+    _evict_legacy_rules
 
     _tmp="$(mktemp -d)"
     trap 'rm -rf "$_tmp"' RETURN
@@ -347,11 +371,12 @@ _trust_hook() {
 }
 
 _check_setup() {
-    local _config _rules _hooks _guard _profile _guard_rc _hook_hash
+    local _config _rules _hooks _guard _profile _pfile _guard_rc _hook_hash
+    local _want_model _mcp_name
     log_section "Codex Healthcheck"
 
     _config="$HOME/.codex/config.toml"
-    _rules="$HOME/.codex/rules/default.rules"
+    _rules="$HOME/.codex/rules/dotfiles.rules"
     _hooks="$HOME/.codex/hooks.json"
     _guard="$HOME/.local/bin/df-chezmoi-guard"
 
@@ -363,18 +388,29 @@ _check_setup() {
     [[ -f "$_hooks" ]] || die "Missing codex hooks: $_hooks"
     [[ -x "$_guard" ]] || die "Missing executable chezmoi guard: $_guard"
 
-    grep -q '^model = "gpt-5\.5"$' "$_config" || die "Unexpected default model in $_config"
+    # Model pin: derived from the source template so the check tracks it.
+    _want_model="$(grep '^model = ' "$DF_ROOT/home/dot_codex/create_config.toml" | head -1 || true)"
+    [[ -n "$_want_model" ]] || die "No 'model =' line in create_config.toml template"
+    grep -qF "$_want_model" "$_config" \
+        || die "Deployed model differs from template (${_want_model}) in $_config"
     grep -q 'project_doc_fallback_filenames = \["AGENTS.md", "CLAUDE.md"\]' "$_config" \
         || die "Missing AGENTS.md fallback in $_config"
-    grep -q '^\[profiles\.deep\]$' "$_config" || die "Missing [profiles.deep] in $_config"
-    grep -q '^\[profiles\.review\]$' "$_config" || die "Missing [profiles.review] in $_config"
-    grep -q '^\[profiles\.bootstrap\]$' "$_config" || die "Missing [profiles.bootstrap] in $_config"
-    grep -q '^\[profiles\.fast\]$' "$_config" || die "Missing [profiles.fast] in $_config"
-    grep -q '^\[profiles\.unrestricted\]$' "$_config" || die "Missing [profiles.unrestricted] in $_config"
-    grep -q '^\[mcp_servers\.openaiDeveloperDocs\]$' "$_config" \
-        || die "Missing OpenAI docs MCP in $_config"
-    grep -q '^\[mcp_servers\.context7\]$' "$_config" \
-        || die "Missing context7 MCP in $_config (generated from packages/mcp-servers.txt)"
+    grep -q '^approval_policy = { granular' "$_config" \
+        || die "approval_policy is not the granular form — prompt rules would be dead letters"
+    ! grep -q '^\[profiles\.' "$_config" \
+        || die "Legacy [profiles.*] tables in $_config — Codex 0.134+ ignores them (profiles live in ~/.codex/<name>.config.toml)"
+    grep -q 'bearer_token_env_var = "GH_TOKEN"' "$_config" \
+        || die "GitHub MCP missing bearer_token_env_var in $_config (auth=gh)"
+
+    # MCP servers: every name in the shared list (+ overlays) must have a
+    # generated block — derived, so list edits can't go stale here.
+    while IFS= read -r _mcp_name; do
+        grep -q "^\[mcp_servers\.${_mcp_name}\]$" "$_config" \
+            || die "Missing [mcp_servers.$_mcp_name] in $_config (generated from packages/mcp-servers.txt)"
+    done < <(while IFS= read -r _file; do
+                 awk '!/^[[:space:]]*(#|$)/{print $1}' "$_file"
+             done < <(overlay_package_files "mcp-servers.txt"))
+
     grep -q '"command": "~/.local/bin/df-chezmoi-guard"' "$_hooks" \
         || die "Codex hook does not use shared chezmoi guard"
     ! grep -q 'format-hook' "$_hooks" \
@@ -385,10 +421,13 @@ _check_setup() {
 
     codex debug prompt-input "healthcheck" >/dev/null \
         || die "Codex config parse failed for default profile"
-    while IFS= read -r _profile; do
+    # Profiles: every ~/.codex/<name>.config.toml overlay must parse.
+    for _pfile in "$HOME"/.codex/*.config.toml; do
+        [[ -e "$_pfile" ]] || continue
+        _profile="$(basename "$_pfile" .config.toml)"
         codex --profile "$_profile" debug prompt-input "healthcheck" >/dev/null \
             || die "Codex config parse failed for profile: $_profile"
-    done < <(awk '/^\[profiles\.[A-Za-z0-9_-]+\]$/ { gsub(/^\[profiles\.|\]$/, ""); print }' "$_config")
+    done
 
     codex execpolicy check --rules "$_rules" -- git status >/dev/null \
         || die "codex execpolicy check failed for $_rules"

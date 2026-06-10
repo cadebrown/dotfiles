@@ -1,0 +1,5 @@
+# ~/.codex/review.config.toml — `codex -p review` (alias: codexr)
+# Delta-only overlay on the base config (Codex 0.134+ profile format).
+#
+# Read-only sandbox for code review / exploration sessions.
+sandbox_mode = "read-only"

@@ -53,19 +53,38 @@ fi
 _pkg_count=0
 _upgrade_count=0
 while IFS= read -r pkg; do
-    if npm list -g "$pkg" --depth=0 &>/dev/null; then
+    # Entries may pin a version ("<name>@1.2.3", scoped names keep their
+    # leading @). Split at the LAST @ — a tail with "/" in it is the package
+    # path of a scoped name, not a version.
+    _name="$pkg" _pin="" _tail="${pkg##*@}"
+    if [[ "$pkg" == *"@"* && -n "$_tail" && "$_tail" != *"/"* && "$pkg" != "@$_tail" ]]; then
+        _name="${pkg%@*}"
+        _pin="$_tail"
+    fi
+
+    if [[ -n "$_pin" ]]; then
+        # Pinned: hold this exact version; upgrade mode does not move it.
+        if npm list -g "${_name}@${_pin}" --depth=0 &>/dev/null; then
+            log_okay "  $_name@$_pin (pinned, installed)"
+        else
+            log_info "  installing $_name@$_pin (pinned)"
+            run_logged npm install -g "${_name}@${_pin}"
+            log_okay "  $_name@$_pin"
+            (( _pkg_count++ )) || true
+        fi
+    elif npm list -g "$_name" --depth=0 &>/dev/null; then
         if [[ "${DF_MODE:-}" == "upgrade" ]]; then
-            log_info "  upgrading $pkg"
-            run_logged npm install -g "$pkg@latest"
-            log_okay "  $pkg (upgraded)"
+            log_info "  upgrading $_name"
+            run_logged npm install -g "$_name@latest"
+            log_okay "  $_name (upgraded)"
             (( _upgrade_count++ )) || true
         else
-            log_okay "  $pkg (already installed)"
+            log_okay "  $_name (already installed)"
         fi
     else
-        log_info "  installing $pkg"
-        run_logged npm install -g "$pkg"
-        log_okay "  $pkg"
+        log_info "  installing $_name"
+        run_logged npm install -g "$_name"
+        log_okay "  $_name"
         (( _pkg_count++ )) || true
     fi
 done < <(_read_package_list "$NPM_TXT")

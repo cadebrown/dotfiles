@@ -1,0 +1,7 @@
+# ~/.codex/fast.config.toml — `codex -p fast`
+# Delta-only overlay on the base config (Codex 0.134+ profile format).
+#
+# Quick-iteration profile: low reasoning effort, workspace-write sandbox.
+model_reasoning_effort = "low"
+plan_mode_reasoning_effort = "medium"
+sandbox_mode = "workspace-write"
