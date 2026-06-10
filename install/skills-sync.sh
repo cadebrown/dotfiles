@@ -37,6 +37,18 @@ _sync_from() {
         fi
 
         case "$_type" in
+            npx-all)
+                # <owner/repo> — install every skill in the repo (--all);
+                # _dir is the marker skill checked for idempotency.
+                log_info "  $_dir ← npx skills add $_rest (--all)"
+                if run_logged npx -y skills add "$_rest" --all -a claude-code -g -y < /dev/null; then
+                    log_okay "  installed $_dir (suite)"
+                    (( _ok++ )) || true
+                else
+                    log_warn "  fail  $_dir"
+                    (( _fail++ )) || true
+                fi
+                ;;
             npx)
                 # <owner/repo[#ref]> <skill-name>
                 local _ref="${_rest%% *}" _skill="${_rest#* }"

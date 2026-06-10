@@ -31,3 +31,33 @@ jj-guide npx mtaran/jj-guide jj-guide
 # qmd: the tool ships its own skill (targets ~/.agents/skills/qmd, which is
 # the same tree via the symlink)
 qmd self qmd skill install --global -f
+
+# entire: checkpoint-mining for the installed `entire` session recorder
+# (official). Deliberately NOT --all: the full 11-skill suite ships generic
+# names (search/explain/review/teach...) that pollute the global skill
+# namespace and cost ~8 extra always-loaded descriptions per session.
+using-entire npx entireio/skills using-entire
+what-happened npx entireio/skills what-happened
+session-handoff npx entireio/skills session-handoff
+
+# glab: GitLab CLI's own bundled skill (EXPERIMENTAL upstream; installs to
+# ~/.agents/skills, same tree via symlink)
+glab self glab skills install --global
+
+# ffmpeg: command cheatsheet skill (rendi-api — ffmpeg API vendor)
+ffmpeg npx rendi-api/ffmpeg-cheatsheet ffmpeg
+
+# terraform/opentofu: antonbabenko (terraform-best-practices author)
+terraform-skill npx antonbabenko/terraform-skill terraform-skill
+
+# tmux: drive interactive processes in tmux panes (mitsuhiko)
+tmux npx mitsuhiko/agent-stuff tmux
+
+# uv: Astral's official skill for uv workflows
+uv npx astral-sh/claude-code-plugins uv
+
+# typst: typst-cli authoring skill
+typst npx lucifer1004/claude-skill-typst typst
+
+# zig: zigcc community org, current-Zig (0.16) idioms
+zig-0.16 npx zigcc/skills zig-0.16
