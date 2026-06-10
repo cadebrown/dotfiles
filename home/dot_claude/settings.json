@@ -4,7 +4,9 @@
     "DISABLE_AUTOUPDATER": "1",
     "ENABLE_PROMPT_CACHING_1H": "1",
     "BASH_DEFAULT_TIMEOUT_MS": "300000",
-    "BASH_MAX_TIMEOUT_MS": "900000"
+    "BASH_MAX_TIMEOUT_MS": "900000",
+    "MAX_MCP_OUTPUT_TOKENS": "10000",
+    "BASH_MAX_OUTPUT_LENGTH": "20000"
   },
   "permissions": {
     "defaultMode": "bypassPermissions",
@@ -30,7 +32,9 @@
   },
   "cleanupPeriodDays": 3650,
   "model": "claude-fable-5[1m]",
-  "fallbackModel": ["opus[1m]"],
+  "fallbackModel": [
+    "opus[1m]"
+  ],
   "sandbox": {
     "enabled": true,
     "filesystem": {
@@ -46,7 +50,18 @@
         "~/.wolframalpha.env"
       ]
     },
-    "excludedCommands": ["gh *", "docker *", "colima *", "tofu *", "terraform *"]
+    "excludedCommands": [
+      "gh *",
+      "docker *",
+      "colima *",
+      "tofu *",
+      "terraform *",
+      "rtk gh *",
+      "rtk docker *",
+      "rtk colima *",
+      "rtk tofu *",
+      "rtk terraform *"
+    ]
   },
   "hooks": {
     "Notification": [
@@ -67,6 +82,15 @@
           {
             "type": "command",
             "command": "~/.claude/chezmoi-guard.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rtk hook claude"
           }
         ]
       }

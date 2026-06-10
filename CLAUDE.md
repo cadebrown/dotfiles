@@ -26,7 +26,7 @@ These are non-negotiable and shape every decision in the repo:
 | What | Where | Notes |
 |---|---|---|
 | Dotfile sources | `home/` | chezmoi templates → applied to `~/` |
-| Package lists | `packages/` | `Brewfile`, `cargo.txt`, `pip.txt`, `npm.txt`, `mlx-models.txt`, `claude-*.txt` |
+| Package lists | `packages/` | `Brewfile`, `cargo.txt`, `pip.txt`, `npm.txt`, `go.txt`, `mlx-models.txt`, `mcp-servers.txt`, `agent-skills.txt`, `claude-*.txt` |
 | Agent skills | `home/dot_claude/skills/` | Single source → `~/.claude/skills`; `~/.agents/skills` symlinks there (read by Codex/opencode/pi) |
 | Shared template partials | `home/.chezmoitemplates/` | `agents-common.md` (engineering norms) + `voice-common.md` (tone/estimates), shared by Claude/Codex/opencode/pi guidance files |
 | Install scripts | `install/` | Each sources `_lib.sh`, each is idempotent |
@@ -99,6 +99,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `local-llm.sh` | Verifies ollama/mlx-lm/mlx-openai-server binaries; creates HF cache dir; `pull-models` subcommand pre-pulls MLX models from `packages/mlx-models.txt` | Warns (does not fail) if tools missing. MLX is the primary local backend (started via `mlxserve`); Ollama remains as fallback. |
 | `opencode.sh` | OpenCode binary check (config is pure chezmoi; primary backend is MLX in `opencode.json`) | The old Ollama context-boost alias machinery was removed — nothing consumed it |
 | `blender-mcp.sh` | Installs the `blender-mcp` Blender addon (`addon.py` from github.com/ahujasid/blender-mcp) and enables it via headless Blender | MCP server side is separate — see `packages/mcp-servers.txt`. Skips if Blender not installed. |
+| `skills-sync.sh` | Installs official agent skills for installed CLIs from `packages/agent-skills.txt` (ast-grep, nushell, jj, qmd self-install) into the shared `~/.claude/skills` tree | Engine: `npx skills add` (vercel-labs; lockfile at `~/.agents/.skill-lock.json`). Installer-managed dirs — never add chezmoi sources for them (one writer per skill dir). |
 | `memory.sh` | Agent memory stack: cass binary (GitHub release, checksum-verified) + session-history index, ~/kb knowledge repo, qmd collections + embeddings, memory daemons | qmd MCP daemon on localhost:8181 (LaunchAgent dev.cade.qmd on macOS, lazy-start on Linux); cass watch daemon likewise. `reindex` mode forces re-embedding. Indexes under ~/.cache (scratch), never synced; ~/kb is git-synced. |
 | `auth.sh` | Guided API token setup with service registry | Creates `~/.{service}.env` files (chmod 600). Built-in services: GitHub, Anthropic, OpenAI, Cloudflare, HuggingFace, plus `gh auth login`. Run `bash auth.sh status` for state, `bash auth.sh <service>` for a single one. Add a service by appending to `_SERVICE_DEFS` in the script. |
 | `dirs.sh` | Creates `~/dev`, `~/bones`, `~/misc` | Symlinks to scratch when available |
@@ -177,6 +178,7 @@ against a recorded install dir (uv was the canonical example of this footgun).
 6.   runtimes         DF_DO_NODE, DF_DO_RUST, DF_DO_GO, DF_DO_PYTHON, DF_DO_CLAUDE, DF_DO_CODEX, DF_DO_CURSOR, DF_DO_VSCODE, DF_DO_CMAKE
 6.5  local LLM        DF_DO_LOCAL_LLM (local-llm.sh + opencode.sh)
 6.6  agent memory     DF_DO_MEMORY (memory.sh — cass + qmd + ~/kb + daemons)
+6.65 agent skills     DF_DO_SKILLS (skills-sync.sh — agent-skills.txt)
 6.7  blender-mcp      DF_DO_BLENDER_MCP (skips if Blender not installed)
 7.   auth             DF_DO_AUTH (off by default)
 ```

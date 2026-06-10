@@ -32,6 +32,9 @@ cass show <hit-id>
 
 # If results look stale or empty
 cass health --robot   # index status; daemon may still be backfilling embeddings
+
+# Full robot-mode command reference (pack/triage/expand options)
+cass robot-docs
 ```
 
 ## Method

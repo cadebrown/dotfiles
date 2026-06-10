@@ -1,0 +1,33 @@
+# agent-skills.txt - official/community agent skills for installed CLIs
+# Usage: install/skills-sync.sh reads this file (overlay-extensible)
+#
+# Rows install into the single shared skill tree (~/.claude/skills, exposed
+# to Codex/opencode/pi via the ~/.agents/skills symlink). Two row types:
+#
+#   <skill-dir> npx <owner/repo[#ref]> <skill-name>
+#       → npx -y skills add '<owner/repo[#ref]>' --skill <skill-name> -a claude-code -g -y
+#         (vercel-labs/skills CLI; lockfile at ~/.agents/.skill-lock.json;
+#          #ref pins a tag/branch/SHA — @name is a skill filter, NOT a ref)
+#
+#   <skill-dir> self <command...>
+#       → the tool installs its own skill (run only when the binary exists)
+#
+# Idempotency: a row is skipped when ~/.claude/skills/<skill-dir>/SKILL.md
+# exists. These dirs are INSTALLER-managed — never add chezmoi sources for
+# them (one writer per skill dir; vendored skills live in home/dot_claude/).
+
+# ast-grep: structural search/rewrite — the official skill teaches pattern
+# syntax + rule files; fills the one capability gap rg/sd can't cover.
+ast-grep npx ast-grep/agent-skill ast-grep
+
+# nushell: structured-data pipelines for the installed `nu`
+nushell npx nushell/nu_scripts nushell
+
+# jj (Jujutsu): community usage guide. Unpinned: the skills CLI cancels on
+# #ref pins in non-interactive mode (June 2026); reproducibility comes from
+# the lockfile (~/.agents/.skill-lock.json records the tree hash).
+jj-guide npx mtaran/jj-guide jj-guide
+
+# qmd: the tool ships its own skill (targets ~/.agents/skills/qmd, which is
+# the same tree via the symlink)
+qmd self qmd skill install --global -f

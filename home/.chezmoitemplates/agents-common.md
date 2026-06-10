@@ -98,6 +98,19 @@ Prefer these — they're all installed via dotfiles:
 - `samply record <cmd>` for CPU profiles (opens in Firefox Profiler)
 - `typos` for a source-tree spell pass before commits
 
+## Output discipline (token hygiene)
+
+Tool output is the dominant context cost. Habits:
+- Prefer machine modes: `--porcelain`, `--json`, `--robot`, `-q` — then filter
+  with `jq`/`rg` instead of reading prose output.
+- Never dump large files or logs: `rg -l` first, then targeted reads;
+  `head`/`tail` long output; `wc -l` before `cat`.
+- Prefix noisy commands with `rtk` (`rtk git status`, `rtk cargo test`) — it
+  compresses output 60-90% with no information you'd act on lost. Claude Code
+  rewrites these automatically via hook; other agents prefix manually.
+- Build/test loops: run the narrowest target (`cargo nextest run <filter>`,
+  single test files) before whole-suite runs.
+
 ## Memory layers
 
 Beyond this file there are three memory layers. Read order for nontrivial

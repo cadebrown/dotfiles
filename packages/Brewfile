@@ -108,6 +108,13 @@ brew "go"  # Go toolchain; packages/go.txt drives `go install` via install/go.sh
 ### AI Coding Agents ###
 brew "opencode"
 
+### Token optimization ###
+# rtk (Rust Token Killer): CLI proxy that compresses command output before it
+# enters agent context (git/cargo/test runners etc.). Wired as a Claude Code
+# PreToolUse hook in dot_claude/settings.json; other agents prefix manually.
+# NOT cargo.txt: the crates.io `rtk` crate is an unrelated project.
+brew "rtk"
+
 ### Memory stack (see install/memory.sh + docs/usage/agents.md) ###
 # cass (session-history search) is installed by install/memory.sh directly
 # from GitHub releases with checksum verification — its brew tap lags asset

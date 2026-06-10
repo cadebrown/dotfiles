@@ -27,6 +27,12 @@
 # daemon on :8181 for Claude+Codex+opencode. See install/memory.sh.
 @tobilu/qmd
 
+# Playwright CLI — token-efficient browser automation (artifacts to disk,
+# agent reads what it needs) vs streaming MCP trees. chrome-devtools MCP
+# stays for live inspection; this is the automation path (~4x fewer tokens,
+# attributed to the Playwright team's launch materials).
+@playwright/cli
+
 # LSP servers backing the Claude Code LSP plugins (pyright-lsp, typescript-lsp).
 # The plugins only wrap these binaries — without them the plugins are inert.
 # (rust-analyzer comes from a rustup component in install/rust.sh; clangd from

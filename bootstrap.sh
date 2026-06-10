@@ -58,6 +58,7 @@
 #   DF_DO_CMAKE         — set to 0 to skip CMake toolchain file install
 #   DF_DO_LOCAL_LLM     — set to 0 to skip local LLM tooling setup
 #   DF_DO_MEMORY        — set to 0 to skip the agent memory stack (qmd/cass/~kb)
+#   DF_DO_SKILLS        — set to 0 to skip agent-skills sync (agent-skills.txt)
 #   DF_DO_BLENDER_MCP   — set to 0 to skip blender-mcp addon install
 #   DF_DO_OVERLAYS      — set to 0 to skip all overlay bootstraps
 
@@ -512,6 +513,16 @@ if [[ "${DF_DO_MEMORY:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/memory.sh" || die "memory.sh failed"
 else
     log_info "Skipping agent memory stack (DF_DO_MEMORY=0)"
+fi
+
+### 6.65. agent skills sync ###
+
+log_section "6.65 — agent skills sync"
+
+if [[ "${DF_DO_SKILLS:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/skills-sync.sh" || die "skills-sync.sh failed"
+else
+    log_info "Skipping agent skills sync (DF_DO_SKILLS=0)"
 fi
 
 ### 6.7. blender-mcp addon ###

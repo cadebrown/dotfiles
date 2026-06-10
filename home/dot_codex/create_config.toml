@@ -22,6 +22,9 @@ approval_policy = { granular = { rules = true, sandbox_approval = false, mcp_eli
 file_opener = "none"
 
 project_doc_max_bytes = 32768
+# Cap stored tool/function output in history (token budget per output) —
+# the context-side analog of Claude's MAX_MCP_OUTPUT_TOKENS/BASH_MAX_OUTPUT_LENGTH.
+tool_output_token_limit = 10000
 project_doc_fallback_filenames = ["AGENTS.md", "CLAUDE.md"]
 
 [features]
