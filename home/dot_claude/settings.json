@@ -25,7 +25,12 @@
     "sonnet[1m]"
   ],
   "sandbox": {
-    "enabled": true
+    "enabled": true,
+    "filesystem": {
+      "allowWrite": [
+        "/tmp"
+      ]
+    }
   },
   "hooks": {
     "Notification": [
