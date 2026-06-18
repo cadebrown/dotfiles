@@ -110,8 +110,13 @@ _ok=0 _fail=0
 
 while IFS= read -r pkg; do
     log_info "  binstall $pkg"
+    # --locked on the source fallback: cargo install ignores the crate's
+    # shipped Cargo.lock by default, resolving newest semver-compatible deps.
+    # That drifts into API-incompatible transitive versions (atuin-ai vs
+    # ratatui-widgets 0.3.1) and trips crates that hard-refuse unlocked builds
+    # (cargo-nextest's locked-tripwire). --locked honors the tested lockfile.
     if run_logged cargo binstall "${_binstall_flags[@]}" "$pkg" \
-        || run_logged cargo install "$pkg"; then
+        || run_logged cargo install --locked "$pkg"; then
         log_okay "  ok    $pkg"
         (( _ok++ )) || true
     else
