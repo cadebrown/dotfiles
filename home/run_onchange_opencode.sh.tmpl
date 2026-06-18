@@ -1,7 +1,13 @@
 #!/bin/bash
-# Chezmoi re-runs this script whenever opencode.json.tmpl changes.
-# config hash: {{ include "dot_config/opencode/opencode.json.tmpl" | sha256sum }}
+# Chezmoi re-runs this whenever the opencode base template or the shared MCP
+# server list changes, to regenerate the script-owned ~/.config/opencode/opencode.json.
+# config hash:      {{ include "dot_config/opencode/create_opencode.json.tmpl" | sha256sum }}
+# mcp-servers.txt:  {{ include "../packages/mcp-servers.txt" | sha256sum }}
+# overlay mcp hashes:
+{{- range glob (joinPath .chezmoi.workingTree "dotfiles-*/packages/mcp-servers.txt") }}
+#   {{ . | include | sha256sum }} {{ . }}
+{{- end }}
 
 set -euo pipefail
 DOTFILES="$CHEZMOI_SOURCE_DIR/.."
-bash "$DOTFILES/install/opencode.sh"
+bash "$DOTFILES/install/opencode.sh" sync-config

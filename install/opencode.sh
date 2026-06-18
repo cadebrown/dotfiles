@@ -1,20 +1,113 @@
 #!/usr/bin/env bash
-# install/opencode.sh - verify the opencode binary is present
+# install/opencode.sh - generate ~/.config/opencode/opencode.json
 #
-# Primary backend for opencode is MLX (mlx-openai-server via the mlxserve
-# LaunchAgent, KeepAlive on :8080), configured in
-# home/dot_config/opencode/opencode.json.tmpl. Ollama stays installed as a
-# plain fallback — an ad-hoc model is one command away (`ollama pull
-# qwen3-coder:30b`) — but the old context-boosted alias fleet is gone:
-# nothing consumed it and its model lineup aged out.
+# opencode.json is SCRIPT-OWNED, like ~/.codex/config.toml: the chezmoi template
+# create_opencode.json.tmpl seeds it once, then this script regenerates it —
+# rendering the model/agent/permission base via `chezmoi execute-template` and
+# injecting the `mcp` object generated from the shared packages/mcp-servers.txt
+# (the same source of truth as Claude/Codex/Cursor).
+#
+# opencode is native MCP. Auth uses opencode's {env:VAR} substitution so no
+# secret is baked into the file; the env vars come from ~/.<svc>.env (sourced by
+# shell profiles, so opencode inherits them at launch). Note: {env:VAR}
+# substitution is documented for headers/environment; for the URL-keyed Firecrawl
+# server it is best-effort — if opencode does not expand {env:} in url, set the
+# Firecrawl key via the header path or accept it inert in opencode only.
+#
+# Modes:
+#   install (default) — verify binary, then sync-config
+#   sync-config       — regenerate opencode.json from template + MCP list
+#   check             — validate the generated config is parseable JSON
 set -euo pipefail
-
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
-log_section "OpenCode (binary check)"
+_mode="${1:-install}"
 
-if ! has opencode; then
-    log_warn "opencode not found — skipping (run: brew install opencode)"
-    exit 0
-fi
-log_okay "opencode: $(opencode --version 2>/dev/null | head -1)"
+# Emit opencode's `mcp` object (JSON) from mcp-servers.txt (+ overlays).
+# Schema: local  {type:"local",  command:[...], enabled}
+#         remote {type:"remote", url, headers?, enabled}
+_emit_opencode_mcp() {
+    local _stream _file _line _name _rest _transport _cmd _url _rest_extras _tok _auth _def
+    _stream="$(mktemp)"; trap 'rm -f "$_stream"' RETURN
+
+    while IFS= read -r _file; do
+        while IFS= read -r _line; do
+            [[ -z "$_line" || "$_line" == \#* ]] && continue
+            _name="${_line%% *}"; _rest="${_line#* }"; _transport="${_rest%% *}"
+
+            if [[ "$_transport" == "stdio" && "$_rest" == *"cmd: "* ]]; then
+                _cmd="${_rest#*cmd: }"
+                _def="$(jq -nc --arg cmd "$_cmd" \
+                    '{type:"local", command:($cmd|split(" ")), enabled:true}')"
+            else
+                read -r _ _ _url _rest_extras <<< "$_line"
+                _auth=""
+                for _tok in $_rest_extras; do [[ "$_tok" == auth=* ]] && _auth="${_tok#auth=}"; done
+                # {VAR} url placeholders → opencode's {env:VAR} (e.g. Firecrawl).
+                _url="$(printf '%s' "$_url" | sed -E 's/\{([A-Za-z_][A-Za-z0-9_]*)\}/{env:\1}/g')"
+                case "$_auth" in
+                    gh)       _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:GH_TOKEN}"}, enabled:true}')" ;;
+                    context7) _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"CONTEXT7_API_KEY":"{env:CONTEXT7_API_KEY}"}, enabled:true}')" ;;
+                    tavily)   _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:TAVILY_API_KEY}"}, enabled:true}')" ;;
+                    exa)      _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"x-api-key":"{env:EXA_API_KEY}"}, enabled:true}')" ;;
+                    "")       _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, enabled:true}')" ;;
+                    *)        log_warn "  $_name: unknown auth '$_auth' — unauthenticated" >&2
+                              _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, enabled:true}')" ;;
+                esac
+            fi
+            jq -nc --arg n "$_name" --argjson def "$_def" '{name:$n, def:$def}' >> "$_stream"
+        done < "$_file"
+    done < <(overlay_package_files "mcp-servers.txt")
+
+    jq -s 'reduce .[] as $e ({}; .[$e.name] = $e.def)' "$_stream"
+}
+
+_sync_config() {
+    log_section "OpenCode config"
+    has jq || { log_warn "jq missing — skipping opencode config"; return 0; }
+    has chezmoi || { log_warn "chezmoi missing — skipping opencode config"; return 0; }
+
+    local _tmpl="$DF_ROOT/home/dot_config/opencode/create_opencode.json.tmpl"
+    local _out="$HOME/.config/opencode/opencode.json" _base _mcp _tmp
+    [[ -f "$_tmpl" ]] || die "missing opencode template: $_tmpl"
+
+    _base="$(chezmoi execute-template < "$_tmpl")" || die "chezmoi execute-template failed for opencode"
+    _mcp="$(_emit_opencode_mcp)"
+
+    _tmp="$(mktemp)"
+    printf '%s' "$_base" | jq --argjson mcp "$_mcp" '.mcp = $mcp' > "$_tmp" \
+        || { log_warn "opencode config assembly failed"; rm -f "$_tmp"; return 1; }
+
+    ensure_dir "$HOME/.config/opencode"
+    if [[ -f "$_out" ]] && cmp -s "$_tmp" "$_out"; then
+        log_okay "opencode.json unchanged → $_out"
+        rm -f "$_tmp"
+    else
+        mv "$_tmp" "$_out"
+        log_okay "Wrote opencode.json ($(jq '.mcp | length' "$_out") MCP servers) → $_out"
+    fi
+}
+
+case "$_mode" in
+    install)
+        log_section "OpenCode (binary check)"
+        if has opencode; then
+            log_okay "opencode: $(opencode --version 2>/dev/null | head -1)"
+        else
+            log_warn "opencode not found — skipping binary (run: brew install opencode)"
+        fi
+        _sync_config
+        ;;
+    sync-config)
+        _sync_config
+        ;;
+    check)
+        _out="$HOME/.config/opencode/opencode.json"
+        [[ -f "$_out" ]] && jq . "$_out" >/dev/null 2>&1 \
+            && log_okay "opencode.json is valid JSON ($(jq '.mcp | length' "$_out") MCP servers)" \
+            || die "opencode.json missing or invalid: $_out"
+        ;;
+    *)
+        die "Usage: opencode.sh [install|sync-config|check]"
+        ;;
+esac
