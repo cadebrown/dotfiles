@@ -50,6 +50,15 @@ _cass_platform() {
     esac
 }
 
+# Build cass from source. The repo (coding_agent_session_search) holds two
+# packages — the main `coding-agent-search` plus a `cass-fuzz` fuzz crate — and
+# the main package builds several bins, so cargo errors with "multiple packages
+# with binaries found" unless BOTH the package and the bin are pinned.
+_cass_build_from_source() {
+    run_logged cargo install --git "https://github.com/$_CASS_REPO" \
+        coding-agent-search --bin cass --locked --root "${ARCH_BIN%/bin}"
+}
+
 _install_cass() {
     local _plat _ver _dest _tmp _url _want _got _meta
     _plat="$(_cass_platform)" || { log_warn "cass: unsupported platform $OS-$ARCH — skipping"; return 0; }
@@ -70,8 +79,7 @@ _install_cass() {
         log_warn "cass: set GITHUB_TOKEN (run 'bash install/auth.sh github') to raise the 60/hr limit."
         if has cargo; then
             log_warn "cass: building from source instead (one-time, ~minutes)"
-            run_logged cargo install --git "https://github.com/$_CASS_REPO" --root "${ARCH_BIN%/bin}" \
-                || log_warn "cass: source build failed — skipping"
+            _cass_build_from_source || log_warn "cass: source build failed — skipping"
         else
             log_warn "cass: no cargo to fall back to — skipping"
         fi
@@ -91,7 +99,7 @@ _install_cass() {
         if ! awk -v v="$_glibc" 'BEGIN { exit !(v >= 2.38) }'; then
             if has cargo; then
                 log_warn "cass: host glibc $_glibc < 2.38 — building from source (one-time, ~minutes)"
-                run_logged cargo install --git "https://github.com/$_CASS_REPO" --root "${ARCH_BIN%/bin}"
+                _cass_build_from_source || log_warn "cass: source build failed — skipping"
                 return 0
             fi
             log_warn "cass: host glibc $_glibc < 2.38 and no cargo — skipping"
