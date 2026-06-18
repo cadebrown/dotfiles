@@ -15,6 +15,12 @@
       {
         "command": "bash ./hooks/sync-dotfiles-cursor.sh --before-submit"
       }
+    ],
+    "preToolUse": [
+      {
+        "command": "rtk hook cursor",
+        "matcher": "Shell"
+      }
     ]
   }
 }
