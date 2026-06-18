@@ -25,6 +25,86 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
+# Generate ~/.cursor/mcp.json (global scope, `mcpServers` schema) from the
+# shared packages/mcp-servers.txt (+ overlays). Same source of truth as
+# install/claude.sh and install/codex.sh. Cursor expands ${env:VAR} in headers,
+# so gh uses Authorization: Bearer ${env:GH_TOKEN} (token never baked); env-file
+# sources (context7/tavily/exa) bake the resolved header value; {VAR} URL
+# placeholders (firecrawl) are substituted from the environment at sync time.
+_sync_cursor_mcp() {
+    has jq || { log_warn "jq not found — skipping Cursor MCP sync"; return 0; }
+    log_section "Cursor MCP servers"
+
+    local _out="$HOME/.cursor/mcp.json" _stream _file _line _count=0
+    local _name _rest _transport _cmd _url _rest_extras _tok _auth _missing _ph _val _hname _hval _def
+    _stream="$(mktemp)"; trap 'rm -f "$_stream"' RETURN
+
+    while IFS= read -r _file; do
+        while IFS= read -r _line; do
+            [[ -z "$_line" || "$_line" == \#* ]] && continue
+            _name="${_line%% *}"; _rest="${_line#* }"; _transport="${_rest%% *}"
+
+            if [[ "$_transport" == "stdio" && "$_rest" == *"cmd: "* ]]; then
+                _cmd="${_rest#*cmd: }"
+                _def="$(jq -nc --arg cmd "$_cmd" \
+                    '($cmd|split(" ")) as $w | {command:$w[0]}
+                     + (if ($w|length)>1 then {args:$w[1:]} else {} end)')"
+            else
+                read -r _ _ _url _rest_extras <<< "$_line"
+
+                # {VAR} URL placeholders → $VAR (env files sourced by _lib.sh).
+                _missing=""
+                while [[ "$_url" =~ \{([A-Za-z_][A-Za-z0-9_]*)\} ]]; do
+                    _ph="${BASH_REMATCH[1]}"; _val="${!_ph:-}"
+                    [[ -n "$_val" ]] || { _missing="$_ph"; break; }
+                    _url="${_url//\{$_ph\}/$_val}"
+                done
+                if [[ -n "$_missing" ]]; then
+                    log_warn "  $_name: \$$_missing unset — run 'bash install/auth.sh $_name'; skipping"
+                    continue
+                fi
+
+                _auth=""
+                for _tok in $_rest_extras; do [[ "$_tok" == auth=* ]] && _auth="${_tok#auth=}"; done
+                _hname=""; _hval=""
+                case "$_auth" in
+                    "") ;;
+                    gh)       _hname="Authorization"; _hval='Bearer ${env:GH_TOKEN}' ;;
+                    context7) [[ -f "$HOME/.context7.env" ]] && { . "$HOME/.context7.env" >/dev/null 2>&1 || true; _hname="CONTEXT7_API_KEY"; _hval="${CONTEXT7_API_KEY:-}"; } ;;
+                    tavily)   [[ -f "$HOME/.tavily.env" ]] && { . "$HOME/.tavily.env" >/dev/null 2>&1 || true; _hname="Authorization"; _hval="Bearer ${TAVILY_API_KEY:-}"; } ;;
+                    exa)      [[ -f "$HOME/.exa.env" ]] && { . "$HOME/.exa.env" >/dev/null 2>&1 || true; _hname="x-api-key"; _hval="${EXA_API_KEY:-}"; } ;;
+                    *)        log_warn "  $_name: unknown auth source '$_auth' — registering unauthenticated" ;;
+                esac
+
+                if [[ -n "$_hname" && -n "$_hval" ]]; then
+                    _def="$(jq -nc --arg url "$_url" --arg hn "$_hname" --arg hv "$_hval" \
+                        '{url:$url, headers:{($hn):$hv}}')"
+                else
+                    [[ -n "$_auth" && ( -z "$_hname" || -z "$_hval" ) ]] && \
+                        log_warn "  $_name: auth=$_auth credential unavailable — unauthenticated (run 'bash install/auth.sh $_auth')"
+                    _def="$(jq -nc --arg url "$_url" '{url:$url}')"
+                fi
+            fi
+
+            jq -nc --arg n "$_name" --argjson def "$_def" '{name:$n, def:$def}' >> "$_stream"
+            (( ++_count ))
+        done < "$_file"
+    done < <(overlay_package_files "mcp-servers.txt")
+
+    local _tmp; _tmp="$(mktemp)"
+    jq -s '{mcpServers: (reduce .[] as $e ({}; .[$e.name] = $e.def))}' "$_stream" > "$_tmp" \
+        || { log_warn "Cursor MCP assembly failed"; rm -f "$_tmp"; return 1; }
+
+    ensure_dir "$HOME/.cursor"
+    if [[ -f "$_out" ]] && cmp -s "$_tmp" "$_out"; then
+        log_okay "Cursor MCP unchanged ($_count servers) → $_out"
+        rm -f "$_tmp"
+    else
+        mv "$_tmp" "$_out"
+        log_okay "Wrote Cursor MCP ($_count servers) → $_out"
+    fi
+}
+
 _CMD="${1:-install}"
 
 ### sync-extensions: union installed extensions back into cursor-extensions.txt ###
@@ -73,11 +153,19 @@ if [[ "$_CMD" == "sync-extensions" || "$_CMD" == "sync" ]]; then
     exit 0
 fi
 
+if [[ "$_CMD" == "sync-mcp" ]]; then
+    _sync_cursor_mcp
+    exit 0
+fi
+
 if [[ "$_CMD" != "install" ]]; then
-    die "Usage: cursor.sh [install|sync-extensions]"
+    die "Usage: cursor.sh [install|sync-extensions|sync-mcp]"
 fi
 
 log_section "Cursor"
+
+### MCP servers (independent of the cursor binary) ###
+_sync_cursor_mcp
 
 ### Settings symlinks ###
 
