@@ -39,6 +39,9 @@ _SERVICE_DEFS=(
     "huggingface|HF_TOKEN|.huggingface.env|HuggingFace token (mlx-lm gated models, transformers)|https://huggingface.co/settings/tokens|read|you don't pull gated models or private repos"
     "context7|CONTEXT7_API_KEY|.context7.env|Context7 API key (MCP library-docs lookups at higher rate limits)|https://context7.com/dashboard|—|you're fine with anonymous rate limits"
     "wolframalpha|WOLFRAM_APPID|.wolframalpha.env|WolframAlpha LLM API AppID (no-sudo Linux fallback for symbolic/computational queries — see agents-common.md; 2000 calls/mo free non-commercial)|https://developer.wolframalpha.com/portal/myapps|LLM API app|you only use Wolfram on macOS (local Wolfram Engine)"
+    "tavily|TAVILY_API_KEY|.tavily.env|Tavily API key (web search + extract + crawl MCP — 1000 credits/mo free, no card)|https://app.tavily.com/home|—|you don't use the Tavily search MCP"
+    "exa|EXA_API_KEY|.exa.env|Exa API key (neural/semantic web search MCP)|https://dashboard.exa.ai/api-keys|—|you don't use the Exa search MCP"
+    "firecrawl|FIRECRAWL_API_KEY|.firecrawl.env|Firecrawl API key (deep web crawl + structured extraction MCP)|https://www.firecrawl.dev/app/api-keys|—|you don't use the Firecrawl crawl MCP"
 )
 
 # Tally for the end-of-walk summary. Reset by _walk_all.

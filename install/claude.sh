@@ -191,6 +191,18 @@ _resolve_header_source() {
             [[ -n "$key" ]] || return 1
             printf 'CONTEXT7_API_KEY\t%s' "$key"
             ;;
+        tavily)
+            [[ -f "$HOME/.tavily.env" ]] || return 1
+            key="$(. "$HOME/.tavily.env" >/dev/null 2>&1 || true; printf '%s' "${TAVILY_API_KEY:-}")"
+            [[ -n "$key" ]] || return 1
+            printf 'Authorization\tBearer %s' "$key"
+            ;;
+        exa)
+            [[ -f "$HOME/.exa.env" ]] || return 1
+            key="$(. "$HOME/.exa.env" >/dev/null 2>&1 || true; printf '%s' "${EXA_API_KEY:-}")"
+            [[ -n "$key" ]] || return 1
+            printf 'x-api-key\t%s' "$key"
+            ;;
         *)
             return 1
             ;;
@@ -241,6 +253,23 @@ _register_mcps_from() {
         else
             # --- HTTP: <name> <transport> <url> [auth=<source>] [extra...] ---
             read -r _ _ _url _rest_extras <<< "$line"
+
+            # URL placeholders: {VAR} → $VAR (env files sourced by _lib.sh), for
+            # servers that carry the key in the URL itself (e.g. Firecrawl).
+            if [[ "$_url" == *'{'*'}'* ]]; then
+                _missing=""
+                while [[ "$_url" =~ \{([A-Za-z_][A-Za-z0-9_]*)\} ]]; do
+                    _ph="${BASH_REMATCH[1]}"; _val="${!_ph:-}"
+                    [[ -n "$_val" ]] || { _missing="$_ph"; break; }
+                    _url="${_url//\{$_ph\}/$_val}"
+                done
+                if [[ -n "$_missing" ]]; then
+                    log_warn "  $_name: \$$_missing unset — run 'bash install/auth.sh $_name'; skipping"
+                    (( _skip++ )) || true
+                    continue
+                fi
+            fi
+
             _auth_source="" _extra=""
             for _tok in $_rest_extras; do
                 if [[ "$_tok" == auth=* ]]; then

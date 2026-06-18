@@ -18,7 +18,18 @@
 #   auth=context7  — CONTEXT7_API_KEY header from ~/.context7.env (optional:
 #                    registers unauthenticated at lower rate limits when the env
 #                    file is missing; create it with `bash install/auth.sh context7`)
+#   auth=tavily    — Authorization: Bearer from ~/.tavily.env (TAVILY_API_KEY).
+#                    Claude: header; Codex: bearer_token_env_var. Create with
+#                    `bash install/auth.sh tavily`.
+#   auth=exa       — x-api-key header from ~/.exa.env (EXA_API_KEY).
+#                    Claude: header; Codex: env_http_headers. Create with
+#                    `bash install/auth.sh exa`.
 # Auth-managed entries cannot also pass --header / --client-id extras.
+#
+# URL placeholders: a {VAR} token in an HTTP url is replaced with $VAR (from
+# ~/.<service>.env, sourced at install time) — for servers that carry the key
+# in the URL itself (e.g. Firecrawl). Missing var → skipped on Claude, emitted
+# inert with a warning on Codex.
 #
 # Install manually:
 #   claude mcp add --transport <transport> --scope user <name> <url> [extra args...]
@@ -54,3 +65,22 @@ qmd http http://localhost:8181/mcp
 
 # Blender: control Blender via MCP (requires addon.py installed in Blender — see github.com/ahujasid/blender-mcp)
 blender stdio cmd: uvx blender-mcp
+
+# === Web search & data retrieval (always-on) ===
+# Tavily: LLM-tuned web search + extract + crawl + map in one server.
+# 1000 credits/mo free (no card). Bearer auth (TAVILY_API_KEY).
+tavily http https://mcp.tavily.com/mcp/ auth=tavily
+
+# Exa: neural/semantic web search + crawling — best recall for research queries.
+# x-api-key header (EXA_API_KEY).
+exa http https://mcp.exa.ai/mcp auth=exa
+
+# Firecrawl: best-in-class deep crawl + structured extraction (scrape, crawl,
+# map, extract). Key rides in the URL path (FIRECRAWL_API_KEY).
+firecrawl http https://mcp.firecrawl.dev/{FIRECRAWL_API_KEY}/v2/mcp
+
+# === Desktop automation (macOS) ===
+# macos-automator: run AppleScript/JXA — control any Mac app (Finder, Mail,
+# Safari, Music, System Events…). No auth; broad local power, so review prompts.
+# Needs Automation + Accessibility grants on first use (System Settings → Privacy).
+macos-automator stdio cmd: npx -y @steipete/macos-automator-mcp@latest

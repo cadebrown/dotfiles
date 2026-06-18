@@ -96,7 +96,7 @@ _toml_escape() {
 # TOML blocks, written to $1. Logs go to stdout via log_*; only TOML hits $1.
 _emit_mcp_blocks_to() {
     local out="$1" _file _line _name _rest _transport _cmd _head _tail _url
-    local _rest_extras _auth_source _client_id _arg _first
+    local _rest_extras _auth_source _client_id _arg _first _ph _val
 
     : > "$out"
 
@@ -134,6 +134,18 @@ _emit_mcp_blocks_to() {
             else
                 # HTTP/SSE: <name> <transport> <url> [auth=<source>] [extras...]
                 read -r _ _ _url _rest_extras <<< "$_line"
+
+                # URL placeholders: {VAR} → $VAR (env files sourced by _lib.sh),
+                # for servers that carry the key in the URL (e.g. Firecrawl).
+                while [[ "$_url" =~ \{([A-Za-z_][A-Za-z0-9_]*)\} ]]; do
+                    _ph="${BASH_REMATCH[1]}"; _val="${!_ph:-}"
+                    if [[ -z "$_val" ]]; then
+                        log_warn "    $_name: \$$_ph unset — server inert until set (bash install/auth.sh $_name)"
+                        break
+                    fi
+                    _url="${_url//\{$_ph\}/$_val}"
+                done
+
                 _auth_source=""
                 _client_id=""
                 # shellcheck disable=SC2086
@@ -167,6 +179,19 @@ _emit_mcp_blocks_to() {
                                 log_info "    $_name ($_transport, auth=context7 via env)"
                             else
                                 log_warn "    $_name: ~/.context7.env missing — unauthenticated (run 'bash install/auth.sh context7')"
+                            fi
+                            ;;
+                        tavily)
+                            printf 'bearer_token_env_var = "TAVILY_API_KEY"\n' >> "$out"
+                            [[ -f "$HOME/.tavily.env" ]] || log_warn "    $_name: ~/.tavily.env missing — TAVILY_API_KEY empty until 'bash install/auth.sh tavily'"
+                            log_info "    $_name ($_transport, auth=tavily via TAVILY_API_KEY)"
+                            ;;
+                        exa)
+                            if [[ -f "$HOME/.exa.env" ]]; then
+                                printf 'env_http_headers = { "x-api-key" = "EXA_API_KEY" }\n' >> "$out"
+                                log_info "    $_name ($_transport, auth=exa via env)"
+                            else
+                                log_warn "    $_name: ~/.exa.env missing — unauthenticated (run 'bash install/auth.sh exa')"
                             fi
                             ;;
                         *)
