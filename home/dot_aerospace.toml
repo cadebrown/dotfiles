@@ -9,8 +9,26 @@ accordion-padding = 30
 default-root-container-layout = 'tiles'
 default-root-container-orientation = 'auto'
 
-automatically-unhide-macos-hidden-apps = true
+# false: `true` re-shows macOS-hidden apps, which collides with iTerm2's pinned
+# hotkey-window hide/focus semantics on click-off and contributed to the
+# hotkey-window focus bug (window visible on top but keystrokes land behind it).
+# Flip to a scoped exceptions list if you rely on cmd-h unhide workflows.
+automatically-unhide-macos-hidden-apps = false
 on-focused-monitor-changed = []
+
+# Float iTerm2's F12 hotkey (dropdown) window instead of tiling it. Root-cause
+# fix for the focus bug: without this, AeroSpace pulls the LSUIElement hotkey
+# window into its tiling tree and wins the macOS key-window race, so the window
+# floats visually on top but typed text goes to the window behind it; F12 toggle
+# and click-off then desync focus. Scoped by title so REGULAR iTerm windows stay
+# tiled (the hotkey profile is named "HotkeyWindow" in the iTerm2 plist).
+# Verify the live title with `aerospace list-windows --all` while the hotkey
+# window is open; if it doesn't contain "Hotkey", widen the regex or drop the
+# title line to float all iTerm2 windows.
+[[on-window-detected]]
+    if.app-id = 'com.googlecode.iterm2'
+    if.window-title-regex-substring = 'Hotkey'
+    run = ['layout floating']
 
 [key-mapping]
     preset = 'qwerty'
