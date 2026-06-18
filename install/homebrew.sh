@@ -47,6 +47,9 @@ else
     log_info "Installing Brewfile packages (upgrades disabled)"
 fi
 
+# Trust the Brewfile's third-party taps so brew bundle can load them.
+trust_brewfile_taps "$BREWFILE"
+
 # Non-fatal: a single cask download failure (e.g. slow mirror) should not
 # abort the entire bootstrap. Re-run homebrew.sh to retry failed packages.
 # shellcheck disable=SC2086

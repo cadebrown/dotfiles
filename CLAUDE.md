@@ -422,6 +422,14 @@ These are non-obvious things that have caused real bugs:
   state at `~/.homebrew/trust.json` on macOS, so a bare directory test misroutes the
   shell profiles onto the Linux user-prefix branch (bit us June 2026; both profile
   templates now guard on the binary).
+- **Third-party taps must be trusted before `brew bundle`** — recent Homebrew refuses
+  to load formulae/casks from non-core taps until trusted (gated by
+  `HOMEBREW_REQUIRE_TAP_TRUST`), so an untrusted tap fails its package with "Refusing
+  to load formula … from untrusted tap". `trust_brewfile_taps()` in `_lib.sh` derives
+  the tap list from the Brewfile (explicit `tap` lines + `owner/repo` prefix of
+  three-part `brew`/`cask` refs) and runs `brew trust --tap` for each before the bundle
+  in both `homebrew.sh` and `linux-packages.sh`. The Brewfile stays the single source
+  of truth — no separate trust list. Adding a tapped formula is enough; trust follows.
 - **cass Linux prebuilts need host glibc >= 2.38** — they link system glibc, not the
   Homebrew one. install/memory.sh falls back to `cargo install --git` on older hosts.
   Its brew tap is NOT used (formula sha lagged a release-asset re-upload, June 2026).

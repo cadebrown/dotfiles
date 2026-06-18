@@ -248,6 +248,42 @@ overlay_package_files() {
     return 0
 }
 
+# trust_brewfile_taps FILE
+# Trust every third-party tap referenced by a Brewfile so `brew bundle` can
+# load its formulae/casks. Recent Homebrew refuses to load formulae from
+# non-core taps unless they are explicitly trusted (gated by
+# $HOMEBREW_REQUIRE_TAP_TRUST), so without this `brew bundle` skips them with
+# "Refusing to load formula ... from untrusted tap" and the package fails.
+#
+# The Brewfile is the single source of truth: taps come from both explicit
+# `tap "owner/repo"` lines and the `owner/repo` prefix of three-part
+# `brew`/`cask "owner/repo/formula"` references. `brew trust` is idempotent
+# (re-trusting is a no-op), and we parse with awk rather than rg because rg is
+# a cargo tool installed long after Homebrew during bootstrap.
+trust_brewfile_taps() {
+    local brewfile="$1" _tap
+    [[ -f "$brewfile" ]] || return 0
+    has brew || return 0
+    # Older Homebrew has no `trust` subcommand — nothing to do.
+    brew trust --help >/dev/null 2>&1 || return 0
+
+    while IFS= read -r _tap; do
+        [[ -n "$_tap" ]] || continue
+        run_logged brew trust --tap "$_tap" || log_warn "Could not trust tap: $_tap"
+    done < <(
+        awk '
+            /^[[:space:]]*tap[[:space:]]+"/ {
+                match($0, /"[^"]+"/); print substr($0, RSTART+1, RLENGTH-2); next
+            }
+            /^[[:space:]]*(brew|cask)[[:space:]]+"[^"]+\/[^"]+\/[^"]+"/ {
+                match($0, /"[^"]+"/); s = substr($0, RSTART+1, RLENGTH-2)
+                if (split(s, a, "/") >= 3) print a[1] "/" a[2]
+            }
+        ' "$brewfile" | sort -u
+    )
+    return 0
+}
+
 ### UTILITIES ###
 
 has() {

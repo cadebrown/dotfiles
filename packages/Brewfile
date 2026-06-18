@@ -141,6 +141,12 @@ brew "podman-compose"
 ### Retro / Embedded ###
 brew "cc65"
 
+### Databases ###
+# surreal: SurrealDB CLI/server. Third-party tap — Homebrew requires explicit
+# trust, applied by trust_brewfile_taps() in _lib.sh before brew bundle runs.
+tap "surrealdb/tap"
+brew "surrealdb/tap/surreal"
+
 if OS.mac?
   ### Languages & Runtimes (macOS) ###
   brew "openjdk"
