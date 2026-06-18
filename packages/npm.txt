@@ -16,11 +16,12 @@
 # upgrades happen via this list, not a hand-rolled GitHub release fetcher.
 # install/codex.sh still handles managed ~/.codex config + hooks + healthcheck.
 #
-# PINNED: Codex 0.134.0 redesigned profiles (config.toml [profiles.*] tables →
-# per-profile ~/.codex/<name>.config.toml files). Our config tracks the new
-# layout; the pin keeps binary and config moving in lockstep. Bump deliberately
-# and re-run `bash install/codex.sh check` after.
-@openai/codex@0.139.0
+# UNPINNED: `bootstrap upgrade` always pulls latest. codex.sh runs right after
+# node.sh and reconciles the managed ~/.codex config (profiles are per-file
+# since 0.134), so a config-format shift surfaces in that step's healthcheck
+# rather than silently. If codex ever breaks config compatibility again,
+# re-pin here (`@openai/codex@X.Y.Z`) until the config catches up.
+@openai/codex
 
 # qmd — local hybrid search (BM25+vectors+rerank, all-local GGUF models) over
 # markdown knowledge: ~/kb + auto-memory + dotfiles docs. Serves one warm MCP
