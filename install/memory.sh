@@ -51,11 +51,32 @@ _cass_platform() {
 }
 
 _install_cass() {
-    local _plat _ver _dest _tmp _url _want _got
+    local _plat _ver _dest _tmp _url _want _got _meta
     _plat="$(_cass_platform)" || { log_warn "cass: unsupported platform $OS-$ARCH — skipping"; return 0; }
-    _ver="$(curl -fsSL "https://api.github.com/repos/$_CASS_REPO/releases/latest" \
-        | jq -r '.tag_name // empty')"
-    [[ -n "$_ver" ]] || { log_warn "cass: could not resolve latest release — skipping"; return 0; }
+
+    # Resolve the latest release tag via the GitHub API. Route through download()
+    # (not raw curl) so it sends Authorization when GITHUB_TOKEN is set: the
+    # unauthenticated API limit is 60/hr per IP and is exhausted constantly on
+    # shared NAT'd networks (NVIDIA clusters), which returns 403. The `if` keeps
+    # a failure non-fatal under `set -e` so we fall back to a source build
+    # instead of aborting all of memory.sh on a transient API hiccup.
+    _meta="$(mktemp)"
+    if download "https://api.github.com/repos/$_CASS_REPO/releases/latest" "$_meta" 2>/dev/null; then
+        _ver="$(jq -r '.tag_name // empty' "$_meta")"
+    fi
+    rm -f "$_meta"
+    if [[ -z "${_ver:-}" ]]; then
+        log_warn "cass: GitHub API release lookup failed — rate-limited or offline."
+        log_warn "cass: set GITHUB_TOKEN (run 'bash install/auth.sh github') to raise the 60/hr limit."
+        if has cargo; then
+            log_warn "cass: building from source instead (one-time, ~minutes)"
+            run_logged cargo install --git "https://github.com/$_CASS_REPO" --root "${ARCH_BIN%/bin}" \
+                || log_warn "cass: source build failed — skipping"
+        else
+            log_warn "cass: no cargo to fall back to — skipping"
+        fi
+        return 0
+    fi
 
     _dest="$ARCH_BIN/cass"
     if [[ -x "$_dest" ]] && "$_dest" --version 2>/dev/null | grep -qF "${_ver#v}"; then
