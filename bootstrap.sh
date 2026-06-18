@@ -11,17 +11,27 @@
 # Modes:
 #   bootstrap.sh              # install (default) — full idempotent setup
 #   bootstrap.sh update       # git pull + chezmoi apply + refresh tools
-#   bootstrap.sh upgrade      # update + aggressive upgrade across the stack:
+#   bootstrap.sh upgrade      # update + aggressive upgrade of EVERYTHING:
+#                             #   - chezmoi self-upgrade
 #                             #   - DF_BREW_UPGRADE=1 (brew + greedy casks)
+#                             #   - mas upgrade (Mac App Store apps)
 #                             #   - rustup self-update + toolchain update
 #                             #   - cargo binstall (re-runs all of cargo.txt)
+#                             #   - go install @latest (re-runs all of go.txt)
 #                             #   - nvm install 25 (latest 25.x patch)
 #                             #   - npm install -g <pkg>@latest for each pkg
 #                             #   - uv self update + uv tool upgrade --all
 #                             #   - oh-my-zsh core git pull (plus plugins)
 #                             #   - VS Code / Cursor extension --force reinstall
+#                             #   - claude plugin marketplace update + plugin update
+#                             #   - npx skills update + self-installer skills (-f)
+#                             #   - MLX models (pull any new mlx-models.txt entries)
 #                             # Always re-downloaded regardless of mode:
-#                             #   Claude Code, Codex CLI
+#                             #   Claude Code, Codex CLI, cass (vs GitHub latest)
+#                             # Intentionally HELD (warned loudly, never silent):
+#                             #   @openai/codex (pinned for binary/config lockstep)
+#                             # NOT touched (out of scope — OS-level, needs sudo):
+#                             #   `softwareupdate` macOS system updates
 #
 # Environment variables (DF_ prefix):
 #   DF_REPO               — override the source repo (default: cadebrown/dotfiles)
@@ -499,7 +509,13 @@ fi
 log_section "6.5 — local LLM tooling"
 
 if [[ "${DF_DO_LOCAL_LLM:-1}" != "0" ]]; then
-    bash "$DF_INSTALL_DIR/local-llm.sh" || die "local-llm.sh failed"
+    # upgrade mode pulls any models added to mlx-models.txt (idempotent — skips
+    # already-cached models); install/update just verify binaries.
+    if [[ "$DF_MODE" == "upgrade" ]]; then
+        bash "$DF_INSTALL_DIR/local-llm.sh" pull-models || die "local-llm.sh failed"
+    else
+        bash "$DF_INSTALL_DIR/local-llm.sh" || die "local-llm.sh failed"
+    fi
     bash "$DF_INSTALL_DIR/opencode.sh" || die "opencode.sh failed"
 else
     log_info "Skipping local LLM tooling (DF_DO_LOCAL_LLM=0)"

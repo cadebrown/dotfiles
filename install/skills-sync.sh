@@ -30,10 +30,17 @@ _sync_from() {
         _dir="${line%% *}"; _rest="${line#* }"
         _type="${_rest%% *}"; _rest="${_rest#* }"
 
+        # Idempotency: skip already-installed skills. EXCEPT in upgrade mode,
+        # where `self` rows re-run their own force-installers (-f) to pull the
+        # tool's latest skill; npx rows are refreshed in bulk by the
+        # `npx skills update` pass below, so they still skip here.
         if [[ -f "$_SKILLS_DIR/$_dir/SKILL.md" ]]; then
-            log_info "  skip  $_dir (already installed)"
-            (( _skip++ )) || true
-            continue
+            if ! { [[ "${DF_MODE:-}" == "upgrade" && "$_type" == "self" ]]; }; then
+                log_info "  skip  $_dir (already installed)"
+                (( _skip++ )) || true
+                continue
+            fi
+            log_info "  upgrade  $_dir (self-installer, forced)"
         fi
 
         case "$_type" in
@@ -86,6 +93,14 @@ _sync_from() {
         esac
     done < "$file"
 }
+
+# In upgrade mode, refresh npx-installed skills in bulk first (lockfile-aware:
+# ~/.agents/.skill-lock.json). Without this, installed skills are frozen at
+# first-install version and `bootstrap upgrade` would silently skip them.
+if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+    log_info "Updating npx-installed skills (lockfile-aware)"
+    run_logged npx -y skills update -a claude-code -g < /dev/null || log_warn "npx skills update failed"
+fi
 
 while IFS= read -r _file; do
     _sync_from "$_file"

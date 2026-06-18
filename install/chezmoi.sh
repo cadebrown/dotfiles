@@ -9,7 +9,13 @@ log_section "chezmoi"
 CHEZMOI_BIN="$ARCH_BIN/chezmoi"
 
 if [[ -x "$CHEZMOI_BIN" ]]; then
-    log_okay "Already installed: $("$CHEZMOI_BIN" --version)"
+    # In upgrade mode, self-upgrade the binary that manages everything else —
+    # otherwise chezmoi is the one tool `bootstrap upgrade` would leave stale.
+    if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+        log_info "Upgrading chezmoi: $("$CHEZMOI_BIN" --version)"
+        run_logged "$CHEZMOI_BIN" upgrade || log_warn "chezmoi self-upgrade failed (continuing)"
+    fi
+    log_okay "Installed: $("$CHEZMOI_BIN" --version)"
     exit 0
 fi
 

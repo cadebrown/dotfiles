@@ -59,6 +59,15 @@ run_logged brew bundle install $_bundle_flags --file="$BREWFILE" || log_warn "So
 if [[ "$_brew_upgrade" != "0" ]]; then
     log_info "Upgrading auto-updating casks (--greedy)"
     run_logged brew upgrade --cask --greedy || log_warn "Some greedy cask upgrades failed"
+
+    # Mac App Store apps (Xcode, GarageBand, iMovie, …) are installed outside
+    # Homebrew and never upgraded by brew. `mas` (Brewfile) bridges that gap so
+    # `bootstrap upgrade` leaves nothing stale. macOS-only; skips if mas absent
+    # or not signed in to the App Store.
+    if [[ "$OS" == "darwin" ]] && has mas; then
+        log_info "Upgrading Mac App Store apps (mas)"
+        run_logged mas upgrade || log_warn "mas upgrade failed (signed in to the App Store?)"
+    fi
 fi
 
 log_okay "Homebrew packages up to date"

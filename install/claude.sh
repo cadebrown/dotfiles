@@ -146,6 +146,24 @@ done < <(overlay_package_files "claude-plugins.txt")
 
 log_okay "Claude plugins: ${_ok} installed, ${_skip} already present, ${_fail} failed"
 
+# Plugins don't auto-update (we set DISABLE_AUTOUPDATER=1), so `bootstrap
+# upgrade` must pull them explicitly: refresh marketplace catalogs, then update
+# each enabled plugin to the marketplace's latest.
+if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+    log_info "Upgrading Claude plugins (marketplaces + plugins)"
+    claude plugin marketplace update --all >/dev/null 2>&1 || true
+    while IFS= read -r _file; do
+        while IFS= read -r line; do
+            [[ -z "$line" || "$line" == \#* ]] && continue
+            _plugin="${line%% *}"
+            claude plugin update "$_plugin" >/dev/null 2>&1 \
+                && log_okay "  updated $_plugin" \
+                || log_debug "  $_plugin up to date or no update path"
+        done < "$_file"
+    done < <(overlay_package_files "claude-plugins.txt")
+    unset _plugin
+fi
+
 ### MCP SERVERS (all platforms) ###
 
 log_section "Claude Code MCP servers"

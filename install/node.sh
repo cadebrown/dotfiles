@@ -66,6 +66,15 @@ while IFS= read -r pkg; do
         # Pinned: hold this exact version; upgrade mode does not move it.
         if npm list -g "${_name}@${_pin}" --depth=0 &>/dev/null; then
             log_okay "  $_name@$_pin (pinned, installed)"
+            # Never SILENTLY stale: in upgrade mode, surface the pin-vs-latest
+            # delta loudly so a held package is a visible decision, not a
+            # forgotten one. (Codex is pinned for binary/config lockstep.)
+            if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+                _latest="$(npm view "$_name" version 2>/dev/null || true)"
+                if [[ -n "$_latest" && "$_latest" != "$_pin" ]]; then
+                    log_warn "  $_name HELD at $_pin — latest is $_latest. Bump the pin in packages/npm.txt deliberately, then re-run install/codex.sh check."
+                fi
+            fi
         else
             log_info "  installing $_name@$_pin (pinned)"
             run_logged npm install -g "${_name}@${_pin}"
