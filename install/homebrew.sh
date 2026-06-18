@@ -50,6 +50,23 @@ fi
 # Trust the Brewfile's third-party taps so brew bundle can load them.
 trust_brewfile_taps "$BREWFILE"
 
+# Remove the deprecated docker-completion keg before bundling. The `docker`
+# formula now ships its own bash/zsh/fish completions, but older machines carry
+# docker-completion as a leftover dependency. Both want to own
+# etc/.../completions/docker, so `brew bundle` aborts linking `docker` with a
+# symlink conflict ("Could not symlink … belonging to docker-completion").
+# Upstream deprecated docker-completion (disables 2027-05-31) and names `docker`
+# as the replacement, so removing the orphan is the canonical fix. Guarded so it
+# only acts when the keg is present — no-op on fresh machines.
+if brew list --formula docker-completion &>/dev/null; then
+    log_info "Removing deprecated docker-completion (folded into docker formula)"
+    # --force removes ALL installed versions (old machines accumulate several,
+    # which makes a plain uninstall refuse); --ignore-dependencies because the
+    # docker formula, not docker-completion, now owns the completions.
+    run_logged brew uninstall --force --ignore-dependencies docker-completion || \
+        log_warn "Could not remove docker-completion — run 'brew link --overwrite docker' if bundle fails"
+fi
+
 # Non-fatal: a single cask download failure (e.g. slow mirror) should not
 # abort the entire bootstrap. Re-run homebrew.sh to retry failed packages.
 # shellcheck disable=SC2086

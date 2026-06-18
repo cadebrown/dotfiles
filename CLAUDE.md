@@ -471,6 +471,13 @@ These are non-obvious things that have caused real bugs:
   real directory. If `scratch.sh` symlinks `~/.claude` to scratch, `chezmoi apply` replaces
   the symlink with a directory containing only managed files, orphaning all conversation
   history, sessions, and file-history on scratch.
+- **docker-completion collides with the docker formula** — the `docker` formula now ships
+  its own shell completions, but older machines carry `docker-completion` as a leftover
+  dependency. Both want `etc/.../completions/docker`, so `brew bundle` aborts linking
+  `docker` ("Could not symlink … belonging to docker-completion"). Upstream deprecated
+  docker-completion (disables 2027-05-31, replacement `docker`), so `homebrew.sh` removes
+  the orphan keg before the bundle. It's not in the Brewfile — fresh machines never hit
+  this. Manual fix if needed: `brew uninstall --ignore-dependencies docker-completion`.
 
 ## Reference
 
