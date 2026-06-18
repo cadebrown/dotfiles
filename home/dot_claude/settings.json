@@ -10,6 +10,9 @@
   },
   "permissions": {
     "defaultMode": "bypassPermissions",
+    "allow": [
+      "Bash(*)"
+    ],
     "ask": [
       "mcp__cloudflare__*",
       "mcp__github__push_files",
@@ -73,7 +76,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "rtk hook claude"
+            "command": "~/.claude/rtk-rewrite.sh"
           }
         ]
       }

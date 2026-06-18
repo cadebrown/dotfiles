@@ -110,10 +110,19 @@ brew "opencode"
 
 ### Token optimization ###
 # rtk (Rust Token Killer): CLI proxy that compresses command output before it
-# enters agent context (git/cargo/test runners etc.). Wired as a Claude Code
-# PreToolUse hook in dot_claude/settings.json; other agents prefix manually.
-# NOT cargo.txt: the crates.io `rtk` crate is an unrelated project.
-brew "rtk"
+# enters agent context (git/cargo/test runners etc.). Wired per harness:
+# Claude + Cursor use thin wrappers delegating to rtk's built-in hook processor
+# (`rtk hook claude` / `rtk hook cursor`); opencode + pi use in-process TS
+# plugins calling `rtk rewrite` (no built-in hook exists for those). Codex is
+# instruction-only (it can't rewrite commands).
+#
+# Source: the OFFICIAL upstream tap, NOT homebrew-core. homebrew-core lags badly
+# (0.29 vs upstream 0.42+), shipping an old rewrite registry and pre-v3 hook
+# protocol. The tap tracks stable releases with prebuilt binaries for all 4
+# platforms; Linux x86_64 is a musl static build (no glibc-version dependency).
+# Tap trust is automatic via trust_brewfile_taps() (owner/repo prefix).
+# NOT cargo.txt: the crates.io `rtk` crate is an unrelated project (Rust Type Kit).
+brew "rtk-ai/tap/rtk"
 
 ### Debugging ###
 # dap: daemonized Debug Adapter Protocol sessions — agents debug statefully

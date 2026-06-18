@@ -402,6 +402,24 @@ These are non-obvious things that have caused real bugs:
   `-Wincompatible-pointer-types` and `-Wimplicit-function-declaration` from warnings to
   errors. Per-formula patches (`netpbm`, etc.) add `-std=gnu17` and the relevant `-Wno-*`
   flags on Linux.
+- **rtk: install from the official tap, not homebrew-core** — homebrew-core lags badly
+  (shipped 0.29 when upstream stable was 0.42+). 0.29 sits in the window where rtk had
+  *removed* the `rtk hook <harness>` subcommand in favor of `rtk rewrite` scripts, so the
+  old `rtk hook claude` hook command made rtk try to exec a binary named `hook` and failed
+  every PreToolUse with "No such file or directory". `packages/Brewfile` uses
+  `brew "rtk-ai/tap/rtk"` (prebuilt, all 4 platforms, Linux x86_64 is musl = no glibc
+  dependency). 0.42+ re-introduced `rtk hook claude|cursor|gemini|copilot` as the canonical
+  built-in; our hooks are thin wrappers (`dot_claude/rtk-rewrite.sh`,
+  `dot_cursor/hooks/rtk-rewrite.sh`) that PATH-harden + `command -v rtk || exit 0` then
+  delegate to it. opencode/pi use in-process TS plugins calling `rtk rewrite` (no built-in
+  hook exists for those). Codex is instruction-only — it has no command-rewrite hook.
+- **rtk needs an allow-rule or it defaults to "ask"** — rtk reads deny/ask/allow from the
+  host's own permission config and defaults unmatched commands to *ask* (least-privilege).
+  For Claude that means the rewrite applies but without an explicit allow (fine under
+  `bypassPermissions`); for Cursor an *ask* verdict yields **no rewrite at all** (Cursor's
+  protocol can't rewrite-and-prompt). So `dot_claude/settings.json` has
+  `permissions.allow: ["Bash(*)"]` and `dot_cursor/cli-config.json` has
+  `permissions.allow: ["Shell(*)"]` — these make every rewrite auto-allow, fully transparent.
 - **GitHub MCP can't use OAuth** — `api.githubcopilot.com/mcp` advertises OAuth, but
   GitHub's IdP doesn't implement Dynamic Client Registration (RFC 7591), so Claude
   Code's `/mcp` Authenticate flow fails with "Incompatible auth server" (tracked in
