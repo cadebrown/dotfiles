@@ -10,17 +10,6 @@
   },
   "permissions": {
     "defaultMode": "bypassPermissions",
-    "deny": [
-      "Read(~/.ssh/**)",
-      "Read(~/.aws/**)",
-      "Read(~/.github.env)",
-      "Read(~/.anthropic.env)",
-      "Read(~/.openai.env)",
-      "Read(~/.cloudflare.env)",
-      "Read(~/.huggingface.env)",
-      "Read(~/.context7.env)",
-      "Read(~/.wolframalpha.env)"
-    ],
     "ask": [
       "mcp__cloudflare__*",
       "mcp__github__push_files",
@@ -36,32 +25,7 @@
     "opus[1m]"
   ],
   "sandbox": {
-    "enabled": true,
-    "filesystem": {
-      "denyRead": [
-        "~/.ssh",
-        "~/.aws",
-        "~/.github.env",
-        "~/.anthropic.env",
-        "~/.openai.env",
-        "~/.cloudflare.env",
-        "~/.huggingface.env",
-        "~/.context7.env",
-        "~/.wolframalpha.env"
-      ]
-    },
-    "excludedCommands": [
-      "gh *",
-      "docker *",
-      "colima *",
-      "tofu *",
-      "terraform *",
-      "rtk gh *",
-      "rtk docker *",
-      "rtk colima *",
-      "rtk tofu *",
-      "rtk terraform *"
-    ]
+    "enabled": true
   },
   "hooks": {
     "Notification": [
