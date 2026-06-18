@@ -28,7 +28,21 @@
     "enabled": true,
     "filesystem": {
       "allowWrite": [
-        "/tmp"
+        "/tmp",
+        "$HOME/.cache",
+        "$HOME/.config",
+        "$HOME/.local",
+        "$HOME/.npm",
+        "$HOME/.claude",
+        "$HOME/.codex",
+        "$HOME/.cursor",
+        "$HOME/.agents",
+        "$HOME/.ollama",
+        "$HOME/kb",
+        "$HOME/.homebrew",
+        "$HOME/Library/Application Support",
+        "$HOME/Library/Caches",
+        "$HOME/Library/Preferences"
       ]
     }
   },
