@@ -147,6 +147,36 @@ _status() {
     else
         printf "  %-12s ${_DIM}gh not installed${_RESET}\n" "github-cli"
     fi
+
+    _github_mcp_token_status
+}
+
+# Verify the token the GitHub MCP will actually present is live. Resolves it
+# the same way ~/.claude/gh-mcp-headers.sh does (env PAT first, gh keyring
+# fallback) and pings the API, so an expired PAT surfaces here as a clear
+# "EXPIRED" line instead of downstream as a cryptic MCP 401. Degrades quietly
+# when offline or curl is missing — never blocks `auth.sh status`.
+_github_mcp_token_status() {
+    local tok resp code exp
+    tok="${GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}"
+    if [[ -z "$tok" ]]; then
+        printf "  %-12s ${_DIM}no token${_RESET}     ${_DIM}set GITHUB_TOKEN in ~/.github.env or run \`gh auth login\`${_RESET}\n" "github-mcp"
+        return
+    fi
+    has curl || return
+    # Single HEAD request: parse both the status code and the PAT expiry header.
+    # Through a proxy the response may carry two HTTP status lines (the CONNECT
+    # tunnel then the real reply) — take the last, which is GitHub's.
+    resp="$(curl -sI -m 6 -H "Authorization: Bearer $tok" https://api.github.com/user 2>/dev/null || true)"
+    code="$(printf '%s' "$resp" | awk 'toupper($1) ~ /^HTTP/ { c=$2 } END { print c }')"
+    exp="$(printf '%s' "$resp" | sed -En 's/^github-authentication-token-expiration: //Ip' | tr -d '\r')"
+    case "$code" in
+        200) printf "  %-12s ${_GREEN}live${_RESET}         ${_DIM}GitHub MCP token valid%s${_RESET}\n" \
+                 "github-mcp" "${exp:+ — expires $exp}" ;;
+        401|403) printf "  %-12s ${_RED}EXPIRED${_RESET}      ${_DIM}GitHub MCP will 401 — rotate the PAT: \`bash install/auth.sh github\`${_RESET}\n" "github-mcp" ;;
+        "") printf "  %-12s ${_YELLOW}unverified${_RESET}   ${_DIM}couldn't reach api.github.com (offline?)${_RESET}\n" "github-mcp" ;;
+        *) printf "  %-12s ${_YELLOW}HTTP %s${_RESET}     ${_DIM}unexpected response from api.github.com${_RESET}\n" "github-mcp" "$code" ;;
+    esac
 }
 
 _prompt_token_for() {

@@ -404,11 +404,23 @@ These are non-obvious things that have caused real bugs:
   flags on Linux.
 - **GitHub MCP can't use OAuth** — `api.githubcopilot.com/mcp` advertises OAuth, but
   GitHub's IdP doesn't implement Dynamic Client Registration (RFC 7591), so Claude
-  Code's `/mcp` Authenticate flow fails with "Incompatible auth server". `mcp-servers.txt`
-  uses `auth=gh` instead: Claude resolves the token at connection time via
+  Code's `/mcp` Authenticate flow fails with "Incompatible auth server" (tracked in
+  anthropics/claude-code#3433). GitHub's own install guide just recommends a static PAT,
+  so `mcp-servers.txt` uses `auth=gh`: Claude resolves the token at connection time via
   `~/.claude/gh-mcp-headers.sh` (headersHelper), Codex via `bearer_token_env_var =
-  "GH_TOKEN"` filled by the `codex()` shell wrapper. Run `gh auth login` once;
-  rotation heals itself — no token is stored in either config.
+  "GH_TOKEN"` filled by the `codex()` shell wrapper. **Token source is `$GITHUB_TOKEN`
+  (the PAT in `~/.github.env`) first, `gh auth token` keyring as fallback** — one value,
+  sourced into every shell, shared across the NFS fleet, no token in any MCP config.
+- **A stale `GITHUB_TOKEN` silently shadows the gh keyring** — `gh auth token` returns
+  `$GH_TOKEN`/`$GITHUB_TOKEN` ahead of its stored credential when either is set, by design
+  (cli/cli#8347), and `gh auth login` even refuses to run while the env var is non-empty.
+  So an expired PAT in `~/.github.env` poisons both the MCP helper and `gh` itself, and
+  the only symptom is a cryptic MCP 401. The headersHelper now reads `$GITHUB_TOKEN`
+  directly (env-first is explicit, not accidental), and `auth.sh status` pings the API to
+  print a `github-mcp: live / EXPIRED` line so expiry is visible. Rotate with
+  `bash install/auth.sh github`; to switch a machine to the keyring instead, clear
+  `GITHUB_TOKEN` then `gh auth login`. After rotating, relaunch Claude Code — the running
+  process caches the old env token at launch.
 - **Codex profiles are per-file since 0.134** — `[profiles.*]` tables in config.toml
   are silently ignored; profiles are delta-only `~/.codex/<name>.config.toml` files
   with top-level keys. `@openai/codex` is version-pinned in `packages/npm.txt` so the
