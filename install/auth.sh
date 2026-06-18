@@ -260,7 +260,9 @@ _prompt_token_for() {
         cat > "$file" <<'EOF'
 # Derived from gh CLI keychain — no literal token stored here.
 # Re-run `bash ~/dotfiles/install/auth.sh github` to switch to a literal token.
-export GITHUB_TOKEN="$(gh auth token 2>/dev/null)"
+# env -u strips any inherited GITHUB_TOKEN/GH_TOKEN first, else gh would just
+# echo a stale env value back instead of reading the keyring (cli/cli#8347).
+export GITHUB_TOKEN="$(env -u GITHUB_TOKEN -u GH_TOKEN gh auth token 2>/dev/null)"
 EOF
         chmod 600 "$file"
         log_okay "$var derives from \`gh auth token\` → $file"
