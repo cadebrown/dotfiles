@@ -47,24 +47,34 @@ else
     (( _missing++ )) || true
 fi
 
-if has mlx_lm.generate; then
-    log_okay "mlx-lm: present"
-else
-    log_warn "mlx_lm.generate not found — run: uv tool install mlx-lm"
-    (( _missing++ )) || true
-fi
+# MLX requires Apple Metal — it's macOS-only (packages/pip.txt marks mlx-lm /
+# mlx-openai-server `# macos-only`). On Linux these tools are never installed, so
+# checking for them is noise and pulling MLX models is impossible. Skip cleanly.
+if [[ "$OS" == "darwin" ]]; then
+    if has mlx_lm.generate; then
+        log_okay "mlx-lm: present"
+    else
+        log_warn "mlx_lm.generate not found — run: uv tool install mlx-lm"
+        (( _missing++ )) || true
+    fi
 
-if has mlx-openai-server; then
-    log_okay "mlx-openai-server: present (tool-calling MLX server)"
-else
-    log_warn "mlx-openai-server not found — run: uv tool install mlx-openai-server"
-    (( _missing++ )) || true
+    if has mlx-openai-server; then
+        log_okay "mlx-openai-server: present (tool-calling MLX server)"
+    else
+        log_warn "mlx-openai-server not found — run: uv tool install mlx-openai-server"
+        (( _missing++ )) || true
+    fi
 fi
 
 [[ "$_missing" -gt 0 ]] && log_warn "$_missing tool(s) missing — re-run after step 4/6 completes"
 
 ### MLX model pre-pull (opt-in via `pull-models` arg) ###
 if [[ "$_mode" == "pull-models" ]]; then
+    if [[ "$OS" != "darwin" ]]; then
+        log_okay "MLX is macOS-only (Apple Metal) — skipping model pull on $OS"
+        log_okay "Local LLM tooling ready"
+        exit 0
+    fi
     log_section "MLX model pull (from packages/mlx-models.txt)"
     if ! has mlx_lm.generate; then
         die "mlx_lm.generate not found — install mlx-lm first (uv tool install mlx-lm)"
