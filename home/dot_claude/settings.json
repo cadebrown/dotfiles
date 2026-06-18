@@ -20,9 +20,9 @@
     ]
   },
   "cleanupPeriodDays": 3650,
-  "model": "claude-fable-5[1m]",
+  "model": "opus[1m]",
   "fallbackModel": [
-    "opus[1m]"
+    "sonnet[1m]"
   ],
   "sandbox": {
     "enabled": true
