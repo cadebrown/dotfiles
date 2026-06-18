@@ -336,11 +336,26 @@ case "$_mode" in
         printf '  %-12s %s\n' "gh" 'Run `gh auth login` (browser flow)'
         ;;
     *)
-        if row="$(_find_service_row "$_mode")"; then
-            log_section "API token: $_mode"
-            _prompt_token_for "$row"
-        else
-            printf "Unknown service: %s\n" "$_mode" >&2
+        # One or more services in a single invocation: `auth.sh tavily exa gh`.
+        _any_unknown=0
+        for _svc in "$@"; do
+            case "$_svc" in
+                gh|github-cli)
+                    log_section "gh CLI login"
+                    _gh_login
+                    ;;
+                *)
+                    if row="$(_find_service_row "$_svc")"; then
+                        log_section "API token: $_svc"
+                        _prompt_token_for "$row"
+                    else
+                        printf "Unknown service: %s\n" "$_svc" >&2
+                        _any_unknown=1
+                    fi
+                    ;;
+            esac
+        done
+        if (( _any_unknown )); then
             printf 'Run `%s help` to see the list.\n' "$0" >&2
             exit 1
         fi
