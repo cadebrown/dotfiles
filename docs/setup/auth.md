@@ -106,4 +106,4 @@ Now `bash auth.sh status`, `bash auth.sh openrouter`, and the walk all include i
 - All env files are **chmod 600** (owner-only).
 - Tokens are **never echoed** in plaintext — only masked tails.
 - The bash glob `for _envfile in "$HOME"/.*.env` in `_lib.sh` errors silently if no files match (no leakage).
-- A pre-push gitleaks hook (`home/dot_config/git/hooks/pre-push`) scans new commits for accidental token leakage before pushing — see [Troubleshooting](../usage/troubleshooting.md) if it ever blocks a push.
+- A global pre-push gitleaks hook scans the commits being pushed for accidental token leakage before they reach a remote, across every repo on the machine (via `core.hooksPath`). Source: `home/dot_config/git/hooks/executable_pre-push` → deployed to `~/.config/git/hooks/pre-push`. See [Troubleshooting → git push blocked by gitleaks](../usage/troubleshooting.md#git-push-blocked-by-gitleaks-secrets-detected) if it ever blocks a push.
