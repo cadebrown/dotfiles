@@ -14,6 +14,10 @@
       "Bash(*)"
     ],
     "ask": [
+      "Bash(git push:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(rm -rf:*)",
+      "Bash(rm -fr:*)",
       "mcp__cloudflare__*",
       "mcp__github__push_files",
       "mcp__github__create_or_update_file",
@@ -28,7 +32,7 @@
     "sonnet[1m]"
   ],
   "sandbox": {
-    "enabled": true,
+    "enabled": false,
     "filesystem": {
       "allowWrite": [
         "/tmp",
