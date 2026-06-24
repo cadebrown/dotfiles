@@ -1,0 +1,17 @@
+{
+  "coworkUserFilesPath": "/Users/cade/Claude",
+  "preferences": {
+    "allowAllBrowserActions": true,
+    "bypassPermissionsModeEnabled": true,
+    "ccRemoteControlDefaultEnabled": true,
+    "ccdScheduledTasksEnabled": true,
+    "chicagoEnabled": true,
+    "coworkHipaaRestricted": false,
+    "coworkScheduledTasksEnabled": true,
+    "coworkWebSearchEnabled": true,
+    "keepAwakeEnabled": true,
+    "launchPreviewPersistSession": true,
+    "quickEntryDictationShortcut": "capslock",
+    "sidebarMode": "epitaxy"
+  }
+}

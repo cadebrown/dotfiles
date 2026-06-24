@@ -1,0 +1,32 @@
+{
+  "appearanceDarkChromeTheme": {
+    "accent": "#ff7edb",
+    "contrast": 60,
+    "fonts": {
+      "code": null,
+      "ui": null
+    },
+    "ink": "#ffffff",
+    "opaqueWindows": false,
+    "semanticColors": {
+      "diffAdded": "#72f1b8",
+      "diffRemoved": "#fe4450",
+      "skill": "#ff7edb"
+    },
+    "surface": "#262335"
+  },
+  "appearanceDarkCodeThemeId": "temple",
+  "electron-persisted-atom-state": {
+    "agent-mode-by-host-id": {
+      "local": "auto"
+    },
+    "composer-auto-context-enabled": false,
+    "composer-personality": "pragmatic",
+    "diff-filter": "branch",
+    "skip-full-access-confirm": true
+  },
+  "open-in-target-preferences": {
+    "global": "cursor"
+  },
+  "reviewDelivery": "detached"
+}

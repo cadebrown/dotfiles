@@ -197,6 +197,22 @@ if OS.mac?
   tap "entireio/tap"
   cask "entire"  # captures AI agent sessions alongside git commits
 
+  # Claude Desktop (GUI app; auto-updates in place). Preferences are tracked
+  # by install/claude-desktop.sh (sync/apply) — not chezmoi, since the app
+  # owns and rewrites its config file. Claude Code (the CLI) is separate, via
+  # install/claude.sh.
+  cask "claude"
+
+  # Codex desktop app (GUI; auto-updates in place via Sparkle). NOTE: this is
+  # `codex-app`, NOT the `codex` cask — that one is the CLI, which we already
+  # get from npm (@openai/codex in npm.txt). The app shares ~/.codex/ with the
+  # CLI, so its substantive config (config.toml, profiles, AGENTS.md, rules,
+  # themes) is already tracked via install/codex.sh + chezmoi. Its GUI-only
+  # prefs (theme, editor target, personality) live in ~/.codex/.codex-global-
+  # state.json and are tracked separately by install/codex-desktop.sh — an
+  # allowlist sync, because that file also holds prompt history + account data.
+  cask "codex-app"
+
   ### Window Management ###
   cask "nikitabobko/tap/aerospace"
   cask "linearmouse"

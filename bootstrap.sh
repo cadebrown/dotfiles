@@ -60,6 +60,8 @@
 #   DF_DO_PYTHON        — set to 0 to skip Python install
 #   DF_DO_CLAUDE        — set to 0 to skip Claude Code install
 #   DF_DO_CODEX         — set to 0 to skip Codex CLI install
+#   DF_DO_CLAUDE_DESKTOP — set to 0 to skip Claude Desktop preference apply (macOS)
+#   DF_DO_CODEX_DESKTOP  — set to 0 to skip Codex desktop app preference apply (macOS)
 #   DF_DO_MACOS_SETTINGS — set to 0 to skip macOS settings
 #   DF_DO_MACOS_QUICK_ACTIONS — set to 0 to skip Finder Quick Actions install
 #   DF_DO_AUTH          — set to 1 to run interactive API token setup
@@ -484,6 +486,23 @@ if [[ "${DF_DO_CODEX:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/codex.sh" || die "codex.sh failed"
 else
     log_info "Skipping Codex (DF_DO_CODEX=0)"
+fi
+
+# Claude Desktop preferences (macOS only; self-skips on Linux). Merges tracked
+# prefs into the app-owned config — see install/claude-desktop.sh.
+if [[ "${DF_DO_CLAUDE_DESKTOP:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/claude-desktop.sh" || die "claude-desktop.sh failed"
+else
+    log_info "Skipping Claude Desktop preferences (DF_DO_CLAUDE_DESKTOP=0)"
+fi
+
+# Codex desktop app preferences (macOS only; self-skips on Linux). Merges an
+# allowlisted subset of GUI prefs into the app-owned state — see
+# install/codex-desktop.sh.
+if [[ "${DF_DO_CODEX_DESKTOP:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/codex-desktop.sh" || die "codex-desktop.sh failed"
+else
+    log_info "Skipping Codex desktop preferences (DF_DO_CODEX_DESKTOP=0)"
 fi
 
 if [[ "${DF_DO_CURSOR:-1}" != "0" ]]; then
