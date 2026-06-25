@@ -90,15 +90,22 @@ firecrawl http https://mcp.firecrawl.dev/{FIRECRAWL_API_KEY}/v2/mcp
 
 # === Google: official remote MCP servers (auth=gcloud / ADC) ===
 # Google's own managed MCP endpoints (announced Dec 2025, expanded at Next '26).
-# One `bash install/auth.sh google` (gcloud ADC login) authenticates all of
-# them — no OAuth client to create, no local process, nothing at rest.
+# Authenticated by gcloud Application Default Credentials — no local process,
+# nothing at rest.
 #
-# Workspace servers are Developer Preview and READ-MOSTLY today: Gmail =
-# search/read + drafts (no send); Calendar = read-only; Drive = read + create
-# (no edit/delete). Enroll in the Workspace Developer Preview Program and run
-# `gcloud services enable gmailmcp.googleapis.com drivemcp.googleapis.com
-# calendarmcp.googleapis.com` (auth.sh google offers to do this). When these GA
-# with full write, no change here is needed — same endpoints.
+# CLOUD servers (cloud-run/cloud-resmgr/cloud-storage/bigquery): full read+write
+# via the cloud-platform scope. `bash install/auth.sh google` sets these up with
+# zero client setup (gcloud's built-in OAuth client). Run + Resource Manager
+# cover nollege deploys; Storage + BigQuery for data. Needs: gcloud services
+# enable run/cloudresourcemanager/storage/bigquery .googleapis.com.
+#
+# WORKSPACE servers (gmail/calendar/drive): Developer Preview + READ-MOSTLY
+# (Gmail = read + drafts, no send; Calendar = read-only; Drive = read + create,
+# no edit/delete). Their scopes are RESTRICTED, so Google blocks gcloud's
+# generic client ("This app is blocked") — you must supply your own Desktop
+# OAuth client: `bash install/auth.sh google <client_secret.json>`. Also enroll
+# in the Workspace Developer Preview Program. If you want full Workspace WRITE,
+# a community server is the better pick (it needs a self-made client anyway).
 gmail       http https://gmailmcp.googleapis.com/mcp/v1    auth=gcloud
 calendar    http https://calendarmcp.googleapis.com/mcp/v1 auth=gcloud
 drive       http https://drivemcp.googleapis.com/mcp/v1    auth=gcloud

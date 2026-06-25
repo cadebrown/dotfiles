@@ -431,13 +431,21 @@ These are non-obvious things that have caused real bugs:
   "GH_TOKEN"` filled by the `codex()` shell wrapper. **Token source is `$GITHUB_TOKEN`
   (the PAT in `~/.github.env`) first, `gh auth token` keyring as fallback** — one value,
   sourced into every shell, shared across the NFS fleet, no token in any MCP config.
-- **Google's official MCP servers use ADC, not an OAuth client** — Google ships
-  managed remote MCP endpoints (Workspace: `gmailmcp`/`drivemcp`/`calendarmcp`;
-  Cloud: `run`/`cloudresourcemanager`/`storage`/`bigquery` `.googleapis.com/mcp`).
-  They authenticate with Application Default Credentials, so there is **no OAuth
-  client to create** — one `bash install/auth.sh google` (`gcloud auth
-  application-default login` with the union of scopes) covers all of them. The
-  `auth=gcloud` helpers mint a short-lived access token at connection time
+- **Google's official MCP servers use ADC — Cloud needs no client, Workspace
+  does** — Google ships managed remote MCP endpoints (Workspace:
+  `gmailmcp`/`drivemcp`/`calendarmcp`; Cloud:
+  `run`/`cloudresourcemanager`/`storage`/`bigquery` `.googleapis.com/mcp`),
+  authenticated by Application Default Credentials. **Cloud** scopes
+  (`cloud-platform`) are not sensitive, so `bash install/auth.sh google` works
+  with gcloud's built-in OAuth client and zero setup. **Workspace** scopes
+  (Gmail/Drive) are *restricted* — Google blocks gcloud's generic client from
+  them ("This app is blocked"), so the Workspace tier requires passing **your
+  own** Desktop OAuth client: `bash install/auth.sh google <client_secret.json>`
+  (which adds `--client-id-file`; needs a consent screen with yourself as a test
+  user). Since Workspace needs a self-made OAuth client either way, a community
+  full-write server (taylorwilsdon/google_workspace_mcp) is often the better
+  Workspace choice than the read-only official one. The `auth=gcloud` helpers
+  mint a short-lived access token at connection time
   (Claude: `~/.claude/gcloud-mcp-headers.sh`; Codex: `GOOGLE_MCP_TOKEN` via the
   `codex()` wrapper) — nothing at rest, like `auth=gh`. Three gotchas: (1) ADC
   access tokens expire ~hourly and the helper runs at *connect*, so an MCP
