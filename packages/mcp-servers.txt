@@ -24,6 +24,15 @@
 #   auth=exa       — x-api-key header from ~/.exa.env (EXA_API_KEY).
 #                    Claude: header; Codex: env_http_headers. Create with
 #                    `bash install/auth.sh exa`.
+#   auth=gcloud    — Google ADC bearer for the official Google/Google Cloud
+#                    remote MCP servers. No token at rest: a short-lived access
+#                    token is minted at connection time from Application Default
+#                    Credentials. Claude: headersHelper (~/.claude/gcloud-mcp-
+#                    headers.sh) emitting Authorization + x-goog-user-project;
+#                    Codex: bearer_token_env_var GOOGLE_MCP_TOKEN + env_http_
+#                    headers x-goog-user-project, both filled by the codex()
+#                    shell wrapper at launch. Set up with `bash install/auth.sh
+#                    google` (one `gcloud auth application-default login`).
 # Auth-managed entries cannot also pass --header / --client-id extras.
 #
 # URL placeholders: a {VAR} token in an HTTP url is replaced with $VAR (from
@@ -78,6 +87,29 @@ exa http https://mcp.exa.ai/mcp auth=exa
 # Firecrawl: best-in-class deep crawl + structured extraction (scrape, crawl,
 # map, extract). Key rides in the URL path (FIRECRAWL_API_KEY).
 firecrawl http https://mcp.firecrawl.dev/{FIRECRAWL_API_KEY}/v2/mcp
+
+# === Google: official remote MCP servers (auth=gcloud / ADC) ===
+# Google's own managed MCP endpoints (announced Dec 2025, expanded at Next '26).
+# One `bash install/auth.sh google` (gcloud ADC login) authenticates all of
+# them — no OAuth client to create, no local process, nothing at rest.
+#
+# Workspace servers are Developer Preview and READ-MOSTLY today: Gmail =
+# search/read + drafts (no send); Calendar = read-only; Drive = read + create
+# (no edit/delete). Enroll in the Workspace Developer Preview Program and run
+# `gcloud services enable gmailmcp.googleapis.com drivemcp.googleapis.com
+# calendarmcp.googleapis.com` (auth.sh google offers to do this). When these GA
+# with full write, no change here is needed — same endpoints.
+gmail       http https://gmailmcp.googleapis.com/mcp/v1    auth=gcloud
+calendar    http https://calendarmcp.googleapis.com/mcp/v1 auth=gcloud
+drive       http https://drivemcp.googleapis.com/mcp/v1    auth=gcloud
+# Cloud servers are full read+write via the cloud-platform scope (IAM-governed).
+# Run + Resource Manager cover nollege deploys; Storage + BigQuery for data.
+# Needs: gcloud services enable run.googleapis.com cloudresourcemanager.
+# googleapis.com storage.googleapis.com bigquery.googleapis.com.
+cloud-run        http https://run.googleapis.com/mcp                   auth=gcloud
+cloud-resmgr     http https://cloudresourcemanager.googleapis.com/mcp  auth=gcloud
+cloud-storage    http https://storage.googleapis.com/storage/mcp       auth=gcloud
+bigquery         http https://bigquery.googleapis.com/mcp              auth=gcloud
 
 # === Desktop automation (macOS) ===
 # macos-automator: run AppleScript/JXA — control any Mac app (Finder, Mail,

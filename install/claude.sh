@@ -176,6 +176,9 @@ log_section "Claude Code MCP servers"
 # Auth sources (see packages/mcp-servers.txt header):
 #   gh        → headersHelper script resolved at connection time. No stored
 #               token, so rotation needs no reconciliation.
+#   gcloud    → headersHelper (gcloud-mcp-headers.sh) mints a short-lived ADC
+#               access token + x-goog-user-project at connection time. Powers
+#               Google's official remote MCP servers; nothing stored.
 #   context7  → CONTEXT7_API_KEY header from ~/.context7.env; optional —
 #               registers unauthenticated when the credential is missing.
 
@@ -316,6 +319,15 @@ _register_mcps_from() {
                     _json="$(jq -nc --arg t "$_transport" --arg url "$_url" \
                         '{type: $t, url: $url, headersHelper: "~/.claude/gh-mcp-headers.sh"}')"
                     _label="$_transport → $_url [auth=gh via headersHelper]"
+                    ;;
+                gcloud)
+                    # Google ADC: headersHelper mints a short-lived access token
+                    # (+ x-goog-user-project) at connection time. Same no-token-
+                    # at-rest model as gh; refreshes on each reconnect.
+                    has gcloud || log_warn "  $_name: gcloud not installed — helper emits no auth until 'bash install/auth.sh google'"
+                    _json="$(jq -nc --arg t "$_transport" --arg url "$_url" \
+                        '{type: $t, url: $url, headersHelper: "~/.claude/gcloud-mcp-headers.sh"}')"
+                    _label="$_transport → $_url [auth=gcloud via headersHelper]"
                     ;;
                 *)
                     if _pair="$(_resolve_header_source "$_auth_source")"; then

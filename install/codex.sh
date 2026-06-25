@@ -164,6 +164,9 @@ _emit_mcp_blocks_to() {
                 # resolves credentials at launch instead of storing them:
                 #   gh       → bearer_token_env_var, filled by the codex() shell
                 #              wrapper (GH_TOKEN) — token never lands on disk
+                #   gcloud   → bearer_token_env_var (GOOGLE_MCP_TOKEN) + env_http_
+                #              headers x-goog-user-project, both filled by the
+                #              codex() wrapper at launch (ADC access token)
                 #   context7 → env_http_headers, read from the environment
                 #              (zprofile sources ~/.context7.env)
                 if [[ -n "$_auth_source" ]]; then
@@ -172,6 +175,12 @@ _emit_mcp_blocks_to() {
                             printf 'bearer_token_env_var = "GH_TOKEN"\n' >> "$out"
                             has gh || log_warn "    $_name: gh not installed — GH_TOKEN stays empty until 'gh auth login'"
                             log_info "    $_name ($_transport, auth=gh via GH_TOKEN)"
+                            ;;
+                        gcloud)
+                            printf 'bearer_token_env_var = "GOOGLE_MCP_TOKEN"\n' >> "$out"
+                            printf 'env_http_headers = { "x-goog-user-project" = "GOOGLE_CLOUD_PROJECT" }\n' >> "$out"
+                            has gcloud || log_warn "    $_name: gcloud not installed — GOOGLE_MCP_TOKEN stays empty until 'bash install/auth.sh google'"
+                            log_info "    $_name ($_transport, auth=gcloud via GOOGLE_MCP_TOKEN)"
                             ;;
                         context7)
                             if [[ -f "$HOME/.context7.env" ]]; then

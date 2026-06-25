@@ -9,7 +9,9 @@
 #   bash auth.sh                  # interactive: walk every service
 #   bash auth.sh status           # print current state and exit
 #   bash auth.sh <service>        # set up just one (e.g. `auth.sh huggingface`)
+#   bash auth.sh google           # ADC login for official Google/Cloud MCP servers
 #   bash auth.sh gh               # run `gh auth login` (browser flow)
+#   bash auth.sh gcloud           # run `gcloud auth login` (browser flow)
 #
 # Existing tokens are NEVER printed in plaintext — only the last 4 chars.
 # Re-runnable; per-service prompt is keep / update / delete.
@@ -43,6 +45,15 @@ _SERVICE_DEFS=(
     "exa|EXA_API_KEY|.exa.env|Exa API key (neural/semantic web search MCP)|https://dashboard.exa.ai/api-keys|—|you don't use the Exa search MCP"
     "firecrawl|FIRECRAWL_API_KEY|.firecrawl.env|Firecrawl API key (deep web crawl + structured extraction MCP)|https://www.firecrawl.dev/app/api-keys|—|you don't use the Firecrawl crawl MCP"
 )
+
+# Google's official remote MCP servers (Workspace + Cloud) authenticate with
+# Application Default Credentials, not a stored token — so `google` is an
+# interactive login (like gh/gcloud), handled by _google_adc_login, NOT a row
+# in _SERVICE_DEFS. The union of scopes the wired servers need (see
+# packages/mcp-servers.txt). cloud-platform covers Run/Resource-Manager/
+# Storage/BigQuery; the rest are the Workspace preview scopes.
+_GOOGLE_MCP_SCOPES="https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.compose,https://www.googleapis.com/auth/calendar.calendarlist.readonly,https://www.googleapis.com/auth/calendar.events.freebusy,https://www.googleapis.com/auth/calendar.events.readonly,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/drive.file"
+_GOOGLE_MCP_APIS="gmailmcp.googleapis.com drivemcp.googleapis.com calendarmcp.googleapis.com run.googleapis.com cloudresourcemanager.googleapis.com storage.googleapis.com bigquery.googleapis.com"
 
 # Tally for the end-of-walk summary. Reset by _walk_all.
 _TALLY_SET=0; _TALLY_UPDATED=0; _TALLY_KEPT=0; _TALLY_DELETED=0; _TALLY_SKIPPED=0
@@ -148,7 +159,35 @@ _status() {
         printf "  %-12s ${_DIM}gh not installed${_RESET}\n" "github-cli"
     fi
 
+    if has gcloud; then
+        local gacct
+        gacct="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -1)"
+        if [[ -n "$gacct" ]]; then
+            printf "  %-12s ${_GREEN}logged in${_RESET}    ${_DIM}as %s — gcloud/gsutil/bq for GCP${_RESET}\n" "gcloud" "$gacct"
+        else
+            printf "  %-12s ${_DIM}not logged in${_RESET}  ${_DIM}\`bash %s gcloud\` to set up${_RESET}\n" "gcloud" "$0"
+        fi
+    else
+        printf "  %-12s ${_DIM}gcloud not installed${_RESET}  ${_DIM}(brew install --cask google-cloud-sdk)${_RESET}\n" "gcloud"
+    fi
+
     _github_mcp_token_status
+    _google_mcp_token_status
+}
+
+# ADC liveness for the official Google MCP servers: can we mint an access token?
+# (auth=gcloud helpers do exactly this at connection time.) Degrades quietly.
+_google_mcp_token_status() {
+    has gcloud || return
+    local proj
+    if gcloud auth application-default print-access-token >/dev/null 2>&1; then
+        proj="${GOOGLE_CLOUD_PROJECT:-$(gcloud config get-value project 2>/dev/null || true)}"
+        [[ "$proj" == "(unset)" ]] && proj=""
+        printf "  %-12s ${_GREEN}live${_RESET}         ${_DIM}ADC mints MCP tokens%s${_RESET}\n" \
+            "google-mcp" "${proj:+ — quota project $proj}"
+    else
+        printf "  %-12s ${_DIM}no ADC${_RESET}       ${_DIM}run \`bash %s google\` to authenticate Google MCP servers${_RESET}\n" "google-mcp" "$0"
+    fi
 }
 
 # Verify the token the GitHub MCP will actually present is live. Resolves it
@@ -304,6 +343,85 @@ _gh_login() {
     gh auth login
 }
 
+_gcloud_login() {
+    # Browser login for the Google Cloud SDK (project/secret/deploy management).
+    # Distinct from the Workspace MCP creds above — that's an OAuth client for
+    # Gmail/Drive/Calendar; this is your gcloud user identity for GCP itself.
+    if ! has gcloud; then
+        log_warn "gcloud not installed (brew install --cask google-cloud-sdk) — skipping"
+        return 0
+    fi
+    if gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | grep -q .; then
+        log_okay "gcloud already logged in ($(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -1))"
+        printf "  Re-login? [y/N] "; read -r yn
+        case "${yn:-n}" in
+            y|Y) ;;
+            *) return 0 ;;
+        esac
+    fi
+    log_info "Launching \`gcloud auth login\` (browser flow)."
+    gcloud auth login
+    # ADC: many client libs and Terraform read application-default credentials.
+    printf "  Also set application-default credentials (for SDKs/Terraform)? [y/N] "
+    read -r yn || yn=""
+    case "${yn:-n}" in
+        y|Y) gcloud auth application-default login ;;
+        *) log_info "Skipped ADC (later: \`gcloud auth application-default login\`)" ;;
+    esac
+}
+
+_google_adc_login() {
+    # Authenticate the official Google/Google Cloud remote MCP servers via
+    # Application Default Credentials. One browser login mints a refresh token;
+    # the MCP helpers exchange it for short-lived access tokens at connect time.
+    # No OAuth client to create, nothing stored in any MCP config.
+    if ! has gcloud; then
+        log_warn "gcloud not installed (brew install --cask google-cloud-sdk) — skipping"
+        log_info "  The Google MCP servers in mcp-servers.txt need ADC; install gcloud first."
+        return 0
+    fi
+    log_info "ADC login for Google MCP servers (Workspace + Cloud)."
+    log_info "  A browser opens; consent to the requested scopes (incl. Gmail/Drive/Calendar)."
+    log_info "  Workspace tools are Developer Preview + read-mostly — enroll at"
+    log_info "  https://developers.google.com/workspace/preview if Workspace calls 403."
+    gcloud auth application-default login --scopes="$_GOOGLE_MCP_SCOPES" || {
+        log_fail "ADC login failed"; return 1
+    }
+
+    # Quota project: user-credential calls to Google APIs need x-goog-user-
+    # project. Set it on the ADC so the MCP helpers can emit it.
+    local proj
+    proj="$(gcloud config get-value project 2>/dev/null || true)"
+    [[ "$proj" == "(unset)" ]] && proj=""
+    if [[ -z "$proj" ]]; then
+        printf "  No default gcloud project set. Enter a project ID for quota/billing (or Enter to skip): "
+        read -r proj || proj=""
+    fi
+    if [[ -n "$proj" ]]; then
+        gcloud auth application-default set-quota-project "$proj" 2>/dev/null \
+            && log_okay "ADC quota project → $proj" \
+            || log_warn "Couldn't set quota project (does $proj exist / billing enabled?)"
+
+        printf "  Enable the MCP-backing APIs on %s now? [y/N] " "$proj"
+        local yn; read -r yn || yn=""
+        case "${yn:-n}" in
+            y|Y)
+                # shellcheck disable=SC2086
+                if gcloud services enable $_GOOGLE_MCP_APIS --project "$proj"; then
+                    log_okay "Enabled: $_GOOGLE_MCP_APIS"
+                else
+                    log_warn "Some APIs failed to enable (Workspace MCP APIs need Preview Program enrollment)"
+                fi
+                ;;
+            *) log_info "Skipped API enable. Later: gcloud services enable $_GOOGLE_MCP_APIS" ;;
+        esac
+    else
+        log_warn "No quota project — Cloud MCP calls may 403 'user project required'."
+        log_info "  Later: gcloud auth application-default set-quota-project <ID>"
+    fi
+    log_okay "Google MCP auth ready. Relaunch Claude/Codex to pick up the credentials."
+}
+
 _find_service_row() {
     local want="$1" row name
     for row in "${_SERVICE_DEFS[@]}"; do
@@ -336,6 +454,21 @@ _walk_all() {
         esac
     fi
 
+    printf "\n${_BOLD}gcloud CLI (browser login)${_RESET}\n"
+    printf "  ${_DIM}Google Cloud SDK — lets agents manage GCP projects, secrets, deploys.${_RESET}\n"
+    if has gcloud && gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | grep -q .; then
+        printf "  status: ${_GREEN}logged in${_RESET}  (skipping; use \`bash %s gcloud\` to re-login)\n" "$0"
+    elif has gcloud; then
+        printf "  Run \`gcloud auth login\` now? [y/N] "
+        read -r yn || yn=""
+        case "${yn:-n}" in
+            y|Y) _gcloud_login ;;
+            *) log_info "Skipped gcloud login (later: \`bash $0 gcloud\`)" ;;
+        esac
+    else
+        log_info "gcloud not installed (brew install --cask google-cloud-sdk) — skipping"
+    fi
+
     _print_summary
 }
 
@@ -360,12 +493,14 @@ case "$_mode" in
         _gh_login
         ;;
     -h|--help|help)
-        printf 'Usage: %s [walk|status|gh|<service>]\n\n' "$0"
+        printf 'Usage: %s [walk|status|gh|gcloud|google|<service>]\n\n' "$0"
         printf 'Services:\n'
         for row in "${_SERVICE_DEFS[@]}"; do
             printf '  %-12s %s\n' "$(_field "$row" 1)" "$(_field "$row" 4)"
         done
+        printf '  %-12s %s\n' "google" 'ADC login for official Google/Cloud MCP servers (+ enable APIs)'
         printf '  %-12s %s\n' "gh" 'Run `gh auth login` (browser flow)'
+        printf '  %-12s %s\n' "gcloud" 'Run `gcloud auth login` (browser flow + optional ADC)'
         ;;
     *)
         # One or more services in a single invocation: `auth.sh tavily exa gh`.
@@ -375,6 +510,14 @@ case "$_mode" in
                 gh|github-cli)
                     log_section "gh CLI login"
                     _gh_login
+                    ;;
+                gcloud|gcloud-cli)
+                    log_section "gcloud CLI login"
+                    _gcloud_login
+                    ;;
+                google)
+                    log_section "Google MCP auth (ADC for official Workspace + Cloud servers)"
+                    _google_adc_login
                     ;;
                 *)
                     if row="$(_find_service_row "$_svc")"; then

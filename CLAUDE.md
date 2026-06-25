@@ -92,8 +92,8 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `rust.sh` | rustup + cargo-binstall + tools from `cargo.txt` | macOS: Homebrew rustup (code-signed); Linux: sh.rustup.rs |
 | `go.sh` | `go install` CLI tools from `packages/go.txt` | Go itself via Brewfile (`brew "go"`). `GOBIN=$ARCH_BIN` so binaries land alongside cargo/uv ones. Respects `# linux-only` / `# macos-only` markers (same as `pip.txt`). |
 | `python.sh` | uv + CLI tools from `pip.txt` via `uv tool install` | Each tool gets isolated venv under `$LOCAL_PLAT/uv/tools/`; no monolithic venv |
-| `claude.sh` | Claude Code binary + plugins + MCP servers + overlay skills + `~/AGENTS.md` symlink | Downloads from Anthropic's GCS bucket; overlay discovery via `DF_OVERLAYS`. MCP servers reconcile declaratively (URL/command drift re-registers). `auth=gh` uses a connection-time headersHelper (`~/.claude/gh-mcp-headers.sh`); `auth=context7` reads `~/.context7.env` (optional). |
-| `codex.sh` | Manages `~/.codex/config.toml` (incl. generated `[mcp_servers.*]` from `packages/mcp-servers.txt`), hooks, and chezmoi guard | Codex binary via npm — PINNED in `npm.txt` so binary and config move in lockstep (0.134 redesigned profiles). Profiles are delta files `~/.codex/<name>.config.toml` (chezmoi-managed). `auth=gh` emits `bearer_token_env_var = "GH_TOKEN"`, filled by the `codex()` shell wrapper at launch. Rules live in `~/.codex/rules/dotfiles.rules` (managed); `default.rules` is left to Codex's own TUI appends. |
+| `claude.sh` | Claude Code binary + plugins + MCP servers + overlay skills + `~/AGENTS.md` symlink | Downloads from Anthropic's GCS bucket; overlay discovery via `DF_OVERLAYS`. MCP servers reconcile declaratively (URL/command drift re-registers). `auth=gh` uses a connection-time headersHelper (`~/.claude/gh-mcp-headers.sh`); `auth=gcloud` uses `~/.claude/gcloud-mcp-headers.sh` (mints an ADC access token + `x-goog-user-project` per connection — powers Google's official remote MCP servers); `auth=context7` reads `~/.context7.env` (optional). |
+| `codex.sh` | Manages `~/.codex/config.toml` (incl. generated `[mcp_servers.*]` from `packages/mcp-servers.txt`), hooks, and chezmoi guard | Codex binary via npm — PINNED in `npm.txt` so binary and config move in lockstep (0.134 redesigned profiles). Profiles are delta files `~/.codex/<name>.config.toml` (chezmoi-managed). `auth=gh` emits `bearer_token_env_var = "GH_TOKEN"`, filled by the `codex()` shell wrapper at launch; `auth=gcloud` emits `bearer_token_env_var = "GOOGLE_MCP_TOKEN"` + `env_http_headers` for `x-goog-user-project`, both filled by the same wrapper (ADC token via `gcloud auth application-default print-access-token`). Rules live in `~/.codex/rules/dotfiles.rules` (managed); `default.rules` is left to Codex's own TUI appends. |
 | `claude-desktop.sh` | Tracks Claude Desktop (macOS GUI app) preferences. `apply` (default) deep-merges tracked prefs into the app-owned config; `sync` captures in-app changes back, sanitized | macOS only (self-skips on Linux). App itself via Brewfile (`cask "claude"`). NOT chezmoi-managed — the app owns/rewrites the live config, so a static managed file would clobber + churn. Tracked source: `install/claude-desktop/claude_desktop_config.json`. `sync` strips a blocklist (`*ByAccount`, `remoteToolsDeviceName`, `coworkOnboardingResumeStep`, `epitaxyPrefs`) so account UUIDs / device name / transient UI never reach the public repo; new prefs are captured automatically. Distinct from `claude.sh` (the CLI). |
 | `codex-desktop.sh` | Tracks the Codex desktop app (macOS GUI) GUI prefs. `apply` (default) deep-merges tracked prefs into the app-owned state; `sync` extracts in-app changes back | macOS only (self-skips on Linux). App via Brewfile (`cask "codex-app"`, NOT `codex` = CLI). Live state `~/.codex/.codex-global-state.json` also holds prompt history + cloud/account data, so this uses an **allowlist** (the inverse of `claude-desktop.sh`'s blocklist): only named keys (theme, `open-in-target-preferences`, `composer-personality`, `diff-filter`, `skip-full-access-confirm`, `agent-mode-by-host-id`) are emitted — never whole objects. Tracked source: `install/codex-desktop/codex-global-state.json`. Substantive Codex config (config.toml, profiles, rules, themes) is separate, via `codex.sh` + chezmoi. |
 | `cursor.sh` | Cursor settings symlinks + extension install; `sync-extensions` subcommand captures new extensions back | Union-only (never removes); app updated via Brewfile cask |
@@ -103,7 +103,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `blender-mcp.sh` | Installs the `blender-mcp` Blender addon (`addon.py` from github.com/ahujasid/blender-mcp) and enables it via headless Blender | MCP server side is separate — see `packages/mcp-servers.txt`. Skips if Blender not installed. |
 | `skills-sync.sh` | Installs official agent skills for installed CLIs from `packages/agent-skills.txt` (ast-grep, nushell, jj, qmd self-install) into the shared `~/.claude/skills` tree | Engine: `npx skills add` (vercel-labs; lockfile at `~/.agents/.skill-lock.json`). Installer-managed dirs — never add chezmoi sources for them (one writer per skill dir). |
 | `memory.sh` | Agent memory stack: cass binary (GitHub release, checksum-verified) + session-history index, ~/kb knowledge repo, qmd collections + embeddings, memory daemons | qmd MCP daemon on localhost:8181 (LaunchAgent dev.cade.qmd on macOS, lazy-start on Linux); cass watch daemon likewise. `reindex` mode forces re-embedding. Indexes under ~/.cache (scratch), never synced; ~/kb is git-synced. |
-| `auth.sh` | Guided API token setup with service registry | Creates `~/.{service}.env` files (chmod 600). Built-in services: GitHub, Anthropic, OpenAI, Cloudflare, HuggingFace, plus `gh auth login`. Run `bash auth.sh status` for state, `bash auth.sh <service>` for a single one. Add a service by appending to `_SERVICE_DEFS` in the script. |
+| `auth.sh` | Guided API token setup with service registry | Creates `~/.{service}.env` files (chmod 600). Built-in token services: GitHub, Anthropic, OpenAI, Cloudflare, HuggingFace, Tavily, Exa, Firecrawl, Context7, WolframAlpha. Interactive logins (not env files): `gh auth login`, `gcloud auth login`, and `google` (= `gcloud auth application-default login` with the union of MCP scopes + optional `gcloud services enable` of the MCP-backing APIs — authenticates Google's official remote MCP servers). Run `bash auth.sh status` for state, `bash auth.sh <service>` for a single one. Add a token service by appending to `_SERVICE_DEFS`; an interactive login gets its own function + dispatch case. |
 | `dirs.sh` | Creates `~/dev`, `~/bones`, `~/misc` | Symlinks to scratch when available |
 | `scratch.sh` | Symlinks `~/.local`, `~/.cache`, etc. to scratch space | NFS quota relief |
 | `verify-path.sh` | Diagnostic: arch check, library check, duplicates, stale symlinks | Not called by bootstrap |
@@ -431,6 +431,25 @@ These are non-obvious things that have caused real bugs:
   "GH_TOKEN"` filled by the `codex()` shell wrapper. **Token source is `$GITHUB_TOKEN`
   (the PAT in `~/.github.env`) first, `gh auth token` keyring as fallback** — one value,
   sourced into every shell, shared across the NFS fleet, no token in any MCP config.
+- **Google's official MCP servers use ADC, not an OAuth client** — Google ships
+  managed remote MCP endpoints (Workspace: `gmailmcp`/`drivemcp`/`calendarmcp`;
+  Cloud: `run`/`cloudresourcemanager`/`storage`/`bigquery` `.googleapis.com/mcp`).
+  They authenticate with Application Default Credentials, so there is **no OAuth
+  client to create** — one `bash install/auth.sh google` (`gcloud auth
+  application-default login` with the union of scopes) covers all of them. The
+  `auth=gcloud` helpers mint a short-lived access token at connection time
+  (Claude: `~/.claude/gcloud-mcp-headers.sh`; Codex: `GOOGLE_MCP_TOKEN` via the
+  `codex()` wrapper) — nothing at rest, like `auth=gh`. Three gotchas: (1) ADC
+  access tokens expire ~hourly and the helper runs at *connect*, so an MCP
+  session held open >1h needs a `/mcp` reconnect to re-mint. (2) User-credential
+  calls need a quota project via `x-goog-user-project` — `auth.sh google` sets it
+  with `gcloud auth application-default set-quota-project`; without it some Cloud
+  APIs 403 "user project required". (3) The Workspace servers are **Developer
+  Preview and read-mostly** (Gmail = drafts only, no send; Calendar = read-only;
+  Drive = create/read, no edit/delete) and need Workspace Developer Preview
+  Program enrollment + `gcloud services enable <product>mcp.googleapis.com`. For
+  full Workspace *write* today you'd swap to a community server (e.g.
+  taylorwilsdon/google_workspace_mcp); we chose official+ADC for cleanliness.
 - **A stale `GITHUB_TOKEN` silently shadows the gh keyring** — `gh auth token` returns
   `$GH_TOKEN`/`$GITHUB_TOKEN` ahead of its stored credential when either is set, by design
   (cli/cli#8347), and `gh auth login` even refuses to run while the env var is non-empty.

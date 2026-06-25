@@ -213,6 +213,16 @@ if OS.mac?
   # allowlist sync, because that file also holds prompt history + account data.
   cask "codex-app"
 
+  ### Cloud CLIs (macOS) ###
+  # Google Cloud SDK: `gcloud` (+ `gsutil`, `bq`). Two roles: (1) agents manage
+  # GCP projects/secrets/deploys — `bash install/auth.sh gcloud` for the user
+  # login; (2) it is the auth for Google's official remote MCP servers, which use
+  # Application Default Credentials — `bash install/auth.sh google` runs that ADC
+  # login (no OAuth client needed) and the auth=gcloud helpers mint tokens from
+  # it. macOS-only here — the cask has no Linux equivalent; a no-sudo Linux box
+  # would need the upstream tarball installer (not yet wired).
+  cask "google-cloud-sdk"
+
   ### Window Management ###
   cask "nikitabobko/tap/aerospace"
   cask "linearmouse"

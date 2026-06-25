@@ -192,12 +192,17 @@ alias cursor-sync='bash ~/dotfiles/install/cursor.sh sync-extensions'
 alias codexs='codex -p deep'
 alias codexr='codex -p review'
 
-# codex launcher — resolve GH_TOKEN at launch so the GitHub MCP server can
-# authenticate: config.toml references it via bearer_token_env_var, so the
-# token never lands on disk. Lazy (`gh auth token` runs per codex launch,
-# not per shell startup), and a caller-provided GH_TOKEN wins.
+# codex launcher — resolve MCP credentials at launch so config.toml can
+# reference them via *_env_var, keeping tokens off disk. Lazy (resolved per
+# codex launch, not per shell startup); caller-provided values win.
+#   GH_TOKEN          → GitHub MCP (bearer_token_env_var)
+#   GOOGLE_MCP_TOKEN  → Google official MCP servers (ADC access token, ~1h)
+#   GOOGLE_CLOUD_PROJECT → x-goog-user-project quota project for the above
 codex() {
-    GH_TOKEN="${GH_TOKEN:-$(command gh auth token 2>/dev/null)}" command codex "$@"
+    GH_TOKEN="${GH_TOKEN:-$(command gh auth token 2>/dev/null)}" \
+    GOOGLE_MCP_TOKEN="${GOOGLE_MCP_TOKEN:-$(command gcloud auth application-default print-access-token 2>/dev/null)}" \
+    GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-$(command gcloud config get-value project 2>/dev/null)}" \
+        command codex "$@"
 }
 
 # mlxserve — start the MLX OpenAI-compat server on localhost:8080.
