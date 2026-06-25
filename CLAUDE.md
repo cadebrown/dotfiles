@@ -431,20 +431,22 @@ These are non-obvious things that have caused real bugs:
   "GH_TOKEN"` filled by the `codex()` shell wrapper. **Token source is `$GITHUB_TOKEN`
   (the PAT in `~/.github.env`) first, `gh auth token` keyring as fallback** — one value,
   sourced into every shell, shared across the NFS fleet, no token in any MCP config.
-- **Google's official MCP servers use ADC — Cloud needs no client, Workspace
-  does** — Google ships managed remote MCP endpoints (Workspace:
-  `gmailmcp`/`drivemcp`/`calendarmcp`; Cloud:
-  `run`/`cloudresourcemanager`/`storage`/`bigquery` `.googleapis.com/mcp`),
-  authenticated by Application Default Credentials. **Cloud** scopes
-  (`cloud-platform`) are not sensitive, so `bash install/auth.sh google` works
-  with gcloud's built-in OAuth client and zero setup. **Workspace** scopes
-  (Gmail/Drive) are *restricted* — Google blocks gcloud's generic client from
-  them ("This app is blocked"), so the Workspace tier requires passing **your
-  own** Desktop OAuth client: `bash install/auth.sh google <client_secret.json>`
-  (which adds `--client-id-file`; needs a consent screen with yourself as a test
-  user). Since Workspace needs a self-made OAuth client either way, a community
-  full-write server (taylorwilsdon/google_workspace_mcp) is often the better
-  Workspace choice than the read-only official one. The `auth=gcloud` helpers
+- **Google MCP is split: Cloud = official ADC, Workspace = community server** —
+  two different mechanisms for two different reasons.
+  **Cloud** (`cloud-run`/`cloud-resmgr`/`cloud-storage`/`bigquery`): Google's
+  official remote MCP endpoints (`*.googleapis.com/mcp`), authenticated by
+  Application Default Credentials. `cloud-platform` is not a sensitive scope, so
+  `bash install/auth.sh google` works with gcloud's built-in OAuth client and
+  zero setup; the `auth=gcloud` helpers mint a short-lived token per connection.
+  **Workspace** (`google-workspace` = Gmail/Calendar/Drive): the community
+  `uvx workspace-mcp` (taylorwilsdon) server, full read+WRITE, OAuth client creds
+  in `~/.google.env` (`bash install/auth.sh workspace`). We did NOT use Google's
+  official Workspace MCP because (a) it's Developer Preview + read-mostly (Gmail
+  drafts-only/no send, Calendar read-only, Drive no edit/delete), and (b) its
+  scopes are *restricted* — Google blocks gcloud's generic client ("This app is
+  blocked"), so it needs a self-made OAuth client anyway. At equal client-setup
+  cost, full write beats read-only. The community server uses the STANDARD
+  Gmail/Calendar/Drive APIs (no Preview Program). The `auth=gcloud` helpers
   mint a short-lived access token at connection time
   (Claude: `~/.claude/gcloud-mcp-headers.sh`; Codex: `GOOGLE_MCP_TOKEN` via the
   `codex()` wrapper) — nothing at rest, like `auth=gh`. Three gotchas: (1) ADC

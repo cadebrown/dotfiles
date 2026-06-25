@@ -88,35 +88,38 @@ exa http https://mcp.exa.ai/mcp auth=exa
 # map, extract). Key rides in the URL path (FIRECRAWL_API_KEY).
 firecrawl http https://mcp.firecrawl.dev/{FIRECRAWL_API_KEY}/v2/mcp
 
-# === Google: official remote MCP servers (auth=gcloud / ADC) ===
-# Google's own managed MCP endpoints (announced Dec 2025, expanded at Next '26).
-# Authenticated by gcloud Application Default Credentials — no local process,
-# nothing at rest.
-#
-# CLOUD servers (cloud-run/cloud-resmgr/cloud-storage/bigquery): full read+write
-# via the cloud-platform scope. `bash install/auth.sh google` sets these up with
-# zero client setup (gcloud's built-in OAuth client). Run + Resource Manager
+# === Google Cloud: official remote MCP servers (auth=gcloud / ADC) ===
+# Google's own managed MCP endpoints (announced Dec 2025, expanded at Next '26),
+# authenticated by gcloud Application Default Credentials — no local process,
+# nothing at rest. Full read+write via the cloud-platform scope (IAM-governed),
+# set up with zero client work by `bash install/auth.sh google` (gcloud's
+# built-in OAuth client can request cloud-platform). Run + Resource Manager
 # cover nollege deploys; Storage + BigQuery for data. Needs: gcloud services
-# enable run/cloudresourcemanager/storage/bigquery .googleapis.com.
-#
-# WORKSPACE servers (gmail/calendar/drive): Developer Preview + READ-MOSTLY
-# (Gmail = read + drafts, no send; Calendar = read-only; Drive = read + create,
-# no edit/delete). Their scopes are RESTRICTED, so Google blocks gcloud's
-# generic client ("This app is blocked") — you must supply your own Desktop
-# OAuth client: `bash install/auth.sh google <client_secret.json>`. Also enroll
-# in the Workspace Developer Preview Program. If you want full Workspace WRITE,
-# a community server is the better pick (it needs a self-made client anyway).
-gmail       http https://gmailmcp.googleapis.com/mcp/v1    auth=gcloud
-calendar    http https://calendarmcp.googleapis.com/mcp/v1 auth=gcloud
-drive       http https://drivemcp.googleapis.com/mcp/v1    auth=gcloud
-# Cloud servers are full read+write via the cloud-platform scope (IAM-governed).
-# Run + Resource Manager cover nollege deploys; Storage + BigQuery for data.
-# Needs: gcloud services enable run.googleapis.com cloudresourcemanager.
-# googleapis.com storage.googleapis.com bigquery.googleapis.com.
+# enable run.googleapis.com cloudresourcemanager.googleapis.com
+# storage.googleapis.com bigquery.googleapis.com (auth.sh google offers this).
 cloud-run        http https://run.googleapis.com/mcp                   auth=gcloud
 cloud-resmgr     http https://cloudresourcemanager.googleapis.com/mcp  auth=gcloud
 cloud-storage    http https://storage.googleapis.com/storage/mcp       auth=gcloud
 bigquery         http https://bigquery.googleapis.com/mcp              auth=gcloud
+
+# === Google Workspace: community server (full read+WRITE) ===
+# taylorwilsdon/google_workspace_mcp — full Gmail (incl. send), Calendar (create/
+# modify), Drive (edit/delete), Docs/Sheets. Chosen over Google's official
+# Workspace MCP because (a) those are Developer-Preview + read-mostly, and (b)
+# their restricted scopes are blocked for gcloud's generic OAuth client — so
+# Workspace needs a self-made OAuth client EITHER WAY, and at equal setup cost
+# full write beats read-only. Uses the STANDARD Gmail/Calendar/Drive APIs (no
+# Preview Program needed).
+#
+# Setup: create a Desktop OAuth client in your GCP project + consent screen with
+# yourself as a test user, then `bash install/auth.sh workspace` to store the
+# id/secret in ~/.google.env (auto-sourced by login shells, so this stdio server
+# inherits them — and Codex too). First tool call opens a browser to authorize;
+# tokens cache encrypted under ~/.workspace-mcp/. OAUTHLIB_INSECURE_TRANSPORT=1
+# lets the localhost callback (http://localhost:8000/oauth2callback) complete.
+# Registers inert until ~/.google.env exists — harmless, like chrome-devtools
+# without Chrome.
+google-workspace stdio cmd: env OAUTHLIB_INSECURE_TRANSPORT=1 uvx workspace-mcp --tools gmail drive calendar
 
 # === Desktop automation (macOS) ===
 # macos-automator: run AppleScript/JXA — control any Mac app (Finder, Mail,

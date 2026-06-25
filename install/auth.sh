@@ -9,7 +9,8 @@
 #   bash auth.sh                  # interactive: walk every service
 #   bash auth.sh status           # print current state and exit
 #   bash auth.sh <service>        # set up just one (e.g. `auth.sh huggingface`)
-#   bash auth.sh google           # ADC login for official Google/Cloud MCP servers
+#   bash auth.sh google           # ADC login for official Google Cloud MCP servers
+#   bash auth.sh workspace        # set Workspace MCP OAuth client (community server)
 #   bash auth.sh gh               # run `gh auth login` (browser flow)
 #   bash auth.sh gcloud           # run `gcloud auth login` (browser flow)
 #
@@ -44,25 +45,20 @@ _SERVICE_DEFS=(
     "tavily|TAVILY_API_KEY|.tavily.env|Tavily API key (web search + extract + crawl MCP — 1000 credits/mo free, no card)|https://app.tavily.com/home|—|you don't use the Tavily search MCP"
     "exa|EXA_API_KEY|.exa.env|Exa API key (neural/semantic web search MCP)|https://dashboard.exa.ai/api-keys|—|you don't use the Exa search MCP"
     "firecrawl|FIRECRAWL_API_KEY|.firecrawl.env|Firecrawl API key (deep web crawl + structured extraction MCP)|https://www.firecrawl.dev/app/api-keys|—|you don't use the Firecrawl crawl MCP"
+    "workspace-id|GOOGLE_OAUTH_CLIENT_ID|.google.env|Workspace MCP OAuth client ID (community full-write Gmail/Drive/Calendar)|https://console.cloud.google.com/apis/credentials|Desktop-app OAuth client; consent screen w/ yourself as test user; enable Gmail/Calendar/Drive APIs|you don't use the Workspace MCP server"
+    "workspace-secret|GOOGLE_OAUTH_CLIENT_SECRET|.google.env|Workspace MCP OAuth client secret (pairs with workspace-id)|https://console.cloud.google.com/apis/credentials|same Desktop OAuth client as workspace-id|you don't use the Workspace MCP server"
 )
 
-# Google's official remote MCP servers authenticate with Application Default
-# Credentials, not a stored token — so `google` is an interactive login (like
-# gh/gcloud), handled by _google_adc_login, NOT a row in _SERVICE_DEFS.
-#
-# IMPORTANT: scopes split into two tiers because of a Google policy.
-#   Cloud (cloud-platform) is NOT sensitive — gcloud's BUILT-IN OAuth client can
-#   request it, so plain `auth.sh google` works with zero setup.
-#   Workspace (Gmail/Drive especially) ARE restricted scopes — Google blocks
-#   gcloud's generic client from them ("This app is blocked"). To get them you
-#   must pass YOUR OWN OAuth client via `auth.sh google <client_secret.json>`
-#   (the file from a Desktop OAuth client you create + a consent screen with
-#   yourself as a test user). ADC holds one credential set, so the workspace
-#   login requests BOTH tiers through your client.
+# `google` is an interactive ADC login (like gh/gcloud) for the official Google
+# CLOUD MCP servers — handled by _google_adc_login, NOT a row in _SERVICE_DEFS.
+# Cloud-only on purpose: cloud-platform is not a sensitive scope, so gcloud's
+# built-in OAuth client can request it with zero setup. Google's *Workspace*
+# scopes (Gmail/Drive) ARE restricted and get blocked for gcloud's generic
+# client ("This app is blocked"), so Workspace is served by the community
+# server instead (env-var creds via the workspace-id/workspace-secret rows;
+# standard Gmail/Calendar/Drive APIs, no Developer Preview Program).
 _GOOGLE_CLOUD_SCOPES="https://www.googleapis.com/auth/cloud-platform"
-_GOOGLE_WS_SCOPES="https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.compose,https://www.googleapis.com/auth/calendar.calendarlist.readonly,https://www.googleapis.com/auth/calendar.events.freebusy,https://www.googleapis.com/auth/calendar.events.readonly,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/drive.file"
 _GOOGLE_CLOUD_APIS="run.googleapis.com cloudresourcemanager.googleapis.com storage.googleapis.com bigquery.googleapis.com"
-_GOOGLE_WS_APIS="gmailmcp.googleapis.com drivemcp.googleapis.com calendarmcp.googleapis.com"
 
 # Tally for the end-of-walk summary. Reset by _walk_all.
 _TALLY_SET=0; _TALLY_UPDATED=0; _TALLY_KEPT=0; _TALLY_DELETED=0; _TALLY_SKIPPED=0
@@ -380,47 +376,23 @@ _gcloud_login() {
 }
 
 _google_adc_login() {
-    # Authenticate the official Google/Google Cloud remote MCP servers via
-    # Application Default Credentials. The MCP helpers exchange the resulting
-    # refresh token for short-lived access tokens at connect time.
-    #
-    #   auth.sh google                       → Cloud only (cloud-platform).
-    #                                          Uses gcloud's built-in OAuth
-    #                                          client; no setup, never blocked.
-    #   auth.sh google <client_secret.json>  → Cloud + Workspace. Workspace
-    #                                          scopes are restricted, so Google
-    #                                          blocks gcloud's generic client
-    #                                          ("This app is blocked"); pass your
-    #                                          own Desktop OAuth client file to
-    #                                          request them.
-    local client_file="${1:-}"
+    # Authenticate the official Google Cloud remote MCP servers (cloud-run,
+    # cloud-resmgr, cloud-storage, bigquery) via Application Default Credentials.
+    # The auth=gcloud helpers exchange the resulting refresh token for short-
+    # lived access tokens at connect time. Cloud-only: cloud-platform is not a
+    # sensitive scope, so gcloud's built-in OAuth client can request it with no
+    # setup and no "app is blocked". Workspace (Gmail/Drive/Calendar) is handled
+    # separately by the community server — `bash auth.sh workspace`.
     if ! has gcloud; then
         log_warn "gcloud not installed (brew install --cask google-cloud-sdk) — skipping"
-        log_info "  The Google MCP servers in mcp-servers.txt need ADC; install gcloud first."
+        log_info "  The Cloud MCP servers in mcp-servers.txt need ADC; install gcloud first."
         return 0
     fi
 
-    local scopes apis tier login_args=()
-    if [[ -n "$client_file" ]]; then
-        [[ -f "$client_file" ]] || { log_fail "client secret file not found: $client_file"; return 1; }
-        scopes="$_GOOGLE_CLOUD_SCOPES,$_GOOGLE_WS_SCOPES"
-        apis="$_GOOGLE_CLOUD_APIS $_GOOGLE_WS_APIS"
-        tier="Cloud + Workspace (via your OAuth client)"
-        login_args+=(--client-id-file="$client_file")
-        log_info "Workspace tools are Developer Preview + read-mostly — enroll at"
-        log_info "  https://developers.google.com/workspace/preview if Workspace calls 403."
-        log_info "  Add yourself as a test user on the client's OAuth consent screen."
-    else
-        scopes="$_GOOGLE_CLOUD_SCOPES"
-        apis="$_GOOGLE_CLOUD_APIS"
-        tier="Cloud only (Run/Resource-Manager/Storage/BigQuery)"
-        log_info "Cloud-only login. For Gmail/Drive/Calendar, re-run with your own"
-        log_info "  OAuth client file: bash $0 google <client_secret.json>"
-        log_info "  (Google blocks gcloud's generic client from Workspace scopes.)"
-    fi
-
-    log_info "ADC login for Google MCP servers — $tier."
-    gcloud auth application-default login --scopes="$scopes" "${login_args[@]}" || {
+    local scopes="$_GOOGLE_CLOUD_SCOPES" apis="$_GOOGLE_CLOUD_APIS"
+    log_info "ADC login for Google Cloud MCP servers (Run/Resource-Manager/Storage/BigQuery)."
+    log_info "  Gmail/Drive/Calendar are separate (community server): bash $0 workspace"
+    gcloud auth application-default login --scopes="$scopes" || {
         log_fail "ADC login failed"; return 1
     }
 
@@ -535,17 +507,25 @@ case "$_mode" in
         log_section "Google MCP auth (ADC for official Google/Cloud servers)"
         _google_adc_login "${2:-}"
         ;;
+    workspace)
+        # Community Workspace MCP server creds: walk both client vars (→ ~/.google.env).
+        log_section "Workspace MCP OAuth client (community full-write server)"
+        for _grow in workspace-id workspace-secret; do
+            if row="$(_find_service_row "$_grow")"; then _prompt_token_for "$row"; fi
+        done
+        ;;
     gcloud|gcloud-cli)
         log_section "gcloud CLI login"
         _gcloud_login
         ;;
     -h|--help|help)
-        printf 'Usage: %s [walk|status|gh|gcloud|google [client.json]|<service>]\n\n' "$0"
+        printf 'Usage: %s [walk|status|gh|gcloud|google|workspace|<service>]\n\n' "$0"
         printf 'Services:\n'
         for row in "${_SERVICE_DEFS[@]}"; do
             printf '  %-12s %s\n' "$(_field "$row" 1)" "$(_field "$row" 4)"
         done
-        printf '  %-12s %s\n' "google" 'ADC login: Cloud only; google <client.json> adds Workspace'
+        printf '  %-12s %s\n' "google" 'ADC login for official Google Cloud MCP servers (+ enable APIs)'
+        printf '  %-12s %s\n' "workspace" 'Set Workspace MCP OAuth client (id+secret) for the community server'
         printf '  %-12s %s\n' "gh" 'Run `gh auth login` (browser flow)'
         printf '  %-12s %s\n' "gcloud" 'Run `gcloud auth login` (browser flow + optional ADC)'
         ;;
