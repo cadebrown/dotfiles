@@ -120,8 +120,11 @@ brew "opencode"
 # (0.29 vs upstream 0.42+), shipping an old rewrite registry and pre-v3 hook
 # protocol. The tap tracks stable releases with prebuilt binaries for all 4
 # platforms; Linux x86_64 is a musl static build (no glibc-version dependency).
-# Tap trust is automatic via trust_brewfile_taps() (owner/repo prefix).
+# The `tap` line is required: trust_brewfile_taps() only *trusts* the tap (so
+# brew won't refuse to load it) — `brew bundle` still needs the explicit tap
+# directive to actually clone it. A bare three-part `brew` ref is not auto-tapped.
 # NOT cargo.txt: the crates.io `rtk` crate is an unrelated project (Rust Type Kit).
+tap "rtk-ai/tap"
 brew "rtk-ai/tap/rtk"
 
 ### Debugging ###
@@ -221,9 +224,10 @@ if OS.mac?
   # login (no OAuth client needed) and the auth=gcloud helpers mint tokens from
   # it. macOS-only here — the cask has no Linux equivalent; a no-sudo Linux box
   # would need the upstream tarball installer (not yet wired).
-  cask "google-cloud-sdk"
+  cask "gcloud-cli"  # was "google-cloud-sdk" — renamed upstream 2026
 
   ### Window Management ###
+  tap "nikitabobko/tap"
   cask "nikitabobko/tap/aerospace"
   cask "linearmouse"
   cask "jordanbaird-ice"
