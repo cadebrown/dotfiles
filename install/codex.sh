@@ -96,7 +96,7 @@ _toml_escape() {
 # TOML blocks, written to $1. Logs go to stdout via log_*; only TOML hits $1.
 _emit_mcp_blocks_to() {
     local out="$1" _file _line _name _rest _transport _cmd _head _tail _url
-    local _rest_extras _auth_source _client_id _arg _first _ph _val
+    local _rest_extras _auth_source _client_id _codex_client_id _arg _first _ph _val
 
     : > "$out"
 
@@ -106,6 +106,7 @@ _emit_mcp_blocks_to() {
             [[ -z "$_line" || "$_line" == \#* ]] && continue
             _name="${_line%% *}"; _rest="${_line#* }"
             _transport="${_rest%% *}"
+            _codex_client_id=""   # reset here so stdio-after-http can't inherit it
 
             printf '\n[mcp_servers.%s]\n' "$_name" >> "$out"
 
@@ -152,9 +153,10 @@ _emit_mcp_blocks_to() {
                 set -- $_rest_extras
                 while (( $# )); do
                     case "$1" in
-                        auth=*)      _auth_source="${1#auth=}"; shift ;;
-                        --client-id) _client_id="${2:-}"; shift 2 ;;
-                        *)           shift ;;
+                        auth=*)            _auth_source="${1#auth=}"; shift ;;
+                        --client-id)       _client_id="${2:-}"; shift 2 ;;
+                        --codex-client-id) _codex_client_id="${2:-}"; shift 2 ;;
+                        *)                 shift ;;
                     esac
                 done
 
@@ -209,12 +211,20 @@ _emit_mcp_blocks_to() {
                     esac
                 fi
 
-                if [[ -n "$_client_id" ]]; then
-                    log_warn "    $_name: Codex has no --client-id analog; interactive OAuth may be required on first use"
-                    printf '# NOTE: Claude registers with --client-id %s; Codex falls back to interactive OAuth.\n' "$_client_id" >> "$out"
+                # Per-client OAuth: some servers need a client_id whose
+                # redirect_uri is registered per MCP client, so the id differs
+                # between Claude and Codex. Codex 0.134+ reads it from an
+                # [mcp_servers.<name>.oauth] sub-table; it rides on its own
+                # --codex-client-id field (distinct from Claude's --client-id).
+                # The sub-table is emitted after the trailer below — TOML
+                # sub-tables must follow all bare keys of their parent table.
+                if [[ -n "$_codex_client_id" ]]; then
+                    log_info "    $_name ($_transport, oauth client_id)"
+                elif [[ -n "$_client_id" ]]; then
+                    log_warn "    $_name: has --client-id but no --codex-client-id; Codex OAuth will fail until one is set"
                 fi
 
-                [[ -z "$_auth_source" && -z "$_client_id" ]] && log_info "    $_name ($_transport)"
+                [[ -z "$_auth_source" && -z "$_client_id" && -z "$_codex_client_id" ]] && log_info "    $_name ($_transport)"
             fi
 
             {
@@ -222,6 +232,14 @@ _emit_mcp_blocks_to() {
                 printf 'tool_timeout_sec = 60\n'
                 printf 'required = false\n'
             } >> "$out"
+
+            # OAuth sub-table — must trail the parent table's bare keys.
+            if [[ -n "$_codex_client_id" ]]; then
+                {
+                    printf '\n[mcp_servers.%s.oauth]\n' "$_name"
+                    printf 'client_id = "%s"\n' "$(_toml_escape "$_codex_client_id")"
+                } >> "$out"
+            fi
         done < "$_file"
     done < <(overlay_package_files "mcp-servers.txt")
 }

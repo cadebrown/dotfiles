@@ -273,10 +273,13 @@ _register_mcps_from() {
                 fi
             fi
 
-            _auth_source="" _extra=""
+            _auth_source="" _extra="" _skip_tok=0
             for _tok in $_rest_extras; do
+                if (( _skip_tok )); then _skip_tok=0; continue; fi
                 if [[ "$_tok" == auth=* ]]; then
                     _auth_source="${_tok#auth=}"
+                elif [[ "$_tok" == "--codex-client-id" ]]; then
+                    _skip_tok=1   # Codex-only field; drop flag + its value (Claude uses --client-id)
                 else
                     _extra="${_extra:+$_extra }$_tok"
                 fi
