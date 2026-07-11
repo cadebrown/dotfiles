@@ -56,7 +56,7 @@ required = false
 default_tools_approval_mode = "approve"
 
 [mcp_servers.urlkey]
-url = "https://key.example/fixture-url-key/v2/mcp"
+url = "https://key.example/fixture-fixture-url/v2/mcp"
 startup_timeout_sec = 20
 tool_timeout_sec = 60
 required = false

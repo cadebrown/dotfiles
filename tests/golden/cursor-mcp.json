@@ -5,25 +5,25 @@
     },
     "c7srv": {
       "headers": {
-        "CONTEXT7_API_KEY": "c7-fixture-key"
+        "CONTEXT7_API_KEY": "fixture-fixture-c7"
       },
       "url": "https://c7.example/mcp"
     },
     "exasrv": {
       "headers": {
-        "x-api-key": "exa-fixture-key"
+        "x-api-key": "fixture-fixture-exa"
       },
       "url": "https://exa.example/mcp"
     },
     "ghsrv": {
       "headers": {
-        "Authorization": "Bearer ghp_fixture_token_0000000000"
+        "Authorization": "Bearer fixture-fixture-github"
       },
       "url": "https://gh.example/mcp"
     },
     "hfsrv": {
       "headers": {
-        "Authorization": "Bearer hf_fixture_token_000000"
+        "Authorization": "Bearer fixture-fixture-hf"
       },
       "url": "https://hf.example/mcp"
     },
@@ -38,7 +38,7 @@
     },
     "tavsrv": {
       "headers": {
-        "Authorization": "Bearer tav-fixture-key"
+        "Authorization": "Bearer fixture-fixture-tav"
       },
       "url": "https://tav.example/mcp"
     },
@@ -51,7 +51,7 @@
       "command": "uvx"
     },
     "urlkey": {
-      "url": "https://key.example/fixture-url-key/v2/mcp"
+      "url": "https://key.example/fixture-fixture-url/v2/mcp"
     }
   }
 }

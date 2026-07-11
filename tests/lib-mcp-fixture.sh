@@ -19,11 +19,14 @@ mcp_fixture_env() {
           "$HOME/.huggingface.env"
 
     # Deterministic credentials (override anything the real env sourced).
-    export GITHUB_TOKEN="ghp_fixture_token_0000000000"
-    export CONTEXT7_API_KEY="c7-fixture-key"
-    export TAVILY_API_KEY="tav-fixture-key"
-    export EXA_API_KEY="exa-fixture-key"
-    export HF_TOKEN="hf_fixture_token_000000"
-    export FIXTURE_KEY="fixture-url-key"
+    # Keep these LOW-ENTROPY (repeated words, no digit soup) — gitleaks scans
+    # every pushed commit and its generic-api-key rule fires on entropy >= 3.5,
+    # which blocked a push over "c7-fixture-key" once (see .gitleaksignore).
+    export GITHUB_TOKEN="fixture-fixture-github"
+    export CONTEXT7_API_KEY="fixture-fixture-c7"
+    export TAVILY_API_KEY="fixture-fixture-tav"
+    export EXA_API_KEY="fixture-fixture-exa"
+    export HF_TOKEN="fixture-fixture-hf"
+    export FIXTURE_KEY="fixture-fixture-url"
     unset FIXTURE_MISSING 2>/dev/null || true
 }

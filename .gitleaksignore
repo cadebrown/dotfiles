@@ -1,0 +1,6 @@
+# Acknowledged gitleaks false positives (fingerprint = commit:file:rule:line).
+# These are synthetic MCP-emitter test fixtures ("c7-fixture-key") baked into
+# commit history; current fixture values are low-entropy so new commits don't
+# trip the generic-api-key rule again.
+8ae29dda89fe3c44e33a0df669adad74cf73d9df:tests/golden/cursor-mcp.json:generic-api-key:8
+8ae29dda89fe3c44e33a0df669adad74cf73d9df:tests/lib-mcp-fixture.sh:generic-api-key:22
