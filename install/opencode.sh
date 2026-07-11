@@ -28,19 +28,21 @@ _mode="${1:-install}"
 #         remote {type:"remote", url, headers?, enabled}
 _emit_opencode_mcp() {
     local _stream _file _line _name _rest _transport _cmd _url _rest_extras _tok _auth _def
-    _stream="$(mktemp)"; trap 'rm -f "$_stream"' RETURN
+    # No `trap ... RETURN` cleanup: bash fires RETURN traps when any sourced
+    # script finishes, which would delete the accumulator mid-loop if a
+    # `source` ever lands in this function (bit install/cursor.sh for real).
+    _stream="$(mktemp)"
 
     while IFS= read -r _file; do
         while IFS= read -r _line; do
             [[ -z "$_line" || "$_line" == \#* ]] && continue
-            _name="${_line%% *}"; _rest="${_line#* }"; _transport="${_rest%% *}"
+            read -r _name _transport _url _rest_extras <<< "$_line"
 
-            if [[ "$_transport" == "stdio" && "$_rest" == *"cmd: "* ]]; then
-                _cmd="${_rest#*cmd: }"
+            if [[ "$_transport" == "stdio" && "$_line" == *"cmd: "* ]]; then
+                _cmd="${_line#*cmd: }"
                 _def="$(jq -nc --arg cmd "$_cmd" \
                     '{type:"local", command:($cmd|split(" ")), enabled:true}')"
             else
-                read -r _ _ _url _rest_extras <<< "$_line"
                 _auth=""
                 for _tok in $_rest_extras; do [[ "$_tok" == auth=* ]] && _auth="${_tok#auth=}"; done
                 # {VAR} url placeholders → opencode's {env:VAR} (e.g. Firecrawl).
@@ -50,6 +52,7 @@ _emit_opencode_mcp() {
                     context7) _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"CONTEXT7_API_KEY":"{env:CONTEXT7_API_KEY}"}, enabled:true}')" ;;
                     tavily)   _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:TAVILY_API_KEY}"}, enabled:true}')" ;;
                     exa)      _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"x-api-key":"{env:EXA_API_KEY}"}, enabled:true}')" ;;
+                    gcloud)   _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:GOOGLE_MCP_TOKEN}", "x-goog-user-project":"{env:GOOGLE_CLOUD_PROJECT}"}, enabled:true}')" ;;
                     "")       _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, enabled:true}')" ;;
                     *)        log_warn "  $_name: unknown auth '$_auth' — unauthenticated" >&2
                               _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, enabled:true}')" ;;
@@ -60,6 +63,7 @@ _emit_opencode_mcp() {
     done < <(overlay_package_files "mcp-servers.txt")
 
     jq -s 'reduce .[] as $e ({}; .[$e.name] = $e.def)' "$_stream"
+    rm -f "$_stream"
 }
 
 _sync_config() {
@@ -103,9 +107,11 @@ case "$_mode" in
         ;;
     check)
         _out="$HOME/.config/opencode/opencode.json"
-        [[ -f "$_out" ]] && jq . "$_out" >/dev/null 2>&1 \
-            && log_okay "opencode.json is valid JSON ($(jq '.mcp | length' "$_out") MCP servers)" \
-            || die "opencode.json missing or invalid: $_out"
+        if [[ -f "$_out" ]] && jq . "$_out" >/dev/null 2>&1; then
+            log_okay "opencode.json is valid JSON ($(jq '.mcp | length' "$_out") MCP servers)"
+        else
+            die "opencode.json missing or invalid: $_out"
+        fi
         ;;
     *)
         die "Usage: opencode.sh [install|sync-config|check]"

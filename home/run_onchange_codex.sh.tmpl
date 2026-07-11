@@ -5,6 +5,7 @@
 # codex hooks hash:   {{ include "dot_codex/hooks.json" | sha256sum }}
 # guard script hash:  {{ include "dot_local/bin/executable_df-chezmoi-guard" | sha256sum }}
 # mcp-servers.txt:    {{ include "../packages/mcp-servers.txt" | sha256sum }}
+# installer hash:     {{ include "../install/codex.sh" | sha256sum }}
 # overlay mcp hashes:
 {{- range glob (joinPath .chezmoi.workingTree "dotfiles-*/packages/mcp-servers.txt") }}
 #   {{ . | include | sha256sum }} {{ . }}

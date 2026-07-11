@@ -95,11 +95,16 @@ _sync_from() {
 }
 
 # In upgrade mode, refresh npx-installed skills in bulk first (lockfile-aware:
-# ~/.agents/.skill-lock.json). Without this, installed skills are frozen at
-# first-install version and `bootstrap upgrade` would silently skip them.
+# ~/.agents/.skill-lock.json — moves to $XDG_STATE_HOME/skills/ if that var is
+# ever set; our profiles don't set it). Without this, installed skills are
+# frozen at first-install version and `bootstrap upgrade` would silently skip
+# them. Note: skills CLI ≥ 1.5 also PRUNES skills deleted upstream here.
 if [[ "${DF_MODE:-}" == "upgrade" ]]; then
     log_info "Updating npx-installed skills (lockfile-aware)"
-    run_logged npx -y skills update -a claude-code -g < /dev/null || log_warn "npx skills update failed"
+    # NOTE: no `-a claude-code` here — skills CLI ≥ 1.5 matches update targets
+    # against the generic ~/.agents tree and an agent filter matches nothing
+    # (verified July 2026: `-a claude-code` silently updates 0 skills).
+    run_logged npx -y skills update -g < /dev/null || log_warn "npx skills update failed"
 fi
 
 while IFS= read -r _file; do

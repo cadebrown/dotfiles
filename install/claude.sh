@@ -393,15 +393,16 @@ for _dir in "${DF_OVERLAYS[@]}"; do
         _skill_name="$(basename "$_skill_dir")"
         _dest_dir="$_SKILLS_DEST/$_skill_name"
 
-        # Skip if identical
-        if [[ -f "$_dest_dir/SKILL.md" ]] && diff -q "$_skill_dir/SKILL.md" "$_dest_dir/SKILL.md" >/dev/null 2>&1; then
+        # Skip if identical — compare the whole dir, not just SKILL.md
+        # (skills may ship scripts/, references/, assets/)
+        if [[ -d "$_dest_dir" ]] && diff -rq "$_skill_dir" "$_dest_dir" >/dev/null 2>&1; then
             log_info "  skip  $_skill_name (unchanged)"
             (( _skip++ )) || true
             continue
         fi
 
-        ensure_dir "$_dest_dir"
-        cp "$_skill_dir/SKILL.md" "$_dest_dir/SKILL.md"
+        rm -rf "$_dest_dir"
+        cp -R "${_skill_dir%/}" "$_dest_dir"
         log_okay "  deployed $_skill_name"
         (( _ok++ )) || true
     done

@@ -18,8 +18,7 @@
 #     └── .claude/               ← heavy *unmanaged* subdirs of ~/.claude (see note)
 #         ├── projects/          ← symlinked from ~/.claude/projects (history + memory)
 #         ├── plugins/           ← symlinked from ~/.claude/plugins
-#         ├── file-history/      ← symlinked from ~/.claude/file-history
-#         └── ccline/            ← symlinked from ~/.claude/ccline
+#         └── file-history/      ← symlinked from ~/.claude/file-history
 #
 # Which top-level dirs are migrated is controlled by DF_LINKS (colon-separated);
 # which ~/.claude subdirs are migrated is controlled by DF_CLAUDE_LINKS.
@@ -34,7 +33,7 @@
 #   (settings.json, skills/, output-styles/, hook scripts) as a REAL directory, so a
 #   symlinked ~/.claude gets clobbered on `chezmoi apply` (replaced with a real dir
 #   holding only the managed files, orphaning history on scratch). Instead we migrate
-#   the heavy *unmanaged* subdirs one level down (projects/plugins/file-history/ccline),
+#   the heavy *unmanaged* subdirs one level down (projects/plugins/file-history),
 #   which chezmoi never touches. Tradeoff: like ~/.local and ~/.cache, these become
 #   per-machine — conversation history and auto-memory under projects/<proj>/memory/
 #   stop syncing across the NFS fleet (~/kb, git-synced, stays the cross-machine layer).
@@ -188,7 +187,7 @@ unset _link_paths _home_path _name
 if [[ -L "$HOME/.claude" ]]; then
     log_warn "~/.claude is a symlink — chezmoi expects a real dir here; skipping .claude subdir migration"
 else
-    _DEFAULT_CLAUDE_LINKS="projects:plugins:file-history:ccline"
+    _DEFAULT_CLAUDE_LINKS="projects:plugins:file-history"
     DF_CLAUDE_LINKS="${DF_CLAUDE_LINKS:-$_DEFAULT_CLAUDE_LINKS}"
     unset _DEFAULT_CLAUDE_LINKS
 

@@ -29,7 +29,9 @@
 #                             # Always re-downloaded regardless of mode:
 #                             #   Claude Code, Codex CLI, cass (vs GitHub latest)
 #                             # Intentionally HELD (warned loudly, never silent):
-#                             #   @openai/codex (pinned for binary/config lockstep)
+#                             #   any pkg pinned <name>@<version> in npm.txt
+#                             #   (@openai/codex is currently UNPINNED — codex.sh's
+#                             #   healthcheck catches config-format drift instead)
 #                             # NOT touched (out of scope — OS-level, needs sudo):
 #                             #   `softwareupdate` macOS system updates
 #

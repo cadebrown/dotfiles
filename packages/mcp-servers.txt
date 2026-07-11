@@ -35,6 +35,14 @@
 #                    google` (one `gcloud auth application-default login`).
 # Auth-managed entries cannot also pass --header / --client-id extras.
 #
+# Tokens-at-rest note: Claude/Codex/opencode resolve gh+gcloud creds at
+# connection/launch time (headersHelper / codex() / opencode() wrappers — no
+# token at rest), but env-file sources are baked resolved into ~/.claude.json
+# and ~/.cursor/mcp.json at sync time (tavily/exa/context7 headers, the
+# firecrawl URL key, and Cursor's GitHub token — Dock-launched Cursor has no
+# shell env to expand). Rotation heals on the next sync. gcloud servers are
+# skipped for Cursor entirely (short-lived ADC tokens can't be baked).
+#
 # URL placeholders: a {VAR} token in an HTTP url is replaced with $VAR (from
 # ~/.<service>.env, sourced at install time) — for servers that carry the key
 # in the URL itself (e.g. Firecrawl). Missing var → skipped on Claude, emitted

@@ -6,6 +6,7 @@
 # cursor hooks hash: {{ include "dot_cursor/hooks.json" | sha256sum }}
 # cursor hooks script hash: {{ include "dot_cursor/hooks/executable_sync-dotfiles-cursor.sh.tmpl" | sha256sum }}
 # mcp-servers.txt hash: {{ include "../packages/mcp-servers.txt" | sha256sum }}
+# installer hash: {{ include "../install/cursor.sh" | sha256sum }}
 # overlay mcp hashes:
 {{- range glob (joinPath .chezmoi.workingTree "dotfiles-*/packages/mcp-servers.txt") }}
 #   {{ . | include | sha256sum }} {{ . }}

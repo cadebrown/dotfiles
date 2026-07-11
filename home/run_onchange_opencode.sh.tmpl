@@ -3,6 +3,7 @@
 # server list changes, to regenerate the script-owned ~/.config/opencode/opencode.json.
 # config hash:      {{ include "dot_config/opencode/create_opencode.json.tmpl" | sha256sum }}
 # mcp-servers.txt:  {{ include "../packages/mcp-servers.txt" | sha256sum }}
+# installer hash:   {{ include "../install/opencode.sh" | sha256sum }}
 # overlay mcp hashes:
 {{- range glob (joinPath .chezmoi.workingTree "dotfiles-*/packages/mcp-servers.txt") }}
 #   {{ . | include | sha256sum }} {{ . }}

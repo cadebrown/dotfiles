@@ -93,7 +93,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `go.sh` | `go install` CLI tools from `packages/go.txt` | Go itself via Brewfile (`brew "go"`). `GOBIN=$ARCH_BIN` so binaries land alongside cargo/uv ones. Respects `# linux-only` / `# macos-only` markers (same as `pip.txt`). |
 | `python.sh` | uv + CLI tools from `pip.txt` via `uv tool install` | Each tool gets isolated venv under `$LOCAL_PLAT/uv/tools/`; no monolithic venv |
 | `claude.sh` | Claude Code binary + plugins + MCP servers + overlay skills + `~/AGENTS.md` symlink | Downloads from Anthropic's GCS bucket; overlay discovery via `DF_OVERLAYS`. MCP servers reconcile declaratively (URL/command drift re-registers). `auth=gh` uses a connection-time headersHelper (`~/.claude/gh-mcp-headers.sh`); `auth=gcloud` uses `~/.claude/gcloud-mcp-headers.sh` (mints an ADC access token + `x-goog-user-project` per connection — powers Google's official remote MCP servers); `auth=context7` reads `~/.context7.env` (optional). |
-| `codex.sh` | Manages `~/.codex/config.toml` (incl. generated `[mcp_servers.*]` from `packages/mcp-servers.txt`), hooks, and chezmoi guard | Codex binary via npm — PINNED in `npm.txt` so binary and config move in lockstep (0.134 redesigned profiles). Profiles are delta files `~/.codex/<name>.config.toml` (chezmoi-managed). `auth=gh` emits `bearer_token_env_var = "GH_TOKEN"`, filled by the `codex()` shell wrapper at launch; `auth=gcloud` emits `bearer_token_env_var = "GOOGLE_MCP_TOKEN"` + `env_http_headers` for `x-goog-user-project`, both filled by the same wrapper (ADC token via `gcloud auth application-default print-access-token`). Rules live in `~/.codex/rules/dotfiles.rules` (managed); `default.rules` is left to Codex's own TUI appends. |
+| `codex.sh` | Manages `~/.codex/config.toml` (incl. generated `[mcp_servers.*]` from `packages/mcp-servers.txt`), hooks, and chezmoi guard | Codex binary via npm — UNPINNED in `npm.txt`; `codex.sh` reconciles the managed config right after upgrades, so format drift surfaces in its healthcheck (re-pin only if config compatibility breaks again, as 0.134's profile redesign did). Profiles are delta files `~/.codex/<name>.config.toml` (chezmoi-managed). `auth=gh` emits `bearer_token_env_var = "GH_TOKEN"`, filled by the `codex()` shell wrapper at launch; `auth=gcloud` emits `bearer_token_env_var = "GOOGLE_MCP_TOKEN"` + `env_http_headers` for `x-goog-user-project`, both filled by the same wrapper (ADC token via `gcloud auth application-default print-access-token`). Rules live in `~/.codex/rules/dotfiles.rules` (managed); `default.rules` is left to Codex's own TUI appends. |
 | `claude-desktop.sh` | Tracks Claude Desktop (macOS GUI app) preferences. `apply` (default) deep-merges tracked prefs into the app-owned config; `sync` captures in-app changes back, sanitized | macOS only (self-skips on Linux). App itself via Brewfile (`cask "claude"`). NOT chezmoi-managed — the app owns/rewrites the live config, so a static managed file would clobber + churn. Tracked source: `install/claude-desktop/claude_desktop_config.json`. `sync` strips a blocklist (`*ByAccount`, `remoteToolsDeviceName`, `coworkOnboardingResumeStep`, `epitaxyPrefs`) so account UUIDs / device name / transient UI never reach the public repo; new prefs are captured automatically. Distinct from `claude.sh` (the CLI). |
 | `codex-desktop.sh` | Tracks the Codex desktop app (macOS GUI) GUI prefs. `apply` (default) deep-merges tracked prefs into the app-owned state; `sync` extracts in-app changes back | macOS only (self-skips on Linux). App via Brewfile (`cask "codex-app"`, NOT `codex` = CLI). Live state `~/.codex/.codex-global-state.json` also holds prompt history + cloud/account data, so this uses an **allowlist** (the inverse of `claude-desktop.sh`'s blocklist): only named keys (theme, `open-in-target-preferences`, `composer-personality`, `diff-filter`, `skip-full-access-confirm`, `agent-mode-by-host-id`) are emitted — never whole objects. Tracked source: `install/codex-desktop/codex-global-state.json`. Substantive Codex config (config.toml, profiles, rules, themes) is separate, via `codex.sh` + chezmoi. |
 | `cursor.sh` | Cursor settings symlinks + extension install; `sync-extensions` subcommand captures new extensions back | Union-only (never removes); app updated via Brewfile cask |
@@ -414,7 +414,10 @@ These are non-obvious things that have caused real bugs:
   built-in; our hooks are thin wrappers (`dot_claude/rtk-rewrite.sh`,
   `dot_cursor/hooks/rtk-rewrite.sh`) that PATH-harden + `command -v rtk || exit 0` then
   delegate to it. opencode/pi use in-process TS plugins calling `rtk rewrite` (no built-in
-  hook exists for those). Codex is instruction-only — it has no command-rewrite hook.
+  hook exists for those). Codex is instruction-only today, but no longer by necessity:
+  Codex ≥ 0.135 supports PreToolUse `updatedInput` command rewriting natively — rtk just
+  ships no Codex hook yet, so wiring it means a hand-rolled hooks.json entry calling
+  `rtk rewrite` (untested; candidate follow-up).
 - **rtk needs an allow-rule or it defaults to "ask"** — rtk reads deny/ask/allow from the
   host's own permission config and defaults unmatched commands to *ask* (least-privilege).
   For Claude that means the rewrite applies but without an explicit allow (fine under
@@ -472,9 +475,10 @@ These are non-obvious things that have caused real bugs:
   process caches the old env token at launch.
 - **Codex profiles are per-file since 0.134** — `[profiles.*]` tables in config.toml
   are silently ignored; profiles are delta-only `~/.codex/<name>.config.toml` files
-  with top-level keys. `@openai/codex` is version-pinned in `packages/npm.txt` so the
-  binary can't drift ahead of the config — bump the pin and run
-  `bash install/codex.sh check` together.
+  with top-level keys. `@openai/codex` is UNPINNED in `packages/npm.txt` (upgrades pull
+  latest; `codex.sh` reconciles the managed config right after, so format drift surfaces
+  in its healthcheck). If Codex breaks config compatibility again, re-pin there until
+  the config catches up, and run `bash install/codex.sh check` after any bump.
 - **Codex `approval_policy` uses the granular form** — a plain `"never"` silently
   suppresses every `decision=prompt` rule in `rules/dotfiles.rules` (rm, git reset
   --hard, git push). `{ granular = { rules = true, ... } }` keeps those prompts live
@@ -503,7 +507,7 @@ These are non-obvious things that have caused real bugs:
   `chezmoi apply` replaces the symlink with a directory containing only managed files,
   orphaning all conversation history, sessions, and file-history on scratch. The supported
   offload is one level down: `scratch.sh` symlinks the heavy *unmanaged* subdirs
-  (`projects`, `plugins`, `file-history`, `ccline`, via `DF_CLAUDE_LINKS`) into
+  (`projects`, `plugins`, `file-history`, via `DF_CLAUDE_LINKS`) into
   `$PATHS/.claude/`, which chezmoi leaves alone (`dot_claude` is not `exact_` and
   `.chezmoiremove` never lists them). Tradeoff: those become per-machine like `~/.local`
   — auto-memory under `projects/<proj>/memory/` stops syncing across the NFS fleet (`~/kb`

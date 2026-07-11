@@ -228,7 +228,7 @@ Default directories redirected to scratch (controlled by `DF_LINKS`):
 - `~/.npm` — npm cache
 - `~/.oh-my-zsh` / `~/.oh-my-zsh-custom` — oh-my-zsh and plugins
 
-Plus heavy *unmanaged* subdirs of `~/.claude` (controlled by `DF_CLAUDE_LINKS`): `projects` (history + memory), `plugins`, `file-history`, `ccline`. `~/.claude` itself stays a real directory because chezmoi manages files inside it.
+Plus heavy *unmanaged* subdirs of `~/.claude` (controlled by `DF_CLAUDE_LINKS`): `projects` (history + memory), `plugins`, `file-history`. `~/.claude` itself stays a real directory because chezmoi manages files inside it.
 
 ---
 

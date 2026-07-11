@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ~/.claude/gcloud-mcp-headers.sh — dynamic MCP headers for Google's official
-# remote MCP servers (Workspace: gmailmcp/drivemcp/calendarmcp; Cloud: run,
-# cloudresourcemanager, storage, bigquery — all *.googleapis.com/mcp).
+# remote Cloud MCP servers (run, cloudresourcemanager, storage, bigquery —
+# all *.googleapis.com/mcp). Workspace uses the community workspace-mcp stdio
+# server instead (own OAuth client via ~/.google.env), not this helper.
 #
 # Claude Code runs this at connection time (headersHelper in ~/.claude.json,
 # registered by install/claude.sh); stdout must be a JSON object of header

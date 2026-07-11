@@ -6,7 +6,8 @@
 #
 #   <skill-dir> npx <owner/repo[#ref]> <skill-name>
 #       → npx -y skills add '<owner/repo[#ref]>' --skill <skill-name> -a claude-code -g -y
-#         (vercel-labs/skills CLI; lockfile at ~/.agents/.skill-lock.json;
+#         (vercel-labs/skills CLI; lockfile at ~/.agents/.skill-lock.json —
+#          moves to $XDG_STATE_HOME/skills/ if that var is set (ours isn't);
 #          #ref pins a tag/branch/SHA — @name is a skill filter, NOT a ref)
 #
 #   <skill-dir> self <command...>

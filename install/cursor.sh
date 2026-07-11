@@ -27,31 +27,36 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 # Generate ~/.cursor/mcp.json (global scope, `mcpServers` schema) from the
 # shared packages/mcp-servers.txt (+ overlays). Same source of truth as
-# install/claude.sh and install/codex.sh. Cursor expands ${env:VAR} in headers,
-# so gh uses Authorization: Bearer ${env:GH_TOKEN} (token never baked); env-file
-# sources (context7/tavily/exa) bake the resolved header value; {VAR} URL
-# placeholders (firecrawl) are substituted from the environment at sync time.
+# install/claude.sh and install/codex.sh. Cursor is usually Dock-launched with
+# no login-shell env, so ${env:VAR} header expansion can't be relied on — every
+# auth source bakes the resolved value at sync time: gh resolves $GITHUB_TOKEN
+# (then the gh keyring), env-file sources (context7/tavily/exa) bake the header
+# value, and {VAR} URL placeholders (firecrawl) are substituted from the
+# environment. Tokens at rest in ~/.cursor/mcp.json is the accepted tradeoff;
+# rotation heals on the next sync.
 _sync_cursor_mcp() {
     has jq || { log_warn "jq not found — skipping Cursor MCP sync"; return 0; }
     log_section "Cursor MCP servers"
 
     local _out="$HOME/.cursor/mcp.json" _stream _file _line _count=0
     local _name _rest _transport _cmd _url _rest_extras _tok _auth _missing _ph _val _hname _hval _def
-    _stream="$(mktemp)"; trap 'rm -f "$_stream"' RETURN
+    # NB: no `trap ... RETURN` for cleanup — bash fires RETURN traps when any
+    # sourced script finishes, so a `.`/`source` anywhere in this function
+    # would silently delete the accumulator mid-loop (this happened: only
+    # servers after the last in-loop `. ~/.<svc>.env` survived into mcp.json).
+    _stream="$(mktemp)"
 
     while IFS= read -r _file; do
         while IFS= read -r _line; do
             [[ -z "$_line" || "$_line" == \#* ]] && continue
-            _name="${_line%% *}"; _rest="${_line#* }"; _transport="${_rest%% *}"
+            read -r _name _transport _url _rest_extras <<< "$_line"
 
-            if [[ "$_transport" == "stdio" && "$_rest" == *"cmd: "* ]]; then
-                _cmd="${_rest#*cmd: }"
+            if [[ "$_transport" == "stdio" && "$_line" == *"cmd: "* ]]; then
+                _cmd="${_line#*cmd: }"
                 _def="$(jq -nc --arg cmd "$_cmd" \
                     '($cmd|split(" ")) as $w | {command:$w[0]}
                      + (if ($w|length)>1 then {args:$w[1:]} else {} end)')"
             else
-                read -r _ _ _url _rest_extras <<< "$_line"
-
                 # {VAR} URL placeholders → $VAR (env files sourced by _lib.sh).
                 _missing=""
                 while [[ "$_url" =~ \{([A-Za-z_][A-Za-z0-9_]*)\} ]]; do
@@ -69,10 +74,15 @@ _sync_cursor_mcp() {
                 _hname=""; _hval=""
                 case "$_auth" in
                     "") ;;
-                    gh)       _hname="Authorization"; _hval='Bearer ${env:GH_TOKEN}' ;;
-                    context7) [[ -f "$HOME/.context7.env" ]] && { . "$HOME/.context7.env" >/dev/null 2>&1 || true; _hname="CONTEXT7_API_KEY"; _hval="${CONTEXT7_API_KEY:-}"; } ;;
-                    tavily)   [[ -f "$HOME/.tavily.env" ]] && { . "$HOME/.tavily.env" >/dev/null 2>&1 || true; _hname="Authorization"; _hval="Bearer ${TAVILY_API_KEY:-}"; } ;;
-                    exa)      [[ -f "$HOME/.exa.env" ]] && { . "$HOME/.exa.env" >/dev/null 2>&1 || true; _hname="x-api-key"; _hval="${EXA_API_KEY:-}"; } ;;
+                    # Env files are already sourced globally by _lib.sh —
+                    # never `source` here (see the RETURN-trap note above).
+                    gh)       _hval="${GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}"
+                              [[ -n "$_hval" ]] && { _hname="Authorization"; _hval="Bearer $_hval"; } ;;
+                    context7) _hname="CONTEXT7_API_KEY"; _hval="${CONTEXT7_API_KEY:-}" ;;
+                    tavily)   _hname="Authorization"; _hval="${TAVILY_API_KEY:+Bearer $TAVILY_API_KEY}" ;;
+                    exa)      _hname="x-api-key"; _hval="${EXA_API_KEY:-}" ;;
+                    gcloud)   log_warn "  $_name: short-lived ADC auth is unavailable to the Cursor GUI; skipping"
+                              continue ;;
                     *)        log_warn "  $_name: unknown auth source '$_auth' — registering unauthenticated" ;;
                 esac
 
@@ -93,7 +103,8 @@ _sync_cursor_mcp() {
 
     local _tmp; _tmp="$(mktemp)"
     jq -s '{mcpServers: (reduce .[] as $e ({}; .[$e.name] = $e.def))}' "$_stream" > "$_tmp" \
-        || { log_warn "Cursor MCP assembly failed"; rm -f "$_tmp"; return 1; }
+        || { log_warn "Cursor MCP assembly failed"; rm -f "$_tmp" "$_stream"; return 1; }
+    rm -f "$_stream"
 
     ensure_dir "$HOME/.cursor"
     if [[ -f "$_out" ]] && cmp -s "$_tmp" "$_out"; then

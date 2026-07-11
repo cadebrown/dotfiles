@@ -37,7 +37,7 @@ _CASS_REPO="Dicklesworthstone/coding_agent_session_search"
 _cass_platform() {
     case "$OS-$ARCH" in
         darwin-aarch64) echo "darwin-arm64" ;;
-        darwin-x86_64)  echo "darwin-aarch64" ;;  # no x86 darwin asset; none in fleet
+        darwin-x86_64)  return 1 ;;  # no x86 darwin release asset — build from source
         linux-aarch64)  echo "linux-arm64" ;;
         linux-x86_64)
             # The optimized build targets x86-64-v3 (AVX2); older CPUs need
