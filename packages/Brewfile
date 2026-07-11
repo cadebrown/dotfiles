@@ -113,9 +113,9 @@ brew "opencode"
 # enters agent context (git/cargo/test runners etc.). Wired per harness:
 # Claude + Cursor use thin wrappers delegating to rtk's built-in hook processor
 # (`rtk hook claude` / `rtk hook cursor`); opencode + pi use in-process TS
-# plugins calling `rtk rewrite` (no built-in hook exists for those). Codex is
-# instruction-only (Codex ≥ 0.135 does support PreToolUse rewrites natively,
-# but rtk ships no Codex hook yet — see the rtk gotcha in CLAUDE.md).
+# plugins calling `rtk rewrite` (no built-in hook exists for those). Codex
+# uses a hand-rolled PreToolUse updatedInput hook (dot_codex/rtk-rewrite.sh;
+# rtk ships no Codex hook itself — see the rtk gotcha in CLAUDE.md).
 #
 # Source: the OFFICIAL upstream tap, NOT homebrew-core. homebrew-core lags badly
 # (0.29 vs upstream 0.42+), shipping an old rewrite registry and pre-v3 hook

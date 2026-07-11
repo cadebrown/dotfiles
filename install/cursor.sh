@@ -75,6 +75,7 @@ _sync_cursor_mcp() {
                     context7) _hname="CONTEXT7_API_KEY"; _hval="${CONTEXT7_API_KEY:-}" ;;
                     tavily)   _hname="Authorization"; _hval="${TAVILY_API_KEY:+Bearer $TAVILY_API_KEY}" ;;
                     exa)      _hname="x-api-key"; _hval="${EXA_API_KEY:-}" ;;
+                    hf)       _hname="Authorization"; _hval="${HF_TOKEN:+Bearer $HF_TOKEN}" ;;
                     gcloud)   log_warn "  $_name: short-lived ADC auth is unavailable to the Cursor GUI; skipping"
                               continue ;;
                     *)        log_warn "  $_name: unknown auth source '$_auth' — registering unauthenticated" ;;

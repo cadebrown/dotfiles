@@ -43,3 +43,12 @@ testing-handbook-skills@trailofbits
 # session (Python/Go/Node/Rust/C++ backends) so debugging happens via plain
 # Bash — no TTY, no tmux. Binary: brew AlmogBaku/tap/dap (Brewfile).
 debugging-code@debug-skill-marketplace
+
+# Lean 4 theorem-proving workflows (cameronfreer, 326★): formalize/prove/
+# autoprove/disprove/golf with a plan→work→checkpoint→review cycle engine,
+# budget enforcement, and proof-immutability guardrails. Plugin (not a bare
+# skill): ships commands + hooks + subagents. NB: plugins are mirrored in
+# THREE places — this file, _MARKETPLACES in install/claude.sh (third-party
+# marketplaces only), and enabledPlugins/extraKnownMarketplaces in
+# home/dot_claude/settings.json. Update all three.
+lean4@lean4-skills

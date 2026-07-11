@@ -414,10 +414,17 @@ These are non-obvious things that have caused real bugs:
   built-in; our hooks are thin wrappers (`dot_claude/rtk-rewrite.sh`,
   `dot_cursor/hooks/rtk-rewrite.sh`) that PATH-harden + `command -v rtk || exit 0` then
   delegate to it. opencode/pi use in-process TS plugins calling `rtk rewrite` (no built-in
-  hook exists for those). Codex is instruction-only today, but no longer by necessity:
-  Codex ≥ 0.135 supports PreToolUse `updatedInput` command rewriting natively — rtk just
-  ships no Codex hook yet, so wiring it means a hand-rolled hooks.json entry calling
-  `rtk rewrite` (untested; candidate follow-up).
+  hook exists for those). Codex uses a hand-rolled PreToolUse `updatedInput` hook
+  (`dot_codex/executable_rtk-rewrite.sh`, wired in `dot_codex/hooks.json`; rtk ships no
+  Codex hook itself). rtk's deny/ask verdicts (exit 2/3) pass through UNREWRITTEN there so
+  Codex's own approval rules stay live; trust hashes are managed by `codex.sh sync-config`
+  — no interactive /hooks review needed after managed edits.
+- **chezmoi-guard covers all four CLI harnesses** — Claude + Codex via PreToolUse
+  hooks, opencode via `dot_config/opencode/plugin/chezmoi-guard.ts`, pi via
+  `dot_pi/agent/extensions/chezmoi-guard.ts`. All four are thin adapters around
+  `~/.local/bin/df-chezmoi-guard` (exit 2 = blocked) — detection logic lives ONLY
+  there. Cursor is the exception: its sync-back hooks capture edits instead of
+  blocking them.
 - **rtk needs an allow-rule or it defaults to "ask"** — rtk reads deny/ask/allow from the
   host's own permission config and defaults unmatched commands to *ask* (least-privilege).
   For Claude that means the rewrite applies but without an explicit allow (fine under

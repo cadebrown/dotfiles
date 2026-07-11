@@ -106,9 +106,9 @@ Tool output is the dominant context cost. Habits:
 - Never dump large files or logs: `rg -l` first, then targeted reads;
   `head`/`tail` long output; `wc -l` before `cat`.
 - Prefix noisy commands with `rtk` (`rtk git status`, `rtk cargo test`) — it
-  compresses output 60-90% with no information you'd act on lost. Claude Code,
-  Cursor, opencode, and pi rewrite these automatically via hook/plugin; Codex
-  has no rtk integration, so prefix manually there.
+  compresses output 60-90% with no information you'd act on lost. All five
+  harnesses rewrite these automatically (Claude Code/Cursor/Codex via hooks,
+  opencode/pi via plugins) — no manual prefixing needed anywhere.
 - Build/test loops: run the narrowest target (`cargo nextest run <filter>`,
   single test files) before whole-suite runs.
 

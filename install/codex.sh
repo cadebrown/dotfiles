@@ -193,6 +193,14 @@ _emit_mcp_blocks_to() {
                                 log_warn "    $_name: ~/.exa.env missing — unauthenticated (run 'bash install/auth.sh exa')"
                             fi
                             ;;
+                        hf)
+                            if [[ -f "$HOME/.huggingface.env" ]]; then
+                                printf 'bearer_token_env_var = "HF_TOKEN"\n' >> "$out"
+                                log_info "    $_name ($_transport, auth=hf via HF_TOKEN)"
+                            else
+                                log_warn "    $_name: ~/.huggingface.env missing — anonymous/rate-limited (run 'bash install/auth.sh huggingface')"
+                            fi
+                            ;;
                         *)
                             log_warn "    $_name: unknown auth source '$_auth_source' — emitting without auth"
                             ;;
@@ -325,22 +333,42 @@ _sync_hooks() {
     install -m 600 "$_hooks_src" "$_hooks_dest"
     install -m 755 "$_guard_src" "$_guard_dest"
 
-    _hook_key="$HOME/.codex/hooks.json:pre_tool_use:0:0"
-    _hook_hash="$(_managed_pre_tool_hook_hash "$_hooks_dest")"
-    _trust_hook "$HOME/.codex/config.toml" "$_hook_key" "$_hook_hash"
+    # Trust every PreToolUse hook (group index : hook index). Codex records
+    # trust per hook hash; a managed edit re-computes and re-trusts here so
+    # no interactive /hooks review is needed on any machine.
+    local _g _h _n_groups _n_hooks _hook_key _hook_hash
+    if has jq; then
+        _n_groups="$(jq '.hooks.PreToolUse | length' "$_hooks_dest")"
+    else
+        _n_groups=1   # pre-jq fallback only understands the first hook
+    fi
+    for (( _g=0; _g<_n_groups; _g++ )); do
+        if has jq; then
+            _n_hooks="$(jq --argjson g "$_g" '.hooks.PreToolUse[$g].hooks | length' "$_hooks_dest")"
+        else
+            _n_hooks=1
+        fi
+        for (( _h=0; _h<_n_hooks; _h++ )); do
+            _hook_key="$HOME/.codex/hooks.json:pre_tool_use:${_g}:${_h}"
+            _hook_hash="$(_managed_pre_tool_hook_hash "$_hooks_dest" "$_g" "$_h")"
+            _trust_hook "$HOME/.codex/config.toml" "$_hook_key" "$_hook_hash"
+            log_okay "Trusted Codex hook [$_g:$_h] → $_hook_hash"
+        done
+    done
 
     log_okay "Synced Codex hooks → $_hooks_dest"
     log_okay "Synced chezmoi guard → $_guard_dest"
-    log_okay "Trusted Codex hook hash → $_hook_hash"
 }
 
+# _managed_pre_tool_hook_hash FILE GROUP_IDX HOOK_IDX — Codex's trust
+# identity for one PreToolUse hook (indices default to 0 0).
 _managed_pre_tool_hook_hash() {
-    local _hooks_file="$1" _identity
+    local _hooks_file="$1" _gidx="${2:-0}" _hidx="${3:-0}" _identity
     if has jq; then
         _identity="$(
-            jq -cS '
-              .hooks.PreToolUse[0] as $group
-              | $group.hooks[0] as $hook
+            jq -cS --argjson g "$_gidx" --argjson h "$_hidx" '
+              .hooks.PreToolUse[$g] as $group
+              | $group.hooks[$h] as $hook
               | {
                   event_name: "pre_tool_use",
                   matcher: $group.matcher,
@@ -357,6 +385,7 @@ _managed_pre_tool_hook_hash() {
             ' "$_hooks_file"
         )"
     else
+        [[ "$_gidx:$_hidx" == "0:0" ]] || die "jq required to trust more than the first Codex hook"
         local _matcher _type _command _status _status_json
         _matcher="$(_json_string_field_fallback "$_hooks_file" "matcher")"
         _type="$(_json_string_field_fallback "$_hooks_file" "type")"

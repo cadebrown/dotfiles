@@ -7,6 +7,7 @@ gcsrv http https://gc.example/mcp auth=gcloud
 c7srv http https://c7.example/mcp auth=context7
 tavsrv http https://tav.example/mcp auth=tavily
 exasrv http https://exa.example/mcp auth=exa
+hfsrv http https://hf.example/mcp auth=hf
 urlkey http https://key.example/{FIXTURE_KEY}/v2/mcp
 misskey http https://key.example/{FIXTURE_MISSING}/v2/mcp
 oauthsrv http https://oauth.example/mcp --client-id claude-oauth-id --codex-client-id codex-oauth-id

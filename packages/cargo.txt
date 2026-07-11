@@ -106,3 +106,13 @@ yazi-cli
 # conflicts (pre-built: github.com/jj-vcs/jj). Crate jj-cli; binary `jj`.
 # Trial: coexists with git in the same repo; not a git replacement yet.
 jj-cli
+
+# Rust docs MCP server — item-level rustdoc + source exploration, wired as the
+# `rust-docs` stdio entry in packages/mcp-servers.txt (pre-built via
+# QuickInstall: github.com/snowmead/rust-docs-mcp). Needs a Rust nightly
+# toolchain at runtime for rustdoc JSON; `rust-docs-mcp doctor` diagnoses.
+rust-docs-mcp
+
+# crates.io MCP server — crate search, dep analysis, OSV audit; the `crates`
+# stdio entry in mcp-servers.txt (pre-built: github.com/joshrotenberg/cratesio-mcp)
+cratesio-mcp

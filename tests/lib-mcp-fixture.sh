@@ -15,13 +15,15 @@ mcp_fixture_env() {
     # ~/.<svc>.env see a controlled world.
     _MCP_FIXTURE_HOME="${_MCP_FIXTURE_HOME:-$(mktemp -d)}"
     export HOME="$_MCP_FIXTURE_HOME"
-    touch "$HOME/.context7.env" "$HOME/.tavily.env" "$HOME/.exa.env"
+    touch "$HOME/.context7.env" "$HOME/.tavily.env" "$HOME/.exa.env" \
+          "$HOME/.huggingface.env"
 
     # Deterministic credentials (override anything the real env sourced).
     export GITHUB_TOKEN="ghp_fixture_token_0000000000"
     export CONTEXT7_API_KEY="c7-fixture-key"
     export TAVILY_API_KEY="tav-fixture-key"
     export EXA_API_KEY="exa-fixture-key"
+    export HF_TOKEN="hf_fixture_token_000000"
     export FIXTURE_KEY="fixture-url-key"
     unset FIXTURE_MISSING 2>/dev/null || true
 }

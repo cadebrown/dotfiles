@@ -21,6 +21,12 @@
       },
       "url": "https://gh.example/mcp"
     },
+    "hfsrv": {
+      "headers": {
+        "Authorization": "Bearer hf_fixture_token_000000"
+      },
+      "url": "https://hf.example/mcp"
+    },
     "mystery": {
       "url": "https://mystery.example/mcp"
     },

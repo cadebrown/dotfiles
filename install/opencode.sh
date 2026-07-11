@@ -49,6 +49,7 @@ _emit_opencode_mcp() {
                 context7) _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"CONTEXT7_API_KEY":"{env:CONTEXT7_API_KEY}"}, enabled:true}')" ;;
                 tavily)   _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:TAVILY_API_KEY}"}, enabled:true}')" ;;
                 exa)      _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"x-api-key":"{env:EXA_API_KEY}"}, enabled:true}')" ;;
+                hf)       _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:HF_TOKEN}"}, enabled:true}')" ;;
                 gcloud)   _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:GOOGLE_MCP_TOKEN}", "x-goog-user-project":"{env:GOOGLE_CLOUD_PROJECT}"}, enabled:true}')" ;;
                 "")       _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, enabled:true}')" ;;
                 *)        log_warn "  $_name: unknown auth '$_auth' — unauthenticated" >&2

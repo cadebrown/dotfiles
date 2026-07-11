@@ -28,8 +28,10 @@ setup() {
     '
     [ "$status" -eq 0 ]
 
-    # 12 entries, comments/blanks skipped
-    [ "$(echo "$output" | jq 'length')" -eq 12 ]
+    # 13 entries, comments/blanks skipped
+    [ "$(echo "$output" | jq 'length')" -eq 13 ]
+    # auth=hf extraction (the newest auth source — added post-refactor)
+    [ "$(echo "$output" | jq -r '.[] | select(.name=="hfsrv") | .auth')" = "hf" ]
     # stdio parsing keeps the full command string
     [ "$(echo "$output" | jq -r '.[] | select(.name=="tool") | .cmd')" = "uvx some-tool --flag val" ]
     # auth= extraction

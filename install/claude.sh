@@ -100,6 +100,7 @@ _MARKETPLACES=(
     "trailofbits/skills|trailofbits"       # c-review and other ToB security skills
     "openai/codex-plugin-cc|openai-codex"  # official Codex-as-delegate bridge
     "AlmogBaku/debug-skill|debug-skill-marketplace"  # dap stateful DAP debugging
+    "cameronfreer/lean4-skills|lean4-skills"         # Lean 4 proving workflows (lean4 plugin)
 )
 for _mp_entry in "${_MARKETPLACES[@]}"; do
     IFS='|' read -r _mp_repo _mp_name <<< "$_mp_entry"
@@ -207,6 +208,12 @@ _resolve_header_source() {
             key="$(. "$HOME/.exa.env" >/dev/null 2>&1 || true; printf '%s' "${EXA_API_KEY:-}")"
             [[ -n "$key" ]] || return 1
             printf 'x-api-key\t%s' "$key"
+            ;;
+        hf)
+            [[ -f "$HOME/.huggingface.env" ]] || return 1
+            key="$(. "$HOME/.huggingface.env" >/dev/null 2>&1 || true; printf '%s' "${HF_TOKEN:-}")"
+            [[ -n "$key" ]] || return 1
+            printf 'Authorization\tBearer %s' "$key"
             ;;
         *)
             return 1

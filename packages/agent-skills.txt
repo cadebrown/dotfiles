@@ -126,3 +126,31 @@ dwarf-debug-format npx mohitmishra786/low-level-dev-skills dwarf-debug-format
 # Emitting debug info from LLVM (DIBuilder, locations, LLVM 22) — pairs with
 # dwarf-debug-format from the consumer side
 add-debug-info npx hbarve1/tessl-llvm add-debug-info
+
+### Web / frontend (July 2026 review batch) ###
+
+# React/Next.js correction layers distilled from Vercel's internal guidelines.
+# NB: --skill matches SKILL.md frontmatter `name:`, which here differs from
+# the repo dir names (react-best-practices/ → vercel-react-best-practices).
+vercel-react-best-practices npx vercel-labs/agent-skills vercel-react-best-practices
+vercel-composition-patterns npx vercel-labs/agent-skills vercel-composition-patterns
+
+### Game development ###
+
+# Engine-detecting router (repo-root skill) — routes to the repo's 66
+# engine/discipline skills. Router-only install: it embeds enough routing
+# context on its own; add specific engine skills if sessions ask for them.
+router npx gamedev-skills/awesome-gamedev-agent-skills router
+
+### GPU beyond CUDA/Triton ###
+
+# NVIDIA official: cuTile tile-based kernel programming (TileGym). Siblings
+# (autotuning, triton/julia conversion) exist in nvidia/skills — add on demand.
+tilegym-cutile-python npx nvidia/skills tilegym-cutile-python
+
+# Metal debug/profile with xctrace/.gputrace capture→fix→verify loop —
+# sibling to the vendored cuda skill, for Apple-silicon GPU work.
+metal-gpu-debug npx rudybear/metal-ai-skill metal-gpu-debug
+
+# WGSL/WebGPU patterns (thin but real; repo-root skill)
+webgpu npx cazala/webgpu-skill webgpu

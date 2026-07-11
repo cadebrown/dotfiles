@@ -24,6 +24,10 @@
 #   auth=exa       — x-api-key header from ~/.exa.env (EXA_API_KEY).
 #                    Claude: header; Codex: env_http_headers. Create with
 #                    `bash install/auth.sh exa`.
+#   auth=hf        — Authorization: Bearer from ~/.huggingface.env (HF_TOKEN).
+#                    Optional: the server works anonymously at lower rate
+#                    limits. Claude/Cursor: header; Codex: bearer_token_env_var;
+#                    opencode: {env:HF_TOKEN}. `bash install/auth.sh huggingface`.
 #   auth=gcloud    — Google ADC bearer for the official Google/Google Cloud
 #                    remote MCP servers. No token at rest: a short-lived access
 #                    token is minted at connection time from Application Default
@@ -36,17 +40,17 @@
 # Auth-managed entries cannot also pass --header / --client-id extras.
 #
 # Tokens-at-rest note: Claude/Codex/opencode resolve gh+gcloud creds at
-# connection/launch time (headersHelper / codex() / opencode() wrappers — no
-# token at rest), but env-file sources are baked resolved into ~/.claude.json
-# and ~/.cursor/mcp.json at sync time (tavily/exa/context7 headers, the
-# firecrawl URL key, and Cursor's GitHub token — Dock-launched Cursor has no
-# shell env to expand). Rotation heals on the next sync. gcloud servers are
-# skipped for Cursor entirely (short-lived ADC tokens can't be baked).
+# connection/launch time (headersHelper / codex() / opencode() wrappers). For
+# context7/tavily/exa, Claude and Cursor bake headers while Codex and opencode
+# retain env references. Firecrawl's URL key is baked by Claude, Codex, and
+# Cursor; opencode retains an env reference. Cursor also bakes its GitHub token
+# because Dock-launched Cursor has no shell env to expand. Generated configs
+# are mode 600; rotation heals on the next sync. gcloud servers are skipped for
+# Cursor entirely because short-lived ADC tokens cannot be baked safely.
 #
-# URL placeholders: a {VAR} token in an HTTP url is replaced with $VAR (from
-# ~/.<service>.env, sourced at install time) — for servers that carry the key
-# in the URL itself (e.g. Firecrawl). Missing var → skipped on Claude, emitted
-# inert with a warning on Codex.
+# URL placeholders: Claude/Codex/Cursor replace {VAR} from the sourced service
+# env; a missing value skips the server in Claude/Cursor and leaves it inert in
+# Codex. opencode converts the placeholder to its native {env:VAR} form.
 #
 # Install manually:
 #   claude mcp add --transport <transport> --scope user <name> <url> [extra args...]
@@ -91,6 +95,21 @@ tavily http https://mcp.tavily.com/mcp/ auth=tavily
 # Exa: neural/semantic web search + crawling — best recall for research queries.
 # x-api-key header (EXA_API_KEY).
 exa http https://mcp.exa.ai/mcp auth=exa
+
+# Hugging Face: official remote MCP (streamable HTTP, stateless) — model/
+# dataset/Space/paper search + HF doc search. Anonymous works (rate-limited,
+# standard toolset); HF_TOKEN unlocks account-scoped tools + quota.
+huggingface http https://huggingface.co/mcp auth=hf
+
+# === Rust development (local stdio, keyless) ===
+# rust-docs: item-level rustdoc JSON + crate source exploration — deeper than
+# any web docs search. Binary via packages/cargo.txt. Needs a Rust nightly
+# toolchain at runtime (tool-pinned; `rust-docs-mcp doctor` diagnoses).
+rust-docs stdio cmd: rust-docs-mcp
+
+# crates.io: crate search, dependency analysis, OSV security audit — 29
+# read-only tools, no auth. Binary via packages/cargo.txt.
+crates stdio cmd: cratesio-mcp
 
 # Firecrawl: best-in-class deep crawl + structured extraction (scrape, crawl,
 # map, extract). Key rides in the URL path (FIRECRAWL_API_KEY).

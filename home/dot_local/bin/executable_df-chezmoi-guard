@@ -18,7 +18,10 @@ resolve_path() {
 
     case "$path" in
         "~") path="$HOME" ;;
-        "~/"*) path="$HOME/${path#~/}" ;;
+        # NB: quote the pattern — in ${path#~/} bash tilde-expands the
+        # PATTERN itself, so it strips "$HOME/" instead of a literal "~/"
+        # and tilde paths sail past the guard unresolved.
+        "~/"*) path="$HOME/${path#"~/"}" ;;
     esac
 
     if [[ "$path" != /* ]]; then

@@ -47,6 +47,14 @@ tool_timeout_sec = 60
 required = false
 default_tools_approval_mode = "writes"
 
+[mcp_servers.hfsrv]
+url = "https://hf.example/mcp"
+bearer_token_env_var = "HF_TOKEN"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"
+
 [mcp_servers.urlkey]
 url = "https://key.example/fixture-url-key/v2/mcp"
 startup_timeout_sec = 20

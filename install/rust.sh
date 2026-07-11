@@ -126,3 +126,21 @@ while IFS= read -r pkg; do
 done < <(_read_package_list "$CARGO_TXT")
 
 log_okay "cargo tools: ${_ok} ok, ${_fail} failed"
+
+### rust-docs-mcp pinned nightly ###
+# rust-docs-mcp (cargo.txt → the `rust-docs` MCP server) generates rustdoc
+# JSON with an EXACT pinned nightly (JSON format stability). The pin lives
+# inside the binary and moves with releases, so ask its doctor: the pin only
+# appears in the output while missing — nothing to do once installed.
+if [[ -x "$CARGO_HOME/bin/rust-docs-mcp" ]]; then
+    _rdm_pin="$("$CARGO_HOME/bin/rust-docs-mcp" doctor 2>&1 \
+        | grep -oE 'nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1 || true)"
+    if [[ -n "$_rdm_pin" ]]; then
+        log_info "Installing rust-docs-mcp pinned toolchain $_rdm_pin"
+        run_logged "$CARGO_HOME/bin/rustup" toolchain install "$_rdm_pin" --profile minimal \
+            || log_warn "rust-docs-mcp toolchain install failed — run 'rust-docs-mcp doctor'"
+    else
+        log_okay "rust-docs-mcp rustdoc toolchain satisfied"
+    fi
+    unset _rdm_pin
+fi
