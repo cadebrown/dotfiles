@@ -16,6 +16,7 @@ eamodio.gitlens
 enkia.tokyo-night
 github.vscode-pull-request-github
 james-yu.latex-workshop
+jock.svg
 llvm-vs-code-extensions.vscode-clangd
 mechatroner.rainbow-csv
 ms-azuretools.vscode-containers
