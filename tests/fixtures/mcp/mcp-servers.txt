@@ -1,0 +1,15 @@
+# Fixture mcp-servers.txt — exercises every parse/render branch.
+# Comment line above, blank line below.
+
+plainsrv http https://plain.example/mcp
+ghsrv http https://gh.example/mcp auth=gh
+gcsrv http https://gc.example/mcp auth=gcloud
+c7srv http https://c7.example/mcp auth=context7
+tavsrv http https://tav.example/mcp auth=tavily
+exasrv http https://exa.example/mcp auth=exa
+urlkey http https://key.example/{FIXTURE_KEY}/v2/mcp
+misskey http https://key.example/{FIXTURE_MISSING}/v2/mcp
+oauthsrv http https://oauth.example/mcp --client-id claude-oauth-id --codex-client-id codex-oauth-id
+mystery http https://mystery.example/mcp auth=doesnotexist
+tool stdio cmd: uvx some-tool --flag val
+bare stdio cmd: solobinary

@@ -95,23 +95,21 @@ _toml_escape() {
 # Translate packages/mcp-servers.txt (+ overlays) into [mcp_servers.<name>]
 # TOML blocks, written to $1. Logs go to stdout via log_*; only TOML hits $1.
 _emit_mcp_blocks_to() {
-    local out="$1" _file _line _name _rest _transport _cmd _head _tail _url
-    local _rest_extras _auth_source _client_id _codex_client_id _arg _first _ph _val
+    local out="$1" _name _kind _transport _cmd _head _tail _url
+    local _auth_source _client_id _codex_client_id _extras _arg _first _sub
 
     : > "$out"
 
-    while IFS= read -r _file; do
-        log_info "  Reading MCP servers from $_file"
-        while IFS= read -r _line; do
-            [[ -z "$_line" || "$_line" == \#* ]] && continue
-            _name="${_line%% *}"; _rest="${_line#* }"
-            _transport="${_rest%% *}"
-            _codex_client_id=""   # reset here so stdio-after-http can't inherit it
+    # Entries come from the shared parser (mcp_servers_each in _lib.sh);
+    # this function only renders Codex's TOML schema + auth policy.
+    log_info "  Reading MCP servers (packages/mcp-servers.txt + overlays)"
+    while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
+       && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth_source \
+       && IFS= read -r _codex_client_id && IFS= read -r _extras; do
 
             printf '\n[mcp_servers.%s]\n' "$_name" >> "$out"
 
-            if [[ "$_transport" == "stdio" && "$_rest" == *"cmd: "* ]]; then
-                _cmd="${_rest#*cmd: }"
+            if [[ "$_kind" == "stdio" ]]; then
                 _head="${_cmd%% *}"
                 if [[ "$_cmd" == *" "* ]]; then
                     _tail="${_cmd#* }"
@@ -133,32 +131,22 @@ _emit_mcp_blocks_to() {
                 fi
                 log_info "    $_name (stdio)"
             else
-                # HTTP/SSE: <name> <transport> <url> [auth=<source>] [extras...]
-                read -r _ _ _url _rest_extras <<< "$_line"
-
                 # URL placeholders: {VAR} → $VAR (env files sourced by _lib.sh),
                 # for servers that carry the key in the URL (e.g. Firecrawl).
-                while [[ "$_url" =~ \{([A-Za-z_][A-Za-z0-9_]*)\} ]]; do
-                    _ph="${BASH_REMATCH[1]}"; _val="${!_ph:-}"
-                    if [[ -z "$_val" ]]; then
-                        log_warn "    $_name: \$$_ph unset — server inert until set (bash install/auth.sh $_name)"
-                        break
+                if [[ "$_url" == *'{'*'}'* ]]; then
+                    if _sub="$(mcp_url_substitute "$_url")"; then
+                        _url="$_sub"
+                    else
+                        log_warn "    $_name: \$$_sub unset — server inert until set (bash install/auth.sh $_name)"
                     fi
-                    _url="${_url//\{$_ph\}/$_val}"
-                done
+                fi
 
-                _auth_source=""
+                # --client-id (Claude's field) rides in extras; Codex only
+                # warns when it appears without a --codex-client-id twin.
                 _client_id=""
-                # shellcheck disable=SC2086
-                set -- $_rest_extras
-                while (( $# )); do
-                    case "$1" in
-                        auth=*)            _auth_source="${1#auth=}"; shift ;;
-                        --client-id)       _client_id="${2:-}"; shift 2 ;;
-                        --codex-client-id) _codex_client_id="${2:-}"; shift 2 ;;
-                        *)                 shift ;;
-                    esac
-                done
+                if [[ "$_extras" == *"--client-id"* ]]; then
+                    _client_id="${_extras#*--client-id }"; _client_id="${_client_id%% *}"
+                fi
 
                 printf 'url = "%s"\n' "$(_toml_escape "$_url")" >> "$out"
 
@@ -231,6 +219,9 @@ _emit_mcp_blocks_to() {
                 printf 'startup_timeout_sec = 20\n'
                 printf 'tool_timeout_sec = 60\n'
                 printf 'required = false\n'
+                # Read-only tools remain autonomous; tools without a read-only
+                # annotation prompt before causing external side effects.
+                printf 'default_tools_approval_mode = "writes"\n'
             } >> "$out"
 
             # OAuth sub-table — must trail the parent table's bare keys.
@@ -240,8 +231,7 @@ _emit_mcp_blocks_to() {
                     printf 'client_id = "%s"\n' "$(_toml_escape "$_codex_client_id")"
                 } >> "$out"
             fi
-        done < "$_file"
-    done < <(overlay_package_files "mcp-servers.txt")
+    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .extras')
 }
 
 # One-time eviction of the retired managed rules file. Managed rules moved
@@ -449,6 +439,12 @@ _check_setup() {
         || die "Missing AGENTS.md fallback in $_config"
     grep -q '^approval_policy = { granular' "$_config" \
         || die "approval_policy is not the granular form — prompt rules would be dead letters"
+    grep -q '^default_permissions = "dev"' "$_config" \
+        || die "Codex default permissions are not the workspace-scoped dev profile"
+    ! grep -q '^sandbox_mode = ' "$_config" \
+        || die "Legacy sandbox_mode disables permission profiles in $_config"
+    grep -q '^default_tools_approval_mode = "writes"' "$_config" \
+        || die "MCP write approval policy missing in $_config"
     ! grep -q '^\[profiles\.' "$_config" \
         || die "Legacy [profiles.*] tables in $_config — Codex 0.134+ ignores them (profiles live in ~/.codex/<name>.config.toml)"
     grep -q 'bearer_token_env_var = "GH_TOKEN"' "$_config" \
@@ -484,16 +480,22 @@ _check_setup() {
     codex execpolicy check --rules "$_rules" -- git status >/dev/null \
         || die "codex execpolicy check failed for $_rules"
 
-    printf '{"tool_input":{"file_path":"/private/tmp/codex-hook-healthcheck"}}\n' | "$_guard" >/dev/null \
+    printf '{"tool_input":{"file_path":"/private/tmp/codex-hook-healthcheck"}}\n' \
+        | env PATH="$ARCH_BIN:$PATH" "$_guard" >/dev/null \
         || die "chezmoi guard blocked an unmanaged path"
     set +e
-    printf '{"tool_input":{"file_path":"%s/.codex/config.toml"}}\n' "$HOME" | "$_guard" >/dev/null 2>&1
+    printf '{"tool_input":{"file_path":"%s/.codex/config.toml"}}\n' "$HOME" \
+        | env PATH="$ARCH_BIN:$PATH" "$_guard" >/dev/null 2>&1
     _guard_rc=$?
     set -e
     [[ "$_guard_rc" == 2 ]] || die "chezmoi guard did not block managed Codex config"
 
     log_okay "Codex healthcheck passed"
 }
+
+# Source-guard: tests/mcp-emitters.bats sources this file for
+# _emit_mcp_blocks_to — everything below only runs when executed directly.
+[[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
 
 case "$_mode" in
     install)

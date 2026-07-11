@@ -38,39 +38,33 @@ _sync_cursor_mcp() {
     has jq || { log_warn "jq not found — skipping Cursor MCP sync"; return 0; }
     log_section "Cursor MCP servers"
 
-    local _out="$HOME/.cursor/mcp.json" _stream _file _line _count=0
-    local _name _rest _transport _cmd _url _rest_extras _tok _auth _missing _ph _val _hname _hval _def
+    local _out="$HOME/.cursor/mcp.json" _stream _count=0
+    local _name _kind _transport _cmd _url _auth _ccid _extras _missing _hname _hval _def
     # NB: no `trap ... RETURN` for cleanup — bash fires RETURN traps when any
     # sourced script finishes, so a `.`/`source` anywhere in this function
     # would silently delete the accumulator mid-loop (this happened: only
     # servers after the last in-loop `. ~/.<svc>.env` survived into mcp.json).
     _stream="$(mktemp)"
 
-    while IFS= read -r _file; do
-        while IFS= read -r _line; do
-            [[ -z "$_line" || "$_line" == \#* ]] && continue
-            read -r _name _transport _url _rest_extras <<< "$_line"
-
-            if [[ "$_transport" == "stdio" && "$_line" == *"cmd: "* ]]; then
-                _cmd="${_line#*cmd: }"
+    # Entries come from the shared parser (mcp_servers_each in _lib.sh);
+    # this function only renders Cursor's schema + auth policy.
+    while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
+       && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth \
+       && IFS= read -r _ccid && IFS= read -r _extras; do
+            if [[ "$_kind" == "stdio" ]]; then
                 _def="$(jq -nc --arg cmd "$_cmd" \
                     '($cmd|split(" ")) as $w | {command:$w[0]}
                      + (if ($w|length)>1 then {args:$w[1:]} else {} end)')"
             else
                 # {VAR} URL placeholders → $VAR (env files sourced by _lib.sh).
-                _missing=""
-                while [[ "$_url" =~ \{([A-Za-z_][A-Za-z0-9_]*)\} ]]; do
-                    _ph="${BASH_REMATCH[1]}"; _val="${!_ph:-}"
-                    [[ -n "$_val" ]] || { _missing="$_ph"; break; }
-                    _url="${_url//\{$_ph\}/$_val}"
-                done
-                if [[ -n "$_missing" ]]; then
-                    log_warn "  $_name: \$$_missing unset — run 'bash install/auth.sh $_name'; skipping"
-                    continue
+                if [[ "$_url" == *'{'*'}'* ]]; then
+                    if ! _missing="$(mcp_url_substitute "$_url")"; then
+                        log_warn "  $_name: \$$_missing unset — run 'bash install/auth.sh $_name'; skipping"
+                        continue
+                    fi
+                    _url="$_missing"
                 fi
 
-                _auth=""
-                for _tok in $_rest_extras; do [[ "$_tok" == auth=* ]] && _auth="${_tok#auth=}"; done
                 _hname=""; _hval=""
                 case "$_auth" in
                     "") ;;
@@ -98,8 +92,7 @@ _sync_cursor_mcp() {
 
             jq -nc --arg n "$_name" --argjson def "$_def" '{name:$n, def:$def}' >> "$_stream"
             (( ++_count ))
-        done < "$_file"
-    done < <(overlay_package_files "mcp-servers.txt")
+    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .extras')
 
     local _tmp; _tmp="$(mktemp)"
     jq -s '{mcpServers: (reduce .[] as $e ({}; .[$e.name] = $e.def))}' "$_stream" > "$_tmp" \
@@ -115,6 +108,10 @@ _sync_cursor_mcp() {
         log_okay "Wrote Cursor MCP ($_count servers) → $_out"
     fi
 }
+
+# Source-guard: tests/mcp-emitters.bats sources this file for _sync_cursor_mcp
+# — everything below only runs when executed directly.
+[[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
 
 _CMD="${1:-install}"
 

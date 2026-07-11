@@ -248,6 +248,66 @@ overlay_package_files() {
     return 0
 }
 
+# mcp_servers_each — the ONE parser for packages/mcp-servers.txt (+ overlays).
+# Emits one normalized JSON object per entry on stdout:
+#   {"name","kind":"stdio"|"remote","transport","cmd","url","auth",
+#    "codex_client_id","extras"}
+# Policy-free: no {VAR} substitution, no credential resolution — the per-tool
+# renderers (install/{claude,codex,opencode,cursor}.sh) own that. `extras` is
+# the passthrough token string minus auth= and --codex-client-id + its value,
+# i.e. exactly what `claude mcp add` should receive. Consume with:
+#   while IFS= read -r _name && IFS= read -r _kind && ...; do ...
+#   done < <(mcp_servers_each | jq -r '.name, .kind, ...')
+# (one field per line — TSV would collapse empty fields under `read`).
+# Tested by tests/mcp-emitters.bats; four emitters once diverged silently
+# from hand-rolled copies of this loop — extend it HERE, not in a renderer.
+mcp_servers_each() {
+    local _file _line _name _transport _url _rest_extras
+    local _auth _codex_client_id _extras _grab_ccid _tok
+    while IFS= read -r _file; do
+        while IFS= read -r _line; do
+            [[ -z "$_line" || "$_line" == \#* ]] && continue
+            read -r _name _transport _url _rest_extras <<< "$_line"
+            if [[ "$_transport" == "stdio" && "$_line" == *"cmd: "* ]]; then
+                jq -nc --arg n "$_name" --arg cmd "${_line#*cmd: }" \
+                    '{name:$n, kind:"stdio", transport:"stdio", cmd:$cmd,
+                      url:"", auth:"", codex_client_id:"", extras:""}'
+            else
+                _auth="" _codex_client_id="" _extras="" _grab_ccid=0
+                for _tok in $_rest_extras; do
+                    if (( _grab_ccid )); then _codex_client_id="$_tok"; _grab_ccid=0; continue; fi
+                    case "$_tok" in
+                        auth=*)            _auth="${_tok#auth=}" ;;
+                        --codex-client-id) _grab_ccid=1 ;;
+                        *)                 _extras="${_extras:+$_extras }$_tok" ;;
+                    esac
+                done
+                jq -nc --arg n "$_name" --arg t "$_transport" --arg url "$_url" \
+                       --arg auth "$_auth" --arg ccid "$_codex_client_id" --arg ex "$_extras" \
+                    '{name:$n, kind:"remote", transport:$t, cmd:"",
+                      url:$url, auth:$auth, codex_client_id:$ccid, extras:$ex}'
+            fi
+        done < "$_file"
+    done < <(overlay_package_files "mcp-servers.txt")
+    return 0
+}
+
+# mcp_url_substitute URL — expand every {VAR} placeholder from the
+# environment (env files are sourced globally by this library). On success
+# prints the substituted URL and returns 0. On the first unset VAR prints
+# that variable's NAME instead and returns 1 — callers decide whether a
+# missing key means skip (claude/cursor) or emit-inert (codex).
+mcp_url_substitute() {
+    local _url="$1" _ph _val
+    while [[ "$_url" =~ \{([A-Za-z_][A-Za-z0-9_]*)\} ]]; do
+        _ph="${BASH_REMATCH[1]}"; _val="${!_ph:-}"
+        if [[ -z "$_val" ]]; then printf '%s' "$_ph"; return 1; fi
+        _url="${_url//\{$_ph\}/$_val}"
+    done
+    printf '%s' "$_url"
+    return 0
+}
+
 # trust_brewfile_taps FILE
 # Trust every third-party tap referenced by a Brewfile so `brew bundle` can
 # load its formulae/casks. Recent Homebrew refuses to load formulae from

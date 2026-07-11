@@ -27,40 +27,36 @@ _mode="${1:-install}"
 # Schema: local  {type:"local",  command:[...], enabled}
 #         remote {type:"remote", url, headers?, enabled}
 _emit_opencode_mcp() {
-    local _stream _file _line _name _rest _transport _cmd _url _rest_extras _tok _auth _def
+    local _stream _name _kind _transport _cmd _url _auth _ccid _extras _def
     # No `trap ... RETURN` cleanup: bash fires RETURN traps when any sourced
     # script finishes, which would delete the accumulator mid-loop if a
     # `source` ever lands in this function (bit install/cursor.sh for real).
     _stream="$(mktemp)"
 
-    while IFS= read -r _file; do
-        while IFS= read -r _line; do
-            [[ -z "$_line" || "$_line" == \#* ]] && continue
-            read -r _name _transport _url _rest_extras <<< "$_line"
-
-            if [[ "$_transport" == "stdio" && "$_line" == *"cmd: "* ]]; then
-                _cmd="${_line#*cmd: }"
-                _def="$(jq -nc --arg cmd "$_cmd" \
-                    '{type:"local", command:($cmd|split(" ")), enabled:true}')"
-            else
-                _auth=""
-                for _tok in $_rest_extras; do [[ "$_tok" == auth=* ]] && _auth="${_tok#auth=}"; done
-                # {VAR} url placeholders → opencode's {env:VAR} (e.g. Firecrawl).
-                _url="$(printf '%s' "$_url" | sed -E 's/\{([A-Za-z_][A-Za-z0-9_]*)\}/{env:\1}/g')"
-                case "$_auth" in
-                    gh)       _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:GH_TOKEN}"}, enabled:true}')" ;;
-                    context7) _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"CONTEXT7_API_KEY":"{env:CONTEXT7_API_KEY}"}, enabled:true}')" ;;
-                    tavily)   _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:TAVILY_API_KEY}"}, enabled:true}')" ;;
-                    exa)      _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"x-api-key":"{env:EXA_API_KEY}"}, enabled:true}')" ;;
-                    gcloud)   _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:GOOGLE_MCP_TOKEN}", "x-goog-user-project":"{env:GOOGLE_CLOUD_PROJECT}"}, enabled:true}')" ;;
-                    "")       _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, enabled:true}')" ;;
-                    *)        log_warn "  $_name: unknown auth '$_auth' — unauthenticated" >&2
-                              _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, enabled:true}')" ;;
-                esac
-            fi
-            jq -nc --arg n "$_name" --argjson def "$_def" '{name:$n, def:$def}' >> "$_stream"
-        done < "$_file"
-    done < <(overlay_package_files "mcp-servers.txt")
+    # Entries come from the shared parser (mcp_servers_each in _lib.sh);
+    # this function only renders opencode's schema + auth policy.
+    while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
+       && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth \
+       && IFS= read -r _ccid && IFS= read -r _extras; do
+        if [[ "$_kind" == "stdio" ]]; then
+            _def="$(jq -nc --arg cmd "$_cmd" \
+                '{type:"local", command:($cmd|split(" ")), enabled:true}')"
+        else
+            # {VAR} url placeholders → opencode's {env:VAR} (e.g. Firecrawl).
+            _url="$(printf '%s' "$_url" | sed -E 's/\{([A-Za-z_][A-Za-z0-9_]*)\}/{env:\1}/g')"
+            case "$_auth" in
+                gh)       _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:GH_TOKEN}"}, enabled:true}')" ;;
+                context7) _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"CONTEXT7_API_KEY":"{env:CONTEXT7_API_KEY}"}, enabled:true}')" ;;
+                tavily)   _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:TAVILY_API_KEY}"}, enabled:true}')" ;;
+                exa)      _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"x-api-key":"{env:EXA_API_KEY}"}, enabled:true}')" ;;
+                gcloud)   _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:GOOGLE_MCP_TOKEN}", "x-goog-user-project":"{env:GOOGLE_CLOUD_PROJECT}"}, enabled:true}')" ;;
+                "")       _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, enabled:true}')" ;;
+                *)        log_warn "  $_name: unknown auth '$_auth' — unauthenticated" >&2
+                          _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, enabled:true}')" ;;
+            esac
+        fi
+        jq -nc --arg n "$_name" --argjson def "$_def" '{name:$n, def:$def}' >> "$_stream"
+    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .extras')
 
     jq -s 'reduce .[] as $e ({}; .[$e.name] = $e.def)' "$_stream"
     rm -f "$_stream"
@@ -91,6 +87,10 @@ _sync_config() {
         log_okay "Wrote opencode.json ($(jq '.mcp | length' "$_out") MCP servers) → $_out"
     fi
 }
+
+# Source-guard: tests/mcp-emitters.bats sources this file for its emit
+# functions — everything below only runs when executed directly.
+[[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
 
 case "$_mode" in
     install)

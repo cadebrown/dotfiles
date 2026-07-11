@@ -1,0 +1,85 @@
+{
+  "bare": {
+    "command": [
+      "solobinary"
+    ],
+    "enabled": true,
+    "type": "local"
+  },
+  "c7srv": {
+    "enabled": true,
+    "headers": {
+      "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
+    },
+    "type": "remote",
+    "url": "https://c7.example/mcp"
+  },
+  "exasrv": {
+    "enabled": true,
+    "headers": {
+      "x-api-key": "{env:EXA_API_KEY}"
+    },
+    "type": "remote",
+    "url": "https://exa.example/mcp"
+  },
+  "gcsrv": {
+    "enabled": true,
+    "headers": {
+      "Authorization": "Bearer {env:GOOGLE_MCP_TOKEN}",
+      "x-goog-user-project": "{env:GOOGLE_CLOUD_PROJECT}"
+    },
+    "type": "remote",
+    "url": "https://gc.example/mcp"
+  },
+  "ghsrv": {
+    "enabled": true,
+    "headers": {
+      "Authorization": "Bearer {env:GH_TOKEN}"
+    },
+    "type": "remote",
+    "url": "https://gh.example/mcp"
+  },
+  "misskey": {
+    "enabled": true,
+    "type": "remote",
+    "url": "https://key.example/{env:FIXTURE_MISSING}/v2/mcp"
+  },
+  "mystery": {
+    "enabled": true,
+    "type": "remote",
+    "url": "https://mystery.example/mcp"
+  },
+  "oauthsrv": {
+    "enabled": true,
+    "type": "remote",
+    "url": "https://oauth.example/mcp"
+  },
+  "plainsrv": {
+    "enabled": true,
+    "type": "remote",
+    "url": "https://plain.example/mcp"
+  },
+  "tavsrv": {
+    "enabled": true,
+    "headers": {
+      "Authorization": "Bearer {env:TAVILY_API_KEY}"
+    },
+    "type": "remote",
+    "url": "https://tav.example/mcp"
+  },
+  "tool": {
+    "command": [
+      "uvx",
+      "some-tool",
+      "--flag",
+      "val"
+    ],
+    "enabled": true,
+    "type": "local"
+  },
+  "urlkey": {
+    "enabled": true,
+    "type": "remote",
+    "url": "https://key.example/{env:FIXTURE_KEY}/v2/mcp"
+  }
+}

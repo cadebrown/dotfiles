@@ -1,0 +1,51 @@
+{
+  "mcpServers": {
+    "bare": {
+      "command": "solobinary"
+    },
+    "c7srv": {
+      "headers": {
+        "CONTEXT7_API_KEY": "c7-fixture-key"
+      },
+      "url": "https://c7.example/mcp"
+    },
+    "exasrv": {
+      "headers": {
+        "x-api-key": "exa-fixture-key"
+      },
+      "url": "https://exa.example/mcp"
+    },
+    "ghsrv": {
+      "headers": {
+        "Authorization": "Bearer ghp_fixture_token_0000000000"
+      },
+      "url": "https://gh.example/mcp"
+    },
+    "mystery": {
+      "url": "https://mystery.example/mcp"
+    },
+    "oauthsrv": {
+      "url": "https://oauth.example/mcp"
+    },
+    "plainsrv": {
+      "url": "https://plain.example/mcp"
+    },
+    "tavsrv": {
+      "headers": {
+        "Authorization": "Bearer tav-fixture-key"
+      },
+      "url": "https://tav.example/mcp"
+    },
+    "tool": {
+      "args": [
+        "some-tool",
+        "--flag",
+        "val"
+      ],
+      "command": "uvx"
+    },
+    "urlkey": {
+      "url": "https://key.example/fixture-url-key/v2/mcp"
+    }
+  }
+}

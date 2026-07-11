@@ -1,0 +1,94 @@
+
+[mcp_servers.plainsrv]
+url = "https://plain.example/mcp"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"
+
+[mcp_servers.ghsrv]
+url = "https://gh.example/mcp"
+bearer_token_env_var = "GH_TOKEN"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"
+
+[mcp_servers.gcsrv]
+url = "https://gc.example/mcp"
+bearer_token_env_var = "GOOGLE_MCP_TOKEN"
+env_http_headers = { "x-goog-user-project" = "GOOGLE_CLOUD_PROJECT" }
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"
+
+[mcp_servers.c7srv]
+url = "https://c7.example/mcp"
+env_http_headers = { CONTEXT7_API_KEY = "CONTEXT7_API_KEY" }
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"
+
+[mcp_servers.tavsrv]
+url = "https://tav.example/mcp"
+bearer_token_env_var = "TAVILY_API_KEY"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"
+
+[mcp_servers.exasrv]
+url = "https://exa.example/mcp"
+env_http_headers = { "x-api-key" = "EXA_API_KEY" }
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"
+
+[mcp_servers.urlkey]
+url = "https://key.example/fixture-url-key/v2/mcp"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"
+
+[mcp_servers.misskey]
+url = "https://key.example/{FIXTURE_MISSING}/v2/mcp"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"
+
+[mcp_servers.oauthsrv]
+url = "https://oauth.example/mcp"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"
+
+[mcp_servers.oauthsrv.oauth]
+client_id = "codex-oauth-id"
+
+[mcp_servers.mystery]
+url = "https://mystery.example/mcp"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"
+
+[mcp_servers.tool]
+command = "uvx"
+args = ["some-tool", "--flag", "val"]
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"
+
+[mcp_servers.bare]
+command = "solobinary"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"

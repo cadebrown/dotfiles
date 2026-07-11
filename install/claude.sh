@@ -156,9 +156,11 @@ if [[ "${DF_MODE:-}" == "upgrade" ]]; then
         while IFS= read -r line; do
             [[ -z "$line" || "$line" == \#* ]] && continue
             _plugin="${line%% *}"
-            claude plugin update "$_plugin" >/dev/null 2>&1 \
-                && log_okay "  updated $_plugin" \
-                || log_debug "  $_plugin up to date or no update path"
+            if claude plugin update "$_plugin" >/dev/null 2>&1; then
+                log_okay "  updated $_plugin"
+            else
+                log_debug "  $_plugin up to date or no update path"
+            fi
         done < "$_file"
     done < <(overlay_package_files "claude-plugins.txt")
     unset _plugin
@@ -235,55 +237,33 @@ _register_server() {
     claude mcp add-json -s user "$1" "$2" >/dev/null 2>&1
 }
 
-_register_mcps_from() {
-    local file="$1"
-    log_info "Reading MCP servers from $file"
-    while IFS= read -r line; do
-        [[ -z "$line" || "$line" == \#* ]] && continue
-        # Parse: <name> <transport> <rest...>
-        _name="${line%% *}"; _rest="${line#* }"
-        _transport="${_rest%% *}"
+_register_mcps() {
+    # Entries come from the shared parser (mcp_servers_each in _lib.sh);
+    # this function only builds Claude's desired shape + reconciles it.
+    log_info "Reading MCP servers (packages/mcp-servers.txt + overlays)"
+    local _name _kind _transport _cmd _url _auth_source _codex_client_id _extra
+    while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
+       && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth_source \
+       && IFS= read -r _codex_client_id && IFS= read -r _extra; do
         _json="" _label=""
 
-        if [[ "$_transport" == "stdio" && "$_rest" == *"cmd: "* ]]; then
-            # --- stdio: <name> stdio cmd: <command...> ---
-            _cmd="${_rest#*cmd: }"
+        if [[ "$_kind" == "stdio" ]]; then
             _json="$(jq -nc --arg cmd "$_cmd" '
                 ($cmd | split(" ")) as $w
                 | {type: "stdio", command: $w[0]}
                 + (if ($w | length) > 1 then {args: $w[1:]} else {} end)')"
             _label="stdio → $_cmd"
         else
-            # --- HTTP: <name> <transport> <url> [auth=<source>] [extra...] ---
-            read -r _ _ _url _rest_extras <<< "$line"
-
             # URL placeholders: {VAR} → $VAR (env files sourced by _lib.sh), for
             # servers that carry the key in the URL itself (e.g. Firecrawl).
             if [[ "$_url" == *'{'*'}'* ]]; then
-                _missing=""
-                while [[ "$_url" =~ \{([A-Za-z_][A-Za-z0-9_]*)\} ]]; do
-                    _ph="${BASH_REMATCH[1]}"; _val="${!_ph:-}"
-                    [[ -n "$_val" ]] || { _missing="$_ph"; break; }
-                    _url="${_url//\{$_ph\}/$_val}"
-                done
-                if [[ -n "$_missing" ]]; then
+                if ! _missing="$(mcp_url_substitute "$_url")"; then
                     log_warn "  $_name: \$$_missing unset — run 'bash install/auth.sh $_name'; skipping"
                     (( _skip++ )) || true
                     continue
                 fi
+                _url="$_missing"
             fi
-
-            _auth_source="" _extra="" _skip_tok=0
-            for _tok in $_rest_extras; do
-                if (( _skip_tok )); then _skip_tok=0; continue; fi
-                if [[ "$_tok" == auth=* ]]; then
-                    _auth_source="${_tok#auth=}"
-                elif [[ "$_tok" == "--codex-client-id" ]]; then
-                    _skip_tok=1   # Codex-only field; drop flag + its value (Claude uses --client-id)
-                else
-                    _extra="${_extra:+$_extra }$_tok"
-                fi
-            done
 
             if [[ -n "$_auth_source" && -n "$_extra" ]]; then
                 log_warn "  $_name: ignoring extras (not supported with auth=): $_extra"
@@ -362,15 +342,13 @@ _register_mcps_from() {
             log_warn "  fail  $_name"
             (( _fail++ )) || true
         fi
-    done < "$file"
+    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .extras')
 }
 
 _ok=0 _skip=0 _fail=0
 
 if has jq; then
-    while IFS= read -r _file; do
-        _register_mcps_from "$_file"
-    done < <(overlay_package_files "mcp-servers.txt")
+    _register_mcps
     log_okay "MCP servers: ${_ok} registered, ${_skip} already present, ${_fail} failed"
 else
     log_warn "jq not found — skipping MCP server sync (installed via Brewfile step 4; re-run after)"

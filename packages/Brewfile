@@ -144,6 +144,7 @@ brew "sqlite"
 
 ### Security ###
 brew "gitleaks"  # secret scanning — also used as a global pre-push hook
+brew "bats-core" # bash test runner — tests/*.bats run locally, not just in docker
 
 ### DevOps ###
 brew "opentofu"
