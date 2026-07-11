@@ -1,5 +1,6 @@
 {{/*
 opencode config — schema: https://opencode.ai/config.json
+The create_private_ source attributes preserve installer-owned contents and mode 0600.
 
 macOS: defaults to local MLX (Qwen3.6-27B 8-bit via mlxserve on :8080).
 Linux: no MLX — defaults to anthropic/claude-haiku-4-5 (cheap + tool calling).
@@ -41,9 +42,23 @@ Hooks live in plugin/ (TS files using Bun shell), not here — see
   },
 
   "agent": {
-    "plan":   { "model": "anthropic/{{ .models.opus }}" },
+    "plan":   { "model": "anthropic/{{ .models.fable }}" },
     "build":  { "model": "mlx/qwen3.6-27b" },
-    "review": { "model": "anthropic/{{ .models.sonnet }}" }
+    "review": {
+      "model": "anthropic/{{ .models.sonnet }}",
+      "mode": "subagent",
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "*": "deny",
+          "git diff*": "allow",
+          "git log*": "allow",
+          "git show*": "allow",
+          "rg*": "allow",
+          "fd*": "allow"
+        }
+      }
+    }
   },
 {{- else -}}
   "model": "anthropic/{{ .models.haiku }}",
@@ -51,27 +66,25 @@ Hooks live in plugin/ (TS files using Bun shell), not here — see
   "default_agent": "build",
 
   "agent": {
-    "plan":   { "model": "anthropic/{{ .models.opus }}" },
+    "plan":   { "model": "anthropic/{{ .models.fable }}" },
     "build":  { "model": "anthropic/{{ .models.haiku }}" },
-    "review": { "model": "anthropic/{{ .models.sonnet }}" }
+    "review": {
+      "model": "anthropic/{{ .models.sonnet }}",
+      "mode": "subagent",
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "*": "deny",
+          "git diff*": "allow",
+          "git log*": "allow",
+          "git show*": "allow",
+          "rg*": "allow",
+          "fd*": "allow"
+        }
+      }
+    }
   },
 {{- end }}
 
-  "permission": {
-    "edit": {
-      "*": "allow",
-      ".git/**": "deny",
-      "node_modules/**": "deny",
-      ".env*": "deny",
-      "**/secrets/**": "deny"
-    },
-    "bash": {
-      "*": "ask",
-      "ls*": "allow", "cat*": "allow", "rg*": "allow", "fd*": "allow",
-      "git status*": "allow", "git diff*": "allow", "git log*": "allow",
-      "git branch*": "allow", "git show*": "allow",
-      "rm -rf*": "deny",
-      "git push*": "ask", "git reset --hard*": "ask"
-    }
-  }
+  "permission": "allow"
 }

@@ -135,9 +135,9 @@ alias datestamp='date +"%Y%m%d"'
 alias timestamp='date +"%Y%m%d%H%M%S"'
 alias verify-path='bash ~/dotfiles/install/verify-path.sh'
 
-# Codex profile shortcuts (default codex = danger-full-access for git ops)
-alias codexs='codex -p deep'        # opt-in workspace-write sandbox
-alias codexr='codex -p review'      # read-only sandbox
+# Codex profile shortcuts (default = unrestricted host access, no prompts)
+alias codexs='codex -p deep'        # Sol, extra-high reasoning
+alias codexr='codex -p review'      # Sol, read-only permissions
 
 # codex launcher — MCP credentials resolved at launch (bearer_token_env_var /
 # env_http_headers in config.toml; tokens never land on disk).
@@ -148,6 +148,15 @@ codex() {
     GOOGLE_MCP_TOKEN="${GOOGLE_MCP_TOKEN:-$(command gcloud auth application-default print-access-token 2>/dev/null)}" \
     GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-$(command gcloud config get-value project 2>/dev/null)}" \
         command codex "$@"
+}
+
+# OpenCode consumes the same short-lived MCP credentials as Codex and starts
+# in auto-approve mode. Explicit deny rules (the review agent) still apply.
+opencode() {
+    GH_TOKEN="${GH_TOKEN:-$(command gh auth token 2>/dev/null)}" \
+    GOOGLE_MCP_TOKEN="${GOOGLE_MCP_TOKEN:-$(command gcloud auth application-default print-access-token 2>/dev/null)}" \
+    GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-$(command gcloud config get-value project 2>/dev/null)}" \
+        command opencode --auto "$@"
 }
 
 # mlxserve — MLX OpenAI-compat server on :8080 (default Qwen3.6-27B 8bit)

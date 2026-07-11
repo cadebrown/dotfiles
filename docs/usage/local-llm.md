@@ -107,11 +107,11 @@ are single-sourced in `home/.chezmoidata.toml` (`{{ .models.opus }}` etc.).
 
 ```sh
 # opencode — switch agent or model in the TUI
-/agent plan                     # plan agent runs Opus
-/model anthropic/claude-sonnet-4-6
+/agent plan                     # plan agent runs Fable
+/model anthropic/claude-sonnet-5
 
 # pi — Ctrl+L (or /model)
-/model anthropic/claude-sonnet-4-6
+/model anthropic/claude-sonnet-5
 ```
 
 API keys come from `~/.<service>.env` files (written by `bash auth.sh`),

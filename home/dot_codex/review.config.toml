@@ -1,5 +1,7 @@
 # ~/.codex/review.config.toml — `codex -p review` (alias: codexr)
 # Delta-only overlay on the base config (Codex 0.134+ profile format).
 #
-# Read-only sandbox for code review / exploration sessions.
-sandbox_mode = "read-only"
+# Read-only permissions for code review / exploration sessions.
+model = "gpt-5.6-sol"
+model_reasoning_effort = "xhigh"
+default_permissions = ":read-only"

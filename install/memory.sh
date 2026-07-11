@@ -220,9 +220,11 @@ if [[ "$OS" == "darwin" ]]; then
         if launchctl print "gui/$(id -u)/$_agent" >/dev/null 2>&1; then
             log_okay "$_agent already loaded"
         else
-            launchctl bootstrap "gui/$(id -u)" "$_plist" 2>/dev/null \
-                && log_okay "loaded $_agent" \
-                || log_warn "could not load $_agent (launchctl bootstrap failed)"
+            if launchctl bootstrap "gui/$(id -u)" "$_plist" 2>/dev/null; then
+                log_okay "loaded $_agent"
+            else
+                log_warn "could not load $_agent (launchctl bootstrap failed)"
+            fi
         fi
     done
 else

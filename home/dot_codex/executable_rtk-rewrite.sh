@@ -14,8 +14,8 @@
 #
 # rtk rewrite exit contract: 0 rewrite+allow, 1 passthrough, 2 deny,
 # 3 rewrite-but-ask. Codex PreToolUse cannot express "rewrite AND ask", so
-# 2/3 pass through UNREWRITTEN — the original command then goes through
-# Codex's normal approval flow (rules/dotfiles.rules prompts stay live).
+# 2/3 pass through UNREWRITTEN. The default full-auto policy runs the original;
+# an explicitly interactive session can still apply rules/dotfiles.rules.
 # `permissionDecision: allow` fires only for commands rtk actively rewrote,
 # i.e. noisy read-only commands — never the destructive ones rtk skips.
 set -uo pipefail

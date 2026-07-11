@@ -64,12 +64,13 @@ Paths below use `$LOCAL_PLAT`, which is `$HOME/.local` by default and `$HOME/.lo
    - Includes `rustup` (Homebrew's code-signed build — required for macOS Sequoia+)
 5. **Services**: colima registered as a login service (rootless Docker)
 6. **macOS defaults**: Dock, Finder, keyboard, trackpad, screenshots, Safari, iTerm2 preferences
-7. **Node.js** via nvm → `$LOCAL_PLAT/nvm/`
-8. **Rust** toolchain → `$LOCAL_PLAT/rustup/` + `$LOCAL_PLAT/cargo/`
+7. **Python** via uv → `$LOCAL_PLAT/uv/tools/<tool>/` (one isolated venv per CLI tool), entrypoints in `$ARCH_BIN`
+8. **Node.js** via nvm → `$LOCAL_PLAT/nvm/`
+   - Uses uv's Python for `node-gyp` fallbacks when an npm package has no prebuilt binary
+9. **Rust** toolchain → `$LOCAL_PLAT/rustup/` + `$LOCAL_PLAT/cargo/`
    - Homebrew's `rustup` (code-signed), required on macOS Sequoia+ where the linker enforces `com.apple.provenance`
    - `cargo-binstall` downloads pre-built binaries from GitHub releases when available, falls back to source
    - Cargo tools install to `$LOCAL_PLAT/cargo/bin/`
-9. **Python** via uv → `$LOCAL_PLAT/uv/tools/<tool>/` (one isolated venv per CLI tool), entrypoints in `$ARCH_BIN`
 10. **Claude Code** native binary → `$ARCH_BIN/claude` + plugins + MCP servers + overlay skills
 11. **Codex CLI** native binary → `$ARCH_BIN/codex`, plus managed config + hooks under `~/.codex/`
 12. **Cursor / VS Code** — settings symlinked from `home/dot_cursor/`; extensions installed from `packages/{cursor,vscode}-extensions.txt`
@@ -113,10 +114,11 @@ Paths use `$LOCAL_PLAT`, which is `$HOME/.local` by default (or `$HOME/.local/$P
    - Installs Homebrew's own glibc 2.35 first — binaries are fully self-contained
    - Most packages pour as precompiled bottles; glibc builds from source (~2 min) on first run
    - Custom Python@3.14 patches applied automatically for Linux compatibility
-5. **Node.js** via nvm → `$LOCAL_PLAT/nvm/`
-6. **Rust** via `sh.rustup.rs` → `$LOCAL_PLAT/rustup/` + `$LOCAL_PLAT/cargo/`
+5. **Python** via uv → `$LOCAL_PLAT/uv/tools/<tool>/` (per-CLI-tool venvs), entrypoints in `$ARCH_BIN`
+6. **Node.js** via nvm → `$LOCAL_PLAT/nvm/`
+   - Uses uv's Python for `node-gyp` fallbacks when an npm package has no prebuilt binary
+7. **Rust** via `sh.rustup.rs` → `$LOCAL_PLAT/rustup/` + `$LOCAL_PLAT/cargo/`
    - `cargo-binstall` downloads pre-built binaries from GitHub releases when available, falls back to source
-7. **Python** via uv → `$LOCAL_PLAT/uv/tools/<tool>/` (per-CLI-tool venvs), entrypoints in `$ARCH_BIN`
 8. **Claude Code** native binary → `$ARCH_BIN/claude` + plugins + MCP servers
 9. **Codex CLI** native binary → `$ARCH_BIN/codex`
 10. **Cursor / VS Code** — extensions from `packages/{cursor,vscode}-extensions.txt`

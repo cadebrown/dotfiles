@@ -102,7 +102,7 @@ log_info "Installing/upgrading cargo tools from cargo.txt"
 #   download endpoints time out before the compile fallback kicks in).
 # GITHUB_TOKEN: if set, passed to binstall to authenticate GitHub API calls
 #   and raise the rate limit from 60 to 5000 req/hr.
-_binstall_flags=(--no-confirm --log-level warn)
+_binstall_flags=(--no-confirm --log-level warn --locked)
 [[ -n "${DF_CARGO_STRATEGIES:-}" ]] && _binstall_flags+=(--strategies "$DF_CARGO_STRATEGIES")
 [[ -n "${GITHUB_TOKEN:-}" ]] && _binstall_flags+=(--github-token "$GITHUB_TOKEN")
 
@@ -112,8 +112,9 @@ while IFS= read -r pkg; do
     log_info "  binstall $pkg"
     # --locked on the source fallback: cargo install ignores the crate's
     # shipped Cargo.lock by default, resolving newest semver-compatible deps.
-    # That drifts into API-incompatible transitive versions (atuin-ai vs
-    # ratatui-widgets 0.3.1) and trips crates that hard-refuse unlocked builds
+    # That drifts into API-incompatible transitive versions (atuin-ai vs its
+    # 0.3.1 terminal-UI widget dependency) and trips crates that reject
+    # unlocked builds.
     # (cargo-nextest's locked-tripwire). --locked honors the tested lockfile.
     if run_logged cargo binstall "${_binstall_flags[@]}" "$pkg" \
         || run_logged cargo install --locked "$pkg"; then

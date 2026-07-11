@@ -9,49 +9,17 @@
     "BASH_MAX_OUTPUT_LENGTH": "20000"
   },
   "permissions": {
-    "defaultMode": "bypassPermissions",
-    "allow": [
-      "Bash(*)"
-    ],
-    "ask": [
-      "Bash(git push:*)",
-      "Bash(git reset --hard:*)",
-      "Bash(rm -rf:*)",
-      "Bash(rm -fr:*)",
-      "mcp__cloudflare__*",
-      "mcp__github__push_files",
-      "mcp__github__create_or_update_file",
-      "mcp__github__delete_file",
-      "mcp__github__merge_pull_request",
-      "mcp__github__create_repository"
-    ]
+    "defaultMode": "bypassPermissions"
   },
+  "skipDangerousModePermissionPrompt": true,
   "cleanupPeriodDays": 3650,
-  "model": "opus[1m]",
+  "model": "claude-fable-5[1m]",
   "fallbackModel": [
-    "sonnet[1m]"
+    "claude-sonnet-5[1m]"
   ],
+  "effortLevel": "xhigh",
   "sandbox": {
-    "enabled": false,
-    "filesystem": {
-      "allowWrite": [
-        "/tmp",
-        "$HOME/.cache",
-        "$HOME/.config",
-        "$HOME/.local",
-        "$HOME/.npm",
-        "$HOME/.claude",
-        "$HOME/.codex",
-        "$HOME/.cursor",
-        "$HOME/.agents",
-        "$HOME/.ollama",
-        "$HOME/kb",
-        "$HOME/.homebrew",
-        "$HOME/Library/Application Support",
-        "$HOME/Library/Caches",
-        "$HOME/Library/Preferences"
-      ]
-    }
+    "enabled": false
   },
   "hooks": {
     "Notification": [

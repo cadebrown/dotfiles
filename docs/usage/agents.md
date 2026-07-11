@@ -81,6 +81,26 @@ Skills live in one place: `home/dot_claude/skills/` → deployed to
 three scan `~/.agents/skills`; opencode also reads `~/.claude/skills`
 directly). One SKILL.md edit propagates to every tool on `chezmoi apply`.
 
+## Model and safety defaults
+
+- Codex defaults to GPT-5.6 Sol at high reasoning. `deep` raises reasoning to
+  extra-high, `fast` uses GPT-5.6 Luna at low reasoning, and `review` is read-only.
+- Codex defaults to the built-in `:danger-full-access` profile with approval policy
+  `never`. All MCP and connector tools, including destructive and open-world tools,
+  run without prompts.
+- Claude Code defaults to Claude Fable 5 with extra-high effort,
+  `bypassPermissions`, and its OS sandbox disabled.
+- OpenCode uses Fable for planning, local Qwen3.6 for builds on macOS, and a
+  read-only Sonnet 5 review subagent. Plan/build agents and all MCP tools use the
+  global `allow` policy; its shell wrapper also passes `--auto`. Review rejects
+  unmatched shell commands without asking.
+- Cursor CLI permits every shell command, Cursor's Claude extension starts in
+  bypass mode, Claude Desktop permits all browser actions, and Codex Desktop skips
+  its full-access confirmation.
+
+The chezmoi source guard still blocks edits to rendered targets when an authoritative
+source exists under `home/`. That is a correctness invariant, not an approval gate.
+
 ## Memory layers
 
 Three layers, set up by `install/memory.sh` (bootstrap step 6.6, `DF_DO_MEMORY`):

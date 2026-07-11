@@ -416,22 +416,19 @@ These are non-obvious things that have caused real bugs:
   delegate to it. opencode/pi use in-process TS plugins calling `rtk rewrite` (no built-in
   hook exists for those). Codex uses a hand-rolled PreToolUse `updatedInput` hook
   (`dot_codex/executable_rtk-rewrite.sh`, wired in `dot_codex/hooks.json`; rtk ships no
-  Codex hook itself). rtk's deny/ask verdicts (exit 2/3) pass through UNREWRITTEN there so
-  Codex's own approval rules stay live; trust hashes are managed by `codex.sh sync-config`
-  — no interactive /hooks review needed after managed edits.
+  Codex hook itself). rtk's deny/ask verdicts (exit 2/3) pass through UNREWRITTEN there;
+  the default full-auto policy runs the original command, while an explicitly
+  interactive session can still apply execpolicy rules. Trust hashes are managed by
+  `codex.sh sync-config` — no interactive /hooks review is needed after managed edits.
 - **chezmoi-guard covers all four CLI harnesses** — Claude + Codex via PreToolUse
   hooks, opencode via `dot_config/opencode/plugin/chezmoi-guard.ts`, pi via
   `dot_pi/agent/extensions/chezmoi-guard.ts`. All four are thin adapters around
   `~/.local/bin/df-chezmoi-guard` (exit 2 = blocked) — detection logic lives ONLY
   there. Cursor is the exception: its sync-back hooks capture edits instead of
   blocking them.
-- **rtk needs an allow-rule or it defaults to "ask"** — rtk reads deny/ask/allow from the
-  host's own permission config and defaults unmatched commands to *ask* (least-privilege).
-  For Claude that means the rewrite applies but without an explicit allow (fine under
-  `bypassPermissions`); for Cursor an *ask* verdict yields **no rewrite at all** (Cursor's
-  protocol can't rewrite-and-prompt). So `dot_claude/settings.json` has
-  `permissions.allow: ["Bash(*)"]` and `dot_cursor/cli-config.json` has
-  `permissions.allow: ["Shell(*)"]` — these make every rewrite auto-allow, fully transparent.
+- **rtk preserves full-auto execution** — Claude runs in `bypassPermissions`, Cursor
+  allows `Shell(*)`, and Codex uses `approval_policy = "never"`. Rewrites are transparent;
+  commands rtk declines to rewrite pass through to the unrestricted host policy.
 - **GitHub MCP can't use OAuth** — `api.githubcopilot.com/mcp` advertises OAuth, but
   GitHub's IdP doesn't implement Dynamic Client Registration (RFC 7591), so Claude
   Code's `/mcp` Authenticate flow fails with "Incompatible auth server" (tracked in
@@ -486,10 +483,11 @@ These are non-obvious things that have caused real bugs:
   latest; `codex.sh` reconciles the managed config right after, so format drift surfaces
   in its healthcheck). If Codex breaks config compatibility again, re-pin there until
   the config catches up, and run `bash install/codex.sh check` after any bump.
-- **Codex `approval_policy` uses the granular form** — a plain `"never"` silently
-  suppresses every `decision=prompt` rule in `rules/dotfiles.rules` (rm, git reset
-  --hard, git push). `{ granular = { rules = true, ... } }` keeps those prompts live
-  while everything else stays autonomous. Watch openai/codex#25312.
+- **Codex full-auto is explicit at every layer** — `default_permissions =
+  ":danger-full-access"` removes the local sandbox, `approval_policy = "never"`
+  suppresses interactive execpolicy prompts, and generated MCP/app policy uses
+  `approve`. `rules/dotfiles.rules` is retained for sessions that deliberately
+  override the approval policy to an interactive mode.
 - **Test `~/.homebrew/bin/brew`, never `-e ~/.homebrew`** — Homebrew stores tap-trust
   state at `~/.homebrew/trust.json` on macOS, so a bare directory test misroutes the
   shell profiles onto the Linux user-prefix branch (bit us June 2026; both profile

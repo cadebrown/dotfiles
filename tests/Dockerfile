@@ -8,9 +8,13 @@ ENV DF_EMAIL="test@example.com"
 RUN apt-get update && apt-get install -y \
     curl \
     git \
+    jq \
     zsh \
     ca-certificates \
     libatomic1 \
+    build-essential \
+    libssl-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # Install bats-core from source (system package is often outdated)

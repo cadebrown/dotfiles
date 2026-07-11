@@ -2,7 +2,7 @@
 # install/opencode.sh - generate ~/.config/opencode/opencode.json
 #
 # opencode.json is SCRIPT-OWNED, like ~/.codex/config.toml: the chezmoi template
-# create_opencode.json.tmpl seeds it once, then this script regenerates it —
+# create_private_opencode.json.tmpl seeds it once, then this script regenerates it —
 # rendering the model/agent/permission base via `chezmoi execute-template` and
 # injecting the `mcp` object generated from the shared packages/mcp-servers.txt
 # (the same source of truth as Claude/Codex/Cursor).
@@ -68,7 +68,7 @@ _sync_config() {
     has jq || { log_warn "jq missing — skipping opencode config"; return 0; }
     has chezmoi || { log_warn "chezmoi missing — skipping opencode config"; return 0; }
 
-    local _tmpl="$DF_ROOT/home/dot_config/opencode/create_opencode.json.tmpl"
+    local _tmpl="$DF_ROOT/home/dot_config/opencode/create_private_opencode.json.tmpl"
     local _out="$HOME/.config/opencode/opencode.json" _base _mcp _tmp
     [[ -f "$_tmpl" ]] || die "missing opencode template: $_tmpl"
 

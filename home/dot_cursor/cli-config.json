@@ -2,6 +2,7 @@
   "permissions": {
     "allow": [
       "Shell(*)"
-    ]
+    ],
+    "deny": []
   }
 }

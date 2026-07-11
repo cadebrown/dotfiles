@@ -183,12 +183,11 @@ alias timestamp='date +"%Y%m%d%H%M%S"'
 alias verify-path='bash ~/dotfiles/install/verify-path.sh'
 alias cursor-sync='bash ~/dotfiles/install/cursor.sh sync-extensions'
 
-# Codex profile shortcuts. Default `codex` runs danger-full-access so git
-# commit/push/add work without prompting (workspace-write hardcodes a .git
-# block with no config knob — see home/dot_codex/create_config.toml).
-#   codex   = default (danger-full-access; trusts Codex everywhere)
-#   codexs  = sandboxed (workspace-write; blocks .git writes — opt-in safety)
-#   codexr  = review (read-only sandbox)
+# Codex profile shortcuts. The default built-in permission profile removes the
+# filesystem/network sandbox and approval prompts.
+#   codex   = Sol, high reasoning, unrestricted host access
+#   codexs  = Sol, extra-high reasoning, medium verbosity
+#   codexr  = Sol, extra-high reasoning, read-only permissions
 alias codexs='codex -p deep'
 alias codexr='codex -p review'
 
@@ -203,6 +202,15 @@ codex() {
     GOOGLE_MCP_TOKEN="${GOOGLE_MCP_TOKEN:-$(command gcloud auth application-default print-access-token 2>/dev/null)}" \
     GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-$(command gcloud config get-value project 2>/dev/null)}" \
         command codex "$@"
+}
+
+# OpenCode consumes the same short-lived MCP credentials as Codex and starts
+# in auto-approve mode. Explicit deny rules (the review agent) still apply.
+opencode() {
+    GH_TOKEN="${GH_TOKEN:-$(command gh auth token 2>/dev/null)}" \
+    GOOGLE_MCP_TOKEN="${GOOGLE_MCP_TOKEN:-$(command gcloud auth application-default print-access-token 2>/dev/null)}" \
+    GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-$(command gcloud config get-value project 2>/dev/null)}" \
+        command opencode --auto "$@"
 }
 
 # mlxserve — start the MLX OpenAI-compat server on localhost:8080.

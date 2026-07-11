@@ -538,7 +538,8 @@ else
     fi
 fi
 
-# Source bashrc if it exists (for interactive non-login shells)
-if [ -f "$HOME/.bashrc" ]; then
+# Login shells need the interactive rc file too, but noninteractive shells must
+# not run prompt hooks or commands such as `bind` that require line editing.
+if [[ $- == *i* && -f "$HOME/.bashrc" ]]; then
     . "$HOME/.bashrc"
 fi

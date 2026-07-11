@@ -42,6 +42,17 @@ nvm use default --silent
 log_okay "Node.js: $(node --version)"
 log_okay "npm:     $(npm --version)"
 
+# Native npm packages use node-gyp when no prebuilt binary exists. Python is
+# installed earlier in bootstrap; point node-gyp at uv's interpreter because
+# uv-managed Python does not add a generic `python3` executable to PATH.
+if [[ -x "$ARCH_BIN/uv" ]]; then
+    _node_gyp_python="$("$ARCH_BIN/uv" python find 2>/dev/null || true)"
+    if [[ -n "$_node_gyp_python" ]]; then
+        export PYTHON="$_node_gyp_python"
+        log_debug "node-gyp Python: $PYTHON"
+    fi
+fi
+
 ### npm global packages ###
 
 NPM_TXT="$DF_PACKAGES/npm.txt"

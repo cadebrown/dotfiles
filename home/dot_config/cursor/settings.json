@@ -105,10 +105,10 @@
     "yaml"
   ],
   "cursor.composer.shouldAllowCustomModes": true,
-  "claudeCode.allowDangerouslySkipPermissions": true,
-  "claudeCode.initialPermissionMode": "bypassPermissions",
   "terminal.integrated.defaultProfile.linux": "zsh",
   "claudeCode.preferredLocation": "sidebar",
+  "claudeCode.allowDangerouslySkipPermissions": true,
+  "claudeCode.initialPermissionMode": "bypassPermissions",
   "remote.autoForwardPortsSource": "hybrid",
   "workbench.sideBar.location": "right"
 }

@@ -83,7 +83,7 @@ Claude Code's status line is a custom bash script at `home/dot_claude/executable
 Codex also has global skills and rules (edit source-of-truth in the repo):
 
 ```sh
-$EDITOR ~/dotfiles/home/dot_codex/create_config.toml
+$EDITOR ~/dotfiles/home/dot_codex/create_private_config.toml
 $EDITOR ~/dotfiles/home/dot_codex/rules/dotfiles.rules
 chezmoi apply
 ~/dotfiles/install/codex.sh sync-config
@@ -116,7 +116,7 @@ Useful Codex commands after updating:
 codex --profile fast
 codex --profile review
 codex --profile deep
-codex   # default profile is already danger-full-access
+codex   # default: Sol/high, unrestricted host access, no prompts
 codex -c 'tui.theme="neon-noir"'
 codex -c 'tui.theme="sunburst-candy"'
 codex -c 'tui.theme="minty-terminal"'
@@ -130,10 +130,10 @@ Codex schema note: profiles are delta-only overlay files at `~/.codex/<name>.con
 with top-level keys (Codex 0.134+); the old `[profiles.*]` tables in config.toml are
 ignored. Managed sources: `home/dot_codex/{deep,review,fast}.config.toml`.
 
-Default Codex mode is intentionally autonomous: `sandbox_mode = "danger-full-access"`
-with granular approvals (`approval_policy = { granular = { rules = true, ... } }`) so the
-execpolicy prompt rules (rm, git reset --hard, git push) stay live. Use `-p deep`
-(workspace-write) or `-p review` (read-only) to opt into tighter sandboxes.
+Default Codex mode uses the built-in `:danger-full-access` permission profile and
+`approval_policy = "never"`. MCP and connector tools are also configured for
+prompt-free execution. Use `-p deep` for extra-high reasoning, `-p fast` for
+Luna/low, or `-p review` for deliberately read-only work.
 
 ---
 

@@ -454,8 +454,22 @@ fi
 
 log_section "6 — language runtimes"
 
+if [[ "${DF_DO_PYTHON:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/python.sh" || die "python.sh failed"
+else
+    log_info "Skipping Python (DF_DO_PYTHON=0)"
+fi
+
 if [[ "${DF_DO_NODE:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/node.sh" || die "node.sh failed"
+    # node.sh is a subprocess, so its nvm PATH changes do not reach this
+    # orchestrator. Activate the installed default before later Codex/skills
+    # steps look for npm-installed binaries and npx.
+    if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+        # shellcheck source=/dev/null
+        source "$NVM_DIR/nvm.sh"
+        nvm use default --silent
+    fi
 else
     log_info "Skipping Node + npm packages (DF_DO_NODE=0)"
 fi
@@ -470,12 +484,6 @@ if [[ "${DF_DO_GO:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/go.sh" || die "go.sh failed"
 else
     log_info "Skipping Go (DF_DO_GO=0)"
-fi
-
-if [[ "${DF_DO_PYTHON:-1}" != "0" ]]; then
-    bash "$DF_INSTALL_DIR/python.sh" || die "python.sh failed"
-else
-    log_info "Skipping Python (DF_DO_PYTHON=0)"
 fi
 
 if [[ "${DF_DO_CLAUDE:-1}" != "0" ]]; then

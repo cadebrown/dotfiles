@@ -227,9 +227,8 @@ _emit_mcp_blocks_to() {
                 printf 'startup_timeout_sec = 20\n'
                 printf 'tool_timeout_sec = 60\n'
                 printf 'required = false\n'
-                # Read-only tools remain autonomous; tools without a read-only
-                # annotation prompt before causing external side effects.
-                printf 'default_tools_approval_mode = "writes"\n'
+                # Full-auto mode: all MCP tools run without an approval prompt.
+                printf 'default_tools_approval_mode = "approve"\n'
             } >> "$out"
 
             # OAuth sub-table — must trail the parent table's bare keys.
@@ -268,7 +267,7 @@ _sync_config() {
     local _tmpl _dest _tmp _managed _runtime _merged _mcp
     log_section "Codex Config Sync"
 
-    _tmpl="$DF_ROOT/home/dot_codex/create_config.toml"
+    _tmpl="$DF_ROOT/home/dot_codex/create_private_config.toml"
     _dest="$HOME/.codex/config.toml"
 
     [[ -f "$_tmpl" ]] || die "Missing managed config template: $_tmpl"
@@ -330,7 +329,7 @@ _sync_hooks() {
     ensure_dir "$HOME/.codex"
     ensure_dir "$HOME/.local/bin"
 
-    install -m 600 "$_hooks_src" "$_hooks_dest"
+    install -m 644 "$_hooks_src" "$_hooks_dest"
     install -m 755 "$_guard_src" "$_guard_dest"
 
     # Trust every PreToolUse hook (group index : hook index). Codex records
@@ -460,20 +459,26 @@ _check_setup() {
     [[ -x "$_guard" ]] || die "Missing executable chezmoi guard: $_guard"
 
     # Model pin: derived from the source template so the check tracks it.
-    _want_model="$(grep '^model = ' "$DF_ROOT/home/dot_codex/create_config.toml" | head -1 || true)"
-    [[ -n "$_want_model" ]] || die "No 'model =' line in create_config.toml template"
+    _want_model="$(grep '^model = ' "$DF_ROOT/home/dot_codex/create_private_config.toml" | head -1 || true)"
+    [[ -n "$_want_model" ]] || die "No 'model =' line in create_private_config.toml template"
     grep -qF "$_want_model" "$_config" \
         || die "Deployed model differs from template (${_want_model}) in $_config"
     grep -q 'project_doc_fallback_filenames = \["AGENTS.md", "CLAUDE.md"\]' "$_config" \
         || die "Missing AGENTS.md fallback in $_config"
-    grep -q '^approval_policy = { granular' "$_config" \
-        || die "approval_policy is not the granular form — prompt rules would be dead letters"
-    grep -q '^default_permissions = "dev"' "$_config" \
-        || die "Codex default permissions are not the workspace-scoped dev profile"
+    grep -q '^approval_policy = "never"' "$_config" \
+        || die "Codex approval policy is not prompt-free"
+    grep -q '^default_permissions = ":danger-full-access"' "$_config" \
+        || die "Codex default permissions are not unrestricted"
     ! grep -q '^sandbox_mode = ' "$_config" \
         || die "Legacy sandbox_mode disables permission profiles in $_config"
-    grep -q '^default_tools_approval_mode = "writes"' "$_config" \
-        || die "MCP write approval policy missing in $_config"
+    grep -q '^default_tools_approval_mode = "approve"' "$_config" \
+        || die "MCP tools are not configured for prompt-free execution in $_config"
+    grep -q '^\[apps\._default\]$' "$_config" \
+        || die "App defaults missing in $_config"
+    grep -q '^destructive_enabled = true$' "$_config" \
+        || die "Destructive app tools are not enabled in $_config"
+    grep -q '^open_world_enabled = true$' "$_config" \
+        || die "Open-world app tools are not enabled in $_config"
     ! grep -q '^\[profiles\.' "$_config" \
         || die "Legacy [profiles.*] tables in $_config — Codex 0.134+ ignores them (profiles live in ~/.codex/<name>.config.toml)"
     grep -q 'bearer_token_env_var = "GH_TOKEN"' "$_config" \

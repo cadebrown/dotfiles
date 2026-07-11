@@ -1,7 +1,7 @@
 #!/bin/bash
 # Chezmoi re-runs this whenever the opencode base template or the shared MCP
 # server list changes, to regenerate the script-owned ~/.config/opencode/opencode.json.
-# config hash:      {{ include "dot_config/opencode/create_opencode.json.tmpl" | sha256sum }}
+# config hash:      {{ include "dot_config/opencode/create_private_opencode.json.tmpl" | sha256sum }}
 # mcp-servers.txt:  {{ include "../packages/mcp-servers.txt" | sha256sum }}
 # installer hash:   {{ include "../install/opencode.sh" | sha256sum }}
 # overlay mcp hashes:

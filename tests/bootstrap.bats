@@ -30,13 +30,13 @@ setup() {
 }
 
 @test "~/.gitconfig has user name from DF_NAME" {
-    run git config user.name
+    run git config --file "$HOME/.gitconfig" user.name
     [ "$status" -eq 0 ]
     [ -n "$output" ]
 }
 
 @test "~/.gitconfig has user email from DF_EMAIL" {
-    run git config user.email
+    run git config --file "$HOME/.gitconfig" user.email
     [ "$status" -eq 0 ]
     [ -n "$output" ]
 }
@@ -44,7 +44,9 @@ setup() {
 # --- chezmoi idempotency ---
 
 @test "chezmoi diff is empty (apply is idempotent)" {
-    run env PAGER=cat chezmoi diff
+    # Run-onchange scripts are actions, not deployed files; chezmoi reports
+    # them as pending in diff even after a successful apply.
+    run env PAGER=cat chezmoi diff --exclude=scripts
     [ "$status" -eq 0 ]
     # diff should be empty — if not, something drifted since apply
     [ -z "$output" ]

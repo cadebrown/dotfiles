@@ -9,12 +9,12 @@ Common guidance lives in the shared partial; opencode-specific notes follow.
 
 ## OpenCode-specific
 
-- **Agents**: `plan` runs Opus, `build` runs local MLX (Qwen3.6-27B), `review` runs Sonnet.
-  Switch with `/agent <name>` in the TUI.
-- **Permissions matter**: `.git/**`, `node_modules/**`, `.env*`, and `**/secrets/**` are
-  edit-denied at the config level. `git push` and destructive bash commands prompt
-  before running. Don't try to circumvent these — surface the need instead.
-- **MCP**: configured in `mcp` block of opencode.json. None enabled by default.
+- **Agents**: `plan` runs Fable, `build` runs local MLX (Qwen3.6-27B), and the
+  read-only `review` subagent runs Sonnet. Switch with `/agent <name>` in the TUI.
+- **Full-auto mode**: build and plan agents run without permission prompts. The
+  `review` subagent remains read-only and rejects unmatched shell commands.
+- **MCP**: generated into the `mcp` block of opencode.json from the shared
+  `packages/mcp-servers.txt` registry. Every generated tool namespace is enabled.
 - **Plugin events** (for reference, when adding new plugins): `session.created`,
   `session.idle`, `tool.execute.before`/`.after`, `file.edited`, `permission.asked`.
   Plugins live in `~/.config/opencode/plugin/*.ts` (Bun-executed; `$` is Bun shell).

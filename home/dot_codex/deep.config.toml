@@ -2,7 +2,6 @@
 # Delta-only overlay on the base config (Codex 0.134+ profile format:
 # top-level keys, overlaid on ~/.codex/config.toml).
 #
-# Workspace-write sandbox: blocks .git/ writes by design — use the default
-# profile when Codex itself must commit/push.
-sandbox_mode = "workspace-write"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "xhigh"
 model_verbosity = "medium"

@@ -39,6 +39,7 @@ subscriptions if I want to swap from API-key billing.
 {{- if eq .chezmoi.os "darwin" }}
     "mlx/*",
 {{- end }}
+    "anthropic/{{ .models.fable }}*",
     "anthropic/{{ .models.sonnet }}*",
     "anthropic/{{ .models.opus }}*",
     "anthropic/{{ .models.haiku }}*",

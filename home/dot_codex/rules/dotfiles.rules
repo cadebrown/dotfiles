@@ -3,7 +3,9 @@
 # Codex's own TUI "always allow" approvals append to default.rules, which is
 # deliberately NOT chezmoi-managed — runtime appends and managed content must
 # not share a file. Keep this file generic: project-specific allows belong in
-# the project's .codex/rules/, secrets-loading commands should keep prompting.
+# the project's .codex/rules/. The default approval_policy="never" makes prompt
+# decisions non-interactive; these rules remain useful with an explicit
+# on-request/granular override.
 #
 # Validate: codex execpolicy check --rules ~/.codex/rules/dotfiles.rules -- <cmd>
 
@@ -35,9 +37,8 @@ prefix_rule(pattern=["curl", "-L", "--fail"], decision="allow")
 prefix_rule(pattern=["bash", "install/codex.sh", "sync-config"], decision="allow")
 prefix_rule(pattern=["bash", "install/codex.sh", "check"], decision="allow")
 
-# These prompt rules are live because approval_policy uses the granular form
-# with rules = true (see create_config.toml) — a plain "never" would suppress
-# them silently.
+# These prompt rules apply only when a session overrides the default
+# approval_policy="never" with an interactive policy.
 prefix_rule(
     pattern=["rm"],
     decision="prompt",

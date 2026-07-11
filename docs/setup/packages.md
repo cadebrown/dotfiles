@@ -60,13 +60,13 @@ Currently ships [`pi`](https://pi.dev) — a multi-provider coding agent (Claude
 
 Other CLI agents are installed via their native packagers:
 - `claude-code` → `install/claude.sh` (Anthropic GCS binary)
-- `codex` → `@openai/codex` (version-pinned) in `packages/npm.txt`; managed config via `install/codex.sh`
+- `codex` → unpinned `@openai/codex` in `packages/npm.txt`; managed config and healthcheck via `install/codex.sh`
 - `opencode` → `brew "opencode"` (`packages/Brewfile`)
 
 Codex CLI config, rules, themes, and MCP servers are managed from `home/dot_codex/`
 (skills live in `home/dot_claude/skills/`, shared via the `~/.agents/skills` symlink).
 `install/codex.sh sync-config` preserves runtime trust/plugin sections while refreshing the
-managed config. Chezmoi also runs this sync when `home/dot_codex/create_config.toml` changes.
+managed config. Chezmoi also runs this sync when `home/dot_codex/create_private_config.toml` changes.
 
 ### 3. pip — Python packages
 
