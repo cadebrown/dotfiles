@@ -414,6 +414,94 @@ if ! command -v ncu >/dev/null 2>&1 && [ -e "$_LOCAL_PLAT/.ncu" ]; then
     ncu_use "$_LOCAL_PLAT/.ncu"
 fi
 
+### QNX SDP ###
+# Installs live under $_LOCAL_PLAT/.qnxsdps/ (dotfiles-nvidia overlay, qnx.sh).
+# The license is separate — an activated $QNX_CONFIGURATION/license/licenses
+# (default ~/.qnx); install/auth.sh qnx points QNX_CONFIGURATION at it and the
+# ~/.nvidia.env export below (sourced under CREDENTIALS) makes it authoritative.
+
+# Activate a specific QNX SDP installation.
+qnx_use() {
+    local _base="$1"
+    if [ ! -e "$_base" ]; then
+        echo "ERROR: QNX SDP not found at $_base" >&2
+        return 1
+    fi
+    # Tarball installs may nest the SDP one dir down; resolve the real base.
+    if [ ! -d "$_base/host" ] && [ ! -f "$_base/qnxsdp-env.sh" ]; then
+        local _d
+        for _d in "$_base"/*/; do
+            if [ -d "$_d/host" ] || [ -f "$_d/qnxsdp-env.sh" ]; then _base="${_d%/}"; break; fi
+        done
+    fi
+    # Derive QNX_HOST/QNX_TARGET from the *actual* dir. Installs here are
+    # symlinked/relocated, so any bundled qnxsdp-env.sh carries stale baked-in
+    # paths — only trust it as a last resort. (SDP8 → target/qnx, SDP7 → qnx7.)
+    local _host=""
+    if [ -d "$_base/host/linux/x86_64" ]; then
+        _host="$_base/host/linux/x86_64"
+    else
+        local _h
+        for _h in "$_base"/host/linux/*/; do [ -d "$_h" ] && { _host="${_h%/}"; break; }; done
+    fi
+    if [ -n "$_host" ]; then
+        export QNX_HOST="$_host"
+        if   [ -d "$_base/target/qnx" ];  then export QNX_TARGET="$_base/target/qnx"
+        elif [ -d "$_base/target/qnx7" ]; then export QNX_TARGET="$_base/target/qnx7"
+        fi
+        export PATH="$QNX_HOST/usr/bin:$PATH"
+        export LD_LIBRARY_PATH="$QNX_HOST/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+        [ -n "${QNX_TARGET:-}" ] && export MAKEFLAGS="-I$QNX_TARGET/usr/include${MAKEFLAGS:+ $MAKEFLAGS}"
+    elif [ -f "$_base/qnxsdp-env.sh" ]; then
+        . "$_base/qnxsdp-env.sh"
+    else
+        echo "ERROR: no host/linux/* or qnxsdp-env.sh under $1" >&2
+        return 1
+    fi
+    # License config dir: an explicit ~/.nvidia.env value (sourced later) wins;
+    # otherwise QNX's own default of ~/.qnx (which auth.sh may symlink to scratch).
+    export QNX_CONFIGURATION="${QNX_CONFIGURATION:-$HOME/.qnx}"
+}
+
+# List installed QNX SDP versions. * marks the active default.
+qnx_list() {
+    local _qnxsdps_dir="$_LOCAL_PLAT/.qnxsdps"
+    local _current=""
+    [ -L "$_LOCAL_PLAT/.qnxsdp" ] && _current="$(basename "$(readlink "$_LOCAL_PLAT/.qnxsdp")")"
+    if [ ! -d "$_qnxsdps_dir" ]; then
+        echo "No QNX SDP installs found at $_qnxsdps_dir" >&2
+        return 1
+    fi
+    for _d in "$_qnxsdps_dir"/*/; do
+        local _name
+        _name="$(basename "$_d")"
+        if [ "$_name" = "$_current" ]; then
+            echo "* $_name"
+        else
+            echo "  $_name"
+        fi
+    done
+}
+
+# Switch the active QNX SDP default for this PLAT.
+# Usage: qnx_switch scratch_qnx_8.0.4
+qnx_switch() {
+    local _target="$_LOCAL_PLAT/.qnxsdps/$1"
+    if [ ! -e "$_target" ]; then
+        echo "ERROR: not found: $1" >&2
+        echo "Run qnx_list to see available versions" >&2
+        return 1
+    fi
+    ln -sfn "$_target" "$_LOCAL_PLAT/.qnxsdp"
+    qnx_use "$_LOCAL_PLAT/.qnxsdp"
+    echo "Switched to $1"
+}
+
+# Auto-activate default QNX SDP if qcc isn't already in PATH.
+if ! command -v qcc >/dev/null 2>&1 && [ -e "$_LOCAL_PLAT/.qnxsdp" ]; then
+    qnx_use "$_LOCAL_PLAT/.qnxsdp"
+fi
+
 # Scratch space: large local storage for NFS homes with small quotas.
 # install/scratch.sh symlinks ~/.local, ~/.cache, etc. here.
 if [ -e "$HOME/scratch" ]; then
