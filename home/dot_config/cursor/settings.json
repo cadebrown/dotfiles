@@ -109,5 +109,6 @@
   "claudeCode.initialPermissionMode": "bypassPermissions",
   "terminal.integrated.defaultProfile.linux": "zsh",
   "claudeCode.preferredLocation": "sidebar",
-  "remote.autoForwardPortsSource": "hybrid"
+  "remote.autoForwardPortsSource": "hybrid",
+  "workbench.sideBar.location": "right"
 }
