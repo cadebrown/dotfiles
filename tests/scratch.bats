@@ -55,6 +55,24 @@ skip_if_no_scratch() {
     [[ "$_resolved" == "$SCRATCH"* || "$_resolved" == "$PATHS"* ]]
 }
 
+# --- ~/.claude: dir stays real, heavy subdirs symlink (the chezmoi gotcha) ---
+
+@test "~/.claude itself is never a symlink (chezmoi manages it as a real dir)" {
+    # Holds regardless of scratch: a symlinked ~/.claude is clobbered on apply.
+    if [[ -e "$HOME/.claude" ]]; then
+        [[ ! -L "$HOME/.claude" ]]
+    fi
+}
+
+@test "~/.claude/projects is a symlink under scratch when configured" {
+    skip_if_no_scratch
+    [[ -L "$HOME/.claude/projects" ]] || skip "projects not migrated (dropped from DF_CLAUDE_LINKS?)"
+    [[ -e "$HOME/.claude/projects" ]]
+    local _resolved
+    _resolved="$(readlink -f "$HOME/.claude/projects")"
+    [[ "$_resolved" == "$PATHS/.claude/"* ]]
+}
+
 # --- scratch.sh idempotency ---
 
 @test "scratch.sh is idempotent (second run succeeds)" {

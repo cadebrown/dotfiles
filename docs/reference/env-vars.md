@@ -29,7 +29,8 @@ Complete reference for `DF_*` variables and the tool-standard ones this repo car
 |---|---|---|
 | `DF_SCRATCH` | (unset) | Path to scratch root. Setting this enables scratch mode (symlinks heavy `$HOME` dirs). |
 | `DF_SCRATCH_LINK` | `$HOME/scratch` | The `$HOME` symlink that points at scratch. Bootstrap creates this if `DF_SCRATCH` is set. |
-| `DF_LINKS` | `~/.local:~/.cache:~/.vscode:~/.vscode-server:~/.cursor:~/.cursor-server:~/.nv:~/.npm:~/.oh-my-zsh:~/.oh-my-zsh-custom` | Colon-separated dirs to redirect to scratch. |
+| `DF_LINKS` | `~/.local:~/.cache:~/.vscode:~/.vscode-server:~/.cursor:~/.cursor-server:~/.nv:~/.npm:~/.oh-my-zsh:~/.oh-my-zsh-custom` | Colon-separated top-level dirs to redirect to scratch. |
+| `DF_CLAUDE_LINKS` | `projects:plugins:file-history:ccline` | Colon-separated `~/.claude` subdir names to redirect to scratch (never `~/.claude` itself — chezmoi owns it). Drop `projects` to keep history + memory on NFS. |
 
 See [Scratch space](../setup/scratch.md).
 

@@ -14,24 +14,39 @@
 #     ├── .npm/                  ← symlinked from ~/.npm (npm cache)
 #     ├── .oh-my-zsh/            ← symlinked from ~/.oh-my-zsh
 #     ├── .oh-my-zsh-custom/     ← symlinked from ~/.oh-my-zsh-custom
-#     └── kb/                    ← symlinked from ~/kb (knowledge base, install/memory.sh)
+#     ├── kb/                    ← symlinked from ~/kb (knowledge base, install/memory.sh)
+#     └── .claude/               ← heavy *unmanaged* subdirs of ~/.claude (see note)
+#         ├── projects/          ← symlinked from ~/.claude/projects (history + memory)
+#         ├── plugins/           ← symlinked from ~/.claude/plugins
+#         ├── file-history/      ← symlinked from ~/.claude/file-history
+#         └── ccline/            ← symlinked from ~/.claude/ccline
 #
-# Which dirs are migrated is controlled by DF_LINKS (colon-separated).
-# Default: see _DEFAULT_LINKS below
+# Which top-level dirs are migrated is controlled by DF_LINKS (colon-separated);
+# which ~/.claude subdirs are migrated is controlled by DF_CLAUDE_LINKS.
+# Defaults: see _DEFAULT_LINKS / _DEFAULT_CLAUDE_LINKS below.
 #
 # Note on ~/kb: on scratch, each machine has its OWN kb working copy — the
 # git remote (not NFS) is the sync mechanism, which is the designed model
 # (memory.sh prompts for a remote). Git on NFS is slow and lock-prone, and
 # kb sits next to the qmd index reads, so local disk is the right home.
 # Note: ~/.config is NOT migrated — chezmoi manages files inside it as a real directory.
-# Note: ~/.claude is NOT migrated — chezmoi manages files inside it as a real directory.
+# Note: ~/.claude itself is NEVER symlinked — chezmoi manages files inside it
+#   (settings.json, skills/, output-styles/, hook scripts) as a REAL directory, so a
+#   symlinked ~/.claude gets clobbered on `chezmoi apply` (replaced with a real dir
+#   holding only the managed files, orphaning history on scratch). Instead we migrate
+#   the heavy *unmanaged* subdirs one level down (projects/plugins/file-history/ccline),
+#   which chezmoi never touches. Tradeoff: like ~/.local and ~/.cache, these become
+#   per-machine — conversation history and auto-memory under projects/<proj>/memory/
+#   stop syncing across the NFS fleet (~/kb, git-synced, stays the cross-machine layer).
+#   Drop `projects` from DF_CLAUDE_LINKS to keep history on NFS and offload only caches.
 #
 # All variables are defined in _lib.sh:
 #   SCRATCH          — absolute path to scratch root (empty if not configured)
 #   PATHS            — $SCRATCH/.paths — the directory holding all symlink targets
 #   DF_SCRATCH       — env var to set scratch root
 #   DF_SCRATCH_LINK  — symlink in $HOME pointing to scratch (default: ~/scratch)
-#   DF_LINKS         — colon-separated dirs to migrate (override above defaults)
+#   DF_LINKS         — colon-separated top-level dirs to migrate (override above defaults)
+#   DF_CLAUDE_LINKS  — colon-separated ~/.claude subdir names to migrate
 #
 # Safe to re-run: skips directories that are already correctly symlinked.
 # No-op when no scratch space is detected.
@@ -78,6 +93,21 @@ if [[ -d "$_OLD_PATHS" && ! -d "$PATHS" ]]; then
     done
 fi
 
+# _verify_copy SRC DST
+#   Returns 0 iff every real entry under SRC also exists under DST. Ignores
+#   ephemeral NFS silly-rename files (.nfs*), which cp legitimately cannot copy.
+#   Used to decide whether a copy was complete enough that deleting the source
+#   is safe — a partial copy must never lead to source removal.
+_verify_copy() {
+    local src="$1" dst="$2" rel missing=0
+    while IFS= read -r -d '' rel; do
+        [[ -e "$dst/$rel" || -L "$dst/$rel" ]] && continue
+        log_warn "  missing after copy: $rel"
+        missing=1
+    done < <(cd "$src" && find . -mindepth 1 ! -name '.nfs*' -print0 2>/dev/null)
+    return "$missing"
+}
+
 # link_to_scratch HOME_PATH PATHS_NAME
 #   HOME_PATH:   the path in $HOME to symlink (e.g. ~/.local)
 #   PATHS_NAME:  name under $PATHS (e.g. .local)
@@ -104,12 +134,23 @@ link_to_scratch() {
 
     ensure_dir "$scratch_target"
 
-    # Real directory with contents — move to scratch
+    # Real directory with contents — copy to scratch, VERIFY, then replace.
+    # The original is removed only after the copy is confirmed complete; a failed
+    # or partial copy leaves the source untouched rather than risking data loss.
     if [[ -d "$home_path" ]]; then
         log_info "Moving $home_path → $scratch_target"
-        cp -a "$home_path/." "$scratch_target/" 2>/dev/null || true
-        # Rename old dir out of the way (handles NFS open-file locks better
-        # than rm -rf, which fails on .nfs* silly-rename files).
+        if ! cp -a "$home_path/." "$scratch_target/"; then
+            # cp returns non-zero on benign junk too (NFS .nfs* files, sockets,
+            # dangling symlinks). Only refuse if a real entry is actually missing.
+            if ! _verify_copy "$home_path" "$scratch_target"; then
+                log_fail "Copy of $home_path → $scratch_target incomplete — leaving original in place"
+                return 1
+            fi
+            log_warn "cp reported errors for $home_path but all real entries verified — continuing"
+        fi
+        # Copy confirmed. Rename the original aside (handles NFS open-file locks
+        # better than rm -rf, which trips on .nfs* silly-rename files), swap in the
+        # symlink, then remove the old copy.
         _old="${home_path}.old.$$"
         mv "$home_path" "$_old"
         ln -sfn "$scratch_target" "$home_path"
@@ -138,5 +179,25 @@ for _home_path in "${_link_paths[@]}"; do
     link_to_scratch "$_home_path" "$_name"
 done
 unset _link_paths _home_path _name
+
+# ~/.claude subdirs — migrate the heavy *unmanaged* ones, never ~/.claude itself.
+# See the header note: chezmoi owns files inside ~/.claude as a real directory, so
+# a symlinked ~/.claude is destroyed on apply. Symlinking one level down is safe —
+# dot_claude is not an exact_ dir and .chezmoiremove never lists these — so chezmoi
+# leaves the symlinked subdirs alone. Targets nest under $PATHS/.claude/<sub>.
+if [[ -L "$HOME/.claude" ]]; then
+    log_warn "~/.claude is a symlink — chezmoi expects a real dir here; skipping .claude subdir migration"
+else
+    _DEFAULT_CLAUDE_LINKS="projects:plugins:file-history:ccline"
+    DF_CLAUDE_LINKS="${DF_CLAUDE_LINKS:-$_DEFAULT_CLAUDE_LINKS}"
+    unset _DEFAULT_CLAUDE_LINKS
+
+    IFS=: read -ra _claude_subs <<< "$DF_CLAUDE_LINKS"
+    for _sub in "${_claude_subs[@]}"; do
+        [[ -z "$_sub" ]] && continue
+        link_to_scratch "$HOME/.claude/$_sub" ".claude/$_sub"
+    done
+    unset _claude_subs _sub
+fi
 
 log_okay "Scratch space setup complete"

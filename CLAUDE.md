@@ -498,10 +498,16 @@ These are non-obvious things that have caused real bugs:
   extensions, killing qmd's vector index. `brew "sqlite"` is in the Brewfile.
 - **Memory indexes are per-machine** — qmd (~/.cache/qmd) and cass (~/.cache/cass)
   rebuild locally; only ~/kb (git) and dotfiles sync across machines.
-- **`~/.claude` must not be in scratch links** — chezmoi manages `home/dot_claude/` as a
-  real directory. If `scratch.sh` symlinks `~/.claude` to scratch, `chezmoi apply` replaces
-  the symlink with a directory containing only managed files, orphaning all conversation
-  history, sessions, and file-history on scratch.
+- **`~/.claude` (the dir) must never be symlinked to scratch** — chezmoi manages
+  `home/dot_claude/` as a real directory. If `scratch.sh` symlinks `~/.claude` itself,
+  `chezmoi apply` replaces the symlink with a directory containing only managed files,
+  orphaning all conversation history, sessions, and file-history on scratch. The supported
+  offload is one level down: `scratch.sh` symlinks the heavy *unmanaged* subdirs
+  (`projects`, `plugins`, `file-history`, `ccline`, via `DF_CLAUDE_LINKS`) into
+  `$PATHS/.claude/`, which chezmoi leaves alone (`dot_claude` is not `exact_` and
+  `.chezmoiremove` never lists them). Tradeoff: those become per-machine like `~/.local`
+  — auto-memory under `projects/<proj>/memory/` stops syncing across the NFS fleet (`~/kb`
+  stays the cross-machine layer). Drop `projects` from `DF_CLAUDE_LINKS` to keep history on NFS.
 - **docker-completion collides with the docker formula** — the `docker` formula now ships
   its own shell completions, but older machines carry `docker-completion` as a leftover
   dependency. Both want `etc/.../completions/docker`, so `brew bundle` aborts linking

@@ -226,8 +226,9 @@ Default directories redirected to scratch (controlled by `DF_LINKS`):
 - `~/.cursor` / `~/.cursor-server` — Cursor IDE data
 - `~/.nv` — NVIDIA shader and OptiX cache
 - `~/.npm` — npm cache
-- `~/.claude` — Claude Code data and cache
 - `~/.oh-my-zsh` / `~/.oh-my-zsh-custom` — oh-my-zsh and plugins
+
+Plus heavy *unmanaged* subdirs of `~/.claude` (controlled by `DF_CLAUDE_LINKS`): `projects` (history + memory), `plugins`, `file-history`, `ccline`. `~/.claude` itself stays a real directory because chezmoi manages files inside it.
 
 ---
 
