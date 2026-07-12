@@ -8,8 +8,8 @@ limits, no cloud — used as the default backend for **opencode** and **pi**
 
 | Layer | Tool | Where it lives |
 |---|---|---|
-| **Server** | `mlxserve` (mlx-openai-server) | LaunchAgent `dev.cade.mlxserve` (KeepAlive) or foreground shell function; port 8080, OpenAI-compat + tool calling |
-| **Server (fallback)** | Ollama | LaunchAgent, port 11434, OpenAI-compat |
+| **Server** | `mlxserve` (mlx-openai-server) | LaunchAgent `dev.cade.mlxserve` (KeepAlive, **auto-start off by default** — start with the `mlxserve` shell function); port 8080, OpenAI-compat + tool calling |
+| **Server (fallback)** | Ollama | LaunchAgent (**auto-start off by default**), port 11434, OpenAI-compat |
 | **Client** | opencode, pi | Both point at `localhost:8080/v1` by default on macOS |
 | **Cloud** | Anthropic, OpenAI | Available everywhere via `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` |
 
@@ -119,8 +119,9 @@ sourced into the shell by `~/.zprofile`.
 
 ## Ollama (fallback)
 
-Installed via Homebrew (`brew "ollama"`). Managed as a LaunchAgent on macOS
-— starts at login at `http://127.0.0.1:11434`. No model fleet is maintained
+Installed via Homebrew (`brew "ollama"`). Has a LaunchAgent on macOS but
+**auto-start is off by default** (`DF_START_LOCAL_SERVICES=1` to opt in, or run
+`ollama serve`); when running it serves `http://127.0.0.1:11434`. No model fleet is maintained
 for it; an ad-hoc pull (`ollama pull qwen3-coder:30b`) is one command away.
 (The old context-boosted alias machinery was removed — nothing consumed it.)
 

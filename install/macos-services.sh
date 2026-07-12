@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # install/macos-services.sh - macOS post-install wiring: login services (launchd) + CLI plugins
 #
-# Services: started now AND registered for auto-start at login.
+# The local backend services (colima container runtime, ollama, mlxserve LLM
+# server) do NOT auto-start by default — mlxserve alone reserves ~34GB RAM at
+# login, and none of the three are needed for day-to-day work. Set
+# DF_START_LOCAL_SERVICES=1 to restore auto-start on bootstrap. Manual control
+# stays available regardless: `colima start`, `ollama serve`, `mlxserve`.
+# The docker CLI-plugin symlinks below always run (so a manual `colima start`
+# gives a working `docker compose` / `docker buildx`).
 # Re-running is safe: all steps are idempotent.
 set -euo pipefail
 
@@ -11,11 +17,16 @@ log_section "Services (auto-start)"
 
 [[ "$OS" == "darwin" ]] || { log_info "Not macOS — no services to configure"; exit 0; }
 
+# Auto-start of colima/ollama/mlxserve is opt-in (see header). Default off.
+: "${DF_START_LOCAL_SERVICES:=0}"
+
 ### colima ###
 # Container runtime — provides a Docker-compatible socket for the `docker` CLI.
 # After this, `docker` works without Docker Desktop.
 
-if has colima; then
+if [[ "$DF_START_LOCAL_SERVICES" != "1" ]]; then
+    log_okay "colima auto-start disabled (DF_START_LOCAL_SERVICES=0) — 'colima start' to run manually"
+elif has colima; then
     if brew services list | grep -q '^colima.*started'; then
         log_okay "colima already running as a service"
     else
@@ -36,7 +47,9 @@ fi
 #   - Homebrew formula (`brew install ollama`): managed via `brew services`
 #   - macOS app (/Applications/Ollama.app): manages its own LaunchAgent
 
-if has ollama; then
+if [[ "$DF_START_LOCAL_SERVICES" != "1" ]]; then
+    log_okay "ollama auto-start disabled (DF_START_LOCAL_SERVICES=0) — 'ollama serve' to run manually"
+elif has ollama; then
     if [[ -d "/Applications/Ollama.app" ]]; then
         # App install handles its own LaunchAgent — brew services is irrelevant here.
         # Checking brew first was wrong: the app's agent can appear in brew services
@@ -70,7 +83,9 @@ fi
 _MLX_PLIST="$HOME/Library/LaunchAgents/dev.cade.mlxserve.plist"
 _MLX_LABEL="dev.cade.mlxserve"
 
-if [[ -f "$_MLX_PLIST" ]]; then
+if [[ "$DF_START_LOCAL_SERVICES" != "1" ]]; then
+    log_okay "mlxserve auto-start disabled (DF_START_LOCAL_SERVICES=0) — 'mlxserve' to run manually"
+elif [[ -f "$_MLX_PLIST" ]]; then
     if ! has mlx-openai-server; then
         log_warn "mlx-openai-server not installed — LaunchAgent will fail to start"
         log_warn "  fix: uv tool install mlx-openai-server"

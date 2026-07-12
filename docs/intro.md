@@ -60,7 +60,7 @@ Rust tools install via `cargo-binstall` (downloads pre-built binaries from GitHu
 ### macOS-specific
 
 - **System settings** (`install/macos-settings.sh`) — Dock autohide, Finder extensions/path bar, fast key repeat, tap to click, PNG screenshots, Safari dev menu, iTerm2 prefs
-- **Services** (`install/macos-services.sh`) — Colima registered as a login service (rootless Docker without Docker Desktop)
+- **Services** (`install/macos-services.sh`) — optional auto-start for Colima (rootless Docker), Ollama, and mlxserve; off by default (`DF_START_LOCAL_SERVICES=1` to enable). Docker CLI plugins always linked.
 - **Quick Actions** (`install/macos-quick-actions.sh`) — Finder right-click "Open in Cursor" and friends
 
 ### Auth (opt-in)

@@ -55,6 +55,8 @@
 #   DF_DO_DIRS          — set to 0 to skip home directory creation
 #   DF_DO_PACKAGES      — set to 0 to skip package install (Homebrew on macOS/Linux)
 #   DF_DO_MACOS_SERVICES — set to 0 to skip macOS service registration
+#   DF_START_LOCAL_SERVICES — set to 1 to auto-start colima/ollama/mlxserve at
+#                         login (default 0: installed but not auto-started)
 #   DF_DO_ZSH           — set to 0 to skip oh-my-zsh + plugins install
 #   DF_DO_NODE          — set to 0 to skip Node install + global npm packages
 #   DF_DO_RUST          — set to 0 to skip Rust install

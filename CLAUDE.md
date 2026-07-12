@@ -85,7 +85,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `zsh.sh` | oh-my-zsh + plugins (pure, autosuggestions, fsh, completions) | Clones or updates via git |
 | `homebrew.sh` | macOS: Homebrew + `brew bundle` from Brewfile | Upgrades enabled by default |
 | `linux-packages.sh` | Linux: Homebrew + glibc + `brew bundle` | Custom prefix, compiler symlinks, upgrades off by default |
-| `macos-services.sh` | Colima + Ollama login services (rootless Docker + local LLM server) | macOS only, skips on Linux |
+| `macos-services.sh` | Colima + Ollama + mlxserve auto-start (rootless Docker + local LLM servers) — **gated off by default** — plus docker CLI-plugin symlinks (always run) | macOS only, skips on Linux. Auto-start is opt-in via `DF_START_LOCAL_SERVICES=1` (default 0); mlxserve alone held ~34GB RAM at login. Manual control unaffected: `colima start` / `ollama serve` / `mlxserve`. |
 | `macos-settings.sh` | System prefs via `defaults write` (Dock, Finder, keyboard, trackpad, Safari, iTerm2) | macOS only |
 | `macos-quick-actions.sh` | Deploys `*.workflow` bundles to `~/Library/Services/` (right-click Finder → "Open in Cursor") | macOS only; source bundles under `install/macos-quick-actions/`; flushes `pbs -flush` after changes |
 | `node.sh` | nvm + Node.js + global npm packages from `npm.txt` | Lazy-loaded in zsh for fast startup |

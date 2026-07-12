@@ -62,7 +62,7 @@ Paths below use `$LOCAL_PLAT`, which is `$HOME/.local` by default and `$HOME/.lo
 4. **Homebrew** → `/opt/homebrew` (Apple Silicon) or `/usr/local` (Intel)
    - All packages from `packages/Brewfile` — CLI tools, casks, macOS-only apps
    - Includes `rustup` (Homebrew's code-signed build — required for macOS Sequoia+)
-5. **Services**: colima registered as a login service (rootless Docker)
+5. **Services**: colima/ollama/mlxserve auto-start is opt-in (`DF_START_LOCAL_SERVICES=1`); off by default. Docker CLI plugins are always linked.
 6. **macOS defaults**: Dock, Finder, keyboard, trackpad, screenshots, Safari, iTerm2 preferences
 7. **Python** via uv → `$LOCAL_PLAT/uv/tools/<tool>/` (one isolated venv per CLI tool), entrypoints in `$ARCH_BIN`
 8. **Node.js** via nvm → `$LOCAL_PLAT/nvm/`
