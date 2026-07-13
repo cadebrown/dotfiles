@@ -266,4 +266,11 @@ fi
 
 # atuin — history search on ctrl-r. MUST init after fzf (which also binds ^R)
 # and after bash-preexec (recording hooks). Up-arrow stays native.
-command -v atuin >/dev/null 2>&1 && eval "$(atuin init bash --disable-up-arrow)"
+# Guard on init succeeding, not just the binary existing: a prebuilt atuin the
+# loader rejects (needs newer glibc than the host) degrades quietly instead of
+# erroring on every shell (install/rust.sh smoke-tests and rebuilds these).
+if command -v atuin >/dev/null 2>&1 \
+    && _atuin_init="$(atuin init bash --disable-up-arrow 2>/dev/null)"; then
+    eval "$_atuin_init"
+fi
+unset _atuin_init

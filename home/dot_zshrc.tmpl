@@ -322,7 +322,15 @@ fi
 # (--disable-up-arrow). Sync is off until configured (atuin register/login);
 # local search works regardless. Data dir: ~/.local/share/atuin (scratch-linked
 # on NFS machines, so the SQLite db stays local).
-command -v atuin >/dev/null 2>&1 && eval "$(atuin init zsh --disable-up-arrow)"
+# Guard on init succeeding, not just the binary existing: a prebuilt atuin the
+# loader rejects (needs newer glibc than the host) degrades quietly to fzf's
+# ^R instead of erroring on every shell. install/rust.sh smoke-tests and
+# rebuilds such binaries on the next bootstrap run.
+if command -v atuin >/dev/null 2>&1 \
+    && _atuin_init="$(atuin init zsh --disable-up-arrow 2>/dev/null)"; then
+    eval "$_atuin_init"
+fi
+unset _atuin_init
 
 ### TOOLCHAIN ###
 

@@ -7,6 +7,36 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
+# Print the crate's binaries that fail to start with a dynamic-loader error
+# (gnu prebuilts from modern CI runners can require a newer glibc than the
+# host provides; ld.so then refuses to load them at exec time, so binstall
+# reports success but every invocation fails). musl and source builds never
+# trip this. Bin names come from cargo's install registry — binstall updates
+# it too, and bins often differ from crate names (yazi-fm → yazi).
+_glibc_broken_bins() {
+    local _crate="$1" _bin _err
+    has jq || return 0
+    [[ -f "$CARGO_HOME/.crates2.json" ]] || return 0
+    while IFS= read -r _bin; do
+        [[ -x "$CARGO_HOME/bin/$_bin" ]] || continue
+        if has timeout; then
+            _err="$(timeout 10 "$CARGO_HOME/bin/$_bin" --version </dev/null 2>&1 >/dev/null)" || true
+        else
+            _err="$("$CARGO_HOME/bin/$_bin" --version </dev/null 2>&1 >/dev/null)" || true
+        fi
+        if [[ "$_err" == *"GLIBC_"* || "$_err" == *"libc.so"* ]]; then
+            printf '%s\n' "$_bin"
+        fi
+    done < <(jq -r --arg c "$_crate " \
+        '.installs | to_entries[] | select(.key | startswith($c)) | .value.bins[]' \
+        "$CARGO_HOME/.crates2.json" 2>/dev/null)
+    return 0
+}
+
+# Source-guard: tests/rust-glibc-smoke.bats sources this file for
+# _glibc_broken_bins — everything below only runs when executed directly.
+[[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
+
 log_section "Rust"
 
 # RUSTUP_HOME and CARGO_HOME are set by _lib.sh to ~/.local/$PLAT/rustup and ~/.local/$PLAT/cargo
@@ -106,6 +136,20 @@ _binstall_flags=(--no-confirm --log-level warn --locked)
 [[ -n "${DF_CARGO_STRATEGIES:-}" ]] && _binstall_flags+=(--strategies "$DF_CARGO_STRATEGIES")
 [[ -n "${GITHUB_TOKEN:-}" ]] && _binstall_flags+=(--github-token "$GITHUB_TOKEN")
 
+# Linux: prefer musl prebuilts (static, zero glibc dependency) over gnu.
+# GitHub's ubuntu-latest runners moved to 24.04 (glibc 2.39), so upstream gnu
+# prebuilts increasingly refuse to start on older hosts (Ubuntu 22.04 = 2.35:
+# atuin/xan/yazi, July 2026). binstall's default order tries gnu first —
+# --targets flips it; gnu stays as fallback for crates without musl assets,
+# and the post-install smoke test below catches those. NB: the flag is
+# repeated, not comma-joined — binstall 1.17 parses "a,b" as one triple and
+# aborts the install with "Unrecognized environment".
+if [[ "$OS" == "linux" ]]; then
+    _mach="$(uname -m)"
+    _binstall_flags+=(--targets "${_mach}-unknown-linux-musl" --targets "${_mach}-unknown-linux-gnu")
+    unset _mach
+fi
+
 _ok=0 _fail=0
 
 while IFS= read -r pkg; do
@@ -118,6 +162,27 @@ while IFS= read -r pkg; do
     # (cargo-nextest's locked-tripwire). --locked honors the tested lockfile.
     if run_logged cargo binstall "${_binstall_flags[@]}" "$pkg" \
         || run_logged cargo install --locked "$pkg"; then
+        # binstall "success" can still leave a binary the loader rejects
+        # (gnu prebuilt wanting newer glibc — also hit when binstall skips an
+        # already-latest-but-broken install). Heal in two steps: force-refetch
+        # (musl-first targets may land a static build), else build from
+        # source, which links the host glibc by construction.
+        if [[ "$OS" == "linux" ]] && _bad="$(_glibc_broken_bins "$pkg")" && [[ -n "$_bad" ]]; then
+            log_warn "  $pkg prebuilt needs newer glibc (${_bad//$'\n'/, }) — refetching"
+            run_logged cargo binstall "${_binstall_flags[@]}" --force "$pkg" || true
+            _bad="$(_glibc_broken_bins "$pkg")"
+            if [[ -n "$_bad" ]]; then
+                log_warn "  $pkg has no runnable prebuilt — building from source"
+                if run_logged cargo install --locked --force "$pkg"; then
+                    log_okay "  ok    $pkg (source build)"
+                    (( _ok++ )) || true
+                else
+                    log_warn "  fail  $pkg (prebuilt incompatible with host glibc, source build failed)"
+                    (( _fail++ )) || true
+                fi
+                continue
+            fi
+        fi
         log_okay "  ok    $pkg"
         (( _ok++ )) || true
     else

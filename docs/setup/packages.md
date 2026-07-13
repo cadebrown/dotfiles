@@ -43,6 +43,12 @@ download a pre-built binary from GitHub releases first (fast, no compilation), a
 On Linux, cargo-binstall avoids the manylinux container round-trip entirely. On macOS, it downloads
 the same pre-built binary that Homebrew bottles provide — same quality, faster install.
 
+On Linux, musl targets are preferred over gnu (`--targets <arch>-unknown-linux-musl,...`): static
+musl builds have no glibc dependency, while gnu prebuilts from modern CI runners (Ubuntu 24.04 =
+glibc 2.39) refuse to load on older hosts. After each install the crate's binaries are smoke-tested;
+one that fails with a dynamic-loader error is force-refetched (musl-first) and, if still broken,
+rebuilt from source against the host glibc.
+
 > **macOS note:** Source compilation requires running from a normal terminal. The macOS Sequoia
 > linker enforces `com.apple.provenance` on object files and will block compilation in sandboxed
 > contexts (e.g., certain CI environments). This isn't an issue for day-to-day use.

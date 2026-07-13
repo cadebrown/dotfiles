@@ -89,7 +89,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `macos-settings.sh` | System prefs via `defaults write` (Dock, Finder, keyboard, trackpad, Safari, iTerm2) | macOS only |
 | `macos-quick-actions.sh` | Deploys `*.workflow` bundles to `~/Library/Services/` (right-click Finder → "Open in Cursor") | macOS only; source bundles under `install/macos-quick-actions/`; flushes `pbs -flush` after changes |
 | `node.sh` | nvm + Node.js + global npm packages from `npm.txt` | Lazy-loaded in zsh for fast startup |
-| `rust.sh` | rustup + cargo-binstall + tools from `cargo.txt` | macOS: Homebrew rustup (code-signed); Linux: sh.rustup.rs |
+| `rust.sh` | rustup + cargo-binstall + tools from `cargo.txt` | macOS: Homebrew rustup (code-signed); Linux: sh.rustup.rs. Linux binstall prefers musl targets and smoke-tests each crate's bins for glibc loader failures (refetch → source-build fallback) |
 | `go.sh` | `go install` CLI tools from `packages/go.txt` | Go itself via Brewfile (`brew "go"`). `GOBIN=$ARCH_BIN` so binaries land alongside cargo/uv ones. Respects `# linux-only` / `# macos-only` markers (same as `pip.txt`). |
 | `python.sh` | uv + CLI tools from `pip.txt` via `uv tool install` | Each tool gets isolated venv under `$LOCAL_PLAT/uv/tools/`; no monolithic venv |
 | `claude.sh` | Claude Code binary + plugins + MCP servers + overlay skills + `~/AGENTS.md` symlink | Downloads from Anthropic's GCS bucket; overlay discovery via `DF_OVERLAYS`. MCP servers reconcile declaratively (URL/command drift re-registers). `auth=gh` uses a connection-time headersHelper (`~/.claude/gh-mcp-headers.sh`); `auth=gcloud` uses `~/.claude/gcloud-mcp-headers.sh` (mints an ADC access token + `x-goog-user-project` per connection — powers Google's official remote MCP servers); `auth=context7` reads `~/.context7.env` (optional). |
@@ -503,6 +503,16 @@ These are non-obvious things that have caused real bugs:
 - **cass Linux prebuilts need host glibc >= 2.38** — they link system glibc, not the
   Homebrew one. install/memory.sh falls back to `cargo install --git` on older hosts.
   Its brew tap is NOT used (formula sha lagged a release-asset re-upload, June 2026).
+- **cargo-binstall gnu prebuilts can outrun the host glibc** — GitHub's ubuntu-latest
+  runners moved to 24.04 (glibc 2.39), so upstream gnu release binaries refuse to load
+  on older hosts (Ubuntu 22.04 = 2.35 broke atuin/xan/yazi, July 2026). Homebrew's
+  keg-only glibc can't help: external prebuilts hardcode the system loader path, and
+  brew only patches its own bottles. `rust.sh` therefore passes musl-first `--targets`
+  on Linux (static, no glibc dep — same reason the rtk tap ships musl) and smoke-tests
+  each crate's bins after install (`_glibc_broken_bins`): loader failure → force
+  refetch (musl may now win) → `cargo install` source fallback. The shell profiles
+  guard `atuin init` on success, so a broken binary degrades to fzf's ^R instead of
+  erroring on every shell.
 - **qmd needs Homebrew sqlite on macOS** — the system libsqlite3 blocks loadable
   extensions, killing qmd's vector index. `brew "sqlite"` is in the Brewfile.
 - **Memory indexes are per-machine** — qmd (~/.cache/qmd) and cass (~/.cache/cass)
