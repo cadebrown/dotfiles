@@ -57,6 +57,11 @@ If a hack is genuinely unavoidable (deadline, blocked dep, etc.), say so explici
 - Idiomatic = both *language*-idiomatic AND *repo*-idiomatic. When they conflict, repo wins.
 - For unfamiliar libs / APIs / domains: look up the docs. Don't guess at API surface.
 
+**Recommend from current reality, not memory.**
+- When the ask is "what exists / what should I use" — tools, libraries, products, models, approaches — web-search for current options *before* answering, especially in fast-moving areas (AI/agent tooling, LLM models, JS frameworks). Training has a cutoff: the leading option may have launched after it, and known ones get renamed, deprecated, or superseded. A confident from-memory survey reads as authoritative but is stale — it can miss the best answer or misattribute it.
+- Verify the shortlist against reality: check each candidate's own repo/docs for current version, maintenance, and status rather than trusting recalled reputation. Search tools: firecrawl/exa/tavily for the web, context7 for library docs, the github/crates/rust-docs MCPs for package specifics.
+- If you do answer from memory (quick take, offline), say so and flag it as unverified — don't present a stale recollection as current fact.
+
 **Reduce duplication — but not prematurely.**
 - 3 similar instances → consider extracting. 2 → leave alone.
 - Coincidental similarity ≠ shared abstraction. Don't unify things just because they look alike — they may diverge tomorrow.
