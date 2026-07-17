@@ -110,5 +110,6 @@
   "claudeCode.allowDangerouslySkipPermissions": true,
   "claudeCode.initialPermissionMode": "bypassPermissions",
   "remote.autoForwardPortsSource": "hybrid",
-  "workbench.sideBar.location": "right"
+  "workbench.sideBar.location": "right",
+  "workbench.preferredDarkColorTheme": "SynthWave '84"
 }
