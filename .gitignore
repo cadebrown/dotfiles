@@ -1,5 +1,8 @@
 # Directories
-.claude/
+# .claude is machine-local (settings.local.json, .cc-writes) EXCEPT rules/,
+# which is checked in — path-scoped instruction files loaded by Claude Code.
+.claude/*
+!.claude/rules/
 dotfiles-*/
 docs/book/
 old/
