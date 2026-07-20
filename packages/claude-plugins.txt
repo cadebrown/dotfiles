@@ -19,6 +19,27 @@ plugin-dev
 # Plugin-only: ships specialized review agents, can't be vendored as a skill.
 c-review@trailofbits
 
+# Rust security review (ToB): the Rust sibling of c-review — safe/unsafe
+# boundary, memory safety, concurrency, panic-DoS, FFI, async-runtime review
+# with clustered workers + SARIF output.
+rust-review@trailofbits
+
+# Static-analysis driver (ToB): CodeQL + Semgrep + SARIF parsing. The
+# testing-handbook set covers fuzzers/sanitizers; this fills static analysis.
+static-analysis@trailofbits
+
+# Dimensional analysis (ToB): unit-annotates code to catch formula/unit bugs —
+# aimed at simulation/numerics work; pairs with the numbat habit.
+dimensional-analysis@trailofbits
+
+# Mutation testing (ToB): mewt/muton campaign config — measures test-suite
+# quality, complementing property-based testing + fuzzing coverage.
+mutation-testing@trailofbits
+
+# Competition-math solving (Anthropic official): fresh-context adversarial
+# verifiers + calibrated abstention — informal-proof complement to lean4.
+math-olympiad
+
 # Codex bridge (OpenAI official): run the installed codex CLI as a delegate —
 # /codex:review, /codex:adversarial-review (second-model review!), /codex:rescue,
 # background job status/result/cancel. Uses ~/.openai.env or ChatGPT login.

@@ -103,6 +103,13 @@ kernel-triton-writing npx NVIDIA/TensorRT-LLM kernel-triton-writing
 # grounded PTX lookup instead of hallucination.
 cuda npx technillogue/ptx-isa-markdown cuda
 
+### Rust (July 2026 research batch) ###
+
+# Idiomatic-Rust correction layer: 265 rules across ownership, unsafe, async
+# cancel-safety, SIMD/PGO, anti-patterns (Rust 1.96 / 2024 edition) — the Rust
+# analogue of the vercel-react-best-practices correction skills.
+rust-skills npx leonardomso/rust-skills rust-skills
+
 ### Meta-AI: authoring skills/plugins/agents ###
 
 # skill-creator (Anthropic official): init/validate/package + progressive-

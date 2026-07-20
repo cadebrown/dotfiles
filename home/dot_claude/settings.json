@@ -6,8 +6,12 @@
     "BASH_DEFAULT_TIMEOUT_MS": "300000",
     "BASH_MAX_TIMEOUT_MS": "900000",
     "MAX_MCP_OUTPUT_TOKENS": "10000",
-    "BASH_MAX_OUTPUT_LENGTH": "20000"
+    "BASH_MAX_OUTPUT_LENGTH": "20000",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION": "50",
+    "CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION": "75"
   },
+  "teammateMode": "auto",
   "permissions": {
     "defaultMode": "bypassPermissions"
   },
@@ -91,6 +95,11 @@
     "typescript-lsp@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
     "c-review@trailofbits": true,
+    "rust-review@trailofbits": true,
+    "static-analysis@trailofbits": true,
+    "dimensional-analysis@trailofbits": true,
+    "mutation-testing@trailofbits": true,
+    "math-olympiad@claude-plugins-official": true,
     "codex@openai-codex": true,
     "plugin-dev@claude-plugins-official": true,
     "mcp-server-dev@claude-plugins-official": true,
