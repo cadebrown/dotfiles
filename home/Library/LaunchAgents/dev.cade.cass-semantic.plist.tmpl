@@ -1,0 +1,58 @@
+{{/*
+LaunchAgent: refresh cass's MiniLM vectors and HNSW graph once per day.
+Semantic backfill currently re-embeds the complete archive and does not emit
+progress heartbeats, so it must not share the five-minute lexical schedule.
+*/ -}}
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>dev.cade.cass-semantic</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{ .chezmoi.homeDir }}/.local/bin/cass</string>
+        <string>index</string>
+        <string>--semantic</string>
+        <string>--build-hnsw</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CASS_DATA_DIR</key>
+        <string>{{ .chezmoi.homeDir }}/.cache/cass</string>
+        <key>CASS_SEMANTIC_EMBEDDER</key>
+        <string>minilm</string>
+        <!-- MiniLM backfill has no progress heartbeat. Retain stall
+             diagnostics, but do not abort valid inference. -->
+        <key>CASS_INDEX_STALL_ABORT_SECS</key>
+        <string>0</string>
+        <key>PATH</key>
+        <string>{{ .chezmoi.homeDir }}/.local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>{{ .chezmoi.homeDir }}</string>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>15</integer>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>300</integer>
+
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/cass/semantic-stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/cass/semantic-stderr.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

@@ -194,10 +194,11 @@ fi
 {{ end -}}
 
 # Memory stack (install/memory.sh): cass session-history index lives under
-# ~/.cache (scratch-linked on NFS machines, never synced). cass defaults to
-# its minilm embedder — the override selects the installed nomic-embed model.
+# ~/.cache (scratch-linked on NFS machines, never synced). MiniLM is the native
+# embedder verified by current cass releases; callers may still override it.
 export CASS_DATA_DIR="${CASS_DATA_DIR:-$HOME/.cache/cass}"
-export CASS_SEMANTIC_EMBEDDER="${CASS_SEMANTIC_EMBEDDER:-nomic-embed}"
+export CASS_SEMANTIC_EMBEDDER="${CASS_SEMANTIC_EMBEDDER:-minilm}"
+export CASS_INDEX_STALL_ABORT_SECS="${CASS_INDEX_STALL_ABORT_SECS:-0}"
 # qmd: Qwen3-Embedding-0.6B (MTEB top tier) over the default embeddinggemma.
 # Changing this requires a one-time `qmd embed -f` re-embed.
 export QMD_EMBED_MODEL="${QMD_EMBED_MODEL:-hf:Qwen/Qwen3-Embedding-0.6B-GGUF/Qwen3-Embedding-0.6B-Q8_0.gguf}"
@@ -216,11 +217,11 @@ fi
 {{ else -}}
 
 # Memory daemons: no launchd on Linux — lazy-start at login (cheap pgrep
-# guards; macOS uses LaunchAgents dev.cade.qmd / dev.cade.cass-watch).
+# guards; macOS uses qmd plus lexical and daily semantic LaunchAgents).
 command -v qmd >/dev/null 2>&1 && ! pgrep -f "qmd mcp --http" >/dev/null 2>&1 \
     && (qmd mcp --http --daemon >/dev/null 2>&1 &)
-command -v cass >/dev/null 2>&1 && ! pgrep -f "cass watch" >/dev/null 2>&1 \
-    && (nohup cass watch >/dev/null 2>&1 &)
+command -v cass >/dev/null 2>&1 && ! pgrep -f "cass index" >/dev/null 2>&1 \
+    && (nohup cass index >/dev/null 2>&1 &)
 
 export SSL_CERT_DIR=/usr/lib/ssl/certs
 

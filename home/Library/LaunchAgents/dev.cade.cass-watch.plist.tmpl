@@ -1,13 +1,14 @@
 {{/*
-LaunchAgent: keep `cass watch` running — incremental re-indexing of agent
-session history (Claude Code, Codex, opencode, pi transcripts) into the
-hybrid BM25+vector index as new sessions land. Loaded by install/memory.sh.
+LaunchAgent: refresh cass's lexical index every five minutes. Persistent
+`index --watch` can wedge in watch_startup while consuming multiple cores
+(cass #258); bounded one-shot runs keep new sessions searchable without a
+resident process. dev.cade.cass-semantic handles the expensive vectors daily.
 
 cass is installed to ~/.local/bin by install/memory.sh (GitHub release binary,
 checksum-verified). CASS_DATA_DIR keeps the SQLite index under ~/.cache
 (scratch-linked on NFS machines).
 
-Cost: ~100-300MB idle, brief spikes while embedding new sessions. To disable:
+Cost: no idle process; brief spikes while indexing new sessions. To disable:
   launchctl bootout gui/$(id -u)/dev.cade.cass-watch
 */ -}}
 <?xml version="1.0" encoding="UTF-8"?>
@@ -20,15 +21,13 @@ Cost: ~100-300MB idle, brief spikes while embedding new sessions. To disable:
     <key>ProgramArguments</key>
     <array>
         <string>{{ .chezmoi.homeDir }}/.local/bin/cass</string>
-        <string>watch</string>
+        <string>index</string>
     </array>
 
     <key>EnvironmentVariables</key>
     <dict>
         <key>CASS_DATA_DIR</key>
         <string>{{ .chezmoi.homeDir }}/.cache/cass</string>
-        <key>CASS_SEMANTIC_EMBEDDER</key>
-        <string>nomic-embed</string>
         <key>PATH</key>
         <string>{{ .chezmoi.homeDir }}/.local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
     </dict>
@@ -39,13 +38,8 @@ Cost: ~100-300MB idle, brief spikes while embedding new sessions. To disable:
     <key>RunAtLoad</key>
     <true/>
 
-    <key>KeepAlive</key>
-    <dict>
-        <key>SuccessfulExit</key>
-        <false/>
-        <key>Crashed</key>
-        <true/>
-    </dict>
+    <key>StartInterval</key>
+    <integer>300</integer>
 
     <key>ThrottleInterval</key>
     <integer>30</integer>

@@ -28,7 +28,8 @@ _mode="${1:-setup}"
 log_section "Agent memory stack ($_mode)"
 
 export CASS_DATA_DIR="${CASS_DATA_DIR:-$HOME/.cache/cass}"
-export CASS_SEMANTIC_EMBEDDER="${CASS_SEMANTIC_EMBEDDER:-nomic-embed}"
+export CASS_SEMANTIC_EMBEDDER="${CASS_SEMANTIC_EMBEDDER:-minilm}"
+export CASS_INDEX_STALL_ABORT_SECS="${CASS_INDEX_STALL_ABORT_SECS:-0}"
 
 ### cass — session-history search (L3) ###
 
@@ -132,25 +133,33 @@ _install_cass
 if has cass || [[ -x "$ARCH_BIN/cass" ]]; then
     _cass="$ARCH_BIN/cass"; has cass && _cass="$(command -v cass)"
 
-    # Embedding model (nomic-embed, 768-dim, ~520MB) — best local quality tier.
+    # MiniLM is cass's architecture-verified native embedder. Nomic's removed
+    # ONNX path is still downloadable in cass 0.6.22 but cannot build an index.
     # `models status` prints a per-model block; an installed model's Status
     # line does NOT contain "not acquired". -y is required: without it the
     # installer prompts and silently cancels on non-tty stdin (exit 0!).
-    if "$_cass" models status 2>/dev/null | grep -A6 -i 'nomic' | grep -i 'status:' | grep -qiv 'not acquired'; then
-        log_okay "cass: nomic-embed model already installed"
+    if "$_cass" models status 2>/dev/null | grep -A6 -i 'minilm' | grep -i 'status:' | grep -qiv 'not acquired'; then
+        log_okay "cass: all-MiniLM-L6-v2 model already installed"
     else
-        log_info "cass: installing nomic-embed model (~520MB, one-time)"
-        run_logged "$_cass" models install --model nomic-embed -y \
+        log_info "cass: installing all-MiniLM-L6-v2 model (~87MB, one-time)"
+        run_logged "$_cass" models install --model all-minilm-l6-v2 -y \
             || log_warn "cass: model install failed — lexical-only until retried"
     fi
 
     if [[ "$_mode" == "reindex" ]]; then
         log_info "cass: full index rebuild"
-        run_logged "$_cass" index --full || log_warn "cass index failed — run 'cass doctor'"
+        run_logged "$_cass" index --full --semantic --build-hnsw \
+            || log_warn "cass index failed — run 'cass doctor'"
+    elif has jq && "$_cass" status --json 2>/dev/null | jq -e '.semantic.available == true' >/dev/null; then
+        # Semantic indexing currently re-embeds the full archive. Keep routine
+        # bootstrap cheap; the daily LaunchAgent refreshes vectors on macOS.
+        log_info "cass: refreshing lexical session index"
+        run_logged "$_cass" index \
+            || log_warn "cass index failed — run 'cass doctor'"
     else
-        # Incremental; first run builds, later runs top up.
-        log_info "cass: indexing session history (incremental)"
-        run_logged "$_cass" index || log_warn "cass index failed — run 'cass doctor'"
+        log_info "cass: building initial semantic session index"
+        run_logged "$_cass" index --semantic --build-hnsw \
+            || log_warn "cass index failed — run 'cass doctor'"
     fi
 fi
 
@@ -214,11 +223,30 @@ if [[ "$OS" == "darwin" ]]; then
     ensure_dir "$HOME/.local/share/qmd"
     ensure_dir "$HOME/.local/share/cass"
     # LaunchAgents are deployed by chezmoi; (re)load them idempotently.
-    for _agent in dev.cade.qmd dev.cade.cass-watch; do
+    for _agent in dev.cade.qmd dev.cade.cass-watch dev.cade.cass-semantic; do
         _plist="$HOME/Library/LaunchAgents/$_agent.plist"
         [[ -f "$_plist" ]] || { log_warn "$_agent.plist missing — run chezmoi apply"; continue; }
         if launchctl print "gui/$(id -u)/$_agent" >/dev/null 2>&1; then
-            log_okay "$_agent already loaded"
+            # Reload cass jobs when an older semantic-every-five-minutes or
+            # removed `--watch` argument vector is still registered.
+            _job="$(launchctl print "gui/$(id -u)/$_agent" 2>/dev/null || true)"
+            if [[ "$_agent" == "dev.cade.cass-watch" ]] \
+               && { grep -q -- '--semantic' <<<"$_job" \
+                    || grep -q -- '--watch' <<<"$_job"; }; then
+                log_info "reloading stale $_agent argument vector"
+                launchctl bootout "gui/$(id -u)/$_agent" >/dev/null 2>&1 || true
+                launchctl bootstrap "gui/$(id -u)" "$_plist" \
+                    && log_okay "reloaded $_agent"
+            elif [[ "$_agent" == "dev.cade.cass-semantic" ]] \
+                 && { ! grep -q -- '--semantic' <<<"$_job" \
+                      || ! grep -q 'minilm' <<<"$_job"; }; then
+                log_info "reloading stale $_agent argument vector"
+                launchctl bootout "gui/$(id -u)/$_agent" >/dev/null 2>&1 || true
+                launchctl bootstrap "gui/$(id -u)" "$_plist" \
+                    && log_okay "reloaded $_agent"
+            else
+                log_okay "$_agent already loaded"
+            fi
         else
             if launchctl bootstrap "gui/$(id -u)" "$_plist" 2>/dev/null; then
                 log_okay "loaded $_agent"
@@ -232,8 +260,9 @@ else
     if has qmd && ! pgrep -f "qmd mcp --http" >/dev/null 2>&1; then
         (qmd mcp --http --daemon >/dev/null 2>&1 &) && log_okay "started qmd mcp daemon"
     fi
-    if [[ -x "$ARCH_BIN/cass" ]] && ! pgrep -f "cass watch" >/dev/null 2>&1; then
-        (nohup "$ARCH_BIN/cass" watch >/dev/null 2>&1 &) && log_okay "started cass watch"
+    if [[ -x "$ARCH_BIN/cass" ]] && ! pgrep -f "cass index" >/dev/null 2>&1; then
+        (nohup "$ARCH_BIN/cass" index >/dev/null 2>&1 &) \
+            && log_okay "started bounded cass lexical refresh"
     fi
 fi
 
