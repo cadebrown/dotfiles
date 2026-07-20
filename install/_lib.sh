@@ -405,6 +405,42 @@ run_logged() {
     return "$_rc"
 }
 
+# qmd MCP daemon lifecycle (Linux / no-launchd path; macOS uses the launchd
+# agent instead). The daemon mmaps native addons (sqlite-vec, node-llama-cpp,
+# better-sqlite3). On an NFS home a global `npm install -g @tobilu/qmd` fails
+# with EBUSY: deleting a file the daemon holds open silly-renames it to
+# .nfsXXXX and keeps it until the fd closes, so npm can't unlink the old tree.
+# node.sh stops the daemon around the upgrade; node.sh + memory.sh + the shell
+# profiles start it. Shared here so the start command has one definition.
+qmd_daemon_running() {
+    # The daemonized process re-execs as ".../qmd.js mcp --http" (not
+    # ".../qmd mcp ..."), so allow an optional non-space suffix after "qmd".
+    # A bare "qmd mcp --http" pattern only matches the transient launcher.
+    pgrep -f "qmd[^ ]* mcp --http" >/dev/null 2>&1
+}
+
+qmd_daemon_stop() {
+    qmd_daemon_running || return 0
+    pkill -TERM -f "qmd[^ ]* mcp --http" 2>/dev/null || true
+    local _i
+    for _i in $(seq 1 50); do
+        qmd_daemon_running || return 0
+        sleep 0.1
+    done
+    # Still holding fds after 5s — force it so NFS can reap the .nfs* files.
+    pkill -KILL -f "qmd[^ ]* mcp --http" 2>/dev/null || true
+    for _i in $(seq 1 20); do
+        qmd_daemon_running || break
+        sleep 0.1
+    done
+}
+
+qmd_daemon_start() {
+    has qmd || return 1
+    qmd_daemon_running && return 0
+    (qmd mcp --http --daemon >/dev/null 2>&1 &)
+}
+
 # Resolve LOCAL_PLAT from current $HOME/.local (handling symlinks) and the
 # DF_USE_PLAT flag. Sets LOCAL_PLAT but does NOT touch derived vars — call
 # _re_derive_plat_vars after this if anything else has changed.

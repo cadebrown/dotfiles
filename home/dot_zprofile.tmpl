@@ -233,7 +233,7 @@ fi
 
 # Memory daemons: no launchd on Linux — lazy-start at login (cheap pgrep
 # guards; macOS uses qmd plus lexical and daily semantic LaunchAgents).
-command -v qmd >/dev/null 2>&1 && ! pgrep -f "qmd mcp --http" >/dev/null 2>&1 \
+command -v qmd >/dev/null 2>&1 && ! pgrep -f "qmd[^ ]* mcp --http" >/dev/null 2>&1 \
     && (qmd mcp --http --daemon >/dev/null 2>&1 &)
 command -v cass >/dev/null 2>&1 && ! pgrep -f "cass index" >/dev/null 2>&1 \
     && (nohup cass index >/dev/null 2>&1 &)

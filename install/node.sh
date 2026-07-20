@@ -63,6 +63,7 @@ fi
 
 _pkg_count=0
 _upgrade_count=0
+_qmd_stopped=0
 while IFS= read -r pkg; do
     # Entries may pin a version ("<name>@1.2.3", scoped names keep their
     # leading @). Split at the LAST @ — a tail with "/" in it is the package
@@ -95,6 +96,15 @@ while IFS= read -r pkg; do
     elif npm list -g "$_name" --depth=0 &>/dev/null; then
         if [[ "${DF_MODE:-}" == "upgrade" ]]; then
             log_info "  upgrading $_name"
+            # qmd runs a persistent MCP daemon that mmaps native addons; on an
+            # NFS home npm can't unlink them mid-upgrade (EBUSY on .nfs*
+            # silly-renames) while it runs. Stop it here, restart after the
+            # loop. Linux only — macOS uses launchd + a local FS (no EBUSY).
+            # See docs/usage/troubleshooting.md.
+            if [[ "$OS" == "linux" && "$_name" == "@tobilu/qmd" ]] && qmd_daemon_running; then
+                log_info "  stopping qmd daemon for safe upgrade (NFS EBUSY guard)"
+                qmd_daemon_stop && _qmd_stopped=1
+            fi
             run_logged npm install -g "$_name@latest"
             log_okay "  $_name (upgraded)"
             (( _upgrade_count++ )) || true
@@ -108,6 +118,13 @@ while IFS= read -r pkg; do
         (( _pkg_count++ )) || true
     fi
 done < <(_read_package_list "$NPM_TXT")
+
+# Bring the qmd MCP daemon back if we stopped it for its upgrade. In a full
+# bootstrap memory.sh (step 6.6) would also restart it, but node.sh can run
+# standalone, so don't leave the memory daemon dead.
+if [[ "$_qmd_stopped" == "1" ]]; then
+    qmd_daemon_start && log_okay "  restarted qmd mcp daemon"
+fi
 
 if [[ $_pkg_count -eq 0 && $_upgrade_count -eq 0 ]]; then
     log_info "All npm packages already installed"
