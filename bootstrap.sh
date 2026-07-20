@@ -123,6 +123,31 @@ DF_INSTALL_DIR="$DF_ROOT/install"
 
 _BOOTSTRAP_START=$SECONDS
 
+# --- degradation tracking -------------------------------------------------
+# Collect non-fatal degradations (every log_warn, here and in each child
+# install/*.sh) into one file and summarize them at exit, so a real gap — a
+# skipped cass build, an unconfigured token — can't scroll past unnoticed.
+# The summary runs from the EXIT trap, so it also prints on a mid-run `die`,
+# not just clean completion. This trap supersedes the tmp-only one set above
+# (that one still covers an early failure before _lib.sh is even sourced).
+export DF_DEGRADE_LOG="$_BOOTSTRAP_TMP/degradations"
+: > "$DF_DEGRADE_LOG"
+
+_bootstrap_summary() {
+    local _rc=$?
+    if [[ -s "$DF_DEGRADE_LOG" ]]; then
+        local _n _line
+        _n="$(wc -l < "$DF_DEGRADE_LOG" 2>/dev/null || echo '?')"
+        log_section "degradations — $_n skipped or degraded"
+        log_info "These did NOT install cleanly. Fix the cause and re-run the noted install/*.sh:"
+        while IFS= read -r _line; do printf "   - %s\n" "$_line"; done < "$DF_DEGRADE_LOG"
+    elif [[ "$_rc" -eq 0 ]]; then
+        log_okay "No degradations — every component installed cleanly."
+    fi
+    return "$_rc"
+}
+trap '_bootstrap_summary; rm -rf "$_BOOTSTRAP_TMP"' EXIT
+
 log_section "dotfiles bootstrap ($DF_MODE)"
 log_info "OS: $OS | Arch: $ARCH | Host: $(hostname)"
 [[ "$DF_DEBUG" == "1" ]] && log_debug "Debug mode enabled"

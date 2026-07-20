@@ -27,7 +27,18 @@ DF_DEBUG="${DF_DEBUG:-0}"
 
 log_info()    { printf "${_BLUE}${_BOLD}[info]${_RESET}  %s\n"    "$*"; }
 log_okay()    { printf "${_GREEN}${_BOLD}[okay]${_RESET}  %s\n"   "$*"; }
-log_warn()    { printf "${_YELLOW}${_BOLD}[warn]${_RESET}  %s\n"  "$*"; }
+log_warn() {
+    printf "${_YELLOW}${_BOLD}[warn]${_RESET}  %s\n"  "$*"
+    # Record degradations (skipped installs, failed-but-non-fatal steps) so
+    # bootstrap can print one consolidated summary at the end — otherwise a
+    # real gap (e.g. cass didn't build) scrolls past unnoticed. DF_DEGRADE_LOG
+    # is exported by bootstrap.sh; each install script runs as a child and
+    # appends to the same file. Never let this fail the caller (set -e).
+    if [[ -n "${DF_DEGRADE_LOG:-}" ]]; then
+        printf '%s\n' "$*" >> "$DF_DEGRADE_LOG" 2>/dev/null || true
+    fi
+    return 0
+}
 log_fail()    { printf "${_RED}${_BOLD}[fail]${_RESET}  %s\n"     "$*" >&2; }
 log_debug()   { [[ "$DF_DEBUG" == "1" ]] && printf "${_CYAN}[dbug]${_RESET}  ${_DIM}%s${_RESET}\n" "$*" || true; }
 
