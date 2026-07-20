@@ -145,28 +145,38 @@ _sync_plugins() {
 }
 
 _check_plugins() {
-    local _tmp _markets _plugin _market
+    local _tmp _markets _avail _plugin _market _json
     has jq || die "jq is required to check Codex plugins"
-    _tmp="$(mktemp)"
-    _markets="$(mktemp)"
-    codex plugin list --json | jq -r '.installed[] | select(.enabled) | .pluginId' > "$_tmp" \
-        || die "Could not read Codex plugin inventory"
+    # One snapshot read: .installed (+enabled) and .available must be consistent.
+    _json="$(codex plugin list --json)" || die "Could not read Codex plugin inventory"
+    _tmp="$(mktemp)"; _markets="$(mktemp)"; _avail="$(mktemp)"
+    jq -r '.installed[] | select(.enabled) | .pluginId' <<<"$_json" > "$_tmp"
+    jq -r '.available[].pluginId'                        <<<"$_json" > "$_avail"
     _marketplace_names > "$_markets" || true
     while IFS= read -r _plugin; do
         [[ -n "$_plugin" ]] || continue
         _market="${_plugin##*@}"
         if ! grep -qxF "$_market" "$_markets"; then
             if _codex_authenticated; then
-                rm -f "$_tmp" "$_markets"
+                rm -f "$_tmp" "$_markets" "$_avail"
                 die "Codex marketplace unavailable while authenticated: $_market"
             fi
             log_warn "Skipping plugin check without Codex login/runtime: $_plugin"
             continue
         fi
-        grep -qxF "$_plugin" "$_tmp" \
-            || die "Missing or disabled Codex plugin: $_plugin"
+        grep -qxF "$_plugin" "$_tmp" && continue
+        # Declared but not installed+enabled. If the marketplace snapshot no
+        # longer offers it, upstream dropped it (the curated snapshot ships with
+        # codex-cli and drifts across versions) — warn and keep going so a stale
+        # list can't break bootstrap. A plugin still offered but missing is a
+        # real local failure and stays fatal.
+        if grep -qxF "$_plugin" "$_avail"; then
+            rm -f "$_tmp" "$_markets" "$_avail"
+            die "Missing or disabled Codex plugin: $_plugin"
+        fi
+        log_warn "  dropped upstream: $_plugin — prune packages/codex-plugins.txt"
     done < <(_declared_plugins)
-    rm -f "$_tmp" "$_markets"
+    rm -f "$_tmp" "$_markets" "$_avail"
 }
 
 # Translate packages/mcp-servers.txt (+ overlays) into [mcp_servers.<name>]

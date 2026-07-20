@@ -1,13 +1,22 @@
 # Codex plugins installed from the built-in OpenAI marketplaces.
 # One PLUGIN@MARKETPLACE selector per line; install/codex.sh reconciles these.
+#
+# Only plugins present in the codex-cli bundled marketplace snapshot install.
+# The snapshot ships WITH codex-cli (unpinned), so curated plugins come and go
+# across versions — an entry the snapshot no longer offers is warned, not fatal
+# (see install/codex.sh _check_plugins). Prune dropped entries when you see the
+# warning.
 
 # Core coding lifecycle
 github@openai-curated
 codex-security@openai-curated
 plugin-eval@openai-curated
-openai-developers@openai-curated
 
-# User project mix: full-stack web, visualizations, games, and mathematical docs
+# User project mix: full-stack web, games
 build-web-apps@openai-curated
-build-web-data-visualization@openai-curated
 game-studio@openai-curated
+
+# Dropped from the openai-curated snapshot as of codex-cli 0.144.6 (re-add if a
+# future codex-cli restores them):
+#   openai-developers
+#   build-web-data-visualization
