@@ -21,6 +21,30 @@ source ~/.zprofile
 
 ---
 
+## Codex install fails with `marketplace unavailable: openai-bundled`
+
+Symptom: `install/codex.sh` reports that `openai-bundled` is unavailable even
+though `codex login status` says the user is authenticated.
+
+Root cause: `openai-bundled` is a local marketplace owned and registered by
+Codex Desktop. Authentication does not expose it to the standalone CLI, whose
+built-in marketplace is `openai-curated`. The CLI-managed
+`packages/codex-plugins.txt` must therefore contain only plugins from
+marketplaces reported by `codex plugin marketplace list`.
+
+Confirm:
+
+```sh
+codex login status
+codex plugin marketplace list --json
+```
+
+**Fix:** update the dotfiles checkout and rerun `bootstrap.sh`. Bundled plugins
+remain owned by Codex Desktop; do not register the app's internal plugin path
+manually because that can conflict with the app's marketplace reconciliation.
+
+---
+
 ## `nvm` or `node` not available in a script
 
 `nvm.sh` is lazy-loaded in interactive shells only. Non-interactive shells get `node`/`npm` via the PATH entry `.zprofile`/`.bash_profile` adds from the highest installed version. If `node` is missing in a script, either:

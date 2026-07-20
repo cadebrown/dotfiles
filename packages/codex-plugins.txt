@@ -11,4 +11,3 @@ openai-developers@openai-curated
 build-web-apps@openai-curated
 build-web-data-visualization@openai-curated
 game-studio@openai-curated
-latex@openai-bundled
