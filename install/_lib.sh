@@ -182,6 +182,18 @@ GOPATH="$LOCAL_PLAT/go"
 GOBIN="$ARCH_BIN"
 GOCACHE="$LOCAL_PLAT/go-build"
 
+# Compiler cache for INSTALL-TIME builds. The shell profiles export these for
+# interactive shells, but install scripts run in bootstrap's non-login bash
+# (and possibly cron/CI) which never sources a profile — so without this,
+# install-time cargo builds (rust.sh, the cass source build) silently miss the
+# sccache cache. Guard on sccache being present (Brewfile installs it at step 4,
+# before rust/memory at step 6). Same SCCACHE_DIR as the profile → one shared
+# cache on scratch. `:-` respects an inherited value / user override.
+if command -v sccache >/dev/null 2>&1; then
+    export RUSTC_WRAPPER="${RUSTC_WRAPPER:-sccache}"
+    export SCCACHE_DIR="${SCCACHE_DIR:-$HOME/.cache/sccache}"
+fi
+
 # Scratch space for NFS homes with small quotas.
 #
 # When scratch is configured, install/scratch.sh symlinks large home dirs

@@ -64,3 +64,15 @@ different toolkit versions — no conflicts.
   which is searched after ld.so.cache, so the system's older libstdc++ wins over Homebrew's.
   All four CMake toolchain files add `-Wl,--disable-new-dtags` when selecting mold or lld.
   `~/.profile` also sets `LDFLAGS` with the same flag for non-CMake builds.
+- **sccache is wired at ALL three layers** — so every cargo build hits the shared cache:
+  1. shell profiles (`~/.profile`) → `RUSTC_WRAPPER` for login/interactive shells;
+  2. `install/_lib.sh` → exports `RUSTC_WRAPPER` (guarded on `command -v sccache`) so
+     bootstrap's non-login install scripts (`rust.sh`, the cass build) get it;
+  3. `$CARGO_HOME/config.toml` `[build] rustc-wrapper` (written by `rust.sh`, guarded on
+     `has sccache`) → read by cargo itself, so even bare cron/CI/non-login `cargo build`
+     is covered.
+  Layer 3 is safe here ONLY because `CARGO_HOME` is on **per-machine scratch**, not the
+  shared NFS home — a config referencing sccache can't break a sibling machine, and
+  `rust.sh` never clobbers a hand-written config. Caveat: if you uninstall sccache, drop
+  the `rustc-wrapper` line too or cargo errors on every build. sccache passes incremental
+  (dev) builds straight through — it only caches clean/release/`cargo install` builds.
