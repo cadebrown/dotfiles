@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Fast end-to-end healthcheck for the local coding-agent harness.
+set -uo pipefail
+
+_repo="${DF_DOTFILES_REPO:-$HOME/dotfiles}"
+_fail=0
+
+_check() {
+    local _name="$1"
+    shift
+    if "$@" >/dev/null 2>&1; then
+        printf '[okay] %s\n' "$_name"
+    else
+        printf '[fail] %s\n' "$_name"
+        _fail=1
+    fi
+}
+
+_has() { command -v "$1" >/dev/null 2>&1; }
+_cass_healthy() { cass health --robot | jq -e '.status == "healthy"' >/dev/null; }
+_entire_healthy() {
+    [[ -f .entire/settings.json || -f .entire/settings.local.json ]] || return 0
+    entire status --json | jq -e '.enabled == true' >/dev/null
+}
+
+for _tool in jq yq codex claude qmd cass entire; do
+    _check "tool: $_tool" _has "$_tool"
+done
+
+if _has cass && _has jq; then
+    _check "cass hybrid index" _cass_healthy
+fi
+if _has qmd; then
+    _check "qmd index" qmd status
+fi
+if [[ -x "$_repo/install/skills-sync.sh" ]]; then
+    _check "skill registry" bash "$_repo/install/skills-sync.sh" check
+fi
+if [[ -x "$_repo/install/codex.sh" ]] && _has codex; then
+    _check "Codex config and plugins" bash "$_repo/install/codex.sh" check
+fi
+if _has entire && _has jq; then
+    _check "Entire for this repository" _entire_healthy
+fi
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    _check "qmd LaunchAgent" launchctl print "gui/$(id -u)/dev.cade.qmd"
+    _check "cass lexical LaunchAgent" launchctl print "gui/$(id -u)/dev.cade.cass-watch"
+    _check "cass semantic LaunchAgent" launchctl print "gui/$(id -u)/dev.cade.cass-semantic"
+fi
+
+exit "$_fail"

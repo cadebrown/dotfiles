@@ -81,6 +81,19 @@ Skills live in one place: `home/dot_claude/skills/` → deployed to
 three scan `~/.agents/skills`; opencode also reads `~/.claude/skills`
 directly). One SKILL.md edit propagates to every tool on `chezmoi apply`.
 
+Installer-managed skills are declared in `packages/agent-skills.txt`; Codex
+plugins are declared separately in `packages/codex-plugins.txt`. Run
+`bash install/skills-sync.sh check` for a read-only drift check. Do not use
+`npx skills check` as an audit: current versions update installed skills.
+
+Codex and Claude each have `researcher` and `reviewer` specialists under their
+managed `agents/` directories. Global instructions authorize bounded parallel
+research, log analysis, tests, and final review while keeping overlapping edits
+in one agent. Codex is capped at six direct children and one level of nesting.
+
+`df-agent-doctor` checks the declared tool surface, skill registry, Codex
+plugins/config, qmd, cass, LaunchAgents, and per-repository Entire state.
+
 ## Model and safety defaults
 
 - Codex defaults to GPT-5.6 Sol at high reasoning. `deep` raises reasoning to
@@ -109,13 +122,30 @@ Three layers, set up by `install/memory.sh` (bootstrap step 6.6, `DF_DO_MEMORY`)
 |---|---|---|---|
 | L1 auto-memory | `~/.claude/projects/<proj>/memory/` (markdown) | loaded each session; also indexed by qmd | no (per-machine) |
 | L2 knowledge base | `~/kb` git repo (markdown) | qmd — hybrid BM25 + local GGUF embeddings + rerank, MCP daemon on `localhost:8181` | yes (git remote) |
-| L3 session history | every agent's transcripts (Claude Code, Codex, opencode, pi) | cass — hybrid BM25 + local ONNX embeddings (`nomic-embed`), CLI/`history-search` skill | no (per-machine) |
+| L3 session history | every agent's transcripts (Claude Code, Codex, opencode, pi) | cass — hybrid BM25 + native MiniLM embeddings, CLI/`history-search` skill | no (per-machine) |
 
 Search indexes always rebuild locally (`~/.cache/qmd`, `~/.cache/cass` — on
 scratch when configured); only `~/kb` and the dotfiles repo sync across
-machines. Daemons: LaunchAgents `dev.cade.qmd` / `dev.cade.cass-watch` on
-macOS, lazy-start from the shell profiles on Linux.
+machines. On macOS qmd has a persistent LaunchAgent; cass refreshes its lexical
+index every five minutes and its full MiniLM/HNSW index daily (persistent watch
+mode can wedge upstream). Linux starts bounded lexical refreshes lazily from
+the shell profiles; `memory.sh reindex` refreshes semantic vectors explicitly.
 
 Re-index after bulk changes: `bash install/memory.sh reindex` (forces qmd
 re-embed and a full cass rebuild). Agent-facing usage rules live in the
 `## Memory layers` section of `agents-common.md`.
+
+## Per-repository session checkpoints
+
+Entire is intentionally not enabled globally. `install/entire.sh` enables and
+repairs integrations only for this dotfiles checkout during bootstrap. In any
+other repository, run `entire enable --project` explicitly and add only the
+agents used there; unrelated repositories remain untouched.
+
+## Remote clipboard
+
+Ghostty copies selections to the local clipboard and permits remote OSC 52
+writes. Its shell integration propagates environment and terminfo over SSH.
+The managed tmux config enables clipboard escape passthrough, and Neovim forces
+its OSC 52 provider whenever `SSH_TTY` or `SSH_CONNECTION` is set. Paste remains
+local terminal input; remote clipboard reads still require Ghostty approval.
