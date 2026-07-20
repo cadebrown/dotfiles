@@ -14,6 +14,7 @@ The repo is designed for:
 - Start with [REPO-MAP.md](/Users/cade/dotfiles/REPO-MAP.md) for a compact repo map.
 - Read [install/_lib.sh](/Users/cade/dotfiles/install/_lib.sh) before changing install scripts.
 - Read the nearest nested `AGENTS.md` before editing `install/`, `home/`, `tests/`, or `docs/`.
+- [docs/usage/troubleshooting.md](/Users/cade/dotfiles/docs/usage/troubleshooting.md) is the FAQ of known failure modes (symptom → root-cause chain → fix). Check it before re-diagnosing an issue; add newly root-caused issues there.
 
 ## Canonical Commands
 

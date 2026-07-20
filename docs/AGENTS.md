@@ -21,6 +21,7 @@ Edit source Markdown in `docs/`. Do not edit generated files under `docs/book/`.
 - Keep docs aligned with the actual scripts and file paths.
 - Prefer updating one authoritative explanation rather than duplicating subtle behavior in several pages.
 - When documenting commands, prefer the canonical repo entrypoints already used in README and scripts.
+- `usage/troubleshooting.md` is the repo FAQ. Entries follow symptom → root-cause chain → confirm → fix; newly root-caused issues belong there.
 
 ## Validation
 

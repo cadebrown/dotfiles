@@ -29,6 +29,7 @@
 - Add or move a package: [packages/](/Users/cade/dotfiles/packages)
 - Change deployed shell behavior: [home/](/Users/cade/dotfiles/home)
 - Change docs: [docs/](/Users/cade/dotfiles/docs), not `docs/book/`
+- Debug a machine or setup issue: [docs/usage/troubleshooting.md](/Users/cade/dotfiles/docs/usage/troubleshooting.md) (the FAQ)
 - Validate setup changes: [tests/run.sh](/Users/cade/dotfiles/tests/run.sh)
 
 ## Frequent Mistakes To Avoid

@@ -226,6 +226,56 @@ Test suite: `bash ~/dotfiles/tests/test-locale.sh`
 
 ---
 
+## Copy/paste from a remote SSH session pastes as mojibake (`â€™`, `Ã©`)
+
+Symptom: text copied out of a remote Linux session — usually inside tmux — pastes
+on the Mac with latin-1 garbage where punctuation or accents should be: `’`
+becomes `â€™`, `é` becomes `Ã©`. The terminal (iTerm2, Cursor) is innocent: the
+bytes are already mangled before they reach it.
+
+Root cause chain:
+
+1. On macOS, `.zprofile` exports `LC_ALL=en_US.UTF-8`
+2. macOS ships `SendEnv LANG LC_*` in `/etc/ssh/ssh_config`, and Linux sshd
+   accepts `LC_*` by default — the Mac's `LC_ALL` lands in the remote environment
+3. `LC_ALL` overrides `LANG`, defeating the deliberate LANG-only locale setup in
+   the Linux shell profiles (see the entry above)
+4. On hosts whose *system* glibc has no `en_US.UTF-8` compiled (minimal server
+   images — the brew-glibc `LOCPATH` data doesn't help system binaries),
+   `setlocale()` falls back to C/ASCII
+5. System tmux in a C locale treats each UTF-8 byte as a separate latin-1
+   character and re-emits it as multibyte UTF-8 — the display, and therefore
+   anything selected and copied from it, is mojibake
+
+Confirm on the remote, inside the garbling session:
+
+```sh
+locale; echo "LC_ALL=$LC_ALL"; locale -a 2>/dev/null | grep -iE 'en_US|utf'
+printf 'caf\xc3\xa9 \xe2\x80\x94 \xe2\x80\x9cok\xe2\x80\x9d\n'   # should render: café — “ok”
+```
+
+Broken looks like: a "cannot change locale" warning or `LC_CTYPE="C"` in the
+`locale` output, and the printf line rendering as `cafÃ© â€” â€œokâ€`.
+
+**Fix:** the Linux shell profiles `unset LC_ALL` before exporting `LANG`. Then:
+
+```sh
+chezmoi apply ~/.zprofile ~/.bash_profile
+tmux kill-server        # the tmux server caches the locale it started with
+exec zsh -l             # or reconnect
+```
+
+If it's still garbled, the host has no UTF-8 locale usable by system binaries at
+all — check `locale -a`; `export LANG=C.UTF-8` (built into every modern glibc)
+is the fallback.
+
+Note the tempting client-side fix does NOT work: `SendEnv -LC_*` in
+`~/.ssh/config` is a no-op here, because ssh reads the user config *before*
+`/etc/ssh/ssh_config` and `-pattern` removals apply at parse time — the system
+default adds the patterns after your removal runs.
+
+---
+
 ## Python@3.14 build fails on Linux (uuid or test_datetime errors)
 
 Python 3.14 from Homebrew has build issues on some Linux systems:
