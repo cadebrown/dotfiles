@@ -56,7 +56,24 @@ _cass_platform() {
 # the main package builds several bins, so cargo errors with "multiple packages
 # with binaries found" unless BOTH the package and the bin are pinned.
 _cass_build_from_source() {
-    run_logged cargo install --git "https://github.com/$_CASS_REPO" \
+    # Two hazards, both learned the hard way:
+    #  1. cass needs a NIGHTLY toolchain — a dep gates `#![feature(try_trait_v2)]`
+    #     and the repo pins channel="nightly". Stable fails (E0554 on stable, or
+    #     an MSRV error on an older stable). Install nightly on demand.
+    #  2. Use the rustup cargo/rustup EXPLICITLY, never PATH `cargo`: a Homebrew
+    #     `rust` formula (a lingering build-dep) can shadow rustup in bootstrap's
+    #     PATH at an old version, which is what silently broke this for months.
+    local _cargo="$CARGO_HOME/bin/cargo" _rustup="$CARGO_HOME/bin/rustup"
+    if [[ ! -x "$_cargo" || ! -x "$_rustup" ]]; then
+        log_warn "cass: rustup toolchain not found under $CARGO_HOME/bin — run install/rust.sh first"
+        return 1
+    fi
+    if ! "$_rustup" toolchain list 2>/dev/null | grep -q '^nightly'; then
+        log_info "cass: installing nightly toolchain (cass requires it to build)"
+        run_logged "$_rustup" toolchain install nightly --profile minimal \
+            || { log_warn "cass: nightly toolchain install failed"; return 1; }
+    fi
+    run_logged "$_cargo" +nightly install --git "https://github.com/$_CASS_REPO" \
         coding-agent-search --bin cass --locked --root "${ARCH_BIN%/bin}"
 }
 
@@ -257,8 +274,8 @@ if [[ "$OS" == "darwin" ]]; then
     done
 else
     # No launchd: lazy-start (also done by shell profiles on login).
-    if has qmd && ! pgrep -f "qmd mcp --http" >/dev/null 2>&1; then
-        (qmd mcp --http --daemon >/dev/null 2>&1 &) && log_okay "started qmd mcp daemon"
+    if has qmd && ! qmd_daemon_running; then
+        qmd_daemon_start && log_okay "started qmd mcp daemon"
     fi
     if [[ -x "$ARCH_BIN/cass" ]] && ! pgrep -f "cass index" >/dev/null 2>&1; then
         (nohup "$ARCH_BIN/cass" index >/dev/null 2>&1 &) \
