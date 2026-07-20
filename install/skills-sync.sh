@@ -11,6 +11,7 @@
 # the pinned #ref in agent-skills.txt and remove the dir to force reinstall.
 #
 # Idempotent: rows are skipped when the skill's SKILL.md already exists.
+# `check` is read-only and verifies both declared skills and lockfile drift.
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
@@ -19,6 +20,64 @@ log_section "Agent skills sync"
 
 _SKILLS_DIR="$HOME/.claude/skills"
 _ok=0 _skip=0 _fail=0
+_mode="${1:-sync}"
+
+case "$_mode" in
+    sync|check) ;;
+    *) die "Usage: skills-sync.sh [sync|check]" ;;
+esac
+
+_lockfile() {
+    if [[ -n "${XDG_STATE_HOME:-}" ]]; then
+        printf '%s/skills/.skill-lock.json\n' "$XDG_STATE_HOME"
+    else
+        printf '%s/.agents/.skill-lock.json\n' "$HOME"
+    fi
+}
+
+_declared_dirs() {
+    local _file
+    while IFS= read -r _file; do
+        awk '!/^[[:space:]]*(#|$)/ { print $1 }' "$_file"
+    done < <(overlay_package_files "agent-skills.txt")
+}
+
+_check_registry() {
+    local _lock _tmp _dir _missing=0 _extra=0
+    _lock="$(_lockfile)"
+    _tmp="$(mktemp -d)"
+    _declared_dirs | sort -u > "$_tmp/declared"
+
+    while IFS= read -r _dir; do
+        if [[ ! -f "$_SKILLS_DIR/$_dir/SKILL.md" ]]; then
+            log_warn "missing declared skill: $_dir"
+            (( _missing++ )) || true
+        fi
+    done < "$_tmp/declared"
+
+    if [[ -f "$_lock" ]] && has jq; then
+        jq -r '.skills // {} | keys[]' "$_lock" | sort -u > "$_tmp/locked"
+        while IFS= read -r _dir; do
+            [[ -n "$_dir" ]] || continue
+            log_warn "unmanaged lockfile skill: $_dir (declare it or remove it deliberately)"
+            (( _extra++ )) || true
+        done < <(comm -23 "$_tmp/locked" "$_tmp/declared")
+    fi
+
+    if (( _missing == 0 && _extra == 0 )); then
+        rm -rf "$_tmp"
+        log_okay "Agent skill registry matches the installed tree"
+        return 0
+    fi
+    rm -rf "$_tmp"
+    log_warn "Agent skill drift: $_missing missing, $_extra unmanaged"
+    return 1
+}
+
+if [[ "$_mode" == "check" ]]; then
+    _check_registry
+    exit $?
+fi
 
 has npx || { log_warn "npx not found — run install/node.sh first; skipping"; exit 0; }
 
@@ -112,3 +171,4 @@ while IFS= read -r _file; do
 done < <(overlay_package_files "agent-skills.txt")
 
 log_okay "Agent skills: ${_ok} installed, ${_skip} already present, ${_fail} failed"
+_check_registry || log_warn "Run 'bash install/skills-sync.sh check' after reconciling the reported drift"

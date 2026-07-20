@@ -30,6 +30,7 @@ brew "eza"
 brew "ncdu"
 brew "fzf"
 brew "jq"
+brew "yq"
 brew "bc"  # statusline.sh arithmetic (ctx%/cost) — not guaranteed on minimal Linux
 brew "bash-preexec"  # preexec/precmd hooks for bash — required by atuin history recording
 brew "direnv"

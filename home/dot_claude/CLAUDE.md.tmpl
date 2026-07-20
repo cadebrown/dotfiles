@@ -9,6 +9,12 @@
 - Use `/research` for deep documentation/library lookups when guessing at an
   API surface would be wrong.
 - Skills (in `~/.claude/skills/`) are the right place for repeatable workflows.
+- Delegate independent, bounded work without asking: read-heavy exploration,
+  primary-source research, log analysis, test runs, and adversarial review.
+  Keep overlapping edits in one agent and collect every result before handing
+  work back.
+- Treat `packages/agent-skills.txt` as the installed-skill registry. Audit it
+  with `install/skills-sync.sh check`; `npx skills check` mutates the tree.
 {{- range glob (joinPath .chezmoi.workingTree "dotfiles-*/home/dot_claude/CLAUDE.md") }}
 
 {{ include . }}

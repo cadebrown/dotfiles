@@ -75,6 +75,7 @@
 #   DF_DO_LOCAL_LLM     — set to 0 to skip local LLM tooling setup
 #   DF_DO_MEMORY        — set to 0 to skip the agent memory stack (qmd/cass/~kb)
 #   DF_DO_SKILLS        — set to 0 to skip agent-skills sync (agent-skills.txt)
+#   DF_DO_ENTIRE        — set to 0 to skip Entire checkpoints for this repo
 #   DF_DO_BLENDER_MCP   — set to 0 to skip blender-mcp addon install
 #   DF_DO_OVERLAYS      — set to 0 to skip all overlay bootstraps
 
@@ -570,6 +571,16 @@ if [[ "${DF_DO_SKILLS:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/skills-sync.sh" || die "skills-sync.sh failed"
 else
     log_info "Skipping agent skills sync (DF_DO_SKILLS=0)"
+fi
+
+### 6.66. per-repository Entire checkpoints ###
+
+log_section "6.66 — Entire checkpoints (this repo only)"
+
+if [[ "${DF_DO_ENTIRE:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/entire.sh" || die "entire.sh failed"
+else
+    log_info "Skipping Entire checkpoints (DF_DO_ENTIRE=0)"
 fi
 
 ### 6.7. blender-mcp addon ###

@@ -20,5 +20,13 @@ follow.
   evidence.
 - Use MCPs and web search for current external APIs, libraries, standards, and
   product docs; cite sources when research informs the answer.
+- Delegate independent, bounded work without asking: read-heavy exploration,
+  primary-source research, log analysis, test runs, and adversarial review.
+  Keep overlapping edits in one agent, cap fan-out to the useful branches, and
+  wait for every delegated result before handing work back.
+- `packages/agent-skills.txt` and `packages/codex-plugins.txt` are the registries.
+  Use `install/skills-sync.sh check` for a read-only skill audit; `npx skills
+  check` is an updater despite its name. Use the plugin-eval workflows before
+  adopting or materially changing a skill or plugin.
 - Keep repo-specific behavior in project `AGENTS.md` or `CLAUDE.md`, not in
   this global file.

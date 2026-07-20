@@ -124,6 +124,13 @@ writing-skills npx obra/superpowers writing-skills
 # session — the discovery half of this very file's workflow.
 find-skills npx vercel-labs/skills find-skills
 
+# First-principles design interrogation. grill-me/grill-with-docs are small
+# explicit entrypoints; grilling and domain-modeling provide the real workflow.
+grill-me npx mattpocock/skills grill-me
+grilling npx mattpocock/skills grilling
+grill-with-docs npx mattpocock/skills grill-with-docs
+domain-modeling npx mattpocock/skills domain-modeling
+
 ### Debugging / toolchain internals ###
 
 # DWARF format + dwarfdump/llvm-dwarfdump workflows (user-requested — partly
@@ -141,6 +148,14 @@ add-debug-info npx hbarve1/tessl-llvm add-debug-info
 # the repo dir names (react-best-practices/ → vercel-react-best-practices).
 vercel-react-best-practices npx vercel-labs/agent-skills vercel-react-best-practices
 vercel-composition-patterns npx vercel-labs/agent-skills vercel-composition-patterns
+
+# Official browser CLI workflow. The CLI itself is already in npm.txt; this
+# gives every harness the same snapshot/ref-driven interaction protocol.
+playwright-cli npx microsoft/playwright-cli playwright-cli
+
+# Keep the interaction and visual layers distinct from frontend-design.
+motion-designer npx dylantarre/animation-principles motion-designer
+web-design-guidelines npx vercel-labs/agent-skills web-design-guidelines
 
 ### Game development ###
 

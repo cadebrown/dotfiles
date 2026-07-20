@@ -15,8 +15,9 @@
 #                  that codex itself maintains
 #   - sync-hooks:  write ~/.codex/hooks.json + ~/.local/bin/df-chezmoi-guard,
 #                  then update the trusted_hash so codex accepts the hook
+#   - plugins:     reconcile packages/codex-plugins.txt against official markets
 #   - check:       healthcheck (codex on PATH, config sections, profiles parse,
-#                  guard blocks managed paths)
+#                  plugins present, guard blocks managed paths)
 #
 # Modes:
 #   install      -> verify codex is on PATH; complain if missing
@@ -90,6 +91,82 @@ _toml_escape() {
     s="${s//\\/\\\\}"
     s="${s//\"/\\\"}"
     printf '%s' "$s"
+}
+
+_declared_plugins() {
+    local _file
+    while IFS= read -r _file; do
+        awk '!/^[[:space:]]*(#|$)/ { print $1 }' "$_file"
+    done < <(overlay_package_files "codex-plugins.txt")
+}
+
+_codex_authenticated() {
+    codex login status >/dev/null 2>&1
+}
+
+_marketplace_names() {
+    codex plugin marketplace list --json 2>/dev/null \
+        | jq -r '.marketplaces[].name'
+}
+
+_sync_plugins() {
+    local _tmp _markets _plugin _market
+    log_section "Codex Plugins"
+    has jq || { log_warn "jq not found — skipping Codex plugin sync"; return 0; }
+    _tmp="$(mktemp)"
+    _markets="$(mktemp)"
+    if ! codex plugin list --json | jq -r '.installed[].pluginId' > "$_tmp"; then
+        log_warn "Could not read Codex plugin inventory"
+        rm -f "$_tmp" "$_markets"
+        return 0
+    fi
+    _marketplace_names > "$_markets" || true
+
+    while IFS= read -r _plugin; do
+        [[ -n "$_plugin" ]] || continue
+        _market="${_plugin##*@}"
+        if ! grep -qxF "$_market" "$_markets"; then
+            log_warn "  skip  $_plugin (marketplace unavailable; Codex login/runtime may be required)"
+            continue
+        fi
+        if grep -qxF "$_plugin" "$_tmp"; then
+            log_info "  skip  $_plugin (already installed)"
+            continue
+        fi
+        log_info "  install  $_plugin"
+        if codex plugin add --json "$_plugin" >/dev/null; then
+            log_okay "  installed $_plugin"
+            printf '%s\n' "$_plugin" >> "$_tmp"
+        else
+            log_warn "  failed $_plugin"
+        fi
+    done < <(_declared_plugins)
+    rm -f "$_tmp" "$_markets"
+}
+
+_check_plugins() {
+    local _tmp _markets _plugin _market
+    has jq || die "jq is required to check Codex plugins"
+    _tmp="$(mktemp)"
+    _markets="$(mktemp)"
+    codex plugin list --json | jq -r '.installed[] | select(.enabled) | .pluginId' > "$_tmp" \
+        || die "Could not read Codex plugin inventory"
+    _marketplace_names > "$_markets" || true
+    while IFS= read -r _plugin; do
+        [[ -n "$_plugin" ]] || continue
+        _market="${_plugin##*@}"
+        if ! grep -qxF "$_market" "$_markets"; then
+            if _codex_authenticated; then
+                rm -f "$_tmp" "$_markets"
+                die "Codex marketplace unavailable while authenticated: $_market"
+            fi
+            log_warn "Skipping plugin check without Codex login/runtime: $_plugin"
+            continue
+        fi
+        grep -qxF "$_plugin" "$_tmp" \
+            || die "Missing or disabled Codex plugin: $_plugin"
+    done < <(_declared_plugins)
+    rm -f "$_tmp" "$_markets"
 }
 
 # Translate packages/mcp-servers.txt (+ overlays) into [mcp_servers.<name>]
@@ -355,6 +432,26 @@ _sync_hooks() {
         done
     done
 
+    # Entire is opt-in per repository. If this dotfiles checkout has enabled
+    # it, trust only the generated hooks at this exact absolute path. Other
+    # repositories remain disabled and untrusted until explicitly enabled.
+    local _project_hooks="$DF_ROOT/.codex/hooks.json" _event _event_key
+    if [[ -f "$DF_ROOT/.entire/settings.json" && -f "$_project_hooks" ]]; then
+        while IFS= read -r _event; do
+            _event_key="$(printf '%s' "$_event" | sed -E 's/([a-z0-9])([A-Z])/\1_\2/g' | tr '[:upper:]' '[:lower:]')"
+            _n_groups="$(jq --arg event "$_event" '.hooks[$event] | length' "$_project_hooks")"
+            for (( _g=0; _g<_n_groups; _g++ )); do
+                _n_hooks="$(jq --arg event "$_event" --argjson g "$_g" '.hooks[$event][$g].hooks | length' "$_project_hooks")"
+                for (( _h=0; _h<_n_hooks; _h++ )); do
+                    _hook_key="$_project_hooks:${_event_key}:${_g}:${_h}"
+                    _hook_hash="$(_managed_hook_hash "$_project_hooks" "$_event" "$_event_key" "$_g" "$_h")"
+                    _trust_hook "$HOME/.codex/config.toml" "$_hook_key" "$_hook_hash"
+                    log_okay "Trusted Entire Codex hook $_event [$_g:$_h] → $_hook_hash"
+                done
+            done
+        done < <(jq -r '.hooks | keys[]' "$_project_hooks")
+    fi
+
     log_okay "Synced Codex hooks → $_hooks_dest"
     log_okay "Synced chezmoi guard → $_guard_dest"
 }
@@ -362,14 +459,22 @@ _sync_hooks() {
 # _managed_pre_tool_hook_hash FILE GROUP_IDX HOOK_IDX — Codex's trust
 # identity for one PreToolUse hook (indices default to 0 0).
 _managed_pre_tool_hook_hash() {
-    local _hooks_file="$1" _gidx="${2:-0}" _hidx="${3:-0}" _identity
+    _managed_hook_hash "$1" "PreToolUse" "pre_tool_use" "${2:-0}" "${3:-0}"
+}
+
+# _managed_hook_hash FILE EVENT_NAME EVENT_KEY GROUP_IDX HOOK_IDX — generic
+# version of Codex's persisted hook-trust identity.
+_managed_hook_hash() {
+    local _hooks_file="$1" _event_name="$2" _event_key="$3"
+    local _gidx="${4:-0}" _hidx="${5:-0}" _identity
     if has jq; then
         _identity="$(
-            jq -cS --argjson g "$_gidx" --argjson h "$_hidx" '
-              .hooks.PreToolUse[$g] as $group
+            jq -cS --arg eventName "$_event_name" --arg eventKey "$_event_key" \
+              --argjson g "$_gidx" --argjson h "$_hidx" '
+              .hooks[$eventName][$g] as $group
               | $group.hooks[$h] as $hook
               | {
-                  event_name: "pre_tool_use",
+                  event_name: $eventKey,
                   matcher: $group.matcher,
                   hooks: [
                     ({
@@ -384,6 +489,8 @@ _managed_pre_tool_hook_hash() {
             ' "$_hooks_file"
         )"
     else
+        [[ "$_event_name" == "PreToolUse" ]] \
+            || die "jq required to trust non-PreToolUse Codex hooks"
         [[ "$_gidx:$_hidx" == "0:0" ]] || die "jq required to trust more than the first Codex hook"
         local _matcher _type _command _status _status_json
         _matcher="$(_json_string_field_fallback "$_hooks_file" "matcher")"
@@ -403,7 +510,7 @@ _managed_pre_tool_hook_hash() {
             _status_json=",\"statusMessage\":\"$_status\""
         fi
 
-        _identity="{\"event_name\":\"pre_tool_use\",\"hooks\":[{\"async\":false,\"command\":\"$_command\"$_status_json,\"timeout\":600,\"type\":\"$_type\"}],\"matcher\":\"$_matcher\"}"
+        _identity="{\"event_name\":\"$_event_key\",\"hooks\":[{\"async\":false,\"command\":\"$_command\"$_status_json,\"timeout\":600,\"type\":\"$_type\"}],\"matcher\":\"$_matcher\"}"
     fi
     printf '%s' "$_identity" | _sha256_stdin | awk '{print "sha256:" $1}'
 }
@@ -514,6 +621,8 @@ _check_setup() {
     codex execpolicy check --rules "$_rules" -- git status >/dev/null \
         || die "codex execpolicy check failed for $_rules"
 
+    _check_plugins
+
     printf '{"tool_input":{"file_path":"/private/tmp/codex-hook-healthcheck"}}\n' \
         | env PATH="$ARCH_BIN:$PATH" "$_guard" >/dev/null \
         || die "chezmoi guard blocked an unmanaged path"
@@ -538,6 +647,7 @@ case "$_mode" in
     sync-config)
         _sync_config
         _sync_hooks
+        _sync_plugins
         ;;
     check)
         _check_setup
@@ -546,6 +656,7 @@ case "$_mode" in
         _verify_codex_present || die "codex not installed — run install/node.sh first"
         _sync_config
         _sync_hooks
+        _sync_plugins
         _check_setup
         ;;
 esac

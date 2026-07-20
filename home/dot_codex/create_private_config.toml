@@ -26,6 +26,13 @@ project_doc_fallback_filenames = ["AGENTS.md", "CLAUDE.md"]
 # Codex-local L1 analog; cross-tool memory lives in ~/kb + cass (memory.sh).
 memories = true
 
+[agents]
+# Direct children only: enough parallelism for independent research/review
+# without recursive fan-out that multiplies cost and merge coordination.
+max_threads = 6
+max_depth = 1
+interrupt_message = true
+
 [history]
 persistence = "save-all"
 max_bytes = 104857600

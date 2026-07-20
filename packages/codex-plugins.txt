@@ -1,0 +1,14 @@
+# Codex plugins installed from the built-in OpenAI marketplaces.
+# One PLUGIN@MARKETPLACE selector per line; install/codex.sh reconciles these.
+
+# Core coding lifecycle
+github@openai-curated
+codex-security@openai-curated
+plugin-eval@openai-curated
+openai-developers@openai-curated
+
+# User project mix: full-stack web, visualizations, games, and mathematical docs
+build-web-apps@openai-curated
+build-web-data-visualization@openai-curated
+game-studio@openai-curated
+latex@openai-bundled
