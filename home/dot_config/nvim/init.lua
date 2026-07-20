@@ -129,6 +129,12 @@ vim.o.mouse = 'a'
 -- Don't show the mode, since it's already in the status line
 vim.o.showmode = false
 
+-- SSH has no clipboard transport. Force Neovim's OSC 52 provider so yanks
+-- reach the terminal emulator's local clipboard on any remote host.
+if vim.env.SSH_TTY or vim.env.SSH_CONNECTION then
+  vim.g.clipboard = 'osc52'
+end
+
 -- Sync clipboard between OS and Neovim.
 --  Schedule the setting after `UiEnter` because it can increase startup-time.
 --  Remove this option if you want your OS clipboard to remain independent.
