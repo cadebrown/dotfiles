@@ -23,7 +23,16 @@ if [[ -x "$ARCH_BIN/uv" ]]; then
     log_okay "uv already installed: $("$ARCH_BIN/uv" --version)"
     if [[ "${DF_MODE:-}" == "upgrade" ]]; then
         log_info "Self-updating uv..."
-        run_logged "$ARCH_BIN/uv" self update || log_warn "uv self update failed"
+        if ! run_logged "$ARCH_BIN/uv" self update; then
+            # `uv self update` only works for standalone-installer builds; a uv
+            # from another source (Homebrew, pip, an older PLAT layout) refuses.
+            # Re-run the standalone installer — it replaces the binary in place,
+            # so this upgrade lands AND future self-updates work.
+            log_info "uv self update unsupported for this build — reinstalling via standalone installer"
+            UV_INSTALL_DIR="$ARCH_BIN" run_logged bash <(curl -LsSf https://astral.sh/uv/install.sh) \
+                && log_okay "uv reinstalled: $("$ARCH_BIN/uv" --version)" \
+                || log_warn "uv reinstall failed — staying on $("$ARCH_BIN/uv" --version 2>/dev/null)"
+        fi
     fi
 else
     log_info "Installing uv → $ARCH_BIN"
