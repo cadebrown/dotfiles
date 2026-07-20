@@ -106,6 +106,14 @@ and chezmoi-managed guidance files built from shared partials.
   latest; `codex.sh` reconciles the managed config right after, so format drift surfaces
   in its healthcheck). If Codex breaks config compatibility again, re-pin there until
   the config catches up, and run `bash install/codex.sh check` after any bump.
+- **Codex curated plugins drift with the codex-cli version** — `openai-curated` is a
+  snapshot bundled with the (unpinned) codex-cli, so its plugin set changes across
+  releases. `packages/codex-plugins.txt` selectors a newer codex-cli drops fail to
+  install; `codex.sh` `_check_plugins` compares declared entries against `codex plugin
+  list --json | jq '.available'` and now *warns* (`dropped upstream: … — prune …`)
+  when one is gone from the snapshot instead of dying — but a plugin still offered yet
+  not installed/enabled stays a hard failure. Prune dropped entries when you see the
+  warning (`openai-developers`, `build-web-data-visualization` went away at 0.144.6).
 - **Codex full-auto is explicit at every layer** — `default_permissions =
   ":danger-full-access"` removes the local sandbox, `approval_policy = "never"`
   suppresses interactive execpolicy prompts, and generated MCP/app policy uses
@@ -114,9 +122,28 @@ and chezmoi-managed guidance files built from shared partials.
 - **cass Linux prebuilts need host glibc >= 2.38** — they link system glibc, not the
   Homebrew one. install/memory.sh falls back to `cargo install --git` on older hosts.
   Its brew tap is NOT used (formula sha lagged a release-asset re-upload, June 2026).
+- **cass source build needs NIGHTLY + the rustup cargo, not brew's** — on glibc<2.38
+  hosts cass builds from source, and it requires a nightly toolchain (a dep gates
+  `#![feature(try_trait_v2)]`; the repo pins `channel="nightly"`). Two traps bit this for
+  months: stable fails (`E0554`, or an MSRV error on an older stable), AND a lingering
+  Homebrew `rust` formula (an orphaned build-dep — NOT in the Brewfile, nothing `uses` it)
+  shadows rustup in bootstrap's PATH at an old version, so `cargo` resolved to brew's
+  1.94.0 even after rust.sh updated rustup to 1.97.1. `_cass_build_from_source` now installs
+  nightly on demand and invokes `$CARGO_HOME/bin/cargo +nightly` explicitly. If cass still
+  won't build, run `which -a cargo` for a stray brew rust and `brew uninstall rust`.
 - **Memory indexes are per-machine** — qmd (~/.cache/qmd) and cass (~/.cache/cass)
   rebuild locally; only ~/kb (git) and dotfiles sync across machines. qmd on macOS
   needs Homebrew sqlite (system libsqlite3 blocks loadable extensions).
+- **qmd upgrades need the daemon stopped on NFS** — the qmd MCP daemon
+  (`qmd mcp --http`) keeps native addons (sqlite-vec, node-llama-cpp,
+  better-sqlite3) mmap'd. On an NFS home npm can't unlink an open file — NFS
+  silly-renames it to `.nfsXXXX` and `npm install -g @tobilu/qmd` dies with
+  `EBUSY`. `node.sh` stops the daemon around the qmd upgrade and restarts it
+  through the `qmd_daemon_{running,stop,start}` helpers in `_lib.sh`
+  (Linux-gated via `$OS`; macOS uses the launchd agent + a local FS, no EBUSY).
+  memory.sh's lazy-start and node.sh's quiesce share those helpers — don't
+  reintroduce an inline `qmd mcp --http --daemon` start. See
+  `docs/usage/troubleshooting.md`.
 - **Skill dirs are installer-managed** — `skills-sync.sh` rows install via
   `npx skills add` into `~/.claude/skills/`; never add chezmoi sources for those
   dirs (one writer per skill dir; vendored skills live in `home/dot_claude/`).

@@ -45,6 +45,37 @@ manually because that can conflict with the app's marketplace reconciliation.
 
 ---
 
+## Codex plugin fails: `plugin X was not found in marketplace openai-curated`
+
+Symptom: `install/codex.sh` (Codex Plugins step) logs a `[warn]` like
+`Error: plugin openai-developers was not found in marketplace openai-curated`,
+and on an older checkout the healthcheck then died with
+`Missing or disabled Codex plugin: <plugin>@openai-curated`.
+
+Root cause: `openai-curated` is a snapshot **bundled with codex-cli**, and codex
+is unpinned (`packages/npm.txt`), so its curated plugin set changes across
+versions. A selector in `packages/codex-plugins.txt` that a newer codex-cli no
+longer ships can't install — the entry is stale. (`openai-developers` and
+`build-web-data-visualization` were dropped as of codex-cli 0.144.6.)
+
+Confirm — list what the installed codex actually offers:
+
+```sh
+codex plugin list --json | jq -r '.available[].pluginId'
+```
+
+**Fix:** prune (or re-point) the missing selectors in
+`packages/codex-plugins.txt` to match that list, then rerun `bootstrap.sh`. The
+healthcheck now **warns** (`dropped upstream: … — prune packages/codex-plugins.txt`)
+instead of failing when a declared plugin is gone from the snapshot, so this no
+longer blocks bootstrap — the warning is your cue to prune. A plugin still
+offered by the snapshot but not installed/enabled stays a hard failure.
+
+The `WARNING: failed to clean up stale arg0 temp dirs: Directory not empty` line
+from codex-cli is unrelated NFS noise (`.nfs*` files in its temp dir) — harmless.
+
+---
+
 ## `nvm` or `node` not available in a script
 
 `nvm.sh` is lazy-loaded in interactive shells only. Non-interactive shells get `node`/`npm` via the PATH entry `.zprofile`/`.bash_profile` adds from the highest installed version. If `node` is missing in a script, either:
@@ -324,6 +355,52 @@ Environment variables in `.zprofile`/`.bash_profile` prevent Homebrew from auto-
 
 ---
 
+## cass source build fails with `rustc 1.94.0 is not supported` or `E0554`
+
+On a host with glibc < 2.38 (e.g. Ubuntu 22.04) cass has no usable prebuilt, so
+`memory.sh` builds it from source — and you see one of:
+
+```
+rustc 1.94.0 is not supported by the following packages: sysinfo@0.39.5 requires rustc 1.95 …
+# or, on a newer stable:
+error[E0554]: `#![feature]` may not be used on the stable release channel
+```
+
+Two root causes stacked:
+
+1. **cass requires nightly.** A dependency gates `#![feature(try_trait_v2)]` and
+   the repo pins `channel = "nightly"`. Stable can't build it — an old stable
+   fails the MSRV check, a new stable fails `E0554`.
+2. **A stray Homebrew `rust` shadows rustup.** A `rust` formula (a lingering
+   *build* dependency — not in the Brewfile, nothing depends on it) puts
+   `cargo`/`rustc` in `brew/bin` at an old version. In bootstrap's PATH that
+   shadows rustup, so `cargo` resolved to brew's 1.94.0 even after `rust.sh`
+   updated rustup's stable to 1.97.1.
+
+Confirm:
+
+```sh
+which -a cargo          # a brew/bin/cargo at an old version is the smoking gun
+rustup toolchain list   # is `nightly` installed?
+```
+
+**Fix** (already baked into current `memory.sh` — this is for older checkouts or
+manual recovery):
+
+```sh
+brew uninstall rust     # remove the orphan shadow (safe: nothing depends on it)
+rustup toolchain install nightly --profile minimal
+$CARGO_HOME/bin/cargo +nightly install --git \
+  https://github.com/Dicklesworthstone/coding_agent_session_search \
+  coding-agent-search --bin cass --locked --root "$LOCAL_PLAT"
+```
+
+`_cass_build_from_source` now installs nightly on demand and calls
+`$CARGO_HOME/bin/cargo +nightly` explicitly, so it no longer depends on PATH
+resolution or the default toolchain.
+
+---
+
 ## `git push` blocked by gitleaks ("secrets detected")
 
 A global **pre-push** hook scans the commits being pushed for secrets with
@@ -367,5 +444,43 @@ git push --no-verify
 
 Don't disable the hook permanently — `core.hooksPath` is global precisely so the
 protection can't be forgotten on a per-repo basis.
+
+---
+
+## `npm install -g` fails with `EBUSY … unlink '.nfsXXXX'` (qmd upgrade)
+
+`bootstrap.sh upgrade` (or `install/node.sh`) dies upgrading a global npm
+package — almost always `@tobilu/qmd`:
+
+```
+npm error code EBUSY
+npm error EBUSY: resource busy or locked, unlink
+'.../@tobilu/qmd/node_modules/sqlite-vec-linux-x64/.nfs000000001f79d0f000015a88'
+[fail]  node.sh failed
+```
+
+**Root cause: NFS "silly-rename".** The qmd MCP daemon
+(`qmd mcp --http --port 8181`) keeps native addons (`sqlite-vec`,
+`node-llama-cpp`, `better-sqlite3`) mmap'd. When npm deletes the old package
+tree to swap in the new one, NFS can't remove a file the daemon still has open,
+so it renames it to `.nfsXXXX` and keeps it until that fd closes. npm then can't
+`unlink` the `.nfs*` file and aborts with `EBUSY`. Only happens on NFS homes
+(the Linux clusters) — macOS local disks unlink open files fine, so this is
+gated to Linux.
+
+`node.sh` now stops the daemon around the qmd upgrade and restarts it (via the
+`qmd_daemon_*` helpers in `_lib.sh`), so a normal upgrade no longer trips on it.
+To recover a checkout that predates the fix, or if you hit it by hand:
+
+```sh
+pkill -f "qmd[^ ]* mcp --http"         # 1. stop the daemon → NFS reaps .nfs* files
+npm install -g @tobilu/qmd@latest      # 2. re-run the upgrade (or: bash install/node.sh)
+qmd mcp --http --daemon &              # 3. restart (a new shell also lazy-starts it)
+```
+
+A failed swap can also leave a **broken husk** — a `qmd/` dir with only an empty
+`node_modules/` plus a dangling `bin/qmd` symlink — in a *different* npm prefix
+than the one `which qmd` resolves to (nvm's). Delete the husk; the live copy is
+the one on PATH.
 
 [allowlist]: https://github.com/gitleaks/gitleaks#configuration
