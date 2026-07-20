@@ -47,8 +47,8 @@ else
     log_info "Installing Brewfile packages (upgrades disabled)"
 fi
 
-# Trust the Brewfile's third-party taps so brew bundle can load them.
-trust_brewfile_taps "$BREWFILE"
+# Trust + tap the Brewfile's third-party taps so brew bundle can resolve them.
+ensure_brewfile_taps "$BREWFILE"
 
 # Remove the deprecated docker-completion keg before bundling. The `docker`
 # formula now ships its own bash/zsh/fish completions, but older machines carry

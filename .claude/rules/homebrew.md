@@ -83,14 +83,20 @@ custom prefix is the source of most build lore below.
   display columns — ZLE completion leaves remnant characters. Fix: `linux-packages.sh`
   generates `en_US.UTF-8` into `$LOCAL_PLAT/locale/` via brew's `localedef`; shell profiles
   export `LOCPATH` pointing there. Test: `bash tests/test-locale.sh`.
-- **Third-party taps must be trusted before `brew bundle`** — recent Homebrew refuses
-  to load formulae/casks from non-core taps until trusted (gated by
-  `HOMEBREW_REQUIRE_TAP_TRUST`), so an untrusted tap fails its package with "Refusing
-  to load formula … from untrusted tap". `trust_brewfile_taps()` in `_lib.sh` derives
-  the tap list from the Brewfile (explicit `tap` lines + `owner/repo` prefix of
-  three-part `brew`/`cask` refs) and runs `brew trust --tap` for each before the bundle
-  in both `homebrew.sh` and `linux-packages.sh`. The Brewfile stays the single source
-  of truth — no separate trust list. Adding a tapped formula is enough; trust follows.
+- **Third-party taps must be trusted AND tapped before `brew bundle`** — two distinct
+  Homebrew refusals: untrusted taps fail with "Refusing to load formula … from
+  untrusted tap" (gated by `HOMEBREW_REQUIRE_TAP_TRUST`), and untapped taps fail with
+  "No available formula … This command requires the tap … tap it explicitly" because
+  brew no longer auto-taps from a fully-qualified `owner/repo/formula` name. The
+  Brewfile's own `tap` directive is NOT reliable protection against the second one:
+  `brew bundle` can hit formula resolution before the directive runs (seen July 2026
+  with `rtk-ai/tap/rtk` while a same-named `rtk` keg from homebrew/core triggered the
+  upgrade check — trusted, tap line present, still failed). `ensure_brewfile_taps()`
+  in `_lib.sh` derives the tap list from the Brewfile (explicit `tap` lines +
+  `owner/repo` prefix of three-part `brew`/`cask` refs) and runs `brew trust --tap` +
+  `brew tap` for each before the bundle in both `homebrew.sh` and
+  `linux-packages.sh`. The Brewfile stays the single source of truth — adding a
+  tapped formula is enough; trust and tap follow.
 - **rtk: install from the official tap, not homebrew-core** — homebrew-core lags badly
   (shipped 0.29 when upstream stable was 0.42+; that version window broke every
   PreToolUse hook). `packages/Brewfile` uses `brew "rtk-ai/tap/rtk"` (prebuilt, all 4

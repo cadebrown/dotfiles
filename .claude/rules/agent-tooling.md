@@ -34,6 +34,16 @@ and chezmoi-managed guidance files built from shared partials.
 
 ## Gotchas
 
+- **Claude plugin installs resolve against LOCAL marketplace clones** — with
+  `DISABLE_AUTOUPDATER=1` the clones under `~/.claude/plugins/marketplaces/` never
+  refresh themselves, so a plugin added upstream after a marketplace's clone date
+  fails with "not found in any configured marketplace" (the official catalog once
+  sat 4 months stale while its plugin existed upstream). `claude.sh` runs
+  `claude plugin marketplace update` (no name = update all; there is NO `--all`
+  flag — the old upgrade path passed one and errored silently behind `>/dev/null`)
+  before the install loop in EVERY mode — don't move that refresh back inside the
+  upgrade-only block. Manual one-off fix:
+  `claude plugin marketplace update <name>` then re-install.
 - **rtk hook wiring** — 0.42+ re-introduced `rtk hook claude|cursor|gemini|copilot` as
   the canonical built-in; our hooks are thin wrappers (`dot_claude/rtk-rewrite.sh`,
   `dot_cursor/hooks/rtk-rewrite.sh`) that PATH-harden + `command -v rtk || exit 0` then

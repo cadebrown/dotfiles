@@ -122,9 +122,11 @@ brew "opencode"
 # (0.29 vs upstream 0.42+), shipping an old rewrite registry and pre-v3 hook
 # protocol. The tap tracks stable releases with prebuilt binaries for all 4
 # platforms; Linux x86_64 is a musl static build (no glibc-version dependency).
-# The `tap` line is required: trust_brewfile_taps() only *trusts* the tap (so
-# brew won't refuse to load it) — `brew bundle` still needs the explicit tap
-# directive to actually clone it. A bare three-part `brew` ref is not auto-tapped.
+# Tapping is handled by ensure_brewfile_taps() (_lib.sh) BEFORE the bundle —
+# it trusts + taps every tap referenced here, because brew no longer auto-taps
+# from a three-part ref and `brew bundle` can hit formula resolution (e.g. the
+# upgrade check for a same-named core keg) before its own `tap` directive runs.
+# The `tap` line stays as the declarative source ensure_brewfile_taps() parses.
 # NOT cargo.txt: the crates.io `rtk` crate is an unrelated project (Rust Type Kit).
 tap "rtk-ai/tap"
 brew "rtk-ai/tap/rtk"

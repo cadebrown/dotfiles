@@ -276,8 +276,8 @@ else
     log_info "Running brew bundle (install only, no upgrades)..."
 fi
 
-# Trust the Brewfile's third-party taps so brew bundle can load them.
-trust_brewfile_taps "$_BREWFILE_TMP"
+# Trust + tap the Brewfile's third-party taps so brew bundle can resolve them.
+ensure_brewfile_taps "$_BREWFILE_TMP"
 
 # shellcheck disable=SC2086
 _bundle_exit=0

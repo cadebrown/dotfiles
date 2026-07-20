@@ -331,28 +331,39 @@ mcp_url_substitute() {
     return 0
 }
 
-# trust_brewfile_taps FILE
-# Trust every third-party tap referenced by a Brewfile so `brew bundle` can
-# load its formulae/casks. Recent Homebrew refuses to load formulae from
-# non-core taps unless they are explicitly trusted (gated by
-# $HOMEBREW_REQUIRE_TAP_TRUST), so without this `brew bundle` skips them with
-# "Refusing to load formula ... from untrusted tap" and the package fails.
+# ensure_brewfile_taps FILE
+# Trust AND tap every third-party tap referenced by a Brewfile so `brew
+# bundle` can resolve its formulae/casks. Two distinct Homebrew refusals:
+#  - untrusted tap → "Refusing to load formula ... from untrusted tap"
+#    (gated by $HOMEBREW_REQUIRE_TAP_TRUST); fixed by `brew trust`.
+#  - untapped tap → "No available formula ... This command requires the tap
+#    ... tap it explicitly". Homebrew no longer auto-taps from a
+#    fully-qualified `owner/repo/formula` name, and `brew bundle` can hit
+#    formula resolution (e.g. the upgrade check for a same-named formula
+#    already installed from core, like rtk) before its own `tap` directive
+#    runs — so tap here, before the bundle, instead of relying on the
+#    Brewfile's `tap` lines.
 #
 # The Brewfile is the single source of truth: taps come from both explicit
 # `tap "owner/repo"` lines and the `owner/repo` prefix of three-part
-# `brew`/`cask "owner/repo/formula"` references. `brew trust` is idempotent
-# (re-trusting is a no-op), and we parse with awk rather than rg because rg is
-# a cargo tool installed long after Homebrew during bootstrap.
-trust_brewfile_taps() {
-    local brewfile="$1" _tap
+# `brew`/`cask "owner/repo/formula"` references. Both `brew trust` and
+# `brew tap` are idempotent, and we parse with awk rather than rg because rg
+# is a cargo tool installed long after Homebrew during bootstrap.
+ensure_brewfile_taps() {
+    local brewfile="$1" _tap _has_trust=1
     [[ -f "$brewfile" ]] || return 0
     has brew || return 0
-    # Older Homebrew has no `trust` subcommand — nothing to do.
-    brew trust --help >/dev/null 2>&1 || return 0
+    # Older Homebrew has no `trust` subcommand — tap-only on those.
+    brew trust --help >/dev/null 2>&1 || _has_trust=0
 
     while IFS= read -r _tap; do
         [[ -n "$_tap" ]] || continue
-        run_logged brew trust --tap "$_tap" || log_warn "Could not trust tap: $_tap"
+        if [[ "$_has_trust" == "1" ]]; then
+            run_logged brew trust --tap "$_tap" || log_warn "Could not trust tap: $_tap"
+        fi
+        if ! brew tap | grep -qFx "$(echo "$_tap" | tr '[:upper:]' '[:lower:]')"; then
+            run_logged brew tap "$_tap" || log_warn "Could not tap: $_tap — its packages will fail below"
+        fi
     done < <(
         awk '
             /^[[:space:]]*tap[[:space:]]+"/ {

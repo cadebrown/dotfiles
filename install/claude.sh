@@ -114,6 +114,17 @@ for _mp_entry in "${_MARKETPLACES[@]}"; do
 done
 unset _mp_entry _mp_repo _mp_name
 
+# Plugin installs resolve against the LOCAL marketplace clones, which never
+# auto-refresh (DISABLE_AUTOUPDATER=1). A plugin added upstream after a
+# marketplace's clone date fails with "not found in any configured
+# marketplace" until the catalog is pulled (the official catalog once sat 4
+# months stale) — so refresh in every mode, not just upgrade. No name = update
+# all; there is no --all flag (the old upgrade path passed one and errored
+# silently for months behind >/dev/null, which is how the staleness happened).
+log_info "Refreshing marketplace catalogs"
+claude plugin marketplace update >/dev/null 2>&1 || \
+    log_warn "marketplace refresh failed — newly added plugins may not resolve below"
+
 _install_plugins_from() {
     local file="$1"
     log_info "Reading plugins from $file"
@@ -148,11 +159,10 @@ done < <(overlay_package_files "claude-plugins.txt")
 log_okay "Claude plugins: ${_ok} installed, ${_skip} already present, ${_fail} failed"
 
 # Plugins don't auto-update (we set DISABLE_AUTOUPDATER=1), so `bootstrap
-# upgrade` must pull them explicitly: refresh marketplace catalogs, then update
-# each enabled plugin to the marketplace's latest.
+# upgrade` must pull them explicitly: update each enabled plugin to the
+# marketplace's latest (catalogs were already refreshed above).
 if [[ "${DF_MODE:-}" == "upgrade" ]]; then
-    log_info "Upgrading Claude plugins (marketplaces + plugins)"
-    claude plugin marketplace update --all >/dev/null 2>&1 || true
+    log_info "Upgrading Claude plugins"
     while IFS= read -r _file; do
         while IFS= read -r line; do
             [[ -z "$line" || "$line" == \#* ]] && continue

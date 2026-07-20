@@ -76,6 +76,67 @@ from codex-cli is unrelated NFS noise (`.nfs*` files in its temp dir) — harmle
 
 ---
 
+## Claude plugin fails: `Plugin "X" not found in any configured marketplace`
+
+Symptom: `install/claude.sh` logs `[warn]  fail  <plugin>: … ✘ Failed to
+install plugin "<plugin>": Plugin "<plugin>" not found in any configured
+marketplace`, but the plugin visibly exists in the marketplace's GitHub repo.
+
+Root cause: plugin installs resolve against the **local marketplace clones**
+under `~/.claude/plugins/marketplaces/`, and with `DISABLE_AUTOUPDATER=1` those
+never refresh themselves. A plugin added upstream after the clone date is
+invisible (the `claude-plugins-official` clone once sat 4 months stale while
+`math-olympiad` existed upstream). `claude.sh` used to refresh catalogs only in
+upgrade mode — and even that call was broken, passing a nonexistent `--all` flag
+whose error was silenced by `>/dev/null || true`, so no mode ever refreshed.
+It now refreshes (with the correct no-name form) in every mode.
+
+Confirm — compare the clone date against upstream:
+
+```sh
+git -C ~/.claude/plugins/marketplaces/<marketplace> log -1 --format=%cd
+jq -r '.plugins[].name' \
+  ~/.claude/plugins/marketplaces/<marketplace>/.claude-plugin/marketplace.json | grep <plugin>
+```
+
+**Fix:** update the checkout and rerun `bootstrap.sh` (or `install/claude.sh`).
+Manual one-off:
+
+```sh
+claude plugin marketplace update <marketplace>
+claude plugin install <plugin>@<marketplace>
+```
+
+---
+
+## Brew bundle fails: `No available formula … This command requires the tap`
+
+Symptom: `brew bundle` errors with `No available formula with the name
+"owner/tap/formula". This command requires the tap owner/tap. If you trust this
+tap, tap it explicitly and then try again: brew tap owner/tap` — even though the
+Brewfile has the `tap "owner/tap"` line and the tap is already trusted.
+
+Root cause: two separate Homebrew gates protect third-party taps — trust
+(`HOMEBREW_REQUIRE_TAP_TRUST`) and the tap actually being cloned. Homebrew no
+longer auto-taps from a fully-qualified formula name, and `brew bundle` can hit
+formula resolution **before** executing the Brewfile's own `tap` directive — in
+particular the upgrade check for a formula already installed under the same name
+from homebrew/core (seen with `rtk`: core keg installed, `rtk-ai/tap/rtk` in the
+Brewfile, tap trusted but never tapped → resolution error every run).
+
+Confirm:
+
+```sh
+brew tap                      # tap missing from the list
+jq . ~/.homebrew/trust.json   # …while already trusted here
+```
+
+**Fix:** update the checkout and rerun — `ensure_brewfile_taps()` (`_lib.sh`)
+now trusts **and taps** every tap referenced by the Brewfile before the bundle.
+Manual one-off: `brew tap owner/tap`, then rerun `install/homebrew.sh`.
+
+---
+
 ## `nvm` or `node` not available in a script
 
 `nvm.sh` is lazy-loaded in interactive shells only. Non-interactive shells get `node`/`npm` via the PATH entry `.zprofile`/`.bash_profile` adds from the highest installed version. If `node` is missing in a script, either:
