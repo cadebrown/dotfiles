@@ -89,27 +89,10 @@ unset _local_root
 
 ### GENERAL ###
 
-{{ if eq .chezmoi.os "darwin" -}}
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
-{{- else -}}
-# LOCPATH must be exported before LANG. Exporting LANG triggers zsh's internal
-# setlocale() call, which reads locale data using LOCPATH. If LOCPATH isn't set
-# first, brew's glibc finds no locale archive and falls back to C/ASCII —
-# wcwidth() then counts bytes instead of display columns, leaving remnant
-# characters on screen after tab-completing multi-byte filenames or commands.
-export LOCPATH="$_LOCAL_PLAT/locale"
-# LC_ALL is intentionally not set on Linux — the locale archive can't be loaded
-# by bash's setlocale(), causing "cannot change locale" warnings on every subshell.
-# LANG alone is sufficient and doesn't trigger the warning. But ssh sessions from
-# a Mac arrive WITH it set: macOS ships `SendEnv LANG LC_*` in /etc/ssh/ssh_config,
-# and LC_ALL=en_US.UTF-8 overrides LANG — on hosts whose system glibc lacks that
-# locale, setlocale() falls back to C/ASCII and system tmux re-encodes UTF-8 as
-# latin-1 mojibake (â€™) that rides terminal copy/paste. Drop it before LANG's
-# setlocale runs. See docs/usage/troubleshooting.md.
-unset LC_ALL
-export LANG=en_US.UTF-8
-{{- end }}
+# Locale lives in a shared partial: it must ALSO run in interactive rc files,
+# because VS Code/Cursor embedded terminals are non-login shells that skip this
+# profile entirely (while still inheriting a forwarded LC_ALL from macOS ssh).
+{{ template "locale-env.sh" . }}
 
 ### HOMEBREW ###
 # Source Homebrew first so PLAT paths can prepend on top of it.

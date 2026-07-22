@@ -23,6 +23,12 @@ must render identically on every machine** — otherwise machines overwrite each
   (`home/dot_claude/output-styles/cade.md.tmpl`, system-prompt level); Codex,
   opencode, and pi include it directly in their always-on file. It is
   deliberately **not** in `agents-common.md`, so Claude doesn't load voice twice.
+- `locale-env.sh` — the OS-branched locale block (macOS: LANG+LC_ALL; Linux:
+  LOCPATH → `unset LC_ALL` → LANG). Included by BOTH login profiles AND both
+  interactive rc files — embedded terminals (VS Code/Cursor Remote-SSH) spawn
+  non-login shells that skip the profiles while inheriting a forwarded LC_ALL,
+  so the guard must run in rc too. Uses `${_LOCAL_PLAT:-$HOME/.local}` since
+  `_LOCAL_PLAT` is unset when the profile never ran.
 
 Reference either from a `.tmpl` with:
 
@@ -51,10 +57,14 @@ See [docs/usage/agents.md](../../docs/usage/agents.md).
 - **ssh from macOS forwards `LC_ALL` and garbles remote copy/paste** — macOS ships
   `SendEnv LANG LC_*` in `/etc/ssh/ssh_config`, so the Mac's `LC_ALL=en_US.UTF-8` overrides
   the Linux profiles' LANG-only locale setup; on hosts without that system locale, system
-  tmux re-encodes UTF-8 as latin-1 mojibake (`â€™`) that rides the clipboard. Both profiles
-  `unset LC_ALL` on Linux; run `tmux kill-server` once after applying. A user-level
-  `SendEnv -LC_*` can't fix it (user config is parsed before the system default adds the
-  patterns). See docs/usage/troubleshooting.md.
+  tmux re-encodes UTF-8 as latin-1 mojibake (`â€™`) that rides the clipboard. The guard
+  (`unset LC_ALL` on Linux) lives in the `locale-env.sh` partial, included by the profiles
+  AND both rc files — the rc inclusion is load-bearing: VS Code/Cursor Remote-SSH embedded
+  terminals are non-login shells that skip the profiles but inherit the forwarded LC_ALL
+  through the remote server process (symptom there: copied text pastes with `Â`/`â€™`).
+  Run `tmux kill-server` once after applying. A user-level `SendEnv -LC_*` can't fix it
+  (user config is parsed before the system default adds the patterns).
+  See docs/usage/troubleshooting.md.
 - **Test `~/.homebrew/bin/brew`, never `-e ~/.homebrew`** — Homebrew stores tap-trust
   state at `~/.homebrew/trust.json` on macOS, so a bare directory test misroutes the
   shell profiles onto the Linux user-prefix branch (bit us June 2026; both profile

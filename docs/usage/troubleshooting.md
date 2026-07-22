@@ -342,26 +342,39 @@ Test suite: `bash ~/dotfiles/tests/test-locale.sh`
 
 ---
 
-## Copy/paste from a remote SSH session pastes as mojibake (`â€™`, `Ã©`)
+## Copy/paste from a remote SSH session pastes as mojibake (`â€™`, `Â`, `Ã©`)
 
-Symptom: text copied out of a remote Linux session — usually inside tmux — pastes
-on the Mac with latin-1 garbage where punctuation or accents should be: `’`
-becomes `â€™`, `é` becomes `Ã©`. The terminal (iTerm2, Cursor) is innocent: the
-bytes are already mangled before they reach it.
+Symptom: text copied out of a remote Linux session pastes with latin-1 garbage
+where punctuation, accents, or spaces should be: `’` becomes `â€™`, `é` becomes
+`Ã©`, non-breaking spaces surface as `Â `. Two common shapes:
+
+- **plain ssh + tmux** — the display itself is garbled, and copies carry it
+- **VS Code/Cursor Remote-SSH embedded terminal** — display may look fine, but
+  copying agent TUI output (Claude Code renders with padding/NBSP characters)
+  pastes with stray `Â` accent characters; no tmux involved
+
+The terminal emulator (iTerm2, xterm.js) is innocent: the bytes are already
+mangled before they reach it.
 
 Root cause chain:
 
 1. On macOS, `.zprofile` exports `LC_ALL=en_US.UTF-8`
 2. macOS ships `SendEnv LANG LC_*` in `/etc/ssh/ssh_config`, and Linux sshd
-   accepts `LC_*` by default — the Mac's `LC_ALL` lands in the remote environment
+   accepts `LC_*` by default — the Mac's `LC_ALL` lands in the remote
+   environment. This covers Remote-SSH too: the VS Code/Cursor server is
+   started over that same ssh connection, and every embedded terminal inherits
+   its environment
 3. `LC_ALL` overrides `LANG`, defeating the deliberate LANG-only locale setup in
-   the Linux shell profiles (see the entry above)
+   the Linux shell profiles (see the entry above). Embedded terminals are hit
+   hardest: they spawn *non-login* shells, so a profile-only guard never even
+   runs there
 4. On hosts whose *system* glibc has no `en_US.UTF-8` compiled (minimal server
    images — the brew-glibc `LOCPATH` data doesn't help system binaries),
    `setlocale()` falls back to C/ASCII
-5. System tmux in a C locale treats each UTF-8 byte as a separate latin-1
-   character and re-emits it as multibyte UTF-8 — the display, and therefore
-   anything selected and copied from it, is mojibake
+5. Anything in that C locale that re-encodes the byte stream (system tmux is
+   the classic offender) treats each UTF-8 byte as a separate latin-1
+   character — the display, and therefore anything selected and copied from
+   it, is mojibake
 
 Confirm on the remote, inside the garbling session:
 
@@ -373,13 +386,21 @@ printf 'caf\xc3\xa9 \xe2\x80\x94 \xe2\x80\x9cok\xe2\x80\x9d\n'   # should render
 Broken looks like: a "cannot change locale" warning or `LC_CTYPE="C"` in the
 `locale` output, and the printf line rendering as `cafÃ© â€” â€œokâ€`.
 
-**Fix:** the Linux shell profiles `unset LC_ALL` before exporting `LANG`. Then:
+**Fix:** the locale guard (`unset LC_ALL` before exporting `LANG`, from the
+`locale-env.sh` shared partial) runs in the Linux shell profiles AND the
+interactive rc files — the rc copy is what protects non-login embedded
+terminals. Then:
 
 ```sh
-chezmoi apply ~/.zprofile ~/.bash_profile
+chezmoi apply ~/.zprofile ~/.bash_profile ~/.zshrc ~/.bashrc
 tmux kill-server        # the tmux server caches the locale it started with
-exec zsh -l             # or reconnect
+exec zsh -l             # or reconnect / open a fresh embedded terminal
 ```
+
+Note the fix cleans the *encoding*; agent TUIs like Claude Code still put
+invisible layout characters (padding spaces, hard wraps) into the scrollback,
+so terminal-selection copies of long output stay imperfect. For clean text use
+`/export` or copy from the paired web/mobile session instead.
 
 If it's still garbled, the host has no UTF-8 locale usable by system binaries at
 all — check `locale -a`; `export LANG=C.UTF-8` (built into every modern glibc)

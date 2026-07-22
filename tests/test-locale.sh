@@ -84,6 +84,18 @@ else
     fail "LOCPATH not in ~/.bash_profile (run: chezmoi apply)"
 fi
 
+# 9/10. Locale guard present in the interactive rc files too — embedded
+# terminals (VS Code/Cursor Remote-SSH) spawn non-login shells that skip the
+# profiles while inheriting a forwarded LC_ALL from macOS ssh; without the rc
+# copy, copy/paste there mangles UTF-8 into latin-1 mojibake (Â, â€™).
+for _rc in .zshrc .bashrc; do
+    if grep -q 'unset LC_ALL' "$HOME/$_rc" 2>/dev/null; then
+        pass "LC_ALL guard in ~/$_rc"
+    else
+        fail "LC_ALL guard not in ~/$_rc (run: chezmoi apply)"
+    fi
+done
+
 echo ""
 if [[ "$FAILURES" -eq 0 ]]; then
     echo "All tests passed."

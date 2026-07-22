@@ -1,5 +1,12 @@
 # .zshrc - interactive ZSH shell configuration
 
+### LOCALE ###
+# Also set in .zprofile — repeated here because embedded terminals (VS Code /
+# Cursor Remote-SSH) spawn NON-LOGIN shells that skip the profile while
+# inheriting a forwarded LC_ALL from macOS ssh; without this guard, copy/paste
+# there rides a C-locale fallback and mangles UTF-8 into Â / â€™ mojibake.
+{{ template "locale-env.sh" . }}
+
 ### ZSH OPTIONS ###
 
 # Completion
