@@ -6,6 +6,7 @@
 dotfiles-*/
 docs/book/
 old/
+/doc/          # stray rustdoc JSON (rust-docs MCP / `rustdoc` defaults output here); real docs live in docs/
 
 # Secrets and credentials (should never be committed)
 .env
