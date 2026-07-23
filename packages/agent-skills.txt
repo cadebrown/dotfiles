@@ -41,6 +41,13 @@ qmd self qmd skill install --global -f
 manim-composer npx adithya-s-k/manim_skill manim-composer
 manimce-best-practices npx adithya-s-k/manim_skill manimce-best-practices
 
+# Anthropic's official document skills (anthropics/skills): read/create/edit PDFs
+# (extract, merge, split, forms, OCR) and Word DOCX (render-and-verify workflow).
+# Generic — Google Docs I/O is the google-workspace MCP; NVIDIA-branded decks are
+# the overlay's nv-pptx. Skipping generic pptx/xlsx (pptx would collide w/ nv-pptx).
+pdf npx anthropics/skills pdf
+docx npx anthropics/skills docx
+
 # entire: checkpoint-mining for the installed `entire` session recorder
 # (official). Deliberately NOT --all: the full 11-skill suite ships generic
 # names (search/explain/review/teach...) that pollute the global skill

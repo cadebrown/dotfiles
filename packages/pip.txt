@@ -27,3 +27,7 @@ conan
 # videos and math/sim visualizations. Needs cairo/pango/pkg-config (Brewfile) +
 # ffmpeg (already present); LaTeX is optional (only Tex/MathTex use it).
 manim
+
+# MkDocs — static documentation-site generator from Markdown + a YAML config.
+# `mkdocs build --strict` surfaces broken links/config as CI failures.
+mkdocs
