@@ -67,6 +67,14 @@ end
 
 ### Media ###
 brew "ffmpeg"
+# Manim rendering backend (2D vector graphics + text shaping). LaTeX is NOT
+# required — only Tex/MathTex need it; text (Pango), shapes, plots, and
+# animations render without a TeX install, so we skip the multi-GB TeX dep and
+# add it per-project if formula typesetting is ever needed. The `manim` package
+# itself is in pip.txt (uv tool). pkg-config lets its build find these libs.
+brew "cairo"
+brew "pango"
+brew "pkg-config"
 
 ### Monitoring ###
 brew "htop"

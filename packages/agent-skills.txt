@@ -33,6 +33,14 @@ jj-guide npx mtaran/jj-guide jj-guide
 # the same tree via the symlink)
 qmd self qmd skill install --global -f
 
+# manim (companions to the `manim` package in pip.txt): manim-composer plans a
+# 3Blue1Brown-style explainer (scenes.md) before any code; manimce-best-practices
+# holds ManimCE idioms (Scene/Text/shapes/animation-groups/CLI) + tested examples.
+# Community skills (adithya-s-k/manim_skill). LaTeX is optional — Text/MarkupText
+# render without it (skip MathTex/Tex if no latex/dvisvgm).
+manim-composer npx adithya-s-k/manim_skill manim-composer
+manimce-best-practices npx adithya-s-k/manim_skill manimce-best-practices
+
 # entire: checkpoint-mining for the installed `entire` session recorder
 # (official). Deliberately NOT --all: the full 11-skill suite ships generic
 # names (search/explain/review/teach...) that pollute the global skill

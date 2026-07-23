@@ -22,3 +22,8 @@ mlx-openai-server  # macos-only python=3.12 (outlines-core 0.1.26 has no cp313/c
 
 # C/C++ package manager
 conan
+
+# Manim Community Edition — programmatic animation engine for explainer/education
+# videos and math/sim visualizations. Needs cairo/pango/pkg-config (Brewfile) +
+# ffmpeg (already present); LaTeX is optional (only Tex/MathTex use it).
+manim
