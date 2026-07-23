@@ -234,6 +234,36 @@ export OS ARCH DF_ROOT DF_PACKAGES DF_USE_PLAT \
 # machines without SSH keys — Docker, CI, fresh Linux boxes).
 export GIT_CONFIG_GLOBAL=/dev/null
 
+# git_clone_url <host> <path> [ssh_port] — resolve a clone URL for <host>/<path>,
+# preferring SSH when a key authenticates to <host>, else HTTPS (which relies on
+# ~/.netrc). The scp-less ssh:// form is uniform for `git clone` and uv/pip
+# `git+ssh://…`. ssh_port defaults to 22 (gitlab-master's git SSH is on 12051 —
+# port 22 there is a different service that rejects git auth). Force a scheme with
+# DF_GIT_PROTO=ssh|https (default: auto = prefer SSH). The SSH probe is BatchMode +
+# ConnectTimeout bounded and never aborts the caller (set -e safe): a blocked port
+# or missing key resolves to https.
+git_clone_url() {
+    local host="$1" path="${2#/}" ssh_port="${3:-22}" proto="${DF_GIT_PROTO:-auto}" rc=0
+    path="${path%.git}"
+    if [[ "$proto" == auto ]]; then
+        proto=https
+        if has ssh; then
+            ssh -o BatchMode=yes -o ConnectTimeout=6 -o StrictHostKeyChecking=accept-new \
+                -p "$ssh_port" -T "git@$host" >/dev/null 2>&1 || rc=$?
+            # rc 255 = connect/auth failure → HTTPS; 0 (GitLab welcome) or other
+            # non-255 (e.g. hosts that deny shell with rc 1) = authenticated → SSH.
+            [[ $rc -ne 255 ]] && proto=ssh || true
+        fi
+    fi
+    if [[ "$proto" != ssh ]]; then
+        printf 'https://%s/%s.git' "$host" "$path"
+    elif [[ "$ssh_port" == 22 ]]; then
+        printf 'ssh://git@%s/%s.git' "$host" "$path"
+    else
+        printf 'ssh://git@%s:%s/%s.git' "$host" "$ssh_port" "$path"
+    fi
+}
+
 # Source credential env files (e.g. ~/.github.env with GITHUB_TOKEN) so that
 # install scripts can authenticate with GitHub APIs (cargo-binstall, gh, etc.).
 # Uses bash globbing — no error if no files match.
