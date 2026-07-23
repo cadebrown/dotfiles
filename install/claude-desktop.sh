@@ -34,7 +34,7 @@ _SRC="$DF_ROOT/install/claude-desktop/claude_desktop_config.json"
 _LIVE="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
 
 # jq filter: drop account-/machine-specific + transient keys from a config blob.
-_SANITIZE='del(.preferences.remoteToolsDeviceName, .preferences.coworkOnboardingResumeStep, .preferences.epitaxyPrefs)
+_SANITIZE='del(.coworkUserFilesPath, .preferences.remoteToolsDeviceName, .preferences.coworkOnboardingResumeStep, .preferences.epitaxyPrefs)
 | if .preferences then .preferences |= with_entries(select(.key | test("ByAccount$") | not)) else . end'
 
 _CMD="${1:-apply}"

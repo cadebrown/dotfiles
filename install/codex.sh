@@ -442,25 +442,6 @@ _sync_hooks() {
         done
     done
 
-    # Entire is opt-in per repository. If this dotfiles checkout has enabled
-    # it, trust only the generated hooks at this exact absolute path. Other
-    # repositories remain disabled and untrusted until explicitly enabled.
-    local _project_hooks="$DF_ROOT/.codex/hooks.json" _event _event_key
-    if [[ -f "$DF_ROOT/.entire/settings.json" && -f "$_project_hooks" ]]; then
-        while IFS= read -r _event; do
-            _event_key="$(printf '%s' "$_event" | sed -E 's/([a-z0-9])([A-Z])/\1_\2/g' | tr '[:upper:]' '[:lower:]')"
-            _n_groups="$(jq --arg event "$_event" '.hooks[$event] | length' "$_project_hooks")"
-            for (( _g=0; _g<_n_groups; _g++ )); do
-                _n_hooks="$(jq --arg event "$_event" --argjson g "$_g" '.hooks[$event][$g].hooks | length' "$_project_hooks")"
-                for (( _h=0; _h<_n_hooks; _h++ )); do
-                    _hook_key="$_project_hooks:${_event_key}:${_g}:${_h}"
-                    _hook_hash="$(_managed_hook_hash "$_project_hooks" "$_event" "$_event_key" "$_g" "$_h")"
-                    _trust_hook "$HOME/.codex/config.toml" "$_hook_key" "$_hook_hash"
-                    log_okay "Trusted Entire Codex hook $_event [$_g:$_h] → $_hook_hash"
-                done
-            done
-        done < <(jq -r '.hooks | keys[]' "$_project_hooks")
-    fi
 
     log_okay "Synced Codex hooks → $_hooks_dest"
     log_okay "Synced chezmoi guard → $_guard_dest"

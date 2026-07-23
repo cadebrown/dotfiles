@@ -135,13 +135,6 @@ Re-index after bulk changes: `bash install/memory.sh reindex` (forces qmd
 re-embed and a full cass rebuild). Agent-facing usage rules live in the
 `## Memory layers` section of `agents-common.md`.
 
-## Per-repository session checkpoints
-
-Entire is intentionally not enabled globally. `install/entire.sh` enables and
-repairs integrations only for this dotfiles checkout during bootstrap. In any
-other repository, run `entire enable --project` explicitly and add only the
-agents used there; unrelated repositories remain untouched.
-
 ## Remote clipboard
 
 Ghostty copies selections to the local clipboard and permits remote OSC 52
