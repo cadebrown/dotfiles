@@ -57,12 +57,10 @@ what-happened npx entireio/skills what-happened
 session-handoff npx entireio/skills session-handoff
 
 # glab: GitLab CLI's own bundled skill (EXPERIMENTAL upstream; installs to
-# ~/.agents/skills, same tree via symlink). DISABLED: `glab skills` is not in
-# Homebrew's stable glab yet (1.89.0 has no `skills` subcommand), and the `self`
-# handler only checks the binary exists — so this row fails every upgrade and
-# reads as registry drift. Re-enable once `glab skills --help` works on the
-# brew-installed glab.
-# glab self glab skills install --global
+# ~/.agents/skills, same tree via symlink). Requires a glab with the `skills`
+# subcommand (brew stable has it as of 1.107); the `self` handler only checks
+# the binary exists, so on an older glab this row fails at install time.
+glab self glab skills install --global
 
 # ffmpeg: command cheatsheet skill (rendi-api — ffmpeg API vendor)
 ffmpeg npx rendi-api/ffmpeg-cheatsheet ffmpeg

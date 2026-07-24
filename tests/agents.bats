@@ -10,17 +10,7 @@ setup() {
     bash -n "$REPO/install/memory.sh"
     bash -n "$REPO/install/skills-sync.sh"
     bash -n "$REPO/install/codex.sh"
-    bash -n "$REPO/install/entire.sh"
     bash -n "$REPO/home/dot_local/bin/executable_df-agent-doctor"
-}
-
-@test "Entire is repository-scoped and privacy-preserving" {
-    jq -e '.enabled == true' "$REPO/.entire/settings.json"
-    jq -e '.telemetry == false' "$REPO/.entire/settings.json"
-    jq -e '.strategy_options.push_sessions == false' "$REPO/.entire/settings.json"
-    [[ -f "$REPO/.codex/hooks.json" ]]
-    [[ -f "$REPO/.opencode/plugins/entire.ts" ]]
-    [[ -f "$REPO/.pi/extensions/entire/index.ts" ]]
 }
 
 @test "cass indexes semantic vectors with bounded periodic refreshes" {

@@ -6,7 +6,10 @@
 dotfiles-*/
 docs/book/
 old/
-/doc/          # stray rustdoc JSON (rust-docs MCP / `rustdoc` defaults output here); real docs live in docs/
+# stray rustdoc JSON (rust-docs MCP / `rustdoc` defaults output here); real docs live in docs/
+/doc/
+# scaffolding recreated by Entire's global git hooks (~/.config/git/hooks); recording is off in this repo
+/.entire/
 
 # Secrets and credentials (should never be committed)
 .env
