@@ -48,7 +48,7 @@ flowchart TD
 | 3 | `install/zsh.sh` | Clone or update oh-my-zsh + plugins. | Yes |
 | 4 | `install/homebrew.sh` (macOS) or `install/linux-packages.sh` | Install Homebrew, run `brew bundle install --file=Brewfile`, optionally `brew upgrade` and `brew upgrade --cask --greedy`. | Yes |
 | 5 | `install/macos-services.sh` | Register Colima as a launchd service; symlink Docker plugins. macOS only. | Yes |
-| 5.5 | `install/macos-settings.sh` | `defaults write` for Dock, Finder, keyboard, trackpad, Safari, iTerm2, screen lock. Power management requires sudo (silently skipped if cache expired). | Yes |
+| 5.5 | `install/macos-settings.sh` | `defaults write` for Dock, Finder, keyboard, trackpad, Safari, iTerm2, screen lock. Sudo-gated extras (skipped if sudo unavailable): power management, Touch ID for sudo (`/etc/pam.d/sudo_local`, with pam_reattach so it works in tmux), and a global 60-min sudo ticket (`/etc/sudoers.d/df-ticket`). | Yes |
 | 5.6 | `install/macos-quick-actions.sh` | Deploy `*.workflow` bundles to `~/Library/Services/`; flush `pbs`. | Yes |
 | 6 | various | See language-runtime table below. Each script is independent; failures cascade only via `die` (not `log_warn`). | Yes |
 | 6.5 | `install/local-llm.sh` + `install/opencode.sh` | Create `$LOCAL_PLAT/.cache/huggingface`; verify ollama/mlx-lm/mlx-openai-server/opencode binaries. | Yes |

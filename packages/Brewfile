@@ -183,6 +183,11 @@ if OS.mac?
   # LLM API fallback documented in agents-common.md (~/.wolframalpha.env).
   cask "wolfram-engine"
 
+  ### Sudo QoL (macOS) ###
+  # PAM module that reattaches sudo to the Aqua session so pam_tid (Touch ID)
+  # works inside tmux. Wired into /etc/pam.d/sudo_local by macos-settings.sh.
+  brew "pam-reattach"
+
   ### Dev Tools - VMs & Containers (macOS) ###
   brew "colima"
   brew "docker"

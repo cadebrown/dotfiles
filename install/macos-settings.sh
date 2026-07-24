@@ -104,6 +104,54 @@ defaults write com.apple.screensaver askForPassword -int 1
 defaults write com.apple.screensaver askForPasswordDelay -int 0
 log_okay "Screen lock configured"
 
+### Security: sudo — Touch ID + single-auth ticket ###
+
+log_info "Sudo auth (requires sudo)"
+if sudo -v 2>/dev/null; then
+    # /etc/pam.d/sudo_local is Apple's update-surviving hook into the sudo PAM
+    # stack. pam_reattach (Brewfile) reattaches to the Aqua session first so
+    # pam_tid works inside tmux; if the module isn't installed its line is
+    # omitted and a later re-run adds it.
+    _brew_prefix="$(brew --prefix 2>/dev/null || true)"
+    _reattach="$_brew_prefix/lib/pam/pam_reattach.so"
+    _pam_live="/etc/pam.d/sudo_local"
+    _pam_desired="# Managed by dotfiles install/macos-settings.sh — manual edits get overwritten."
+    [[ -f "$_reattach" ]] && _pam_desired+=$'\n'"auth       optional       $_reattach ignore_ssh"
+    _pam_desired+=$'\n'"auth       sufficient     pam_tid.so"
+    # A broken symlink here (→ /etc/static/…) is residue from an uninstalled
+    # nix-darwin and blocks writing a real file — clear it first.
+    [[ -L "$_pam_live" && ! -e "$_pam_live" ]] && sudo rm "$_pam_live"
+    if [[ -e "$_pam_live" ]] && diff -q <(printf '%s\n' "$_pam_desired") "$_pam_live" >/dev/null 2>&1; then
+        log_okay "Touch ID for sudo already enabled"
+    else
+        printf '%s\n' "$_pam_desired" | sudo tee "$_pam_live" >/dev/null
+        sudo chown root:wheel "$_pam_live"
+        sudo chmod 444 "$_pam_live"
+        log_okay "Touch ID for sudo enabled ($_pam_live)"
+    fi
+
+    # One authentication covers every terminal for 60 min (macOS default is a
+    # separate 5-min ticket per tty). timestamp_timeout=-1 = never expires.
+    _sudoers_file="/etc/sudoers.d/df-ticket"
+    _sudoers_desired="Defaults timestamp_type=global,timestamp_timeout=60"
+    if [[ -f "$_sudoers_file" ]] && [[ "$(sudo cat "$_sudoers_file" 2>/dev/null)" == "$_sudoers_desired" ]]; then
+        log_okay "Sudo ticket policy already configured"
+    else
+        _tmp="$(mktemp)"
+        printf '%s\n' "$_sudoers_desired" > "$_tmp"
+        # Validate before installing — a malformed sudoers.d file breaks sudo.
+        if sudo visudo -cf "$_tmp" >/dev/null 2>&1; then
+            sudo install -m 0440 -o root -g wheel "$_tmp" "$_sudoers_file"
+            log_okay "Sudo ticket policy installed ($_sudoers_file)"
+        else
+            log_warn "sudoers validation failed — leaving $_sudoers_file untouched"
+        fi
+        rm -f "$_tmp"
+    fi
+else
+    log_warn "sudo not available — skipping sudo Touch ID / ticket policy"
+fi
+
 ### Power management ###
 
 log_info "Power management (requires sudo)"
