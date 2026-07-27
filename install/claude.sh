@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # install/claude.sh - install Claude Code CLI and plugins
 #
-# Downloads the native binary from Anthropic's release bucket and places
-# it in $ARCH_BIN (PLAT-isolated for shared home directory safety).
-# Works on both macOS and Linux — no Homebrew cask needed.
+# Downloads the native binary from Anthropic's release CDN and places it in
+# $ARCH_BIN (PLAT-isolated for shared home directory safety). Works on both
+# macOS and Linux — no Homebrew cask needed.
 #
-# To update, re-run this script — it always downloads latest.
+# We deliberately bypass the native installer (`claude install` / the launcher
+# under ~/.local/share/claude/versions/): it hardcodes ~/.local paths with no
+# relocation knob, so two CPU arches sharing an NFS home would clobber one
+# another's binary and fight over one launcher. Auto-update is off
+# (DISABLE_AUTOUPDATER=1 in settings.json) — `claude update` refuses a binary
+# it didn't create anyway. Update path is this script (bootstrap upgrade).
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
@@ -30,7 +35,10 @@ else
     _platform="linux-${_plat_arch}"
 fi
 
-_BUCKET="https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"
+# Documented public CDN (fronts the internal claude-code-dist GCS bucket).
+# Exposes /latest and /$version/manifest.json (SHA256 per platform) — the same
+# interface the official install.sh consumes.
+_BUCKET="https://downloads.claude.ai/claude-code-releases"
 
 log_info "Fetching latest version tag..."
 _version=$(curl -fsSL "$_BUCKET/latest")
