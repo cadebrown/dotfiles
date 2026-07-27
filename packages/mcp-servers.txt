@@ -75,10 +75,8 @@ context7 http https://mcp.context7.com/mcp auth=context7
 deepwiki http https://mcp.deepwiki.com/mcp
 
 # Chrome DevTools: drive/inspect a live Chrome — network, console, performance
-# traces. Google's official server. --autoConnect attaches to a running Chrome
-# with remote debugging on (chrome://inspect, Chrome 144+) instead of launching
-# its own; fails to connect where that isn't set up.
-chrome-devtools stdio cmd: npx -y chrome-devtools-mcp@latest --autoConnect
+# traces. Google's official server; gracefully useless on machines without Chrome.
+chrome-devtools stdio cmd: npx -y chrome-devtools-mcp@latest
 
 # qmd: semantic+lexical search over the markdown knowledge layers (~/kb,
 # Claude auto-memory, dotfiles docs). Talks to the warm local daemon
