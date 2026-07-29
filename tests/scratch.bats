@@ -55,12 +55,18 @@ skip_if_no_scratch() {
     [[ "$_resolved" == "$SCRATCH"* || "$_resolved" == "$PATHS"* ]]
 }
 
-# --- ~/.claude: dir stays real, heavy subdirs symlink (the chezmoi gotcha) ---
+# --- ~/.claude and ~/.codex: dirs stay real, heavy entries symlink (the chezmoi gotcha) ---
 
 @test "~/.claude itself is never a symlink (chezmoi manages it as a real dir)" {
     # Holds regardless of scratch: a symlinked ~/.claude is clobbered on apply.
     if [[ -e "$HOME/.claude" ]]; then
         [[ ! -L "$HOME/.claude" ]]
+    fi
+}
+
+@test "~/.codex itself is never a symlink (chezmoi manages it as a real dir)" {
+    if [[ -e "$HOME/.codex" ]]; then
+        [[ ! -L "$HOME/.codex" ]]
     fi
 }
 
@@ -71,6 +77,37 @@ skip_if_no_scratch() {
     local _resolved
     _resolved="$(readlink -f "$HOME/.claude/projects")"
     [[ "$_resolved" == "$PATHS/.claude/"* ]]
+}
+
+@test "~/.codex/sessions is a symlink under scratch when configured" {
+    skip_if_no_scratch
+    [[ -d "$HOME/.codex" ]] || skip "Codex not installed"
+    [[ -L "$HOME/.codex/sessions" ]] || skip "sessions not migrated (dropped from DF_CODEX_LINKS?)"
+    [[ -e "$HOME/.codex/sessions" ]]
+    local _resolved
+    _resolved="$(readlink -f "$HOME/.codex/sessions")"
+    [[ "$_resolved" == "$PATHS/.codex/"* ]]
+}
+
+@test "~/.codex chezmoi-managed entries stay real, never symlinked to scratch" {
+    [[ -d "$HOME/.codex" ]] || skip "Codex not installed"
+    local _entry
+    for _entry in config.toml AGENTS.md hooks.json rules themes agents; do
+        [[ -e "$HOME/.codex/$_entry" ]] || continue
+        [[ ! -L "$HOME/.codex/$_entry" ]]
+    done
+}
+
+@test "no SQLite -wal/-shm left beside a migrated ~/.codex database" {
+    skip_if_no_scratch
+    [[ -d "$HOME/.codex" ]] || skip "Codex not installed"
+    local _db
+    for _db in "$HOME"/.codex/*.sqlite; do
+        [[ -L "$_db" ]] || continue
+        # SQLite canonicalizes before naming siblings, so both belong on scratch.
+        [[ ! -e "$_db-wal" ]]
+        [[ ! -e "$_db-shm" ]]
+    done
 }
 
 # --- scratch.sh idempotency ---

@@ -230,7 +230,12 @@ Default directories redirected to scratch (controlled by `DF_LINKS`):
 - `~/.npm` — npm cache
 - `~/.oh-my-zsh` / `~/.oh-my-zsh-custom` — oh-my-zsh and plugins
 
-Plus heavy *unmanaged* subdirs of `~/.claude` (controlled by `DF_CLAUDE_LINKS`): `projects` (history + memory), `plugins`, `file-history`. `~/.claude` itself stays a real directory because chezmoi manages files inside it.
+Plus the heavy *unmanaged* entries of the two agent config dirs, which stay real directories themselves because chezmoi manages files inside them:
+
+- `~/.claude` (controlled by `DF_CLAUDE_LINKS`): `projects` (history + memory), `plugins`, `file-history`
+- `~/.codex` (controlled by `DF_CODEX_LINKS`): `sessions` (transcripts — usually the largest single directory on the machine), `cache`, `plugins`, `attachments`, `shell_snapshots`, `.tmp`, `tmp`, plus the loose `*.sqlite` databases
+
+`~/.codex` is skipped while any process holds a file there open — see [Scratch space](scratch.md#codex-specifics).
 
 ---
 

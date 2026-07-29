@@ -259,6 +259,44 @@ The fix is almost always to replace a template variable with a shell runtime exp
 
 ---
 
+## A symlinked `~/.codex` or `~/.claude` turned back into a real directory
+
+Symptom: you hand-symlinked `~/.codex` (or `~/.claude`) to scratch, and some time
+later it is a plain directory again holding only the managed config — while the
+scratch copy sits frozen at the date the link died. Nothing logged an error.
+
+Root cause: chezmoi manages files *inside* both directories (`config.toml`,
+`AGENTS.md`, `hooks.json`, profiles, `rules/`, `themes/`, `agents/` for Codex;
+`settings.json`, `skills/`, hook scripts for Claude). A source *directory* means
+chezmoi's target state for that path is "directory" — so on the next `chezmoi apply`
+it removes whatever is there, symlink included, and recreates a real directory with
+just the managed files. Everything else is orphaned wherever the link pointed.
+
+Confirm — a stale target next to a fresh `$HOME` copy is the tell:
+
+```sh
+chezmoi managed | grep -x '.codex'          # non-empty ⇒ chezmoi owns this path
+stat -c '%n %y' ~/.codex ~/scratch/.codex   # scratch frozen, home current
+```
+
+**Fix:** don't symlink the directory. Run `bash install/scratch.sh`, which redirects
+the heavy *unmanaged* entries one level down (`sessions`, `cache`, `plugins`,
+`*.sqlite`, …) where chezmoi never looks. See
+[Scratch space](../setup/scratch.md#codex-specifics).
+
+Then reconcile the orphaned copy by hand — the script won't touch it, because it
+cannot tell your stale data from a deliberate second install:
+
+```sh
+du -sh ~/scratch/.codex                     # what was orphaned
+rm -rf ~/scratch/.codex                     # once you've confirmed nothing is wanted
+```
+
+Setting `CODEX_HOME` instead does not help here, and makes things worse — see
+[Why not CODEX_HOME?](../setup/scratch.md#why-not-codex_home).
+
+---
+
 ## Duplicate PLAT paths in PATH (both v3 and v4 showing up)
 
 Only relevant with `DF_USE_PLAT=1`. Fixed in current versions — `.zprofile`/`.bash_profile` resolve `~/.local` symlinks before setting `_LOCAL_PLAT` so PATH entries use the same physical path.

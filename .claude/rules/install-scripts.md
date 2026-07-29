@@ -36,7 +36,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `memory.sh` | Agent memory stack: cass binary (GitHub release, checksum-verified) + session-history index, ~/kb knowledge repo, qmd collections + embeddings, memory daemons | qmd MCP daemon on localhost:8181 (LaunchAgent dev.cade.qmd on macOS, lazy-start on Linux); cass watch daemon likewise. `reindex` mode forces re-embedding. Indexes under ~/.cache (scratch), never synced; ~/kb is git-synced. |
 | `auth.sh` | Guided API token setup with service registry | Creates `~/.{service}.env` files (chmod 600). Built-in token services: GitHub, Anthropic, OpenAI, Cloudflare, HuggingFace, Tavily, Exa, Firecrawl, Context7, WolframAlpha. Interactive logins (not env files): `gh auth login`, `gcloud auth login`, and `google` (= `gcloud auth application-default login` with the union of MCP scopes + optional `gcloud services enable` of the MCP-backing APIs — authenticates Google's official remote MCP servers). Run `bash auth.sh status` for state, `bash auth.sh <service>` for a single one. Add a token service by appending to `_SERVICE_DEFS`; an interactive login gets its own function + dispatch case. |
 | `dirs.sh` | Creates `~/dev`, `~/bones`, `~/misc` | Symlinks to scratch when available |
-| `scratch.sh` | Symlinks `~/.local`, `~/.cache`, etc. to scratch space | NFS quota relief |
+| `scratch.sh` | Symlinks `~/.local`, `~/.cache`, etc. to scratch space | NFS quota relief. `~/.claude` and `~/.codex` are chezmoi-owned real dirs — only their unmanaged entries move, via `DF_CLAUDE_LINKS` / `DF_CODEX_LINKS`. Codex's loose `*.sqlite` files are linked individually and only while Codex is stopped. |
 | `verify-path.sh` | Diagnostic: arch check, library check, duplicates, stale symlinks | Not called by bootstrap |
 | `patch-homebrew-*.sh` | Per-formula/toolchain patches for Homebrew on Linux | See `.claude/rules/homebrew.md` for the full patch catalog and the underlying build failures |
 
@@ -121,6 +121,22 @@ re-runs the install script.
 
 ## Gotchas
 
+- **Never symlink a chezmoi-managed directory** — `~/.claude` and `~/.codex` both have
+  source *directories* (`home/dot_claude/`, `home/dot_codex/`), so chezmoi's target state
+  for those paths is "directory". `chezmoi apply` deletes whatever is there — symlink
+  included — and recreates a real dir holding only the managed files. It logs nothing;
+  the only symptom is a scratch copy frozen at the moment the link died. `scratch.sh`
+  therefore migrates one level down (`DF_CLAUDE_LINKS` / `DF_CODEX_LINKS`); those
+  subdirs are safe because neither source is an `exact_` dir and `.chezmoiremove` never
+  lists them. `CODEX_HOME` is *not* the escape hatch: it relocates the managed config
+  too, and any Codex started without the var (IDE, cron, non-interactive ssh) silently
+  builds a second unconfigured `~/.codex`. `.chezmoiignore` **is** an escape hatch (it's
+  how `~/.local` survives as a scratch symlink) but costs more than it saves here —
+  `install/codex.sh` would have to re-implement `create_` (seed-once), `private_` (600),
+  `executable_` (755) and `.tmpl` rendering, and `chezmoi apply` would stop repairing
+  Codex config drift, all to move 1.5 MB. Declaring `symlink_dot_codex` next to
+  `dot_codex/` is not an option at all — chezmoi errors with `inconsistent state`.
+  Rationale in `docs/setup/scratch.md`.
 - **Don't run install scripts without sourcing `_lib.sh`** — PLAT paths won't be set.
 - **`GIT_CONFIG_GLOBAL=/dev/null`** is set by `_lib.sh` intentionally — prevents SSH URL
   rewrites from breaking curl-based installers on machines without SSH keys.
