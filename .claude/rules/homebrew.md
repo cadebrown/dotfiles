@@ -38,9 +38,26 @@ custom prefix is the source of most build lore below.
   stale. `homebrew.sh` runs `brew upgrade --cask --greedy` after the bundle when
   `DF_BREW_UPGRADE=1` to keep the records in sync with the running apps.
 - **Python@3.14 formula is patched on Linux** — `install/patch-homebrew-python.sh` fixes uuid
-  and test_datetime build issues. `HOMEBREW_NO_AUTO_UPDATE=1` prevents Homebrew from
-  overwriting patches. Formulas depending on python@3.14 (vim, imagemagick, graphviz, ffmpeg,
-  glances) now build successfully with these patches.
+  and test_datetime build issues. `HOMEBREW_NO_AUTO_UPDATE=1` stops brew refreshing the tap
+  mid-command and reverting patches. Formulas depending on python@3.14 (vim, imagemagick,
+  graphviz, ffmpeg, glances) now build successfully with these patches.
+- **The Linux tap needs an EXPLICIT refresh — `NO_AUTO_UPDATE` freezes it forever.**
+  With auto-update off and `HOMEBREW_NO_INSTALL_FROM_API=1` forcing every lookup through
+  the local clone, homebrew-core stays pinned at its clone date no matter how often
+  bootstrap runs (one machine: 4.5 months stale, 193/336 formulae behind; glab stuck at
+  1.89 so `glab skills` didn't exist yet). `linux-packages.sh` therefore runs
+  `git checkout -- Formula/` → `brew update` → patch block, in that order. Discarding
+  first is the load-bearing part: `brew update` stashes dirty formulae and pops them
+  afterwards, so an upstream edit to a patched line leaves the tap mid-conflict.
+  Refreshing definitions is NOT upgrading — `DF_BREW_UPGRADE` still gates installed kegs.
+- **Patch anchors rot; a stale anchor fails SILENTLY.** Every `patch-homebrew-*.sh`
+  matches an exact source block and only `log_warn`s when it misses, so a formula that
+  moved upstream leaves the build unpatched while the script still exits 0. The first
+  real refresh broke two: `pkgconf` (2.5.1 → 3.0.4 rewrote `def install` for meson) and
+  the `llvm_clang++` shim (Homebrew moved Linux super shims into `shims/linux/super/bin/`).
+  Anchor on the narrowest stable line (`  def install`) with a separate idempotency
+  marker rather than whole-block matching. After any tap refresh, verify with:
+  `for f in install/patch-homebrew-*.sh; do bash "$f" 2>&1 | grep '^\[warn\]'; done`
 - **Python dev headers come from Homebrew** — python@3.14 provides `Python.h` and
   `libpython3.14.so` at `$(brew --prefix)/opt/python@3.14/include/python3.14/`.
   CMake's `FindPython3` discovers these automatically via `brew shellenv` paths.

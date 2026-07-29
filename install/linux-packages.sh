@@ -170,6 +170,27 @@ log_info "Tapping homebrew-core for editable formulas..."
 # the script under set -euo pipefail. The '|| true' absorbs that non-fatal exit.
 brew tap homebrew/core --force 2>&1 | grep -v "^Warning" | head -5 || true
 
+### Refresh formula definitions ###
+#
+# Must stay explicit: HOMEBREW_NO_AUTO_UPDATE=1 (set above) means nothing else
+# ever refreshes the tap, so without this it stays frozen at its clone date and
+# no amount of re-running bootstrap moves a formula version.
+#
+# Must stay BEFORE the patch block, and must discard first: `brew update`
+# stashes dirty files and pops them afterwards, so an upstream edit to a patched
+# line leaves the checkout mid-conflict. Both checkouts carry patches — formulae
+# in the homebrew-core tap, superenv/stdenv/shim in Homebrew's own Library.
+#
+# Refreshing definitions is NOT upgrading: DF_BREW_UPGRADE still governs whether
+# installed kegs move.
+log_info "Refreshing Homebrew (discarding patches first, re-applied below)..."
+_core_repo="$(brew --repo homebrew/core)"
+_brew_repo="$(brew --repo)"
+[[ -d "$_core_repo/.git" ]] && { git -C "$_core_repo" checkout -- Formula/ 2>/dev/null || true; }
+[[ -d "$_brew_repo/.git" ]] && { git -C "$_brew_repo" checkout -- Library/ 2>/dev/null || true; }
+run_logged brew update || log_warn "brew update failed — formula definitions may be stale"
+unset _core_repo _brew_repo
+
 if [[ "${DF_PATCH_BREW_ALL:-1}" == "0" ]]; then
     log_info "DF_PATCH_BREW_ALL=0 — skipping all Homebrew formula patches"
 else

@@ -137,6 +137,44 @@ Manual one-off: `brew tap owner/tap`, then rerun `install/homebrew.sh`.
 
 ---
 
+## A Homebrew package is months behind upstream (Linux)
+
+Symptom: a formula installs at a version far older than upstream stable, and
+re-running bootstrap never moves it. Seen with `glab`, which stuck at 1.89.0
+while upstream was 1.109.0 — old enough that `glab skills install --global`
+failed with `Unknown command "skills"`, so `install/skills-sync.sh` reported
+`fail glab` / `missing declared skill: glab` on every run.
+
+Root cause: `install/linux-packages.sh` sets `HOMEBREW_NO_AUTO_UPDATE=1` (so an
+implicit refresh can't revert the in-place formula patches) and, until now, never
+ran an explicit `brew update`. The homebrew-core clone therefore froze at
+whatever date it was first cloned, and `HOMEBREW_NO_INSTALL_FROM_API=1` forces
+every lookup through that frozen clone. One machine sat 4.5 months stale with
+193 of 336 installed formulae behind upstream.
+
+Confirm:
+
+```sh
+git -C "$(brew --repo homebrew/core)" log -1 --format=%ci   # tap's age
+brew info <formula> | head -1                               # frozen version
+```
+
+**Fix:** rerun `install/linux-packages.sh` — it now discards the formula patches,
+runs `brew update`, and re-applies each patch against the fresh formula. This
+refreshes *definitions* only; `DF_BREW_UPGRADE` still governs whether installed
+kegs move, so a plain run leaves working binaries alone.
+
+Upgrade a single package without touching the tap:
+
+```sh
+env -u HOMEBREW_NO_INSTALL_FROM_API -u HOMEBREW_NO_AUTO_UPDATE brew upgrade <formula>
+```
+
+Expect patch anchors to rot across a long refresh — see the patch-anchor gotcha
+in `.claude/rules/homebrew.md`.
+
+---
+
 ## `nvm` or `node` not available in a script
 
 `nvm.sh` is lazy-loaded in interactive shells only. Non-interactive shells get `node`/`npm` via the PATH entry `.zprofile`/`.bash_profile` adds from the highest installed version. If `node` is missing in a script, either:

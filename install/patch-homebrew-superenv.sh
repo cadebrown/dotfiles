@@ -117,7 +117,16 @@ if [[ "${DF_PATCH_BREW_SUPERENV:-1}" == "0" ]]; then
 fi
 
 SUPERENV_RB="$LOCAL_PLAT/brew/Homebrew/Library/Homebrew/extend/os/linux/extend/ENV/super.rb"
-SUPERENV_SHIM="$LOCAL_PLAT/brew/Homebrew/Library/Homebrew/shims/linux/super/llvm_clang++"
+
+# Homebrew moved the Linux super shims into a bin/ subdirectory; older checkouts
+# keep them flat. Take whichever exists so the patch works across both layouts.
+_SHIM_DIR="$LOCAL_PLAT/brew/Homebrew/Library/Homebrew/shims/linux/super"
+if [[ -f "$_SHIM_DIR/bin/llvm_clang++" ]]; then
+    SUPERENV_SHIM="$_SHIM_DIR/bin/llvm_clang++"
+else
+    SUPERENV_SHIM="$_SHIM_DIR/llvm_clang++"
+fi
+unset _SHIM_DIR
 
 [[ -f "$SUPERENV_RB" ]] || { log_warn "super.rb not found at $SUPERENV_RB — skipping"; exit 0; }
 

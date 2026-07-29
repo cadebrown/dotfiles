@@ -3,7 +3,7 @@
 #
 # ─── WHY THIS EXISTS ────────────────────────────────────────────────────────────
 #
-# pkgconf 2.5.1 bundles gnulib, which includes the macro
+# pkgconf bundles gnulib, which includes the macro
 # AC_C_UNDECLARED_BUILTIN_OPTIONS. This macro has the same broken probe as
 # m4 1.4.21: it tries to determine compiler flags needed to treat calls to
 # undeclared builtins as errors, by compiling a test program that calls
@@ -49,8 +49,9 @@
 # ─── WHEN TO REMOVE ─────────────────────────────────────────────────────────────
 #
 # When the upstream pkgconf formula uses a version with the fixed gnulib and
-# explicitly handles linux-headers. Check:
-# grep -c 'ac_cv_c_undeclared' pkgconf.rb — if > 0, upstream handles it.
+# explicitly handles linux-headers. Check against a PRISTINE formula
+# (`git -C "$(brew --repo homebrew/core)" show HEAD:Formula/p/pkgconf.rb`) —
+# grepping the working copy matches this patch's own marker.
 #
 # ─── SKIP FLAG ──────────────────────────────────────────────────────────────────
 #
@@ -75,59 +76,19 @@ PKGCONF_RB="$LOCAL_PLAT/brew/Homebrew/Library/Taps/homebrew/homebrew-core/Formul
 
 log_section "Patching pkgconf formula for Linux (bypass undeclared-builtin probe + linux-headers)"
 
-_ORIG='  def install
-    if build.head?
-      ENV["LIBTOOLIZE"] = "glibtoolize"
-      system "./autogen.sh"
-    end'
-
-# v1: only gnulib probe fix, no linux-headers
-_PROBE_ONLY_FIX='  def install
+# Anchored on the `def install` line alone, not the body: upstream rewrites the
+# body freely (2.5.1's autotools-only install became 3.0.4's meson-for-HEAD
+# split), and a whole-block match silently degrades to "target not found" every
+# time that happens. `ac_cv_c_undeclared_builtin_options` is the idempotency
+# marker — it appears only in this patch.
+_ANCHOR='  def install
+'
+_INJECT='  def install
     on_linux do
-      # pkgconf 2.5.1 bundled gnulib has a broken probe for undeclared builtins:
-      # GCC treats memcpy/strchr as compiler builtins, so the test program
-      # compiles silently and configure aborts with "cannot detect". Pre-set
-      # the autoconf cache variable to skip the probe (standard AC mechanism).
-      # Remove when pkgconf upgrades to a version with the fixed gnulib.
-      ENV["ac_cv_c_undeclared_builtin_options"] = \
-        "-Wimplicit-function-declaration -Werror=implicit-function-declaration"
-    end
-    if build.head?
-      ENV["LIBTOOLIZE"] = "glibtoolize"
-      system "./autogen.sh"
-    end'
-
-# v2: probe fix + CPPFLAGS — fixes configure tests but not .lo compilation;
-# pkgconf's libtool Makefile does not consistently propagate $(CPPFLAGS).
-_CPPFLAGS_FIX='  def install
-    on_linux do
-      # pkgconf 2.5.1 bundled gnulib has a broken probe for undeclared builtins:
-      # GCC treats memcpy/strchr as compiler builtins, so the test program
-      # compiles silently and configure aborts with "cannot detect". Pre-set
-      # the autoconf cache variable to skip the probe (standard AC mechanism).
-      # Remove when pkgconf upgrades to a version with the fixed gnulib.
-      ENV["ac_cv_c_undeclared_builtin_options"] = \
-        "-Wimplicit-function-declaration -Werror=implicit-function-declaration"
-      # linux-headers@6.8 provides asm/ioctls.h, linux/limits.h, etc.
-      # Homebrew glibc requires these kernel headers transitively, but pkgconf
-      # does not declare the dependency. Without this, configure tests for
-      # socklen_t and others fail because glibc headers cannot be included.
-      ENV.append "CPPFLAGS", "-I#{Formula["linux-headers@6.8"].include}"
-    end
-    if build.head?
-      ENV["LIBTOOLIZE"] = "glibtoolize"
-      system "./autogen.sh"
-    end'
-
-# v3 (correct): probe fix + CPATH — GCC reads CPATH directly, works for both
-# configure tests and actual .lo compilation regardless of Makefile structure.
-_CPATH_FIX='  def install
-    on_linux do
-      # pkgconf 2.5.1 bundled gnulib has a broken probe for undeclared builtins:
-      # GCC treats memcpy/strchr as compiler builtins, so the test program
-      # compiles silently and configure aborts with "cannot detect". Pre-set
-      # the autoconf cache variable to skip the probe (standard AC mechanism).
-      # Remove when pkgconf upgrades to a version with the fixed gnulib.
+      # pkgconf bundles a gnulib whose undeclared-builtin probe is broken: GCC
+      # treats memcpy/strchr as compiler builtins, so the test program compiles
+      # silently and configure aborts with "cannot detect". Pre-set the autoconf
+      # cache variable to skip the probe (standard AC mechanism).
       ENV["ac_cv_c_undeclared_builtin_options"] = \
         "-Wimplicit-function-declaration -Werror=implicit-function-declaration"
       # linux-headers@6.8 provides asm/ioctls.h, linux/limits.h, linux/errno.h,
@@ -137,37 +98,25 @@ _CPATH_FIX='  def install
       # rules. GCC always checks CPATH regardless of Makefile structure.
       ENV.prepend_path "CPATH", Formula["linux-headers@6.8"].include.to_s
     end
-    if build.head?
-      ENV["LIBTOOLIZE"] = "glibtoolize"
-      system "./autogen.sh"
-    end'
+'
 
 _result=$(python3 -c "
 import sys
-path = sys.argv[1]
-orig, probe_only, cppflags_fix, cpath_fix = sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+path, anchor, inject = sys.argv[1], sys.argv[2], sys.argv[3]
 txt = open(path).read()
-if cpath_fix in txt:
+if 'ac_cv_c_undeclared_builtin_options' in txt:
     print('already')
-elif cppflags_fix in txt:
-    open(path,'w').write(txt.replace(cppflags_fix, cpath_fix, 1))
-    print('migrated_cppflags')
-elif probe_only in txt:
-    open(path,'w').write(txt.replace(probe_only, cpath_fix, 1))
-    print('migrated_probe')
-elif orig in txt:
-    open(path,'w').write(txt.replace(orig, cpath_fix, 1))
+elif anchor in txt:
+    open(path,'w').write(txt.replace(anchor, inject, 1))
     print('patched')
 else:
     print('notfound')
-" "$PKGCONF_RB" "$_ORIG" "$_PROBE_ONLY_FIX" "$_CPPFLAGS_FIX" "$_CPATH_FIX")
+" "$PKGCONF_RB" "$_ANCHOR" "$_INJECT")
 case "$_result" in
-    already)           log_okay "pkgconf full patch (probe bypass + linux-headers CPATH) already applied" ;;
-    migrated_cppflags) log_okay "Migrated: pkgconf linux-headers changed from CPPFLAGS to CPATH" ;;
-    migrated_probe)    log_okay "Migrated: pkgconf patch updated from probe-only to probe + CPATH" ;;
-    patched)           log_okay "Patched: pkgconf probe bypass + linux-headers CPATH added for Linux" ;;
-    notfound)          log_warn "pkgconf patch target not found — formula may have changed; check pkgconf.rb" ;;
+    already)  log_okay "pkgconf patch (probe bypass + linux-headers CPATH) already applied" ;;
+    patched)  log_okay "Patched: pkgconf probe bypass + linux-headers CPATH added for Linux" ;;
+    notfound) log_warn "pkgconf patch target not found — formula may have changed; check pkgconf.rb" ;;
 esac
-unset _ORIG _PROBE_ONLY_FIX _CPPFLAGS_FIX _CPATH_FIX _result
+unset _ANCHOR _INJECT _result
 
 log_okay "pkgconf.rb patch done"
