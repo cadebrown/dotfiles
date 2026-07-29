@@ -40,17 +40,18 @@ log_okay "HF_HOME → $LOCAL_PLAT/.cache/huggingface"
 
 _missing=0
 
-if has ollama; then
-    log_okay "ollama: $(ollama --version 2>/dev/null | head -1)"
-else
-    log_warn "ollama not found — run: brew install ollama  (or re-run install/homebrew.sh)"
-    (( _missing++ )) || true
-fi
-
-# MLX requires Apple Metal — it's macOS-only (packages/pip.txt marks mlx-lm /
-# mlx-openai-server `# macos-only`). On Linux these tools are never installed, so
-# checking for them is noise and pulling MLX models is impossible. Skip cleanly.
+# The whole local-inference stack is macOS-only: MLX needs Apple Metal
+# (packages/pip.txt marks mlx-lm / mlx-openai-server `# macos-only`) and ollama
+# sits inside the Brewfile's `if OS.mac?` block. On Linux none of it is ever
+# installed, so checking is noise and pulling MLX models is impossible.
 if [[ "$OS" == "darwin" ]]; then
+    if has ollama; then
+        log_okay "ollama: $(ollama --version 2>/dev/null | head -1)"
+    else
+        log_warn "ollama not found — run: brew install ollama  (or re-run install/homebrew.sh)"
+        (( _missing++ )) || true
+    fi
+
     if has mlx_lm.generate; then
         log_okay "mlx-lm: present"
     else
