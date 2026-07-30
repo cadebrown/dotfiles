@@ -283,8 +283,9 @@ function cuda_list() {
         return 1
     fi
     for _d in "$_cudas_dir"/*/; do
-        local _name
-        _name="$(basename "$_d")"
+        # Declare and assign together: a bare `local` re-declaring an existing
+        # local echoes "_name=<value>" in zsh, once per loop iteration.
+        local _name="$(basename "$_d")"
         if [ "$_name" = "$_current" ]; then
             echo "* $_name"
         else
@@ -338,8 +339,9 @@ function nsys_list() {
         return 1
     fi
     for _d in "$_nsyss_dir"/*/; do
-        local _name
-        _name="$(basename "$_d")"
+        # Declare and assign together: a bare `local` re-declaring an existing
+        # local echoes "_name=<value>" in zsh, once per loop iteration.
+        local _name="$(basename "$_d")"
         if [ "$_name" = "$_current" ]; then
             echo "* $_name"
         else
@@ -362,8 +364,10 @@ function nsys_switch() {
     echo "Switched to $1"
 }
 
-# Auto-activate default nsys if nsys isn't already in PATH.
-if ! command -v nsys &>/dev/null && [ -e "$_LOCAL_PLAT/.nsys" ]; then
+# Activate unconditionally so the standalone install shadows the toolkit's older
+# bundled nsys. cuda_use ran first and put .cuda/bin (which has nsys) on PATH, so
+# a "not already in PATH" guard here can never fire.
+if [ -e "$_LOCAL_PLAT/.nsys" ]; then
     nsys_use "$_LOCAL_PLAT/.nsys"
 fi
 
@@ -373,7 +377,12 @@ fi
 function ncu_use() {
     export NCU_HOME="$1"
     if [ -e "$NCU_HOME" ]; then
-        path=("$NCU_HOME/bin" $path)
+        # Nsight Compute ships ncu at the tree root, not under bin/ (unlike nsys).
+        if [ -d "$NCU_HOME/bin" ]; then
+            path=("$NCU_HOME/bin" $path)
+        else
+            path=("$NCU_HOME" $path)
+        fi
         export LD_LIBRARY_PATH="$NCU_HOME/lib64:$NCU_HOME/lib:${LD_LIBRARY_PATH:-}"
     else
         echo "ERROR: ncu not found at $NCU_HOME" >&2
@@ -390,8 +399,9 @@ function ncu_list() {
         return 1
     fi
     for _d in "$_ncus_dir"/*/; do
-        local _name
-        _name="$(basename "$_d")"
+        # Declare and assign together: a bare `local` re-declaring an existing
+        # local echoes "_name=<value>" in zsh, once per loop iteration.
+        local _name="$(basename "$_d")"
         if [ "$_name" = "$_current" ]; then
             echo "* $_name"
         else
@@ -414,8 +424,8 @@ function ncu_switch() {
     echo "Switched to $1"
 }
 
-# Auto-activate default ncu if ncu isn't already in PATH.
-if ! command -v ncu &>/dev/null && [ -e "$_LOCAL_PLAT/.ncu" ]; then
+# Activate unconditionally — same reasoning as nsys above.
+if [ -e "$_LOCAL_PLAT/.ncu" ]; then
     ncu_use "$_LOCAL_PLAT/.ncu"
 fi
 
@@ -478,8 +488,9 @@ function qnx_list() {
         return 1
     fi
     for _d in "$_qnxsdps_dir"/*/; do
-        local _name
-        _name="$(basename "$_d")"
+        # Declare and assign together: a bare `local` re-declaring an existing
+        # local echoes "_name=<value>" in zsh, once per loop iteration.
+        local _name="$(basename "$_d")"
         if [ "$_name" = "$_current" ]; then
             echo "* $_name"
         else

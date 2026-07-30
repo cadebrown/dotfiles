@@ -84,3 +84,16 @@ See [docs/usage/agents.md](../../docs/usage/agents.md).
   stays the cross-machine layer). Drop `projects` from `DF_CLAUDE_LINKS` to keep history on NFS.
 - **nvm lazy loading design:** `home/dot_zprofile.tmpl` (PATH entry) +
   `home/dot_zshrc.tmpl` (oh-my-zsh plugin).
+- **Never write a bare `local x` inside a loop in the profiles** — zsh echoes
+  `x=<current value>` when `local` re-declares an existing local, so the
+  `*_list` helpers spewed a `_name=…` line per entry. Declare and assign in one
+  statement (`local _name="$(basename "$_d")"`). bash is silent either way, so
+  this only shows up in a zsh login shell.
+- **Don't guard the `nsys`/`ncu` auto-activation on `! command -v`** — the
+  `### CUDA ###` block runs first and `cuda_use` prepends `$CUDA_HOME/bin`, which
+  bundles both tools, so such a guard is dead code and the standalone
+  `.nsys`/`.ncu` installs stay permanently shadowed. Activation is unconditional
+  on the symlink existing; it prepends after `cuda_use`, so it wins. Related:
+  Nsight Compute puts `ncu` at its tree root (no `bin/`), unlike Nsight Systems —
+  `ncu_use` tests for `bin/` and falls back to `$NCU_HOME`. See
+  docs/usage/troubleshooting.md.

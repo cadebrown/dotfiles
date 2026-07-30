@@ -256,6 +256,47 @@ The other classic shadowing footgun: legacy binaries at `~/.local/bin/<tool>` fr
 
 ---
 
+## `nsys` / `ncu` resolve to the CUDA toolkit copy, not the standalone install
+
+**Symptom.** You added a newer Nsight Systems / Nsight Compute to
+`dotfiles-nvidia/packages/{nsys,ncu}-versions.txt`, the installer reports `ok`,
+`nsys_list` / `ncu_list` show it — but `nsys --version` still prints the older
+version, and `which nsys` points at `$_LOCAL_PLAT/.cuda/bin/nsys`.
+
+**Root cause chain.** The CUDA toolkit bundles its own `nsys` and `ncu`. In the
+shell profiles the `### CUDA ###` block runs *before* the Nsight blocks, and
+`cuda_use` prepends `$CUDA_HOME/bin` to PATH. The Nsight auto-activation used to
+be guarded on `! command -v nsys` ("activate only if not already in PATH") — by
+that point the toolkit had *always* put one there, so the guard never fired and
+the standalone install was permanently shadowed.
+
+A second, independent trap: Nsight Compute ships `ncu` at the **root** of its
+tree, not under `bin/` (Nsight Systems does use `bin/`). So even when `ncu_use`
+did run, prepending `$NCU_HOME/bin` added a nonexistent directory.
+
+**Confirm.**
+
+```sh
+which nsys ncu                       # .cuda/bin/... means it's shadowed
+ls "$_LOCAL_PLAT/.ncu"               # ncu at top level, no bin/
+readlink "$_LOCAL_PLAT/.nsys"        # which standalone version is active
+```
+
+**Fix.** Both are fixed in the profile templates: activation is now
+unconditional whenever `$_LOCAL_PLAT/.nsys` / `.ncu` exists (the standalone
+prepends *after* `cuda_use`, so it wins), and `ncu_use` falls back to
+`$NCU_HOME` when there is no `bin/`. Run `chezmoi apply` and start a new login
+shell. If it still resolves wrong, the version symlink is the likely culprit —
+`cuda.sh`/`nsys.sh`/`ncu.sh` deliberately never overwrite an existing `.nsys` /
+`.ncu` / `.cuda`, so a new install does not become active on its own:
+
+```sh
+nsys_switch tarball_nsys_2026.1.3.425
+ncu_switch  tarball_ncu_2026.2.1.5
+```
+
+---
+
 ## Cloudflare Pages build failing
 
 Check the build log via the API:
