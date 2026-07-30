@@ -56,7 +56,9 @@
 #   DF_DO_PACKAGES      — set to 0 to skip package install (Homebrew on macOS/Linux)
 #   DF_DO_MACOS_SERVICES — set to 0 to skip macOS service registration
 #   DF_START_LOCAL_SERVICES — set to 1 to auto-start colima/ollama/mlxserve at
-#                         login (default 0: installed but not auto-started)
+#                         login (default 0: installed but not auto-started; at 0
+#                         mlxserve is also actively stopped + disabled, so a
+#                         hand-started one does not survive a bootstrap run)
 #   DF_DO_ZSH           — set to 0 to skip oh-my-zsh + plugins install
 #   DF_DO_NODE          — set to 0 to skip Node install + global npm packages
 #   DF_DO_RUST          — set to 0 to skip Rust install

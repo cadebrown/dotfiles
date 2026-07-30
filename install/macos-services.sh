@@ -6,6 +6,9 @@
 # login, and none of the three are needed for day-to-day work. Set
 # DF_START_LOCAL_SERVICES=1 to restore auto-start on bootstrap. Manual control
 # stays available regardless: `colima start`, `ollama serve`, `mlxserve`.
+# colima/ollama are skip-only when the flag is off (brew services state is
+# already persistent); mlxserve is actively booted out and disabled, because
+# launchd auto-loads its plist from ~/Library/LaunchAgents at every login.
 # The docker CLI-plugin symlinks below always run (so a manual `colima start`
 # gives a working `docker compose` / `docker buildx`).
 # Re-running is safe: all steps are idempotent.
@@ -77,13 +80,23 @@ fi
 # the user remembered to start mlxserve manually.
 #
 # The plist itself (deployed by chezmoi) holds the model + parser config.
-# This block loads it into the user's launchd domain (idempotent: bootstraps
-# once, then no-ops on subsequent runs).
+#
+# launchd auto-loads every plist in ~/Library/LaunchAgents at login, so skipping
+# the bootstrap is not enough to keep the agent off — the disabled-override
+# database is the only thing that survives a re-login. Hence both branches below
+# are active: off explicitly boots out + disables, on re-enables before
+# bootstrapping (a stale override makes bootstrap succeed but never run).
 
 _MLX_PLIST="$HOME/Library/LaunchAgents/dev.cade.mlxserve.plist"
 _MLX_LABEL="dev.cade.mlxserve"
+_MLX_DOMAIN="gui/$(id -u)"
 
 if [[ "$DF_START_LOCAL_SERVICES" != "1" ]]; then
+    if launchctl print "$_MLX_DOMAIN/$_MLX_LABEL" &>/dev/null; then
+        log_info "Unloading mlxserve LaunchAgent (DF_START_LOCAL_SERVICES=0)"
+        launchctl bootout "$_MLX_DOMAIN/$_MLX_LABEL" 2>/dev/null || true
+    fi
+    launchctl disable "$_MLX_DOMAIN/$_MLX_LABEL" 2>/dev/null || true
     log_okay "mlxserve auto-start disabled (DF_START_LOCAL_SERVICES=0) — 'mlxserve' to run manually"
 elif [[ -f "$_MLX_PLIST" ]]; then
     if ! has mlx-openai-server; then
@@ -91,20 +104,21 @@ elif [[ -f "$_MLX_PLIST" ]]; then
         log_warn "  fix: uv tool install mlx-openai-server"
     fi
     mkdir -p "$HOME/.local/share/mlxserve"
-    if launchctl print "gui/$(id -u)/$_MLX_LABEL" &>/dev/null; then
+    launchctl enable "$_MLX_DOMAIN/$_MLX_LABEL" 2>/dev/null || true
+    if launchctl print "$_MLX_DOMAIN/$_MLX_LABEL" &>/dev/null; then
         log_okay "mlxserve LaunchAgent already loaded ($_MLX_LABEL)"
     else
         log_info "Loading mlxserve LaunchAgent (auto-start at login)"
-        if launchctl bootstrap "gui/$(id -u)" "$_MLX_PLIST" 2>/dev/null; then
+        if launchctl bootstrap "$_MLX_DOMAIN" "$_MLX_PLIST" 2>/dev/null; then
             log_okay "mlxserve LaunchAgent loaded — first run downloads ~25GB Qwen weights"
         else
-            log_warn "launchctl bootstrap failed — try manually: launchctl bootstrap gui/\$UID $_MLX_PLIST"
+            log_warn "launchctl bootstrap failed — try manually: launchctl bootstrap $_MLX_DOMAIN $_MLX_PLIST"
         fi
     fi
 else
     log_warn "mlxserve plist missing — chezmoi apply may not have run yet"
 fi
-unset _MLX_PLIST _MLX_LABEL
+unset _MLX_PLIST _MLX_LABEL _MLX_DOMAIN
 
 ### docker CLI plugins ###
 # docker-compose and docker-buildx are installed by Homebrew but must be

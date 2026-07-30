@@ -265,6 +265,9 @@ if [[ "$OS" == "darwin" ]]; then
                 log_okay "$_agent already loaded"
             fi
         else
+            # Clear any disabled override first: bootstrap on a disabled label
+            # returns success but launchd never runs the job.
+            launchctl enable "gui/$(id -u)/$_agent" 2>/dev/null || true
             if launchctl bootstrap "gui/$(id -u)" "$_plist" 2>/dev/null; then
                 log_okay "loaded $_agent"
             else

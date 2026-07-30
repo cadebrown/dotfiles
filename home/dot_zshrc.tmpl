@@ -277,9 +277,30 @@ mlxserve() {
 # mlxstart / mlxstop / mlxstatus — control the LaunchAgent (dev.cade.mlxserve).
 # Battery: an idle MLX server holds the model in unified memory but burns very
 # little CPU/GPU power. Stop it when on battery + not coding for hours.
-alias mlxstart='launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/dev.cade.mlxserve.plist"'
-alias mlxstop='launchctl bootout "gui/$(id -u)/dev.cade.mlxserve"'
-alias mlxstatus='launchctl print "gui/$(id -u)/dev.cade.mlxserve" 2>/dev/null | head -20 || echo "mlxserve LaunchAgent not loaded"'
+# The enable/disable calls are load-bearing, not decoration: bootstrap on a
+# disabled job returns success but launchd never runs it, and bootout alone is
+# undone at the next login when launchd rescans ~/Library/LaunchAgents.
+mlxstart() {
+    launchctl enable "gui/$(id -u)/dev.cade.mlxserve"
+    launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/dev.cade.mlxserve.plist"
+}
+mlxstop() {
+    launchctl bootout "gui/$(id -u)/dev.cade.mlxserve"
+    launchctl disable "gui/$(id -u)/dev.cade.mlxserve"
+}
+# Must stay a function: as an alias the `|| echo` binds to the pipeline, whose
+# status is head's, so the not-loaded message could never print.
+mlxstatus() {
+    local _out
+    if _out="$(launchctl print "gui/$(id -u)/dev.cade.mlxserve" 2>/dev/null)"; then
+        printf '%s\n' "$_out" | head -20
+    elif launchctl print-disabled "gui/$(id -u)" 2>/dev/null \
+        | grep -qE '"dev\.cade\.mlxserve" => (disabled|true)'; then
+        echo "mlxserve LaunchAgent disabled — 'mlxstart' to re-enable"
+    else
+        echo "mlxserve LaunchAgent not loaded"
+    fi
+}
 
 # mlxpull — pre-download a model without starting a server. Same alias map as mlxserve.
 # `mlxserve <name>` already auto-downloads on first request; use this when you want

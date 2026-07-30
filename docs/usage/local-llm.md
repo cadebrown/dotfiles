@@ -22,9 +22,9 @@ Ollama remains installed as a plain fallback.
 
 ```sh
 # LaunchAgent (preferred — survives terminal close, KeepAlive):
-mlxstart                          # launchctl bootstrap dev.cade.mlxserve
+mlxstart                          # launchctl enable + bootstrap dev.cade.mlxserve
 mlxstatus                         # is it running?
-mlxstop
+mlxstop                           # bootout + disable (stays off across logins)
 
 # Or foreground in a terminal:
 mlxserve                          # default: Qwen3.6-27B 8-bit (served as "qwen3.6-27b")

@@ -16,7 +16,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `zsh.sh` | oh-my-zsh + plugins (pure, autosuggestions, fsh, completions) | Clones or updates via git |
 | `homebrew.sh` | macOS: Homebrew + `brew bundle` from Brewfile | Upgrades enabled by default |
 | `linux-packages.sh` | Linux: Homebrew + glibc + `brew bundle` | Custom prefix, compiler symlinks, upgrades off by default |
-| `macos-services.sh` | Colima + Ollama + mlxserve auto-start (rootless Docker + local LLM servers) — **gated off by default** — plus docker CLI-plugin symlinks (always run) | macOS only, skips on Linux. Auto-start is opt-in via `DF_START_LOCAL_SERVICES=1` (default 0); mlxserve alone held ~34GB RAM at login. Manual control unaffected: `colima start` / `ollama serve` / `mlxserve`. |
+| `macos-services.sh` | Colima + Ollama + mlxserve auto-start (rootless Docker + local LLM servers) — **gated off by default** — plus docker CLI-plugin symlinks (always run) | macOS only, skips on Linux. Auto-start is opt-in via `DF_START_LOCAL_SERVICES=1` (default 0); mlxserve alone held ~34GB RAM at login. colima/ollama are skip-only when off; mlxserve is actively `bootout` + `disable`d (launchd auto-loads its plist from `~/Library/LaunchAgents` each login, so skipping the bootstrap doesn't keep it off), and re-`enable`d when the flag goes back on. Manual control unaffected: `colima start` / `ollama serve` / `mlxserve`. |
 | `macos-settings.sh` | System prefs via `defaults write` (Dock, Finder, keyboard, trackpad, Safari, iTerm2) + sudo QoL: Touch ID (`/etc/pam.d/sudo_local`, pam_reattach for tmux) and a global 60-min sudo ticket (`/etc/sudoers.d/df-ticket`) | macOS only |
 | `macos-quick-actions.sh` | Deploys `*.workflow` bundles to `~/Library/Services/` (right-click Finder → "Open in Cursor") | macOS only; source bundles under `install/macos-quick-actions/`; flushes `pbs -flush` after changes |
 | `node.sh` | nvm + Node.js + global npm packages from `npm.txt` | Lazy-loaded in zsh for fast startup |
@@ -137,6 +137,15 @@ re-runs the install script.
   Codex config drift, all to move 1.5 MB. Declaring `symlink_dot_codex` next to
   `dot_codex/` is not an option at all — chezmoi errors with `inconsistent state`.
   Rationale in `docs/setup/scratch.md`.
+- **Pair every `launchctl bootstrap` with an `enable`, every `bootout` with a `disable`** —
+  the two halves are independent and both are needed. `bootstrap` on a label carrying a
+  disabled override returns success and launchd never runs the job, so the script logs
+  "loaded" over a dead agent; `bootout` alone is undone at the next login, when launchd
+  rescans `~/Library/LaunchAgents` and re-loads every plist there. Only the override
+  database survives a re-login, which is why `DF_START_LOCAL_SERVICES=0` has to actively
+  `disable` mlxserve rather than just skip the bootstrap. Applies to `macos-services.sh`
+  and `memory.sh` (qmd, cass-watch, cass-semantic) alike. `launchctl print-disabled
+  gui/$(id -u)` shows the overrides.
 - **Don't run install scripts without sourcing `_lib.sh`** — PLAT paths won't be set.
 - **`GIT_CONFIG_GLOBAL=/dev/null`** is set by `_lib.sh` intentionally — prevents SSH URL
   rewrites from breaking curl-based installers on machines without SSH keys.

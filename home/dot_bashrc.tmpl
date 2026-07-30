@@ -192,6 +192,30 @@ mlxserve() {
     mlx-openai-server "${args[@]}"
 }
 
+# mlxstart / mlxstop / mlxstatus — control the LaunchAgent (dev.cade.mlxserve).
+# The enable/disable calls are load-bearing, not decoration: bootstrap on a
+# disabled job returns success but launchd never runs it, and bootout alone is
+# undone at the next login when launchd rescans ~/Library/LaunchAgents.
+mlxstart() {
+    launchctl enable "gui/$(id -u)/dev.cade.mlxserve"
+    launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/dev.cade.mlxserve.plist"
+}
+mlxstop() {
+    launchctl bootout "gui/$(id -u)/dev.cade.mlxserve"
+    launchctl disable "gui/$(id -u)/dev.cade.mlxserve"
+}
+mlxstatus() {
+    local _out
+    if _out="$(launchctl print "gui/$(id -u)/dev.cade.mlxserve" 2>/dev/null)"; then
+        printf '%s\n' "$_out" | head -20
+    elif launchctl print-disabled "gui/$(id -u)" 2>/dev/null \
+        | grep -qE '"dev\.cade\.mlxserve" => (disabled|true)'; then
+        echo "mlxserve LaunchAgent disabled — 'mlxstart' to re-enable"
+    else
+        echo "mlxserve LaunchAgent not loaded"
+    fi
+}
+
 {{ if eq .chezmoi.os "linux" -}}
 alias open='xdg-open'
 {{ end -}}
