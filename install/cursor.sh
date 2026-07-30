@@ -128,9 +128,10 @@ if [[ "$_CMD" == "sync-extensions" || "$_CMD" == "sync" ]]; then
     EXT_TXT="$DF_PACKAGES/cursor-extensions.txt"
     [[ -f "$EXT_TXT" ]] || die "No cursor-extensions.txt at $EXT_TXT"
 
-    # Get installed extensions from Cursor
-    _cursor_exts="$(cursor --list-extensions 2>/dev/null)" \
-        || die "Failed to list Cursor extensions"
+    # Get installed extensions from Cursor. Over Remote-SSH the CLI prefixes a
+    # banner line ("Extensions installed on SSH: <host>:"), so keep only IDs.
+    _cursor_exts="$(cursor --list-extensions 2>/dev/null | grep -E '^[A-Za-z0-9][A-Za-z0-9_-]*\.[A-Za-z0-9][A-Za-z0-9_-]*$' || true)"
+    [[ -n "$_cursor_exts" ]] || die "Failed to list Cursor extensions"
 
     # Read existing entries (skip comments and blanks)
     _file_exts="$(grep -v '^\s*#' "$EXT_TXT" | grep -v '^\s*$' || true)"

@@ -27,9 +27,10 @@ if [[ "$_CMD" == "sync-extensions" || "$_CMD" == "sync" ]]; then
     EXT_TXT="$DF_PACKAGES/vscode-extensions.txt"
     [[ -f "$EXT_TXT" ]] || die "No vscode-extensions.txt at $EXT_TXT"
 
-    # Get installed extensions from VS Code
-    _vscode_exts="$(code --list-extensions 2>/dev/null)" \
-        || die "Failed to list VS Code extensions"
+    # Get installed extensions from VS Code. Over Remote-SSH the CLI prefixes a
+    # banner line ("Extensions installed on SSH: <host>:"), so keep only IDs.
+    _vscode_exts="$(code --list-extensions 2>/dev/null | grep -E '^[A-Za-z0-9][A-Za-z0-9_-]*\.[A-Za-z0-9][A-Za-z0-9_-]*$' || true)"
+    [[ -n "$_vscode_exts" ]] || die "Failed to list VS Code extensions"
 
     # Read existing entries (skip comments and blanks)
     _file_exts="$(grep -v '^\s*#' "$EXT_TXT" | grep -v '^\s*$' || true)"
