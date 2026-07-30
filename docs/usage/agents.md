@@ -92,7 +92,7 @@ research, log analysis, tests, and final review while keeping overlapping edits
 in one agent. Codex is capped at six direct children and one level of nesting.
 
 `df-agent-doctor` checks the declared tool surface, skill registry, Codex
-plugins/config, qmd, cass, LaunchAgents, and per-repository Entire state.
+plugins/config, qmd, cass, and LaunchAgents.
 
 ## Model and safety defaults
 

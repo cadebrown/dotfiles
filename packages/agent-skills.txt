@@ -48,14 +48,6 @@ manimce-best-practices npx adithya-s-k/manim_skill manimce-best-practices
 pdf npx anthropics/skills pdf
 docx npx anthropics/skills docx
 
-# entire: checkpoint-mining for the installed `entire` session recorder
-# (official). Deliberately NOT --all: the full 11-skill suite ships generic
-# names (search/explain/review/teach...) that pollute the global skill
-# namespace and cost ~8 extra always-loaded descriptions per session.
-using-entire npx entireio/skills using-entire
-what-happened npx entireio/skills what-happened
-session-handoff npx entireio/skills session-handoff
-
 # glab: GitLab CLI's own bundled skill (EXPERIMENTAL upstream; installs to
 # ~/.agents/skills, same tree via symlink). Requires a glab with the `skills`
 # subcommand (brew stable has it as of 1.107); the `self` handler only checks

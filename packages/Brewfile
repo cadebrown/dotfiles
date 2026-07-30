@@ -214,10 +214,6 @@ if OS.mac?
   cask "cursor"
 
   ### AI Agent Tooling (macOS) ###
-  # Linux gets these via go install — see packages/go.txt.
-  tap "entireio/tap"
-  cask "entire"  # captures AI agent sessions alongside git commits
-
   # Claude Desktop (GUI app; auto-updates in place). Preferences are tracked
   # by install/claude-desktop.sh (sync/apply) — not chezmoi, since the app
   # owns and rewrites its config file. Claude Code (the CLI) is separate, via
