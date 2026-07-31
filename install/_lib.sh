@@ -625,6 +625,26 @@ _netrc_remove() {
     fi
 }
 
+# Print the `login` recorded for host $1; empty when the host has no block.
+# Lets callers detect drift between a netrc entry and the credential source it
+# was written from (netrc keeps whatever login it was last given).
+_netrc_login() {
+    local host="$1" file="$HOME/.netrc"
+    [[ -n "$host" && -f "$file" ]] || return 0
+    awk -v target="$host" '
+        /^machine[[:space:]]+/ {
+            inblock = ($2 == target)
+            if (inblock)
+                for (i = 3; i < NF; i++) if ($i == "login") { print $(i+1); exit }
+            next
+        }
+        /^default([[:space:]]|$)/ { inblock = 0; next }
+        inblock {
+            for (i = 1; i < NF; i++) if ($i == "login") { print $(i+1); exit }
+        }
+    ' "$file"
+}
+
 # Idempotently add option $1 (e.g. "--netrc", "--location") to ~/.curlrc.
 # Other options pass through untouched. Creates the file at chmod 600 if
 # missing. Match is anchored — `--netrc` will not be confused with
