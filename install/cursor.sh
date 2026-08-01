@@ -76,7 +76,10 @@ _sync_cursor_mcp() {
                     tavily)   _hname="Authorization"; _hval="${TAVILY_API_KEY:+Bearer $TAVILY_API_KEY}" ;;
                     exa)      _hname="x-api-key"; _hval="${EXA_API_KEY:-}" ;;
                     hf)       _hname="Authorization"; _hval="${HF_TOKEN:+Bearer $HF_TOKEN}" ;;
-                    gcloud)   log_warn "  $_name: short-lived ADC auth is unavailable to the Cursor GUI; skipping"
+                    # Expected, not a degradation: ADC tokens are short-lived
+                    # and the Cursor GUI has no way to refresh them, so these
+                    # servers are Claude/Codex-only by design.
+                    gcloud)   log_info "  $_name: skipped (short-lived ADC auth is unavailable to the Cursor GUI)"
                               continue ;;
                     *)        log_warn "  $_name: unknown auth source '$_auth' — registering unauthenticated" ;;
                 esac
@@ -245,27 +248,15 @@ EXT_TXT="$DF_PACKAGES/cursor-extensions.txt"
 # Get currently installed extensions once
 _installed="$(cursor --list-extensions 2>/dev/null || true)"
 
-_ok=0 _skip=0 _fail=0 _upg=0
-_is_upgrade=0
-[[ "${DF_MODE:-}" == "upgrade" ]] && _is_upgrade=1
+_ok=0 _skip=0 _fail=0
 
 while IFS= read -r line; do
     [[ -z "$line" || "$line" == \#* ]] && continue
     ext="${line%% *}"
 
     if echo "$_installed" | grep -qxF "$ext"; then
-        if [[ "$_is_upgrade" == "1" ]]; then
-            log_info "  upgrading $ext"
-            if cursor --install-extension "$ext" --force >/dev/null 2>&1; then
-                (( _upg++ )) || true
-            else
-                log_warn "  fail  $ext"
-                (( _fail++ )) || true
-            fi
-        else
-            log_debug "  skip  $ext (already installed)"
-            (( _skip++ )) || true
-        fi
+        log_debug "  skip  $ext (already installed)"
+        (( _skip++ )) || true
         continue
     fi
 
@@ -279,4 +270,14 @@ while IFS= read -r line; do
     fi
 done < "$EXT_TXT"
 
-log_okay "Cursor extensions: ${_ok} installed, ${_upg} upgraded, ${_skip} already present, ${_fail} failed"
+# Upgrades go through Cursor's own bulk pass, never a per-extension
+# `--install-extension --force`: forcing a reinstall re-resolves every ID
+# against Open VSX, which fails for the VS-Code-imported extensions Cursor
+# can't serve by ID even though they are installed and working.
+if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+    log_info "Updating installed extensions"
+    cursor --update-extensions >/dev/null 2>&1 || \
+        log_warn "Extension update pass failed — run 'cursor --update-extensions'"
+fi
+
+log_okay "Cursor extensions: ${_ok} installed, ${_skip} already present, ${_fail} failed"

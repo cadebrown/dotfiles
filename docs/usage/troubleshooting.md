@@ -109,6 +109,40 @@ claude plugin install <plugin>@<marketplace>
 
 ---
 
+## The same VS Code / Cursor extensions report `fail` on every upgrade run
+
+Symptom: `bootstrap.sh upgrade` logs `fail <ext-id>` for a fixed set of
+extensions, run after run — yet the extensions are installed and working in the
+editor. Install mode never reports them.
+
+Root cause: upgrade mode used to reinstall each declared extension with
+`--install-extension <id> --force`, which re-resolves the ID against the
+editor's marketplace. Two categories can never satisfy that:
+
+- **Extensions the editor now bundles.** VS Code ships `github.copilot-chat`
+  built in (0.59.0); the marketplace copy is older (0.48.1) and the CLI refuses
+  the downgrade outright: `is a built-in extension … and cannot be downgraded`.
+- **IDs the marketplace doesn't carry.** Cursor resolves against Open VSX, so
+  Microsoft-proprietary IDs fail with `Extension '<id>' not found` even when the
+  extension is installed — Cursor imported it from VS Code on first run, a path
+  the CLI can't reproduce. `nvidia.nsight-vscode-edition` is refused explicitly:
+  `not available in Cursor for the Mac Silicon`.
+
+Confirm — run the install by hand to see the real error the scripts swallow:
+
+```sh
+code --install-extension <id> --force      # or: cursor --install-extension …
+```
+
+**Fix:** update the checkout and rerun. `vscode.sh` / `cursor.sh` now upgrade
+with a single `--update-extensions` bulk pass instead of per-extension
+`--force`, which only touches what the editor can actually resolve. Drop
+bundled extensions from `packages/vscode-extensions.txt`, and keep IDs Open VSX
+can't serve out of `packages/cursor-extensions.txt` (that file's header lists
+the known-unavailable set and the Anysphere forks to use instead).
+
+---
+
 ## Brew bundle fails: `No available formula … This command requires the tap`
 
 Symptom: `brew bundle` errors with `No available formula with the name

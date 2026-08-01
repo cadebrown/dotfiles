@@ -1,7 +1,22 @@
 # Cursor extensions — one extension ID per line
 # Managed by install/cursor.sh
 # Generate fresh list: cursor --list-extensions
-analytic-signal.preview-mp4
+#
+# Cursor resolves IDs against Open VSX, not the Visual Studio Marketplace, so a
+# valid vscode-extensions.txt entry can still fail here with "Extension '<id>'
+# not found." Anything below must exist in Cursor's registry — verify a new ID
+# with `cursor --install-extension <id>` before adding it.
+#
+# Known-unavailable in Cursor (present in vscode-extensions.txt only). Some are
+# installed locally because Cursor imported them from VS Code on first run; that
+# path is not reproducible, so they are not declared here:
+#   analytic-signal.preview-mp4
+#   ms-vscode.cpptools                  (use anysphere.cpptools — Cursor's fork)
+#   ms-vscode.cpptools-extension-pack
+#   ms-vscode-remote.remote-ssh-edit    (use anysphere.remote-ssh)
+#   platformio.platformio-ide
+#   nvidia.nsight-vscode-edition        ("not available in Cursor for the Mac
+#                                        Silicon" — refused by ID, not missing)
 anthropic.claude-code
 anysphere.cpptools
 anysphere.cursorpyright
@@ -32,15 +47,10 @@ ms-toolsai.jupyter-renderers
 ms-toolsai.vscode-jupyter-cell-tags
 ms-toolsai.vscode-jupyter-slideshow
 ms-vscode.cmake-tools
-ms-vscode.cpptools
-ms-vscode.cpptools-extension-pack
 ms-vscode.cpptools-themes
-ms-vscode-remote.remote-ssh-edit
 ms-vscode.theme-tomorrowkit
 myriad-dreamin.tinymist
-nvidia.nsight-vscode-edition
 openai.chatgpt
-platformio.platformio-ide
 polymeilex.wgsl
 redhat.vscode-yaml
 revng.llvm-ir

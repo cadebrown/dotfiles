@@ -121,6 +121,18 @@ re-runs the install script.
 
 ## Gotchas
 
+- **Editor extensions upgrade with `--update-extensions`, never per-ID `--force`.**
+  `vscode.sh` / `cursor.sh` install missing extensions one at a time, but the upgrade
+  pass is a single `code --update-extensions` / `cursor --update-extensions`. A
+  per-extension `--install-extension <id> --force` re-resolves every ID against the
+  marketplace, which permanently fails for two classes it can't satisfy: extensions the
+  editor now bundles (VS Code refuses to "downgrade" `github.copilot-chat` from the
+  built-in 0.59.0 to the marketplace 0.48.1) and IDs Cursor's Open VSX registry doesn't
+  carry (`ms-vscode.cpptools`, `ms-vscode-remote.remote-ssh-edit`, `platformio.*` —
+  installed only because Cursor imported them from VS Code on first run). Both showed up
+  as a fixed set of `fail` lines on every `bootstrap upgrade` while the extensions
+  worked fine. Verify a new `cursor-extensions.txt` ID with `cursor --install-extension`
+  before adding it; Cursor and VS Code do not share a marketplace.
 - **Never symlink a chezmoi-managed directory** — `~/.claude` and `~/.codex` both have
   source *directories* (`home/dot_claude/`, `home/dot_codex/`), so chezmoi's target state
   for those paths is "directory". `chezmoi apply` deletes whatever is there — symlink

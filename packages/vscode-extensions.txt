@@ -12,7 +12,8 @@ astro-build.astro-vscode
 charliermarsh.ruff
 davidanson.vscode-markdownlint
 donjayamanne.githistory
-github.copilot-chat
+# github.copilot-chat is bundled with VS Code now (built-in 0.59.0 vs 0.48.1 on
+# the marketplace), and --install-extension refuses the downgrade. Do not re-add.
 github.vscode-pull-request-github
 mechatroner.rainbow-csv
 ms-azuretools.vscode-containers

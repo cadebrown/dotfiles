@@ -45,6 +45,8 @@ _SERVICE_DEFS=(
     "tavily|TAVILY_API_KEY|.tavily.env|Tavily API key (web search + extract + crawl MCP — 1000 credits/mo free, no card)|https://app.tavily.com/home|—|you don't use the Tavily search MCP"
     "exa|EXA_API_KEY|.exa.env|Exa API key (neural/semantic web search MCP)|https://dashboard.exa.ai/api-keys|—|you don't use the Exa search MCP"
     "firecrawl|FIRECRAWL_API_KEY|.firecrawl.env|Firecrawl API key (deep web crawl + structured extraction MCP)|https://www.firecrawl.dev/app/api-keys|—|you don't use the Firecrawl crawl MCP"
+    "gitlab|GITLAB_ACCESS_TOKEN|.gitlab.env|GitLab PAT (VS Code CMake Tools configureEnvironment, glab)|https://gitlab.com/-/user_settings/personal_access_tokens|read_api + read_repository (write_repository to push)|you don't build against GitLab-hosted CMake dependencies"
+    "gitlab-user|GITLAB_USER|.gitlab.env|GitLab username (pairs with gitlab; not a secret, but the same env file feeds both \${env:} refs in VS Code settings)|https://gitlab.com/-/user_settings/profile|—|you set no gitlab token"
     "workspace-id|GOOGLE_OAUTH_CLIENT_ID|.google.env|Workspace MCP OAuth client ID (community full-write Gmail/Drive/Calendar)|https://console.cloud.google.com/apis/credentials|Desktop-app OAuth client; consent screen w/ yourself as test user; enable Gmail/Calendar/Drive APIs|you don't use the Workspace MCP server"
     "workspace-secret|GOOGLE_OAUTH_CLIENT_SECRET|.google.env|Workspace MCP OAuth client secret (pairs with workspace-id)|https://console.cloud.google.com/apis/credentials|same Desktop OAuth client as workspace-id|you don't use the Workspace MCP server"
 )
