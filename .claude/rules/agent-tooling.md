@@ -34,6 +34,17 @@ and chezmoi-managed guidance files built from shared partials.
 
 ## Gotchas
 
+- **MCP spec 2026-07-28 is Current, but nothing has shipped it — don't chase it.**
+  The revision drops the initialization handshake for per-request negotiation
+  (`io.modelcontextprotocol/protocolVersion` in `_meta`, `MCP-Protocol-Version` on
+  Streamable HTTP) and adds a mandatory `server/discover` RPC. It changes nothing in
+  this repo: `packages/mcp-servers.txt` carries URLs, commands, and auth source only —
+  the harnesses own protocol negotiation, and the spec's backward-compatibility path
+  keeps them on the handshake revisions. Verified 2026-08-01: deepwiki answers
+  `Unsupported protocol version: 2026-07-28. Supported versions: 2024-11-05,
+  2025-03-26, 2025-06-18, 2025-11-25`. Re-check when a server we use advertises it;
+  probe with
+  `curl -sX POST <url> -H 'MCP-Protocol-Version: 2026-07-28' -d '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{}}'`.
 - **Claude plugin installs resolve against LOCAL marketplace clones** — with
   `DISABLE_AUTOUPDATER=1` the clones under `~/.claude/plugins/marketplaces/` never
   refresh themselves, so a plugin added upstream after a marketplace's clone date

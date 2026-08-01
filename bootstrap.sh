@@ -137,11 +137,31 @@ export DF_DEGRADE_LOG="$_BOOTSTRAP_TMP/degradations"
 _bootstrap_summary() {
     local _rc=$?
     if [[ -s "$DF_DEGRADE_LOG" ]]; then
-        local _n _line
-        _n="$(wc -l < "$DF_DEGRADE_LOG" 2>/dev/null || echo '?')"
+        local _n _line _collapsed
+        # Collapse warnings that share a `run '<cmd>'` remediation: one missing
+        # credential is reported once per harness that wanted it (three lines
+        # for context7), but there is still only one thing to fix. Lines with no
+        # remediation hint pass through untouched, in original order.
+        _collapsed="$(awk -v q="'" '
+            NR == FNR {
+                if (match($0, "run " q "[^" q "]*" q)) n[substr($0, RSTART, RLENGTH)]++
+                next
+            }
+            {
+                k = match($0, "run " q "[^" q "]*" q) ? substr($0, RSTART, RLENGTH) : ""
+                if (k != "" && n[k] > 1) {
+                    if (k in shown) next
+                    shown[k] = 1
+                    printf "%s  [reported by %d steps]\n", $0, n[k]
+                    next
+                }
+                print
+            }
+        ' "$DF_DEGRADE_LOG" "$DF_DEGRADE_LOG")"
+        _n="$(printf '%s\n' "$_collapsed" | wc -l | tr -d ' ')"
         log_section "degradations — $_n skipped or degraded"
         log_info "These did NOT install cleanly. Fix the cause and re-run the noted install/*.sh:"
-        while IFS= read -r _line; do printf "   - %s\n" "$_line"; done < "$DF_DEGRADE_LOG"
+        while IFS= read -r _line; do printf "   - %s\n" "$_line"; done <<< "$_collapsed"
     elif [[ "$_rc" -eq 0 ]]; then
         log_okay "No degradations — every component installed cleanly."
     fi

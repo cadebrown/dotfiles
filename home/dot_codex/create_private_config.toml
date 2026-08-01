@@ -26,6 +26,12 @@ project_doc_fallback_filenames = ["AGENTS.md", "CLAUDE.md"]
 # Codex-local L1 analog; cross-tool memory lives in ~/kb + cass (memory.sh).
 memories = true
 
+# Agents V2: subagents get path-based addresses instead of opaque thread IDs,
+# parent/child context inheritance is explicit, and a running child can be
+# steered mid-task. Stable upstream but off by default; it replaces the removed
+# `collaboration_modes` flag. The [agents] caps below still bound the tree.
+multi_agent_v2 = true
+
 [agents]
 # Direct children only: enough parallelism for independent research/review
 # without recursive fan-out that multiplies cost and merge coordination.
