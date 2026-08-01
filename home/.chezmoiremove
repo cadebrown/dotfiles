@@ -40,3 +40,4 @@
 .config/git/hooks/post-rewrite
 .config/git/hooks/prepare-commit-msg
 .config/git/hooks/pre-push.pre-entire
+.config/entire
