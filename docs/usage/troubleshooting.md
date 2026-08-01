@@ -137,6 +137,47 @@ Manual one-off: `brew tap owner/tap`, then rerun `install/homebrew.sh`.
 
 ---
 
+## Cask upgrade fails: `It seems there is already an App at '/Applications/X.app'`
+
+Symptom: `bootstrap.sh upgrade` reports `Some greedy cask upgrades failed`, and
+`brew upgrade --cask --greedy` ends with `Error: Problems with multiple casks:`
+naming an app (or a binary, e.g. `already a Binary at '/opt/homebrew/bin/dnx'`).
+Homebrew reverts the upgrade, so the same failure repeats every run.
+
+Root cause: Homebrew refuses to overwrite an artifact it doesn't have a receipt
+for. Two ways an auto-updating cask gets there:
+
+- **Upstream renames the app bundle.** The cask's `app` stanza changes name, the
+  self-updater has already written the new bundle, and brew's receipt still
+  points at the old one — so brew tries to *create* a file that exists. This is
+  what `codex-app` did: OpenAI folded the Codex desktop app into ChatGPT and
+  renamed `Codex.app` → `ChatGPT.app` (same `com.openai.codex` bundle ID). The
+  `codex-app` cask is deprecated with `chatgpt` as its replacement, and the
+  auto-migration leaves an orphan `Caskroom/codex-app/` directory behind, so
+  `brew list --cask` still shows it while `brew info` says "Not installed".
+- **A leftover symlink from a previous install.** `dnx` pointing into
+  `/usr/local/share/dotnet/` blocked every `dotnet-sdk` upgrade.
+
+Confirm:
+
+```sh
+brew outdated --cask --greedy               # which casks are stuck
+ls /opt/homebrew/Caskroom/<cask>            # receipt version vs the running app
+/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" /Applications/X.app
+```
+
+Two apps printing the *same* bundle ID means one is a stale copy under the old
+name, not a second product.
+
+**Fix:** `brew install --cask <name> --force` — it overwrites the unmanaged
+artifact, removes the old-named bundle, and re-establishes the receipt at the
+current version. Delete any orphan `Caskroom/<old-cask>/` directory (it holds
+only a symlink and metadata; `rm -rf` on it does not follow the symlink) and
+remove stray binaries before retrying. For a renamed cask, also update
+`packages/Brewfile` to the replacement name.
+
+---
+
 ## A Homebrew package is months behind upstream (Linux)
 
 Symptom: a formula installs at a version far older than upstream stable, and

@@ -22,7 +22,9 @@
 # themes) lives elsewhere in ~/.codex/ and is already chezmoi-managed via
 # install/codex.sh — this script only covers the desktop app's GUI prefs.
 #
-# The Codex desktop app itself is managed via Brewfile (cask "codex-app").
+# The app itself is managed via Brewfile (cask "chatgpt" — OpenAI folded the
+# Codex desktop app into ChatGPT and renamed the bundle; the state file below
+# kept its ~/.codex/ home).
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"

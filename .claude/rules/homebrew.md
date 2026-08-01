@@ -33,6 +33,19 @@ custom prefix is the source of most build lore below.
 
 - **Homebrew upgrades are off by default on Linux** (`DF_BREW_UPGRADE=0`) because glibc
   upgrades can break every installed binary. Use `bootstrap.sh upgrade` deliberately.
+- **A renamed or deprecated cask blocks the greedy sweep forever.** `brew upgrade
+  --cask --greedy` reverts and re-fails every run with `It seems there is already an App
+  at '/Applications/X.app'` when the artifact name changed under a self-updating cask, or
+  when a stray binary/symlink from an earlier install sits where the cask wants to link.
+  Both hit at once in Aug 2026: OpenAI folded the Codex desktop app into ChatGPT
+  (`Codex.app` → `ChatGPT.app`, same `com.openai.codex` bundle ID, `codex-app` cask
+  deprecated in favour of `chatgpt`), and a leftover `/opt/homebrew/bin/dnx` symlink
+  blocked `dotnet-sdk`. Homebrew's auto-migration also leaves an orphan
+  `Caskroom/<old-cask>/` behind, so `brew list --cask` shows a cask `brew info` calls
+  "Not installed". Fix is `brew install --cask <name> --force` plus deleting the orphan
+  directory and stray links; then update the Brewfile to the replacement name. Two
+  `/Applications` bundles with the same `CFBundleIdentifier` means a rename, not two
+  products.
 - **`brew bundle` skips `auto_updates: true` casks** — Cursor, VS Code, iTerm2, etc.
   self-update in place, so `brew bundle install --upgrade` leaves their cask metadata
   stale. `homebrew.sh` runs `brew upgrade --cask --greedy` after the bundle when

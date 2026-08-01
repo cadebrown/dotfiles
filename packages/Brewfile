@@ -175,6 +175,11 @@ brew "surrealdb/tap/surreal"
 if OS.mac?
   ### Languages & Runtimes (macOS) ###
   brew "openjdk"
+  # .NET SDK. Cask, not formula — the pkg installer needs sudo, so `bootstrap
+  # upgrade` prompts when this one is outdated. It also links `dotnet`/`dnx`
+  # into the brew prefix; a stray `dnx` symlink from an older install blocks
+  # every upgrade until removed (see .claude/rules/homebrew.md).
+  cask "dotnet-sdk"
   # Free Wolfram Engine (full Mathematica kernel + wolframscript). Free for
   # personal/dev use; one-time activation with a Wolfram ID on first run:
   #   wolframscript   (prompts for login; 2 activation keys per account)
@@ -195,6 +200,10 @@ if OS.mac?
   brew "docker-buildx"
   brew "qemu"
   brew "mas"
+  # Docker Sandboxes — container-isolated runtimes for coding agents. Ships from
+  # Docker's own tap; `ensure_brewfile_taps()` trusts + taps it before bundling.
+  tap "docker/homebrew-tap"
+  cask "docker/homebrew-tap/sbx"
 
   ### Local AI ###
   brew "ollama"
@@ -208,6 +217,7 @@ if OS.mac?
   ### Terminal ###
   cask "ghostty"
   cask "tabby"
+  cask "iterm2"
 
   ### Editors & IDEs ###
   cask "visual-studio-code"
@@ -220,15 +230,20 @@ if OS.mac?
   # install/claude.sh.
   cask "claude"
 
-  # Codex desktop app (GUI; auto-updates in place via Sparkle). NOTE: this is
-  # `codex-app`, NOT the `codex` cask — that one is the CLI, which we already
-  # get from npm (@openai/codex in npm.txt). The app shares ~/.codex/ with the
-  # CLI, so its substantive config (config.toml, profiles, AGENTS.md, rules,
-  # themes) is already tracked via install/codex.sh + chezmoi. Its GUI-only
-  # prefs (theme, editor target, personality) live in ~/.codex/.codex-global-
-  # state.json and are tracked separately by install/codex-desktop.sh — an
-  # allowlist sync, because that file also holds prompt history + account data.
-  cask "codex-app"
+  # OpenAI desktop app (GUI; auto-updates in place via Sparkle). This is the
+  # former Codex desktop app: OpenAI folded it into ChatGPT and renamed the
+  # bundle Codex.app → ChatGPT.app, keeping the `com.openai.codex` identifier.
+  # The old `codex-app` cask is deprecated (disabled 2027-07-12) and names
+  # `chatgpt` as its replacement. NOT the `codex` cask — that one is the CLI,
+  # which we get from npm (@openai/codex in npm.txt).
+  #
+  # The app shares ~/.codex/ with the CLI, so its substantive config
+  # (config.toml, profiles, AGENTS.md, rules, themes) is already tracked via
+  # install/codex.sh + chezmoi. Its GUI-only prefs (theme, editor target,
+  # personality) live in ~/.codex/.codex-global-state.json and are tracked
+  # separately by install/codex-desktop.sh — an allowlist sync, because that
+  # file also holds prompt history + account data.
+  cask "chatgpt"
 
   ### Cloud CLIs (macOS) ###
   # Google Cloud SDK: `gcloud` (+ `gsutil`, `bq`). Two roles: (1) agents manage
@@ -245,11 +260,14 @@ if OS.mac?
   cask "nikitabobko/tap/aerospace"
   cask "linearmouse"
   cask "jordanbaird-ice"
-  cask "enjoyable"
+  # `enjoyable` (gamepad → keyboard mapper) was dropped: unmaintained upstream,
+  # disabled in homebrew-cask 2026-04-01, so a fresh `brew bundle` can't install
+  # it. An existing keg keeps working; there is no maintained replacement cask.
 
   ### Productivity ###
   cask "alfred"
   cask "the-unarchiver"
+  cask "notion"
 
   ### Browsers ###
   cask "firefox"
@@ -265,9 +283,14 @@ if OS.mac?
   cask "blender"
   cask "kdenlive"
   cask "touchdesigner"
+  cask "freecad"
 
   ### Documents ###
   cask "libreoffice"
+  # Full TeX Live (~6GB). Load-bearing for the agent skills that render math:
+  # manim's MathTex/Tex, typst comparisons, and the latex-workshop extension.
+  # Linux has no cask equivalent — headless boxes render without LaTeX.
+  cask "mactex"
 
   ### Games ###
   cask "openemu"
