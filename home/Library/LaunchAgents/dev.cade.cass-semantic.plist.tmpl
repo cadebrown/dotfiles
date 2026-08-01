@@ -21,7 +21,7 @@ progress heartbeats, so it must not share the five-minute lexical schedule.
     <key>EnvironmentVariables</key>
     <dict>
         <key>CASS_DATA_DIR</key>
-        <string>{{ .chezmoi.homeDir }}/.cache/cass</string>
+        <string>{{ .chezmoi.homeDir }}/.cass</string>
         <key>CASS_SEMANTIC_EMBEDDER</key>
         <string>minilm</string>
         <!-- MiniLM backfill has no progress heartbeat. Retain stall

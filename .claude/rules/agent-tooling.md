@@ -141,9 +141,19 @@ and chezmoi-managed guidance files built from shared partials.
   1.94.0 even after rust.sh updated rustup to 1.97.1. `_cass_build_from_source` now installs
   nightly on demand and invokes `$CARGO_HOME/bin/cargo +nightly` explicitly. If cass still
   won't build, run `which -a cargo` for a stray brew rust and `brew uninstall rust`.
-- **Memory indexes are per-machine** — qmd (~/.cache/qmd) and cass (~/.cache/cass)
-  rebuild locally; only ~/kb (git) and dotfiles sync across machines. qmd on macOS
-  needs Homebrew sqlite (system libsqlite3 blocks loadable extensions).
+- **Memory indexes are per-machine** — qmd (~/.cache/qmd) and cass (~/.cass) are
+  local; only ~/kb (git) and dotfiles sync across machines. qmd on macOS needs
+  Homebrew sqlite (system libsqlite3 blocks loadable extensions).
+- **cass is an ARCHIVE, not a rebuildable index — that's why it's ~/.cass.** qmd
+  can always be rebuilt from ~/kb, but cass indexes transcripts the harnesses
+  eventually rotate away: `cass doctor` currently reports 124 conversations for
+  which cass holds the only surviving copy, and it refuses source-only rebuilds
+  to protect them. Nearly all of the ~10 GB is `raw-mirror/` (verbatim capture);
+  only ~287 MB (vector_index, index, models) is derived. `cass mirror prune`
+  retires by `--older-than`/`--max-size` only — there is no "prune where upstream
+  still exists", so age-based pruning sheds exactly the sole-copy rows first.
+  Living under ~/.cache invited any cache sweep to delete it; scratch.sh still
+  symlinks ~/.cass into scratch where that exists (10 TB there), same path.
 - **qmd upgrades need the daemon stopped on NFS** — the qmd MCP daemon
   (`qmd mcp --http`) keeps native addons (sqlite-vec, node-llama-cpp,
   better-sqlite3) mmap'd. On an NFS home npm can't unlink an open file — NFS

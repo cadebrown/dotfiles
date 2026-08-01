@@ -5,8 +5,8 @@ LaunchAgent: refresh cass's lexical index every five minutes. Persistent
 resident process. dev.cade.cass-semantic handles the expensive vectors daily.
 
 cass is installed to ~/.local/bin by install/memory.sh (GitHub release binary,
-checksum-verified). CASS_DATA_DIR keeps the SQLite index under ~/.cache
-(scratch-linked on NFS machines).
+checksum-verified). CASS_DATA_DIR points at ~/.cass — an archive, not a cache
+(scratch-linked on NFS machines, same path either way).
 
 Cost: no idle process; brief spikes while indexing new sessions. To disable:
   launchctl bootout gui/$(id -u)/dev.cade.cass-watch
@@ -27,7 +27,7 @@ Cost: no idle process; brief spikes while indexing new sessions. To disable:
     <key>EnvironmentVariables</key>
     <dict>
         <key>CASS_DATA_DIR</key>
-        <string>{{ .chezmoi.homeDir }}/.cache/cass</string>
+        <string>{{ .chezmoi.homeDir }}/.cass</string>
         <key>PATH</key>
         <string>{{ .chezmoi.homeDir }}/.local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
     </dict>

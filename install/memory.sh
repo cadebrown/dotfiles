@@ -27,7 +27,11 @@ _mode="${1:-setup}"
 
 log_section "Agent memory stack ($_mode)"
 
-export CASS_DATA_DIR="${CASS_DATA_DIR:-$HOME/.cache/cass}"
+# ~/.cass, not ~/.cache/cass: 124 conversations here have no surviving upstream
+# transcript, so this is an archive, not a cache, and nothing may treat it as
+# reclaimable. On scratch machines scratch.sh symlinks ~/.cass into scratch
+# (10 TB there vs a quota'd NFS home) — the path stays identical either way.
+export CASS_DATA_DIR="${CASS_DATA_DIR:-$HOME/.cass}"
 export CASS_SEMANTIC_EMBEDDER="${CASS_SEMANTIC_EMBEDDER:-minilm}"
 export CASS_INDEX_STALL_ABORT_SECS="${CASS_INDEX_STALL_ABORT_SECS:-0}"
 
@@ -163,10 +167,24 @@ if has cass || [[ -x "$ARCH_BIN/cass" ]]; then
             || log_warn "cass: model install failed — lexical-only until retried"
     fi
 
+    # The dev.cade.cass-watch LaunchAgent runs `cass index` every 300s. cass
+    # keeps an index-run.lock in its data dir, but it does not stop a second run
+    # from reinitializing the WAL under a live reader — `cass doctor` reports
+    # "WAL frame salt mismatch" and one of the two runs dies.
+    # Routine modes yield — the watcher reindexes within 5 minutes anyway.
+    # `reindex` is explicit user intent, so it waits the watcher out instead.
     if [[ "$_mode" == "reindex" ]]; then
+        _waited=0
+        while pgrep -f "cass index" >/dev/null 2>&1 && (( _waited < 60 )); do
+            [[ $_waited -eq 0 ]] && log_info "cass: waiting for the cass-watch index to finish"
+            sleep 2; _waited=$(( _waited + 2 ))
+        done
+        (( _waited >= 60 )) && log_warn "cass: watcher still indexing after 60s — rebuilding anyway"
         log_info "cass: full index rebuild"
         run_logged "$_cass" index --full --semantic --build-hnsw \
             || log_warn "cass index failed — run 'cass doctor'"
+    elif pgrep -f "cass index" >/dev/null 2>&1; then
+        log_info "cass: index already running (cass-watch LaunchAgent) — skipping this pass"
     elif has jq && "$_cass" status --json 2>/dev/null | jq -e '.semantic.available == true' >/dev/null; then
         # Semantic indexing currently re-embeds the full archive. Keep routine
         # bootstrap cheap; the daily LaunchAgent refreshes vectors on macOS.

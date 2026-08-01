@@ -124,9 +124,11 @@ Three layers, set up by `install/memory.sh` (bootstrap step 6.6, `DF_DO_MEMORY`)
 | L2 knowledge base | `~/kb` git repo (markdown) | qmd — hybrid BM25 + local GGUF embeddings + rerank, MCP daemon on `localhost:8181` | yes (git remote) |
 | L3 session history | every agent's transcripts (Claude Code, Codex, opencode, pi) | cass — hybrid BM25 + native MiniLM embeddings, CLI/`history-search` skill | no (per-machine) |
 
-Search indexes always rebuild locally (`~/.cache/qmd`, `~/.cache/cass` — on
-scratch when configured); only `~/kb` and the dotfiles repo sync across
-machines. On macOS qmd has a persistent LaunchAgent; cass refreshes its lexical
+Both stores are local (`~/.cache/qmd`, `~/.cass` — on scratch when configured);
+only `~/kb` and the dotfiles repo sync across machines. qmd's index is fully
+rebuildable from `~/kb`; **cass is not** — it keeps transcripts the harnesses
+later rotate away, so for those conversations it is the only remaining copy.
+That is why it lives at `~/.cass` rather than under `~/.cache`. On macOS qmd has a persistent LaunchAgent; cass refreshes its lexical
 index every five minutes and its full MiniLM/HNSW index daily (persistent watch
 mode can wedge upstream). Linux starts bounded lexical refreshes lazily from
 the shell profiles; `memory.sh reindex` refreshes semantic vectors explicitly.

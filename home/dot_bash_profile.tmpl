@@ -178,10 +178,12 @@ if [ -d "${HOMEBREW_PREFIX:-}/opt/binutils/bin" ]; then
 fi
 {{ end -}}
 
-# Memory stack (install/memory.sh): cass session-history index lives under
-# ~/.cache (scratch-linked on NFS machines, never synced). MiniLM is the native
+# Memory stack (install/memory.sh): the cass session archive lives at ~/.cass —
+# an archive, not a cache, since conversations whose harness already rotated the
+# original transcript survive nowhere else. scratch.sh symlinks it into scratch
+# on NFS machines, so the path is the same everywhere. MiniLM is the native
 # embedder verified by current cass releases; callers may still override it.
-export CASS_DATA_DIR="${CASS_DATA_DIR:-$HOME/.cache/cass}"
+export CASS_DATA_DIR="${CASS_DATA_DIR:-$HOME/.cass}"
 export CASS_SEMANTIC_EMBEDDER="${CASS_SEMANTIC_EMBEDDER:-minilm}"
 export CASS_INDEX_STALL_ABORT_SECS="${CASS_INDEX_STALL_ABORT_SECS:-0}"
 # qmd: Qwen3-Embedding-0.6B (MTEB top tier) over the default embeddinggemma.

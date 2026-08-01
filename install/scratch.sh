@@ -10,6 +10,8 @@
 #   $SCRATCH/.paths/
 #     ├── .local/                ← symlinked from ~/.local
 #     ├── .cache/                ← symlinked from ~/.cache
+#     ├── .cass/                 ← symlinked from ~/.cass (session archive; ~10 GB
+#     │                            of raw-mirror evidence, install/memory.sh)
 #     ├── .nv/                   ← symlinked from ~/.nv (NVIDIA shader/optix cache)
 #     ├── .npm/                  ← symlinked from ~/.npm (npm cache)
 #     ├── .oh-my-zsh/            ← symlinked from ~/.oh-my-zsh
@@ -269,7 +271,7 @@ link_managed_subdirs() {
 log_info "Scratch: $SCRATCH"
 log_info "Paths:   $PATHS"
 
-_DEFAULT_LINKS="$HOME/.local:$HOME/.cache:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom:$HOME/kb"
+_DEFAULT_LINKS="$HOME/.local:$HOME/.cache:$HOME/.cass:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom:$HOME/kb"
 DF_LINKS="${DF_LINKS-$_DEFAULT_LINKS}"
 unset _DEFAULT_LINKS
 
