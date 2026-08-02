@@ -846,3 +846,33 @@ than the one `which qmd` resolves to (nvm's). Delete the husk; the live copy is
 the one on PATH.
 
 [allowlist]: https://github.com/gitleaks/gitleaks#configuration
+
+## `import sage.all` / cysignals dies with `TypeError: signal handler must be signal.SIG_IGN, signal.SIG_DFL, or a callable object`
+
+**Symptom.** Importing `cysignals.pysignals` (directly, or transitively via
+passagemath's `sage.all`) raises the TypeError above. Plain `import
+cysignals.signals` (and cypari2) works fine.
+
+**Root cause.** This macOS release (Darwin 25.x) pre-installs C-level fault
+handlers (SIGILL, SIGABRT, SIGFPE, SIGBUS, SIGSEGV) in every process.
+`signal.getsignal()` reports a handler Python didn't install as `None`, and
+cysignals' pysignals init saves + re-installs existing handlers — re-setting
+`None` is rejected by CPython. Not sandbox-, uv-, or Python-version-specific:
+reproduced on uv's python-build-standalone 3.12/3.13 and Homebrew 3.14.
+
+**Confirm.**
+```bash
+python3 -c "import signal; print(signal.getsignal(signal.SIGSEGV))"   # → None
+```
+
+**Fix.** Reset the fault handlers from Python before anything imports
+`cysignals.pysignals` (`~/dev/math-lab/sagefix.py` does exactly this):
+```python
+import signal
+for s in (signal.SIGILL, signal.SIGABRT, signal.SIGFPE, signal.SIGBUS, signal.SIGSEGV):
+    signal.signal(s, signal.SIG_DFL)
+```
+Related trap: pinning `cysignals` older than what passagemath wheels were
+built against fails later with `cysignals.signals does not export expected C
+function _do_raise_exception` — keep the resolver's cysignals (1.12.x), fix
+the handlers instead.
