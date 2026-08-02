@@ -675,6 +675,94 @@ resolution or the default toolchain.
 
 ---
 
+## `cass search` misses sessions you know happened
+
+Symptom: history you remember from Codex or Cursor never surfaces, even on exact
+phrases, while Claude Code sessions from the same week come back fine.
+
+Root cause: cass ingest is **append-only per conversation**. Once a conversation is
+in the canonical DB it is never re-read, so every parser improvement since it was
+first indexed only reaches *new* sessions. Old ones keep whatever subset the parser
+of the day extracted. `cass index --full` does not fix this — it forces a full
+*scan* and a lexical rebuild, then logs `skipping historical salvage because
+canonical database is already populated`.
+
+Confirm — compare the DB against a fresh parse of the same files:
+
+```sh
+sqlite3 -readonly ~/.cass/agent_search.db \
+  "select a.name, count(m.id) from messages m
+   join conversations c on c.id=m.conversation_id
+   join agents a on a.id=c.agent_id group by 1 order by 2 desc;"
+wc -l < ~/.codex/sessions/2026/*/*/rollout-*.jsonl   # rough upper bound per file
+```
+
+Measured 2026-08-01: codex held 15,037 messages where the same 88 rollouts parse to
+85,488 today, and cursor 3,384 vs 6,949 — 82% and 51% of that history unsearchable.
+
+**Fix**, one connector at a time. Every step matters:
+
+```sh
+# 0. verify each source file still exists — forget is only safe if it can come back
+sqlite3 -readonly ~/.cass/agent_search.db \
+  "select c.source_path from conversations c join agents a on a.id=c.agent_id
+   where a.name='codex';" | while read -r p; do [ -f "$p" ] || echo "MISSING: $p"; done
+
+# 1. back up via sqlite, NOT cp — a plain copy can tear a live WAL
+sqlite3 ~/.cass/agent_search.db ".backup '$HOME/.cass/agent_search.db.bak'"
+
+# 2. drop the stale rows (dry-run first: omit --apply)
+cass forget --source-glob "$HOME/.codex/sessions/**" --apply
+
+# 3. reset the connector watermark — --full still honours it, and rollouts dated
+#    months ago never beat a watermark stamped today, so the scan finds nothing
+sqlite3 ~/.cass/agent_search.db \
+  "update meta set value='0' where key='last_scan_ts:connector:codex';"
+
+# 4. re-ingest, then clean up after a cass bug: forget leaks tail-state rows keyed
+#    by the deleted conversation_id, and that column is a plain rowid — SQLite
+#    reuses freed ids, so a future conversation would inherit a stale
+#    "ingested through idx N" marker and be silently truncated
+cass index --full
+sqlite3 ~/.cass/agent_search.db \
+  "delete from conversation_tail_state
+   where conversation_id not in (select id from conversations);"
+
+# 5. rebuild vectors
+cass index --semantic
+```
+
+Skipping step 3 is the usual failure — the run exits 0, having ingested nothing.
+
+---
+
+## `cass index` fails with `graph topology attestation failed`
+
+```
+build HNSW index failed: hnsw error: graph topology attestation failed:
+parallel construction failed (search entry origin 6219 reaches only 92908/97513
+points at the base layer); serial rebuild also failed
+```
+
+Transcripts contain thousands of byte-identical tool stubs — `[Tool: apply_patch]`
+alone repeats 4,383 times — and identical text embeds to identical vectors. Under
+`DistDot` those form zero-distance cliques larger than the layer-0 fanout
+(`max_nb_connection 16` → ~32 links), so a clique fills every member's neighbour
+list with its own duplicates and nothing outside ever links *in*. HNSW reachability
+is directional, so the whole group is unreachable from the entry point and cass's
+attestation rejects the graph.
+
+It is deterministic: retrying fails identically, which is why the serial rebuild
+also failed and why `retryable=true` in the error is misleading.
+
+**Fix:** drop `--build-hnsw` (already done in `memory.sh` and the cass-semantic
+LaunchAgent). HNSW only backs `--approximate`; exact search over ~100k vectors is
+fast enough, and the flag has never once succeeded on this archive — every
+`semantic_manifest.json` here records `"hnsw": null`. Restore it if cass starts
+deduping identical vectors before insert.
+
+---
+
 ## `git push` blocked by gitleaks ("secrets detected")
 
 A global **pre-push** hook scans the commits being pushed for secrets with
