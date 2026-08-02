@@ -16,7 +16,7 @@ mcp_fixture_env() {
     _MCP_FIXTURE_HOME="${_MCP_FIXTURE_HOME:-$(mktemp -d)}"
     export HOME="$_MCP_FIXTURE_HOME"
     touch "$HOME/.context7.env" "$HOME/.tavily.env" "$HOME/.exa.env" \
-          "$HOME/.huggingface.env"
+          "$HOME/.huggingface.env" "$HOME/.asta.env"
 
     # Deterministic credentials (override anything the real env sourced).
     # Keep these LOW-ENTROPY (repeated words, no digit soup) — gitleaks scans
@@ -27,6 +27,7 @@ mcp_fixture_env() {
     export TAVILY_API_KEY="fixture-fixture-tav"
     export EXA_API_KEY="fixture-fixture-exa"
     export HF_TOKEN="fixture-fixture-hf"
+    export ASTA_API_KEY="fixture-fixture-asta"
     export FIXTURE_KEY="fixture-fixture-url"
     unset FIXTURE_MISSING 2>/dev/null || true
 }

@@ -145,3 +145,5 @@ search history when past work is referenced.
    this before"), before re-debugging something that feels familiar, or to
    recover the context behind an old decision. Never write here —
    transcripts record themselves.
+
+{{ template "math-common.md" . }}

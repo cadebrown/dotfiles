@@ -28,10 +28,10 @@ setup() {
     '
     [ "$status" -eq 0 ]
 
-    # 13 entries, comments/blanks skipped
-    [ "$(echo "$output" | jq 'length')" -eq 13 ]
-    # auth=hf extraction (the newest auth source — added post-refactor)
-    [ "$(echo "$output" | jq -r '.[] | select(.name=="hfsrv") | .auth')" = "hf" ]
+    # 14 entries, comments/blanks skipped
+    [ "$(echo "$output" | jq 'length')" -eq 14 ]
+    # auth=asta extraction (the newest auth source — added with the math stack)
+    [ "$(echo "$output" | jq -r '.[] | select(.name=="astasrv") | .auth')" = "asta" ]
     # stdio parsing keeps the full command string
     [ "$(echo "$output" | jq -r '.[] | select(.name=="tool") | .cmd')" = "uvx some-tool --flag val" ]
     # auth= extraction

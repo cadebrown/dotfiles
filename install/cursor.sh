@@ -75,6 +75,7 @@ _sync_cursor_mcp() {
                     context7) _hname="CONTEXT7_API_KEY"; _hval="${CONTEXT7_API_KEY:-}" ;;
                     tavily)   _hname="Authorization"; _hval="${TAVILY_API_KEY:+Bearer $TAVILY_API_KEY}" ;;
                     exa)      _hname="x-api-key"; _hval="${EXA_API_KEY:-}" ;;
+                    asta)     _hname="x-api-key"; _hval="${ASTA_API_KEY:-}" ;;
                     hf)       _hname="Authorization"; _hval="${HF_TOKEN:+Bearer $HF_TOKEN}" ;;
                     # Expected, not a degradation: ADC tokens are short-lived
                     # and the Cursor GUI has no way to refresh them, so these

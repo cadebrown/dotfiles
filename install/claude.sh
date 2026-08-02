@@ -233,6 +233,12 @@ _resolve_header_source() {
             [[ -n "$key" ]] || return 1
             printf 'Authorization\tBearer %s' "$key"
             ;;
+        asta)
+            [[ -f "$HOME/.asta.env" ]] || return 1
+            key="$(. "$HOME/.asta.env" >/dev/null 2>&1 || true; printf '%s' "${ASTA_API_KEY:-}")"
+            [[ -n "$key" ]] || return 1
+            printf 'x-api-key\t%s' "$key"
+            ;;
         *)
             return 1
             ;;

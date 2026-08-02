@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# wolfram-mcp — stdio MCP server exposing real Wolfram Language evaluation
+# (WolframLanguageEvaluator, notebook read/write, SymbolDefinition,
+# CodeInspector, TestReport) via the Wolfram/AgentTools paclet.
+#
+# Invocation captured from Wolfram`AgentTools`InstallMCPServer (2.1.37).
+# Wrapped in a script because packages/mcp-servers.txt commands are
+# space-split by the parser and the kernel path contains spaces.
+#
+# Requires: Wolfram Engine cask, activated kernel (run `wolframscript` once),
+# and `wolframscript -code 'PacletInstall["Wolfram/AgentTools"]'`.
+set -euo pipefail
+
+kernel="/Applications/Wolfram Engine.app/Contents/Resources/Wolfram Player.app/Contents/MacOS/wolfram"
+if [[ ! -x "$kernel" ]]; then
+    echo "wolfram-mcp: WolframKernel not found at: $kernel (macOS cask only for now)" >&2
+    exit 1
+fi
+
+export MCP_SERVER_NAME="${MCP_SERVER_NAME:-WolframLanguage}"
+export WOLFRAM_BASE="${WOLFRAM_BASE:-/Library/WolframEngine}"
+export WOLFRAM_LOCALBASE="${WOLFRAM_LOCALBASE:-$HOME/Library/Wolfram/Objects}"
+export WOLFRAM_USERBASE="${WOLFRAM_USERBASE:-$HOME/Library/WolframEngine}"
+
+exec "$kernel" -run 'PacletSymbol["Wolfram/AgentTools","Wolfram`AgentTools`StartMCPServer"][]' -noinit -noprompt

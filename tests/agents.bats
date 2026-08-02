@@ -14,8 +14,10 @@ setup() {
 }
 
 @test "cass indexes semantic vectors with bounded periodic refreshes" {
-    grep -q 'index --full --semantic --build-hnsw' "$REPO/install/memory.sh"
-    grep -q 'index --semantic --build-hnsw' "$REPO/install/memory.sh"
+    # HNSW build dropped deliberately (commit 995cde2) — plain semantic index.
+    grep -q 'index --full --semantic' "$REPO/install/memory.sh"
+    grep -q 'index --semantic' "$REPO/install/memory.sh"
+    ! grep -q -- '--build-hnsw' "$REPO/install/memory.sh"
     ! grep -Eq '"\$_cass" watch|"\$ARCH_BIN/cass" watch' "$REPO/install/memory.sh"
 
     plist="$REPO/home/Library/LaunchAgents/dev.cade.cass-watch.plist.tmpl"
@@ -26,7 +28,7 @@ setup() {
     grep -q '<integer>300</integer>' "$plist"
     semantic="$REPO/home/Library/LaunchAgents/dev.cade.cass-semantic.plist.tmpl"
     grep -q '<string>--semantic</string>' "$semantic"
-    grep -q '<string>--build-hnsw</string>' "$semantic"
+    ! grep -q -- '--build-hnsw' "$semantic"
     grep -q '<key>StartCalendarInterval</key>' "$semantic"
     grep -q '<key>CASS_SEMANTIC_EMBEDDER</key>' "$semantic"
     grep -q '<string>minilm</string>' "$semantic"

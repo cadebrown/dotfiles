@@ -187,3 +187,8 @@ metal-gpu-debug npx rudybear/metal-ai-skill metal-gpu-debug
 
 # WGSL/WebGPU patterns (thin but real; repo-root skill)
 webgpu npx cazala/webgpu-skill webgpu
+doc-coauthoring npx anthropics/skills doc-coauthoring
+# lean4 shared skill: gives Codex/opencode/pi/Cursor the Lean workflow knowledge.
+# Claude ALSO has the richer lean4@lean4-skills PLUGIN (commands+hooks+agents);
+# the near-duplicate is deliberate — plugin = cycle engine, skill = portable docs.
+lean4 npx cameronfreer/lean4-skills lean4

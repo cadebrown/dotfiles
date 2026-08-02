@@ -280,6 +280,14 @@ _emit_mcp_blocks_to() {
                                 log_warn "    $_name: ~/.exa.env missing — unauthenticated (run 'bash install/auth.sh exa')"
                             fi
                             ;;
+                        asta)
+                            if [[ -f "$HOME/.asta.env" ]]; then
+                                printf 'env_http_headers = { "x-api-key" = "ASTA_API_KEY" }\n' >> "$out"
+                                log_info "    $_name ($_transport, auth=asta via env)"
+                            else
+                                log_warn "    $_name: ~/.asta.env missing — unauthenticated (run 'bash install/auth.sh asta')"
+                            fi
+                            ;;
                         hf)
                             if [[ -f "$HOME/.huggingface.env" ]]; then
                                 printf 'bearer_token_env_var = "HF_TOKEN"\n' >> "$out"

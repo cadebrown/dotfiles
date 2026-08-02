@@ -1,5 +1,11 @@
 {
   "mcpServers": {
+    "astasrv": {
+      "headers": {
+        "x-api-key": "fixture-fixture-asta"
+      },
+      "url": "https://asta.example/mcp"
+    },
     "bare": {
       "command": "solobinary"
     },

@@ -153,3 +153,37 @@ google-workspace stdio cmd: env OAUTHLIB_INSECURE_TRANSPORT=1 uvx workspace-mcp 
 # Safari, Music, System Events…). No auth; broad local power, so review prompts.
 # Needs Automation + Accessibility grants on first use (System Settings → Privacy).
 macos-automator stdio cmd: npx -y @steipete/macos-automator-mcp@latest
+
+# === Research mathematics ===
+# lean-lsp: Lean 4 LSP bridge (oOo0oOo/lean-lsp-mcp) — goal states, diagnostics,
+# multi-attempt tactics, axiom audit (lean_verify), LeanSearch/Loogle/LeanFinder/
+# LeanHammer search. The lean4 plugin's subagents expect these tools. Pinned;
+# bump deliberately (uvx re-resolves on version change).
+lean-lsp stdio cmd: uvx lean-lsp-mcp==0.29.0
+
+# arxiv: paper search + LaTeX source retrieval BY SECTION (blazickjp/arxiv-mcp-server)
+# — source-level access matters for math papers; generic web-search MCPs can't do it.
+arxiv stdio cmd: uvx arxiv-mcp-server
+
+# mathlas: no-LLM verification tools — theorem search (3.68M docs), verify_formal
+# against a real Lean kernel, PSLQ constant identification, exact OEIS matching.
+# Young solo-maintainer project — drop if it misbehaves.
+mathlas stdio cmd: uvx mathlas-mcp
+
+# asta: Ai2's official scholarly-corpus MCP (Semantic Scholar successor) — 200M+
+# papers, dense snippet search, citation graph. Free key via the Ai2 form:
+# https://allenai.org/asta/resources/mcp → `bash install/auth.sh asta`.
+# Registers unauthenticated until ~/.asta.env exists.
+asta http https://asta-tools.allen.ai/mcp/v1 auth=asta
+
+# lean-explore: semantic search across Lean libraries beyond Mathlib (local
+# backend — 3.7 GB index at ~/.lean_explore via `lean-explore data fetch`;
+# CLI itself is in pip.txt). API backend exists but needs a key.
+lean-explore stdio cmd: uvx lean-explore mcp serve --backend local
+
+# wolfram: real Wolfram Language evaluation (AgentTools paclet, StartMCPServer)
+# — upgrades the wolfram-alpha/wolfram-language skills from "answers" to
+# in-kernel computation. Wrapper script (chezmoi: dot_local/bin/wolfram-mcp)
+# because the kernel path contains spaces. Needs an activated Wolfram Engine
+# + PacletInstall["Wolfram/AgentTools"]; registers inert otherwise.
+wolfram stdio cmd: wolfram-mcp

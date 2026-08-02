@@ -55,6 +55,14 @@ tool_timeout_sec = 60
 required = false
 default_tools_approval_mode = "approve"
 
+[mcp_servers.astasrv]
+url = "https://asta.example/mcp"
+env_http_headers = { "x-api-key" = "ASTA_API_KEY" }
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "approve"
+
 [mcp_servers.urlkey]
 url = "https://key.example/fixture-fixture-url/v2/mcp"
 startup_timeout_sec = 20

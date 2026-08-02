@@ -172,9 +172,31 @@ if [[ -d "/Applications/iTerm.app" ]]; then
     defaults write com.googlecode.iterm2.plist PrefsCustomFolder -string "$HOME/.iterm2"
     defaults write com.googlecode.iterm2.plist LoadPrefsFromCustomFolder -bool true
     defaults write com.googlecode.iterm2.plist "NoSyncNeverRemindPrefsChangesLostForFile_selection" -int 2
+    # Python API server — required by it2 (pip.txt) for agent-driven split panes
+    defaults write com.googlecode.iterm2.plist EnableAPIServer -bool true
     log_okay "iTerm2 prefs configured"
 else
     log_info "iTerm2 not installed — skipping"
+fi
+
+### Wolfram Engine ###
+
+# wolframscript ships without a kernel path — first run fails with
+# "A WolframKernel location could not be determined". Point it at the cask's
+# app bundle. Activation (Wolfram ID login) stays manual: run `wolframscript`
+# once interactively after this.
+_wolfram_kernel="/Applications/Wolfram Engine.app/Contents/MacOS/WolframKernel"
+if command -v wolframscript >/dev/null 2>&1 && [[ -x "$_wolfram_kernel" ]]; then
+    _ws_conf="$HOME/Library/Application Support/Wolfram/WolframScript/WolframScript.conf"
+    if [[ -f "$_ws_conf" ]] && grep -q '^WOLFRAMSCRIPT_KERNELPATH=' "$_ws_conf"; then
+        log_okay "wolframscript kernel path already configured"
+    else
+        wolframscript -configure "WOLFRAMSCRIPT_KERNELPATH=$_wolfram_kernel" >/dev/null 2>&1 \
+            && log_okay "wolframscript kernel path configured" \
+            || log_warn "wolframscript -configure failed"
+    fi
+else
+    log_info "Wolfram Engine not installed — skipping wolframscript config"
 fi
 
 ### Apply Dock/Finder changes ###

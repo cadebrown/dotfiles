@@ -1,4 +1,12 @@
 {
+  "astasrv": {
+    "enabled": true,
+    "headers": {
+      "x-api-key": "{env:ASTA_API_KEY}"
+    },
+    "type": "remote",
+    "url": "https://asta.example/mcp"
+  },
   "bare": {
     "command": [
       "solobinary"
