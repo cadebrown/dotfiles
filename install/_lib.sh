@@ -182,6 +182,12 @@ GOPATH="$LOCAL_PLAT/go"
 GOBIN="$ARCH_BIN"
 GOCACHE="$LOCAL_PLAT/go-build"
 
+# elan (Lean toolchains) + julia depots: arch-specific compiled artifacts,
+# PLAT-isolated like rustup. Same paths as the shell profiles.
+ELAN_HOME="$LOCAL_PLAT/elan"
+JULIAUP_DEPOT_PATH="$LOCAL_PLAT/julia/juliaup"
+JULIA_DEPOT_PATH="$LOCAL_PLAT/julia/depot"
+
 # Compiler cache for INSTALL-TIME builds. The shell profiles export these for
 # interactive shells, but install scripts run in bootstrap's non-login bash
 # (and possibly cron/CI) which never sources a profile — so without this,
@@ -227,7 +233,8 @@ export OS ARCH DF_ROOT DF_PACKAGES DF_USE_PLAT \
        PLAT LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR \
        UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR \
        NVM_DIR CONAN_HOME \
-       GOPATH GOBIN GOCACHE
+       GOPATH GOBIN GOCACHE \
+       ELAN_HOME JULIAUP_DEPOT_PATH JULIA_DEPOT_PATH
 
 # Install scripts clone public repos and must not be affected by the user's
 # gitconfig (which may have url.insteadOf SSH rewrites, breaking clones on
@@ -537,9 +544,12 @@ _re_derive_plat_vars() {
     GOPATH="$LOCAL_PLAT/go"
     GOBIN="$ARCH_BIN"
     GOCACHE="$LOCAL_PLAT/go-build"
+    ELAN_HOME="$LOCAL_PLAT/elan"
+    JULIAUP_DEPOT_PATH="$LOCAL_PLAT/julia/juliaup"
+    JULIA_DEPOT_PATH="$LOCAL_PLAT/julia/depot"
     export PLAT LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR \
            UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR NVM_DIR CONAN_HOME \
-           GOPATH GOBIN GOCACHE
+           GOPATH GOBIN GOCACHE ELAN_HOME JULIAUP_DEPOT_PATH JULIA_DEPOT_PATH
 }
 
 # Read a package list file, skipping blank lines and comments.

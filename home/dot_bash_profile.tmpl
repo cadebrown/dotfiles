@@ -137,6 +137,22 @@ export RUSTUP_HOME="$_LOCAL_PLAT/rustup"
 export CARGO_HOME="$_LOCAL_PLAT/cargo"
 export PATH="$CARGO_HOME/bin:$PATH"
 
+### LEAN (elan) ###
+
+# elan manages Lean toolchains (arch-specific binaries, ~1.5 GB each) — PLAT-
+# isolated like rustup. Projects pin via lean-toolchain files; the Mathlib
+# build cache lands in ~/.cache/mathlib (scratch-relocated).
+export ELAN_HOME="$_LOCAL_PLAT/elan"
+export PATH="$ELAN_HOME/bin:$PATH"
+
+### JULIA (juliaup) ###
+
+# Depots hold compiled per-arch artifacts — PLAT-isolated so NFS-shared homes
+# don't fight. The juliaup/julia launchers come from Homebrew; OSCAR and other
+# packages install per-project via Pkg.
+export JULIAUP_DEPOT_PATH="$_LOCAL_PLAT/julia/juliaup"
+export JULIA_DEPOT_PATH="$_LOCAL_PLAT/julia/depot"
+
 ### GO ###
 
 # GOBIN equals $_LOCAL_PLAT/bin (already on PATH), so `go install` binaries

@@ -63,6 +63,8 @@
 #   DF_DO_NODE          — set to 0 to skip Node install + global npm packages
 #   DF_DO_RUST          — set to 0 to skip Rust install
 #   DF_DO_GO            — set to 0 to skip Go-installed CLI tools (packages/go.txt)
+#   DF_DO_LEAN          — set to 0 to skip the Lean 4 toolchain (elan + default toolchain)
+#   DF_DO_LATEX         — set to 0 to skip the TeX distribution (MacTeX verify / TinyTeX on Linux)
 #   DF_DO_PYTHON        — set to 0 to skip Python install
 #   DF_DO_CLAUDE        — set to 0 to skip Claude Code install
 #   DF_DO_CODEX         — set to 0 to skip Codex CLI install
@@ -533,6 +535,18 @@ if [[ "${DF_DO_GO:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/go.sh" || die "go.sh failed"
 else
     log_info "Skipping Go (DF_DO_GO=0)"
+fi
+
+if [[ "${DF_DO_LEAN:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/lean.sh" || die "lean.sh failed"
+else
+    log_info "Skipping Lean toolchain (DF_DO_LEAN=0)"
+fi
+
+if [[ "${DF_DO_LATEX:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/latex.sh" || die "latex.sh failed"
+else
+    log_info "Skipping TeX distribution (DF_DO_LATEX=0)"
 fi
 
 if [[ "${DF_DO_CLAUDE:-1}" != "0" ]]; then
