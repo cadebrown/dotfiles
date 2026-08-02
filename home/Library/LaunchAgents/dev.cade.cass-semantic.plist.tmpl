@@ -1,7 +1,9 @@
 {{/*
-LaunchAgent: refresh cass's MiniLM vectors and HNSW graph once per day.
+LaunchAgent: refresh cass's MiniLM vectors once per day.
 Semantic backfill currently re-embeds the complete archive and does not emit
 progress heartbeats, so it must not share the five-minute lexical schedule.
+No --build-hnsw — duplicate tool-stub vectors make the graph fail cass's
+topology attestation every time. See install/memory.sh for the full reason.
 */ -}}
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -15,7 +17,6 @@ progress heartbeats, so it must not share the five-minute lexical schedule.
         <string>{{ .chezmoi.homeDir }}/.local/bin/cass</string>
         <string>index</string>
         <string>--semantic</string>
-        <string>--build-hnsw</string>
     </array>
 
     <key>EnvironmentVariables</key>

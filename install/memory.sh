@@ -27,11 +27,16 @@ _mode="${1:-setup}"
 
 log_section "Agent memory stack ($_mode)"
 
-# ~/.cass, not ~/.cache/cass: 124 conversations here have no surviving upstream
-# transcript, so this is an archive, not a cache, and nothing may treat it as
-# reclaimable. On scratch machines scratch.sh symlinks ~/.cass into scratch
-# (10 TB there vs a quota'd NFS home) — the path stays identical either way.
-export CASS_DATA_DIR="${CASS_DATA_DIR:-$HOME/.cass}"
+# ~/.cass, not ~/.cache/cass: cass holds the only surviving copy of conversations
+# whose transcripts the harnesses have rotated away, so this is an archive, not a
+# cache, and nothing may treat it as reclaimable. On scratch machines scratch.sh
+# symlinks ~/.cass into scratch (10 TB there vs a quota'd NFS home) — the path
+# stays identical either way, so forcing $HOME/.cass is scratch-safe. Forced, not
+# defaulted: an inherited value splits the archive in two, silently.
+if [[ -n "${CASS_DATA_DIR:-}" && "$CASS_DATA_DIR" != "$HOME/.cass" ]]; then
+    log_warn "cass: ignoring inherited CASS_DATA_DIR=$CASS_DATA_DIR — the archive is $HOME/.cass"
+fi
+export CASS_DATA_DIR="$HOME/.cass"
 export CASS_SEMANTIC_EMBEDDER="${CASS_SEMANTIC_EMBEDDER:-minilm}"
 export CASS_INDEX_STALL_ABORT_SECS="${CASS_INDEX_STALL_ABORT_SECS:-0}"
 
@@ -167,6 +172,10 @@ if has cass || [[ -x "$ARCH_BIN/cass" ]]; then
             || log_warn "cass: model install failed — lexical-only until retried"
     fi
 
+    # No --build-hnsw: duplicate tool-stub vectors fail cass's topology attestation
+    # deterministically (see docs/usage/troubleshooting.md), and HNSW only backs
+    # `--approximate`. Restore the flag if cass starts deduping identical vectors.
+    #
     # The dev.cade.cass-watch LaunchAgent runs `cass index` every 300s. cass
     # keeps an index-run.lock in its data dir, but it does not stop a second run
     # from reinitializing the WAL under a live reader — `cass doctor` reports
@@ -181,7 +190,7 @@ if has cass || [[ -x "$ARCH_BIN/cass" ]]; then
         done
         (( _waited >= 60 )) && log_warn "cass: watcher still indexing after 60s — rebuilding anyway"
         log_info "cass: full index rebuild"
-        run_logged "$_cass" index --full --semantic --build-hnsw \
+        run_logged "$_cass" index --full --semantic \
             || log_warn "cass index failed — run 'cass doctor'"
     elif pgrep -f "cass index" >/dev/null 2>&1; then
         log_info "cass: index already running (cass-watch LaunchAgent) — skipping this pass"
@@ -193,7 +202,7 @@ if has cass || [[ -x "$ARCH_BIN/cass" ]]; then
             || log_warn "cass index failed — run 'cass doctor'"
     else
         log_info "cass: building initial semantic session index"
-        run_logged "$_cass" index --semantic --build-hnsw \
+        run_logged "$_cass" index --semantic \
             || log_warn "cass index failed — run 'cass doctor'"
     fi
 fi
