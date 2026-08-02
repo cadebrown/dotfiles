@@ -157,14 +157,36 @@ and chezmoi-managed guidance files built from shared partials.
   Homebrew sqlite (system libsqlite3 blocks loadable extensions).
 - **cass is an ARCHIVE, not a rebuildable index — that's why it's ~/.cass.** qmd
   can always be rebuilt from ~/kb, but cass indexes transcripts the harnesses
-  eventually rotate away: `cass doctor` currently reports 124 conversations for
-  which cass holds the only surviving copy, and it refuses source-only rebuilds
-  to protect them. Nearly all of the ~10 GB is `raw-mirror/` (verbatim capture);
+  eventually rotate away, and it refuses source-only rebuilds to protect them.
+  `cass doctor`'s `sole_copy_candidate_count: 124` is narrower than it sounds —
+  its `root_cause_kind` is `mirror-missing-with-db-sole-copy`, i.e. 124 rows whose
+  raw-mirror blob is absent, not 124 vanished upstream transcripts. Measured
+  2026-08-01: a from-scratch index into an empty data dir re-discovered all 785
+  conversations from live sources. Keep the archive stance anyway — that headroom
+  is a snapshot, and it is the harnesses' rotation policy, not cass, that decides
+  when it ends. Nearly all of the ~10 GB is `raw-mirror/` (verbatim capture);
   only ~287 MB (vector_index, index, models) is derived. `cass mirror prune`
   retires by `--older-than`/`--max-size` only — there is no "prune where upstream
   still exists", so age-based pruning sheds exactly the sole-copy rows first.
   Living under ~/.cache invited any cache sweep to delete it; scratch.sh still
   symlinks ~/.cass into scratch where that exists (10 TB there), same path.
+- **cass ingest is append-only per conversation — `--full` does NOT re-parse.** A
+  conversation already in the canonical DB is never re-read, so parser improvements
+  never reach old rows and the archive silently drifts behind what the same files
+  would yield today (found 2026-08-01: codex sat at 15,037 messages where a fresh
+  parse of the same 88 rollouts gives 85,488 — 82% of that history was unsearchable;
+  cursor 3,384 vs 6,949). `--full` only forces a full *scan* + lexical rebuild —
+  its log says `skipping historical salvage because canonical database is already
+  populated`. The re-parse recipe, per connector:
+  `cass forget --source-glob '<path>/**' --apply`, then reset the connector
+  watermark (`update meta set value='0' where key='last_scan_ts:connector:<name>'`
+  — `--full` still honours it, and rollouts dated months back never beat it), then
+  `cass index --full`. Verify every `source_path` still exists on disk BEFORE the
+  forget, and back up with `sqlite3 ... ".backup"` (a plain `cp` can tear a live WAL).
+  Two cass bugs to work around: `forget` leaks `conversation_tail_state` rows keyed
+  by the deleted `conversation_id`, and since that column is a plain rowid SQLite
+  reuses freed ids — a future conversation inherits a stale "ingested through idx N"
+  marker and gets silently truncated. Delete the orphans afterwards.
 - **qmd upgrades need the daemon stopped on NFS** — the qmd MCP daemon
   (`qmd mcp --http`) keeps native addons (sqlite-vec, node-llama-cpp,
   better-sqlite3) mmap'd. On an NFS home npm can't unlink an open file — NFS
