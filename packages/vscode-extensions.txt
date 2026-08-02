@@ -15,6 +15,9 @@ donjayamanne.githistory
 # github.copilot-chat is bundled with VS Code now (built-in 0.59.0 vs 0.48.1 on
 # the marketplace), and --install-extension refuses the downgrade. Do not re-add.
 github.vscode-pull-request-github
+james-yu.latex-workshop
+leanprover.lean4
+ltex-plus.vscode-ltex-plus
 mechatroner.rainbow-csv
 ms-azuretools.vscode-containers
 ms-azuretools.vscode-docker
@@ -40,6 +43,7 @@ myriad-dreamin.tinymist
 nvidia.nsight-vscode-edition
 platformio.platformio-ide
 polymeilex.wgsl
+quarto.quarto
 redhat.vscode-yaml
 robbowen.synthwave-vscode
 sumneko.lua

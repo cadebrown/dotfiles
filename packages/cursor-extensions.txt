@@ -17,6 +17,8 @@
 #   platformio.platformio-ide
 #   nvidia.nsight-vscode-edition        ("not available in Cursor for the Mac
 #                                        Silicon" — refused by ID, not missing)
+#   ltex-plus.vscode-ltex-plus          (not on Open VSX — verified 2026-08;
+#                                        grammar via harper-ls instead)
 anthropic.claude-code
 anysphere.cpptools
 anysphere.cursorpyright
@@ -31,6 +33,7 @@ eamodio.gitlens
 enkia.tokyo-night
 github.vscode-pull-request-github
 james-yu.latex-workshop
+leanprover.lean4
 jock.svg
 llvm-vs-code-extensions.vscode-clangd
 mechatroner.rainbow-csv
@@ -52,6 +55,7 @@ ms-vscode.theme-tomorrowkit
 myriad-dreamin.tinymist
 openai.chatgpt
 polymeilex.wgsl
+quarto.quarto
 redhat.vscode-yaml
 revng.llvm-ir
 robbowen.synthwave-vscode

@@ -116,3 +116,7 @@ rust-docs-mcp
 # crates.io MCP server — crate search, dep analysis, OSV audit; the `crates`
 # stdio entry in mcp-servers.txt (pre-built: github.com/joshrotenberg/cratesio-mcp)
 cratesio-mcp
+
+# ripgrep-all: rga — rg across PDFs, EPUBs, Office docs, archives. Agent-friendly
+# full-text search over a paper library.
+ripgrep_all

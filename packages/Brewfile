@@ -55,6 +55,24 @@ brew "graphviz"
 
 ### Documents ###
 brew "pandoc"
+brew "texlab"    # LaTeX LSP (integrates chktex)
+brew "harper"    # harper-ls/harper-cli — Automattic's local Rust grammar checker
+brew "quarto"    # notes/books/sites from one source; PDF via LaTeX or typst backend
+brew "tinymist"  # Typst LSP + CLI (preview/export; bundles typstyle)
+
+### Research mathematics ###
+# gp collides with the `gp='git push'` shell alias in interactive shells —
+# scripts and agents get PARI, humans should use `command gp` or rlwrap gp.
+brew "pari"      # PARI/GP — number theory CAS
+brew "flint"     # FLINT number-theory library (Arb merged in 3.x); feeds python-flint
+brew "juliaup"   # Julia version manager; OSCAR.jl installed per-project via Pkg
+# SAT/SMT/CP solvers: z3 was previously only a transitive keg — declared now.
+# cadical emits LRAT proofs (Lean's bv_decide kernel-checks these); cvc5 comes
+# per-project via pip (not in homebrew-core).
+brew "z3"
+brew "minizinc"
+brew "cadical"
+brew "kissat"
 
 ### Claude Code sandbox (Linux backend) ###
 # macOS uses the built-in Seatbelt sandbox; Linux needs bubblewrap (user
@@ -280,6 +298,13 @@ if OS.mac?
   cask "inkscape"
   cask "spotify"
   cask "obs"
+  # Research math GUI layer. sage = signed 3-manifolds Sage_macOS app (Homebrew
+  # core has no formula); per-project passagemath wheels are the uv-native route.
+  # zotero pairs with the Better BibTeX addon (manual install in-app) for
+  # git-tracked auto-exported .bib files. DaVinci Resolve has NO cask anymore —
+  # manual download from blackmagicdesign.com.
+  cask "sage"
+  cask "zotero"
   cask "blender"
   cask "kdenlive"
   cask "touchdesigner"

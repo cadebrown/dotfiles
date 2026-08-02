@@ -23,6 +23,10 @@ mlx-openai-server  # macos-only python=3.12 (outlines-core 0.1.26 has no cp313/c
 # C/C++ package manager
 conan
 
+# iTerm2 split-pane CLI — Claude Code teammate/agent panes drive iTerm2 through
+# its Python API (EnableAPIServer, set in install/macos-settings.sh)
+it2  # macos-only
+
 # Manim Community Edition — programmatic animation engine for explainer/education
 # videos and math/sim visualizations. Needs cairo/pango/pkg-config (Brewfile) +
 # ffmpeg (already present); LaTeX is optional (only Tex/MathTex use it).
@@ -31,3 +35,33 @@ manim
 # MkDocs — static documentation-site generator from Markdown + a YAML config.
 # `mkdocs build --strict` surfaces broken links/config as CI failures.
 mkdocs
+
+# --- Research mathematics (see MATH_PLAN_CLAUDE.md) ---
+
+# Lean blueprint tool (Massot) — LaTeX blueprint ↔ Lean formalization scaffolds,
+# web+PDF output. Needs a TeX distribution (MacTeX here / TinyTeX on Linux).
+leanblueprint
+
+# Reactive notebooks stored as plain .py — git-diffable, deterministic DAG,
+# the agents-in-the-loop notebook. Math libs (sympy etc.) stay per-project.
+marimo
+
+# Strips comments/unused files from LaTeX source before arXiv submission.
+arxiv-latex-cleaner
+
+# Word-level-aligned subtitles (SRT/VTT) for explainer videos.
+whisperx
+
+# Manim scenes → interactive/HTML slide decks.
+manim-slides
+
+# CLI-first reference manager (DOI/arXiv fetch, plain-file library) — the
+# scriptable layer next to the Zotero GUI (cask) + Better BibTeX.
+papis
+
+# PaperQA2 (`pqa`) — citation-grounded RAG QA over a local PDF corpus.
+paper-qa
+
+# LeanExplore — semantic search across Lean libraries beyond Mathlib; also the
+# `lean-explore` MCP entry (local backend; data via `lean-explore data fetch`).
+lean-explore
