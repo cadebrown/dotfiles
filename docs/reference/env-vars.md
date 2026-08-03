@@ -60,6 +60,7 @@ Each `DF_DO_*` flag defaults to `1` (run). Set to `0` to skip.
 | `DF_DO_CODEX` | 6 | Codex CLI binary + managed config + hooks |
 | `DF_DO_CLAUDE_DESKTOP` | 6 | Claude Desktop tracked preferences (macOS) |
 | `DF_DO_CODEX_DESKTOP` | 6 | Codex desktop app tracked preferences (macOS) |
+| `DF_DO_LINEARMOUSE` | 6 | LinearMouse tracked settings (macOS) |
 | `DF_DO_CURSOR` | 6 | Cursor settings symlinks + extensions |
 | `DF_DO_VSCODE` | 6 | VS Code extensions |
 | `DF_DO_CMAKE` | 6 | CMake toolchain file deployment |

@@ -1,0 +1,47 @@
+{
+  "schemes": [
+    {
+      "if": {
+        "device": {
+          "category": "mouse",
+          "productID": "0xf508",
+          "productName": "Xlite V3 Large",
+          "vendorID": "0x3554"
+        }
+      },
+      "pointer": {
+        "acceleration": 1,
+        "disableAcceleration": true
+      },
+      "scrolling": {
+        "reverse": {
+          "vertical": false
+        }
+      }
+    },
+    {
+      "if": {
+        "device": {
+          "category": "trackpad"
+        }
+      },
+      "pointer": {
+        "acceleration": 1,
+        "disableAcceleration": true,
+        "speed": 0.6474
+      }
+    },
+    {
+      "if": {
+        "device": {
+          "category": "trackpad"
+        }
+      },
+      "scrolling": {
+        "reverse": {
+          "vertical": false
+        }
+      }
+    }
+  ]
+}

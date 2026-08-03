@@ -928,3 +928,40 @@ brew info --formula quarto
 macOS-only, so a cask-only tool has no Homebrew route on Linux — install it
 another way there rather than leaving a `brew` line that breaks every bundle
 run. Check a new entry with `brew info --formula <name>` before committing.
+
+## A GUI app's config is permanently dirty in `chezmoi status`
+
+**Symptom.** `chezmoi status` shows `MM` on an app's config file every time you
+look, even when you changed nothing. Running `chezmoi apply` "fixes" it, then it
+comes back after the app runs. Worse, bootstrap (which runs `chezmoi apply
+--force`) silently reverts real in-app settings changes along the way.
+
+**Root cause.** Two writers on one file. The app owns and rewrites its config,
+and a statically chezmoi-managed copy fights it. LinearMouse is the sharpest
+case: it stamps `"$schema": "https://schema.linearmouse.app/<app version>"` into
+the file, so the file goes dirty **on a timer** — every app update produces a
+diff with no setting change behind it. That trains you to ignore the dirty
+status, which is exactly when a real reverted setting slips past.
+
+**Confirm.**
+```bash
+chezmoi diff ~/.config/linearmouse/linearmouse.json
+# -  "$schema" : ".../0.11.3"      <- what the app wrote
+# +  "$schema" : ".../0.11.2"      <- what apply would force back
+```
+
+**Fix.** Don't let chezmoi manage app-owned configs. Use the apply/sync split
+(`install/linearmouse.sh`, `install/claude-desktop.sh`,
+`install/codex-desktop.sh`): the tracked source lives under `install/<app>/`,
+`apply` merges it into the live file live-first so app-owned keys survive, and
+`sync` captures in-app changes back. For LinearMouse specifically the tracked
+source omits `$schema` entirely, so only genuine setting changes ever diff.
+
+```bash
+bash install/linearmouse.sh sync    # capture in-app changes → repo
+bash install/linearmouse.sh         # push repo settings → app (default: apply)
+```
+
+Adding a new app to this pattern means deleting its `home/` chezmoi source
+(chezmoi then leaves the live file alone), adding the script, and wiring a
+`DF_DO_*` flag in `bootstrap.sh`.

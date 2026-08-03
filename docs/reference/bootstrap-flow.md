@@ -70,7 +70,7 @@ flowchart TD
 | 6f | `install/latex.sh` | macOS: verify the MacTeX cask. Linux: install TinyTeX, route `sys_bin` into `$ARCH_BIN`, install latexmk/chktex/texcount/latexdiff. | Upgrade mode runs `tlmgr update --self --all` (macOS needs a sudo ticket; skipped without one). |
 | 6g | `install/claude.sh` | Download Claude Code; install plugins; register MCP servers; deploy overlay skills. | Atomic binary replacement. |
 | 6h | `install/codex.sh` | Sync private config, hooks, rtk/chezmoi guards, MCP servers, and run the healthcheck. | The npm package is unpinned; the healthcheck catches config drift. |
-| 6i | desktop scripts | Merge tracked Claude/Codex Desktop preferences on macOS. | Preserve app-owned state. |
+| 6i | desktop scripts | Merge tracked Claude/Codex Desktop and LinearMouse settings on macOS. | Preserve app-owned state — including LinearMouse's `$schema` version stamp, which is what makes a statically managed copy churn. |
 | 6j | `install/cursor.sh` / `install/vscode.sh` | Sync Cursor MCP/settings and editor extensions. | Extension failures are warnings. |
 | 6k | `install/cmake.sh` | Copy CMake toolchain files into `$LOCAL_PLAT/cmake/toolchains/`. | Always overwrites deployed copies. |
 

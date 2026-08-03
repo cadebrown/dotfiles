@@ -167,6 +167,7 @@ DF_DO_CLAUDE=0               # skip Claude Code install + plugins + MCP servers
 DF_DO_CODEX=0                # skip Codex CLI install
 DF_DO_CLAUDE_DESKTOP=0       # skip Claude Desktop tracked preferences (macOS)
 DF_DO_CODEX_DESKTOP=0        # skip Codex desktop app tracked preferences (macOS)
+DF_DO_LINEARMOUSE=0          # skip LinearMouse tracked settings (macOS)
 DF_DO_CURSOR=0               # skip Cursor settings symlinks + extension install
 DF_DO_VSCODE=0               # skip VS Code extension install
 DF_DO_CMAKE=0                # skip CMake toolchain file deployment

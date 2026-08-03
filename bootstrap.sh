@@ -70,6 +70,7 @@
 #   DF_DO_CODEX         — set to 0 to skip Codex CLI install
 #   DF_DO_CLAUDE_DESKTOP — set to 0 to skip Claude Desktop preference apply (macOS)
 #   DF_DO_CODEX_DESKTOP  — set to 0 to skip Codex desktop app preference apply (macOS)
+#   DF_DO_LINEARMOUSE   — set to 0 to skip LinearMouse settings apply (macOS)
 #   DF_DO_MACOS_SETTINGS — set to 0 to skip macOS settings
 #   DF_DO_MACOS_QUICK_ACTIONS — set to 0 to skip Finder Quick Actions install
 #   DF_DO_AUTH          — set to 1 to run interactive API token setup
@@ -576,6 +577,15 @@ if [[ "${DF_DO_CODEX_DESKTOP:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/codex-desktop.sh" || die "codex-desktop.sh failed"
 else
     log_info "Skipping Codex desktop preferences (DF_DO_CODEX_DESKTOP=0)"
+fi
+
+# LinearMouse settings (macOS only; self-skips on Linux). Merges tracked
+# settings into the app-owned config, preserving the app's "$schema" — see
+# install/linearmouse.sh.
+if [[ "${DF_DO_LINEARMOUSE:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/linearmouse.sh" || die "linearmouse.sh failed"
+else
+    log_info "Skipping LinearMouse settings (DF_DO_LINEARMOUSE=0)"
 fi
 
 if [[ "${DF_DO_CURSOR:-1}" != "0" ]]; then
