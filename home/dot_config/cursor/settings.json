@@ -111,5 +111,8 @@
   "claudeCode.initialPermissionMode": "bypassPermissions",
   "remote.autoForwardPortsSource": "hybrid",
   "workbench.sideBar.location": "right",
-  "workbench.preferredDarkColorTheme": "SynthWave '84"
+  "workbench.preferredDarkColorTheme": "SynthWave '84",
+  "remote.SSH.remotePlatform": {
+    "g492-ha0-0001": "linux"
+  }
 }
