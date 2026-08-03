@@ -80,11 +80,12 @@ while IFS= read -r pkg; do
             log_okay "  $_name@$_pin (pinned, installed)"
             # Never SILENTLY stale: in upgrade mode, surface the pin-vs-latest
             # delta loudly so a held package is a visible decision, not a
-            # forgotten one. (Codex is pinned for binary/config lockstep.)
+            # forgotten one. Nothing is pinned today; codex was, for binary/
+            # config lockstep, and npm.txt says to re-pin it if that recurs.
             if [[ "${DF_MODE:-}" == "upgrade" ]]; then
                 _latest="$(npm view "$_name" version 2>/dev/null || true)"
                 if [[ -n "$_latest" && "$_latest" != "$_pin" ]]; then
-                    log_warn "  $_name HELD at $_pin — latest is $_latest. Bump the pin in packages/npm.txt deliberately, then re-run install/codex.sh check."
+                    log_warn "  $_name HELD at $_pin — latest is $_latest. Bump the pin in packages/npm.txt deliberately, then re-run that package's install script check."
                 fi
             fi
         else
