@@ -203,7 +203,16 @@ Tools that have no pre-built binary and are painful to compile (or only make sen
 ## Why Homebrew for Linux
 
 Homebrew on Linux installs natively on the host (no container, no sudo). It bundles its own
-glibc 2.35, making binaries fully self-contained regardless of the host's glibc version.
+glibc, making binaries fully self-contained regardless of the host's glibc version.
+
+**The glibc keg tracks the formula.** Homebrew's Linux bottles carry the glibc floor of the
+CI image that built them, and a builder move comes with a formula bump (Ubuntu 22.04 → 24.04
+and glibc 2.35 → 2.39 in July 2026). Since glibc is installed by `linux-packages.sh` rather
+than the `Brewfile`, nothing else would ever upgrade it — and a keg left behind makes every
+formula poured afterwards die with ``version `GLIBC_2.38' not found``. Each run reconciles the
+keg first, then checks the kegs installed since the last run against what the keg provides.
+The keg is built for the architecture baseline, not the build host's CPU, so a prefix built on
+an AVX-512 node still runs on every other machine sharing the home.
 
 **Custom prefix tradeoff:** Installing to `~/.local/$PLAT/brew/` instead of the standard
 `/home/linuxbrew/.linuxbrew` enables per-CPU isolation on shared NFS homes, but bottles

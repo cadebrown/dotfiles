@@ -22,17 +22,66 @@ custom prefix is the source of most build lore below.
 | `patch-homebrew-m4.sh` | Bypass gnulib undeclared-builtin probe (GCC builtins make it silently succeed, configure aborts) |
 | `patch-homebrew-pkgconf.sh` | Same gnulib probe as m4; pkgconf is a critical dep (openssh, podman, fish) |
 | `patch-homebrew-cc65.sh` | linux-headers CPATH — Makefile uses $(CC) $(CFLAGS) without $(CPPFLAGS) |
-| `patch-homebrew-mesa.sh` | pyyaml binary wheel (Cython SIGILL in superenv) |
+| `patch-homebrew-mesa.sh` | pyyaml binary wheel (Cython SIGILL in superenv) + bindgen `--gcc-install-dir` (rusticl bindings can't find `<cassert>`) |
 | `patch-homebrew-fastfetch.sh` | Disable WSL GPU detection — directx-headers shim fails at custom prefix |
 | `patch-homebrew-fish.sh` | Disable sphinx man pages — headless nodes lack configured locale for Python/sphinx |
 | `patch-homebrew-rpm.sh` | LUA_MATH_LIBRARY cmake fix — FindLua can't find libm; glibc is keg-only |
 | `patch-homebrew-systemd.sh` | lxml binary wheel (Cython SIGILL in superenv) |
 | `patch-homebrew-netpbm.sh` | GCC 15 C23 + incompatible-pointer fix |
+| `patch-homebrew-optflags.sh` | `HOMEBREW_OPTFLAGS_PLAT` overrides Linux's hardcoded `-march=native` — glibc is the one formula every machine builds from source |
 
 ## Gotchas
 
 - **Homebrew upgrades are off by default on Linux** (`DF_BREW_UPGRADE=0`) because glibc
   upgrades can break every installed binary. Use `bootstrap.sh upgrade` deliberately.
+- **The glibc keg must track the formula, or new bottles stop loading.** Linux bottles
+  carry the glibc floor of homebrew-core's builder image, and a builder move comes with
+  a formula bump (Ubuntu 22.04 → 24.04, glibc 2.35 → 2.39, Jul 2026). glibc is installed
+  by `linux-packages.sh`, not the Brewfile, so `brew bundle` never upgrades it — a keg
+  left behind means every formula poured afterwards dies with ``version `GLIBC_2.38' not
+  found``, naming the binary instead of the cause (Aug 2026: binutils, gcc@15, texlab,
+  tinymist, cadical, harper, juliaup, all from one bundle run). `linux-packages.sh` now
+  reconciles the keg before the bundle and scans kegs installed since the last run
+  against what the keg provides. Three asymmetries to remember: an upgrade is safe
+  (backward compatible — older kegs keep working); `brew reinstall glibc` is not
+  possible at all, because it unlinks the keg before building and every brew binary,
+  compiler included, loses its loader mid-flight; and a bare `brew upgrade glibc`
+  continues into `upgrade_dependents` after the 3-minute keg build, source-rebuilding
+  most of the Cellar for hours while holding formula locks that fail every other brew
+  command. `brew_glibc_build` sets `HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1`; by hand,
+  pass it too.
+- **libclang picks a GCC with no libstdc++ headers.** Ubuntu 24.04 ships gcc-14's runtime
+  bits while `/usr/include/c++/` stops at 13, and clang selects the highest-numbered dir
+  under `/usr/lib/gcc/<triple>/` regardless — so anything driving libclang (bindgen, IDE
+  tooling, standalone clang) dies on `fatal error: '<cassert>' file not found` for a
+  perfectly ordinary C++ header. clang even warns that it *would* pick 13 in a future
+  release and then doesn't. Fix is `--gcc-install-dir=<newest GCC that has
+  /usr/include/c++/N>`; Homebrew's own GCC does **not** work as a substitute (its Cellar
+  layout isn't what `--gcc-install-dir` expects). Currently hits mesa's rusticl frontend
+  (`patch-homebrew-mesa.sh` patch 2). Reproduce in one line:
+  `echo '#include <llvm/ADT/DenseMapInfo.h>' | clang++ -fsyntax-only -I "$(brew --prefix llvm)/include" -x c++ -`
+- **An interrupted dependents rebuild leaves dangling sonames.** `brew upgrade <x>` moves
+  a dependency and then rebuilds its dependents; kill it in between and the dependents
+  keep an RPATH into `opt/<dep>/lib` where the old soname no longer exists — e.g. node
+  25.8.1 after llhttp went 9.3.1 → 9.4.3: `node: error while loading shared libraries:
+  libllhttp.so.9.3`. The old keg is usually still in the Cellar, so it looks installed.
+  Fix is to rebuild the dependent (`brew upgrade node`), not to relink the old keg.
+- **"A `brew install X` process has already locked …" means contention, not corruption.**
+  Homebrew takes an flock per formula under `var/homebrew/locks`; a long-running brew
+  elsewhere (a dependents rebuild, another terminal) makes every other install fail one
+  formula at a time, and `brew bundle` surfaces it as a plain install failure. The locks
+  are released when the holder exits — `flock -n <lockfile> true` tells you whether one
+  is genuinely held. Deleting lock files is not the fix and races the holder;
+  `linux-packages.sh` warns up front when it sees a live brew on the prefix.
+- **Homebrew's Linux ENV ignores `HOMEBREW_OPTFLAGS` and always builds `-march=native`.**
+  `determine_optflags` hardcodes `:native` for Intel and ARM alike, and `glibc.rb` feeds
+  it straight into cflags — so the one library every binary in the prefix loads gets the
+  build host's exact ISA baked in, and dies with SIGILL or `Fatal glibc error: CPU does
+  not support x86-64-v4` on any older CPU sharing the home. `patch-homebrew-optflags.sh`
+  makes `HOMEBREW_OPTFLAGS_PLAT` win; `brew_glibc_build` in `linux-packages.sh` sets it
+  to the arch baseline. glibc picks its tuned memcpy/strlen through IFUNC at load time,
+  so the baseline build keeps the fast paths. Kegs built before this patch existed stay
+  native-tuned until the next formula bump rebuilds them.
 - **A renamed or deprecated cask blocks the greedy sweep forever.** `brew upgrade
   --cask --greedy` reverts and re-fails every run with `It seems there is already an App
   at '/Applications/X.app'` when the artifact name changed under a self-updating cask, or

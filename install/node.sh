@@ -37,6 +37,18 @@ else
 fi
 
 nvm alias default 25
+
+# Put nvm's bin at the front before activating. `nvm use` rewrites an existing
+# nvm entry in PATH *in place* rather than prepending, so it cannot recover the
+# ordering once something else has moved ahead of it — and under bootstrap `brew
+# shellenv` has done exactly that. Every `node`/`npm` below then runs Homebrew's
+# keg instead of the version nvm just selected. Aug 2026: a half-finished brew
+# dependency upgrade left that keg unable to start (`libllhttp.so.9.3`), and it
+# took the whole script down while nvm's own node sat there working.
+_nvm_node="$(nvm which default 2>/dev/null || true)"
+[[ -x "$_nvm_node" ]] && export PATH="$(dirname "$_nvm_node"):$PATH"
+unset _nvm_node
+
 nvm use default --silent
 
 log_okay "Node.js: $(node --version)"

@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # install/patch-homebrew-mesa.sh — patch mesa.rb for Linux custom-prefix builds
 #
-# ─── WHY THIS EXISTS ────────────────────────────────────────────────────────────
+# Two independent fixes, both Linux-only:
+#   1. pyyaml installs from its binary wheel (source build SIGILLs in superenv)
+#   2. bindgen gets a GCC that actually ships libstdc++ headers
+#
+# ─── WHY THIS EXISTS (1: pyyaml) ────────────────────────────────────────────────
 #
 # mesa is a dependency of fastfetch (and glfw, etc.). The mesa formula builds
 # Python resources (mako, markupsafe, packaging, ply, pyyaml) in a virtualenv
@@ -49,17 +53,51 @@
 # ply is excluded on Linux too (same as macOS) — mesa's meson build uses its
 # own GLSL parser; the ply-based fallback is not needed on either platform.
 #
+# ─── WHY THIS EXISTS (2: bindgen toolchain) ─────────────────────────────────────
+#
+# mesa builds its rusticl (OpenCL) frontend by running bindgen over LLVM's C++
+# headers. bindgen's libclang picks the highest-numbered GCC under /usr/lib/gcc
+# as its toolchain, and Ubuntu 24.04 ships gcc-14's runtime bits without the
+# matching libstdc++ headers (/usr/include/c++/ stops at 13). The whole build
+# then dies on the first standard header:
+#
+#   FAILED: src/gallium/frontends/rusticl/rusticl_llvm_bindings.rs
+#   llvm/ADT/DenseMapInfo.h:17:10: fatal error: 'cassert' file not found
+#
+# clang diagnoses its own mistake and does nothing about it:
+#
+#   warning: future releases of the clang compiler will prefer GCC installations
+#   containing libstdc++ include directories; '/usr/lib/gcc/x86_64-linux-gnu/13'
+#   would be chosen over '/usr/lib/gcc/x86_64-linux-gnu/14'
+#
+# Homebrew's own GCC can't stand in: its Cellar layout doesn't match what
+# --gcc-install-dir expects, and clang still fails to find <cassert>.
+#
+# ─── WHAT THE PATCH DOES (2) ────────────────────────────────────────────────────
+#
+# Before the meson setup call, sets BINDGEN_EXTRA_CLANG_ARGS to the newest system
+# GCC that carries C++ headers, matched to the host arch so cross-toolchains
+# under /usr/lib/gcc can't be picked. Left unset when no such GCC exists — the
+# build then fails exactly as it does today rather than silently differently.
+#
 # ─── SIDE EFFECTS ───────────────────────────────────────────────────────────────
 #
 # pyyaml is installed from its binary wheel instead of being compiled from source.
 # The wheel is ABI-compatible with the brew python@3.14 build. No functionality
 # is lost — only the compilation step is skipped.
 #
+# bindgen parses LLVM's headers against system GCC 13's libstdc++ instead of a
+# toolchain with no headers at all. Only the generated Rust bindings are affected;
+# mesa's own C/C++ is compiled by the superenv shim as before.
+#
 # ─── WHEN TO REMOVE ─────────────────────────────────────────────────────────────
 #
 # When the upstream mesa formula explicitly handles the pyyaml source build failure
 # on non-standard prefixes, or when the SIGILL root cause is fixed (e.g., a Cython
 # update that doesn't trigger the issue in the superenv).
+#
+# For (2): when clang ships the libstdc++-aware GCC selection its own warning
+# promises, or when the host stops carrying a GCC without C++ headers.
 #
 # ─── SKIP FLAG ──────────────────────────────────────────────────────────────────
 #
@@ -82,7 +120,7 @@ MESA_RB="$LOCAL_PLAT/brew/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/m
 
 [[ -f "$MESA_RB" ]] || { log_warn "mesa.rb not found at $MESA_RB — skipping"; exit 0; }
 
-log_section "Patching mesa formula for Linux (pyyaml binary wheel install)"
+log_section "Patching mesa formula for Linux (pyyaml wheel + bindgen toolchain)"
 
 _ORIG='    venv.pip_install resources.reject { |r| OS.mac? && r.name == "ply" }'
 
@@ -112,6 +150,40 @@ case "$_result" in
     already)  log_okay "mesa pyyaml binary-wheel patch already applied" ;;
     patched)  log_okay "Patched: mesa pyyaml installs from binary wheel on Linux" ;;
     notfound) log_warn "mesa patch target not found — formula may have changed; check mesa.rb" ;;
+esac
+
+### Patch 2: bindgen toolchain ###
+
+_ORIG='    system "meson", "setup", "build", *args, *std_meson_args'
+
+_FIX='    if OS.linux?
+      # rusticl'"'"'s bindgen runs libclang over LLVM'"'"'s C++ headers, and it picks
+      # the highest-numbered GCC under /usr/lib/gcc — on Ubuntu 24.04 that is
+      # gcc-14, whose libstdc++ headers are not installed, so every standard
+      # header is missing ("fatal error: '"'"'cassert'"'"' file not found"). Pin the
+      # newest system GCC that actually carries C++ headers, matched to the host
+      # arch so cross-toolchains cannot be selected.
+      gcc_arch = Utils.safe_popen_read("uname", "-m").chomp
+      gcc_dir = Dir["/usr/lib/gcc/#{gcc_arch}-*/*"]
+                .select { |d| File.directory?("/usr/include/c++/#{File.basename(d)}") }
+                .max_by { |d| File.basename(d).to_i }
+      ENV["BINDGEN_EXTRA_CLANG_ARGS"] = "--gcc-install-dir=#{gcc_dir}" if gcc_dir
+    end
+
+    system "meson", "setup", "build", *args, *std_meson_args'
+
+_result=$(python3 -c "
+import sys
+path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+txt = open(path).read()
+if new in txt:    print('already')
+elif old in txt:  open(path,'w').write(txt.replace(old, new, 1)); print('patched')
+else:             print('notfound')
+" "$MESA_RB" "$_ORIG" "$_FIX")
+case "$_result" in
+    already)  log_okay "mesa bindgen toolchain patch already applied" ;;
+    patched)  log_okay "Patched: mesa bindgen uses newest system GCC with C++ headers" ;;
+    notfound) log_warn "mesa bindgen patch target not found — formula may have changed; check mesa.rb" ;;
 esac
 unset _ORIG _FIX _result
 

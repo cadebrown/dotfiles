@@ -119,6 +119,14 @@ brew "llvm@21"
 brew "llvm@22"
 brew "lld"    # LLVM linker (now a separate formula)
 brew "mold"   # fast modern linker
+if OS.linux?
+  # Explicit, not transitive: the shell profiles put opt/binutils/bin at the
+  # front of PATH so nvcc gets an assembler new enough for its `.base64`
+  # pseudo-ops (binutils >= 2.39; Ubuntu 22.04 ships 2.38). A dependency-only
+  # keg can vanish when whatever pulled it in is removed, taking the PATH entry
+  # — and every nvcc blob compile — with it.
+  brew "binutils"
+end
 brew "ccache"  # C/C++ compiler cache
 brew "sccache" # compiler cache with Rust support (RUSTC_WRAPPER)
 # bacon: background cargo check/clippy/test on save (successor to cargo-watch).

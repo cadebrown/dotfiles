@@ -15,7 +15,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `plat-decommission.sh` | Removes leftover `~/.local/plat_*/` dirs after switching to flat layout | Standalone only — never invoked by `bootstrap.sh` (including upgrade). Refuses if `DF_USE_PLAT=1`. |
 | `zsh.sh` | oh-my-zsh + plugins (pure, autosuggestions, fsh, completions) | Clones or updates via git |
 | `homebrew.sh` | macOS: Homebrew + `brew bundle` from Brewfile | Upgrades enabled by default |
-| `linux-packages.sh` | Linux: Homebrew + glibc + `brew bundle` | Custom prefix, compiler symlinks, upgrades off by default |
+| `linux-packages.sh` | Linux: Homebrew + glibc + `brew bundle` | Custom prefix, compiler symlinks, upgrades off by default. glibc is reconciled against the formula (not the Brewfile) before the bundle and built for the baseline ISA; kegs installed since the last run are checked against the keg's symbol floor |
 | `macos-services.sh` | Colima + Ollama + mlxserve auto-start (rootless Docker + local LLM servers) — **gated off by default** — plus docker CLI-plugin symlinks (always run) | macOS only, skips on Linux. Auto-start is opt-in via `DF_START_LOCAL_SERVICES=1` (default 0); mlxserve alone held ~34GB RAM at login. colima/ollama are skip-only when off; mlxserve is actively `bootout` + `disable`d (launchd auto-loads its plist from `~/Library/LaunchAgents` each login, so skipping the bootstrap doesn't keep it off), and re-`enable`d when the flag goes back on. Manual control unaffected: `colima start` / `ollama serve` / `mlxserve`. |
 | `macos-settings.sh` | System prefs via `defaults write` (Dock, Finder, keyboard, trackpad, Safari, iTerm2) + sudo QoL: Touch ID (`/etc/pam.d/sudo_local`, pam_reattach for tmux) and a global 60-min sudo ticket (`/etc/sudoers.d/df-ticket`) | macOS only |
 | `macos-quick-actions.sh` | Deploys `*.workflow` bundles to `~/Library/Services/` (right-click Finder → "Open in Cursor") | macOS only; source bundles under `install/macos-quick-actions/`; flushes `pbs -flush` after changes |
@@ -161,6 +161,12 @@ re-runs the install script.
   `disable` mlxserve rather than just skip the bootstrap. Applies to `macos-services.sh`
   and `memory.sh` (qmd, cass-watch, cass-semantic) alike. `launchctl print-disabled
   gui/$(id -u)` shows the overrides.
+- **`nvm use` can't win a PATH fight it didn't start.** It rewrites an existing nvm entry
+  *in place* instead of prepending, so once `brew shellenv` has put brew's bin ahead of
+  nvm's (which bootstrap does), every `node`/`npm` in `node.sh` runs Homebrew's node keg
+  rather than the version nvm just selected — invisible until that keg breaks, at which
+  point the whole script fails with a linker error naming a library nobody asked for.
+  `node.sh` therefore prepends `$(dirname "$(nvm which default)")` before `nvm use`.
 - **Don't run install scripts without sourcing `_lib.sh`** — PLAT paths won't be set.
 - **`GIT_CONFIG_GLOBAL=/dev/null`** is set by `_lib.sh` intentionally — prevents SSH URL
   rewrites from breaking curl-based installers on machines without SSH keys.

@@ -2,16 +2,59 @@
 # install/linux-packages.sh - install packages on Linux via Homebrew
 #
 # Runs Homebrew directly on the host — no container, no Docker, no sudo.
-# Homebrew installs its own glibc 2.35 so binaries are self-contained and
-# portable across Linux systems regardless of the host glibc version.
+# Homebrew installs its own glibc so binaries are self-contained and portable
+# across Linux systems regardless of the host glibc version.
 #
 # Most packages pour as precompiled bottles. glibc builds from source (~2 min)
-# on first install and is installed explicitly before brew bundle so that all
-# subsequent bottles link against Homebrew's glibc rather than the system one.
+# and is installed — and kept in step with the formula — before brew bundle, so
+# that all subsequent bottles link against Homebrew's glibc, and so that the
+# keg is never older than the bottles Homebrew's CI is currently producing.
 
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+
+# _ver_lt A B — true when A sorts strictly before B in version order.
+_ver_lt() {
+    [[ "$1" != "$2" && "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" == "$1" ]]
+}
+
+# _glibc_keg_version PREFIX — version of the *linked* glibc keg. `brew list
+# --versions` lists every keg in the Cellar, and an upgrade leaves the previous
+# one there until cleanup; only the one opt/glibc points at is loaded.
+_glibc_keg_version() {
+    local _keg
+    _keg="$(readlink -f "$1/opt/glibc" 2>/dev/null || true)"
+    [[ -n "$_keg" ]] && basename "$_keg" || true
+}
+
+# _glibc_provided LIBC — highest GLIBC_x.y symbol version a libc.so.6 defines.
+_glibc_provided() {
+    grep -aoE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' "$1" 2>/dev/null | sort -Vu | tail -1
+}
+
+# _glibc_offenders PROVIDED < NUL-separated paths — prints "<path>\t<GLIBC_x.y>"
+# for every file needing a symbol version beyond PROVIDED.
+#
+# Reads the version strings straight out of .dynstr with grep -a instead of
+# readelf/objdump: when this check matters, brew's binutils is itself among the
+# binaries the loader refuses to start.
+_glibc_offenders() {
+    xargs -0 -r grep -aoHE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' 2>/dev/null \
+        | awk -F: -v provided="${1#GLIBC_}" '
+            function num(v,   p) { split(v, p, "."); return p[1] * 1000000 + p[2] * 1000 + p[3] }
+            BEGIN { limit = num(provided) }
+            {
+                sub(/^GLIBC_/, "", $2)
+                n = num($2)
+                if (n > limit && n > seen[$1]) { seen[$1] = n; need[$1] = $2 }
+            }
+            END { for (f in seen) print f "\tGLIBC_" need[f] }'
+}
+
+# Source-guard: tests/brew-glibc.bats sources this file for the helpers above —
+# everything below only runs when executed directly.
+[[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
 
 [[ "$OS" == "linux" ]] || { log_warn "Not on Linux — skipping"; exit 0; }
 
@@ -60,13 +103,73 @@ unset _GIT_PATH
 # resolve ANY formula name. Re-exported below right before brew tap + patches.
 unset HOMEBREW_NO_INSTALL_FROM_API
 
-### Install glibc first ###
+### Warn on a concurrent brew ###
 #
-# Homebrew's glibc (2.35) makes all bottles self-contained — binaries use
-# Homebrew's own loader (brew/lib/ld.so → opt/glibc/bin/ld.so) which resolves
-# libc from the Cellar rather than the host system. Without this step, machines
-# whose system glibc is already ≥ 2.35 would skip glibc and binaries would
-# silently depend on the host glibc — breaking portability to older systems.
+# Homebrew holds an flock per formula under var/homebrew/locks, so a brew
+# already working in this prefix makes this run fail formula by formula with
+#   A `brew install <x>` process has already locked .../Cellar/<dep>
+# naming the *other* process's command, which reads like corruption rather than
+# contention — and `brew bundle` reports it as a plain install failure. Say it
+# once, up front. Only local processes are visible; a brew on another machine
+# sharing this prefix looks the same to Homebrew and is unsupported either way.
+if pgrep -f "$_REAL_BREW_PREFIX/Homebrew" &>/dev/null; then
+    log_warn "Another brew process is using this prefix — installs below will fail on formula locks:"
+    while IFS= read -r _proc; do
+        log_warn "  $_proc"
+    done < <(pgrep -af "$_REAL_BREW_PREFIX/Homebrew" | cut -c1-100 | head -3)
+    log_warn "  Wait for it to finish (or terminate it) and re-run."
+    unset _proc
+fi
+
+# brew_glibc_build install|upgrade glibc — source-build glibc for the baseline
+# ISA rather than the build host's.
+#
+# Homebrew's Linux ENV hardcodes -march=native (see patch-homebrew-optflags.sh),
+# which bakes the build machine's ISA into the one library every binary in the
+# prefix loads. A prefix built on an AVX-512 node then dies on every older CPU
+# that mounts the same home with "Fatal glibc error: CPU does not support
+# x86-64-v4". glibc selects its tuned memcpy/strlen through IFUNC resolvers at
+# load time, so the baseline build keeps the fast paths regardless.
+#
+# HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK is the second half of the job. Left
+# unset, `brew upgrade glibc` follows up by rebuilding every dependent whose
+# linkage it considers stale — on a custom prefix that means source-building
+# most of the Cellar, hours of work for a library that is backward compatible by
+# design and whose existing kegs keep running untouched (Aug 2026: an unguarded
+# upgrade was still rebuilding dependents 45 minutes later, holding formula
+# locks that failed every other brew command in the meantime).
+brew_glibc_build() {
+    local _baseline
+    case "$ARCH" in
+        x86_64)  _baseline="-march=x86-64" ;;
+        aarch64) _baseline="-march=armv8-a" ;;
+        *)       _baseline="" ;;
+    esac
+    (
+        bash "$DF_INSTALL_DIR/patch-homebrew-optflags.sh" || true
+        export HOMEBREW_OPTFLAGS_PLAT="$_baseline"
+        export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
+        brew "$@" 2>&1
+    )
+}
+
+### Reconcile glibc first ###
+#
+# Homebrew's glibc makes all bottles self-contained — binaries use Homebrew's
+# own loader (brew/lib/ld.so → opt/glibc/bin/ld.so) which resolves libc from the
+# Cellar rather than the host system. Without this step, machines whose system
+# glibc is already recent enough would skip glibc and binaries would silently
+# depend on the host glibc — breaking portability to older systems.
+#
+# The keg must then be kept in step with the formula, because Homebrew's Linux
+# bottles are only guaranteed to run against the glibc Homebrew itself ships.
+# When homebrew-core moves its builder image (Ubuntu 22.04 → 24.04, Jul 2026) it
+# bumps the glibc formula (2.35 → 2.39) in the same breath, and every bottle
+# poured afterwards carries the newer floor. An installed-but-stale keg then
+# fails *only* on freshly poured formulas, with an error that names the binary
+# rather than the cause:
+#   .../bin/as: .../opt/glibc/lib/libc.so.6: version `GLIBC_2.38' not found
+# The check at the end of this script catches any that slip through.
 #
 # Exception: Homebrew refuses to source-build glibc when host glibc is strictly
 # newer than its own (e.g. Ubuntu 24.04 / Debian 13 aarch64 ship glibc 2.39 vs
@@ -77,22 +180,49 @@ unset HOMEBREW_NO_INSTALL_FROM_API
 # On those hosts we skip glibc entirely; bottles will link against the host
 # loader. Portability to older hosts is lost — acceptable on a host whose
 # daily driver is itself a newer host.
-if brew list glibc &>/dev/null; then
-    log_okay "glibc already installed"
-else
-    _sys_glibc="$(ldd --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+$' || true)"
+_glibc_changed=0
+_sys_glibc="$(ldd --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+$' || true)"
+
+if ! brew list glibc &>/dev/null; then
     _brew_glibc="$(brew info glibc 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 || true)"
     # Strictly older: brew refuses; skip with warning. Equal or newer: proceed.
-    if [[ -n "$_sys_glibc" && -n "$_brew_glibc" \
-          && "$_brew_glibc" != "$_sys_glibc" \
-          && "$(printf '%s\n%s\n' "$_brew_glibc" "$_sys_glibc" | sort -V | head -1)" == "$_brew_glibc" ]]; then
+    if [[ -n "$_sys_glibc" && -n "$_brew_glibc" ]] && _ver_lt "$_brew_glibc" "$_sys_glibc"; then
         log_warn "Host glibc $_sys_glibc > Homebrew glibc $_brew_glibc — skipping brew glibc install"
         log_warn "  Bottles will link against the host loader. Binaries are not portable to hosts with glibc < $_sys_glibc."
     else
         log_info "Installing glibc (builds from source, ~2 min)..."
-        brew install glibc 2>&1
+        brew_glibc_build install glibc
+        _glibc_changed=1
     fi
-    unset _sys_glibc _brew_glibc
+    unset _brew_glibc
+else
+    # `brew outdated --verbose` prints "glibc (2.35_2) < 2.39_1", nothing when
+    # current. Revision suffixes (_1) are Homebrew's, not glibc's — strip before
+    # comparing against the host.
+    _glibc_outdated="$(brew outdated --formula --verbose glibc 2>/dev/null | head -1 || true)"
+    _glibc_have="$(_glibc_keg_version "$_REAL_BREW_PREFIX")"
+    _glibc_want="${_glibc_outdated##* }"
+
+    if [[ -z "$_glibc_outdated" ]]; then
+        log_okay "brew glibc ${_glibc_have:-installed} is current"
+    elif [[ -n "$_sys_glibc" ]] && _ver_lt "$_sys_glibc" "${_glibc_want%%_*}"; then
+        # Homebrew won't build a glibc newer than the host's, and this is the one
+        # combination it can't dig itself out of: the keg stays behind the
+        # bottles. Upgrading the host, or dropping the keg and reinstalling every
+        # formula against the host loader, are the only ways out.
+        log_warn "brew glibc $_glibc_have is behind formula $_glibc_want, but host glibc is only $_sys_glibc"
+        log_warn "  Homebrew refuses to build a glibc newer than the host — newly poured bottles will fail to load."
+        log_warn "  See docs/usage/troubleshooting.md (\"GLIBC_x.y not found\")."
+    else
+        log_info "Upgrading brew glibc $_glibc_have → $_glibc_want (builds from source, ~2 min)..."
+        if brew_glibc_build upgrade glibc; then
+            _glibc_changed=1
+            log_okay "brew glibc upgraded to $_glibc_want"
+        else
+            log_warn "brew glibc upgrade failed — bottles newer than $_glibc_have will not load"
+        fi
+    fi
+    unset _glibc_outdated _glibc_have _glibc_want
 fi
 
 ### Pre-install gcc@13 and pin source-build compiler ###
@@ -269,6 +399,12 @@ else
     # See install/patch-homebrew-pkgconf.sh for full details.
     [[ -f "$DF_INSTALL_DIR/patch-homebrew-pkgconf.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-pkgconf.sh"
 
+    # gecode: builds without Gist (its Qt search-tree viewer) on Linux, which is
+    # the only reason gecode — and therefore minizinc — pulls in qtbase. qtbase
+    # links the wrong ICU on a custom prefix and fails outright.
+    # See install/patch-homebrew-gecode.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-gecode.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-gecode.sh"
+
     # netpbm: GCC 15 changed its default C standard from C17 to C23. C23 makes
     # `bool` a keyword, breaking netpbm's `typedef unsigned char bool` in buildtools/
     # libopt.c. Fix: force -std=gnu17 on Linux via ENV.append_to_cflags.
@@ -319,12 +455,18 @@ fi
 # Fix: generate en_US.UTF-8 into $LOCAL_PLAT/locale/ using brew's own localedef
 # and i18n data. The shell profiles export LOCPATH pointing there so brew zsh
 # picks it up at startup.
+#
+# The archive is glibc's own binary format and is read by the loader that
+# generated it, so a version stamp forces a regenerate whenever the keg moves.
 
 BREW_GLIBC="$LOCAL_PLAT/brew/opt/glibc"
 LOCALE_DIR="$LOCAL_PLAT/locale"
+_LOCALE_STAMP="$LOCALE_DIR/.glibc-version"
+_glibc_installed="$(_glibc_keg_version "$_REAL_BREW_PREFIX")"
 
 if [[ -x "$BREW_GLIBC/bin/localedef" ]]; then
-    if [[ -f "$LOCALE_DIR/en_US.UTF-8/LC_CTYPE" ]]; then
+    if [[ -f "$LOCALE_DIR/en_US.UTF-8/LC_CTYPE" \
+          && "$(cat "$_LOCALE_STAMP" 2>/dev/null || true)" == "$_glibc_installed" ]]; then
         log_okay "brew glibc locale already generated"
     else
         log_info "Generating en_US.UTF-8 locale for brew glibc → $LOCALE_DIR"
@@ -335,11 +477,13 @@ if [[ -x "$BREW_GLIBC/bin/localedef" ]]; then
                 --prefix="$LOCALE_DIR" \
                 -i en_US -f UTF-8 \
                 "$LOCALE_DIR/en_US.UTF-8"
+        printf '%s\n' "$_glibc_installed" > "$_LOCALE_STAMP"
         log_okay "locale generated"
     fi
 else
     log_warn "brew glibc localedef not found — skipping locale generation"
 fi
+unset _LOCALE_STAMP
 
 ### SYSTEM LDCONFIG (brew's ld.so needs to find system driver libs) ###
 #
@@ -363,7 +507,12 @@ _SYS_CONF="$_BREW_LDCONF_D/99-system-ld.so.conf"
 _SYS_CONF_EXAMPLE="${_SYS_CONF}.example"
 
 if [[ -x "$_BREW_LDCONFIG" ]]; then
-    if [[ -f "$_SYS_CONF" ]]; then
+    if [[ -f "$_SYS_CONF" && "$_glibc_changed" == "1" ]]; then
+        # The cache records Cellar paths, which the upgrade just moved.
+        log_info "Rebuilding brew ldconfig cache after glibc change"
+        run_logged "$_BREW_LDCONFIG"
+        log_okay "brew ldconfig rebuilt"
+    elif [[ -f "$_SYS_CONF" ]]; then
         log_okay "brew ldconfig already includes system paths"
     elif [[ -f "$_SYS_CONF_EXAMPLE" ]]; then
         log_info "Enabling system paths in brew ldconfig (99-system-ld.so.conf)"
@@ -410,6 +559,57 @@ if [[ -n "$_LLVM_LATEST" ]]; then
     ln -sf "$_LLVM_LATEST/clang-tidy" "$_PLAT_BIN/clang-tidy"
     echo "[ok]   Linked $_LLVM_VER → $_PLAT_BIN/clang"
 fi
+
+### Verify kegs against the glibc keg ###
+#
+# A bottle poured from a builder image newer than the glibc keg loads nothing:
+#   .../bin/as: .../opt/glibc/lib/libc.so.6: version `GLIBC_2.38' not found
+# Nothing upstream announces the floor, and the message names the victim rather
+# than the cause, so check for it here instead of discovering it a month later
+# in a build log. Only relevant while a brew glibc keg exists — without one,
+# bottles resolve against the host loader, which brew already required to be new
+# enough before skipping the keg.
+#
+# Scanning every keg costs ~30s of NFS reads, so the stamp file scopes routine
+# runs to kegs installed since the last scan. A glibc change invalidates the
+# stamp and forces a full pass — exactly when every keg's floor is back in play.
+
+_GLIBC_LIBC="$_REAL_BREW_PREFIX/opt/glibc/lib/libc.so.6"
+_SCAN_STAMP="$_REAL_LOCAL_PLAT/.brew-glibc-scan"
+
+if [[ -f "$_GLIBC_LIBC" ]]; then
+    _provided="$(_glibc_provided "$_GLIBC_LIBC")"
+    _find_args=()
+    if [[ "$(cat "$_SCAN_STAMP" 2>/dev/null || true)" == "$_provided" ]]; then
+        _find_args=(-newer "$_SCAN_STAMP")
+        log_info "Checking kegs installed since the last scan against $_provided"
+    else
+        log_info "Checking all kegs against $_provided (glibc changed or first run)"
+    fi
+
+    _offenders="$(
+        find "$_REAL_BREW_PREFIX/Cellar" -mindepth 3 -maxdepth 4 -type f \
+            \( -path '*/bin/*' -o -path '*/sbin/*' \) "${_find_args[@]}" -print0 2>/dev/null \
+            | _glibc_offenders "$_provided" \
+            | sed -E "s|^$_REAL_BREW_PREFIX/Cellar/([^/]+)/([^/]+)/.*\t|\1 \2\t|" \
+            | sort -u | awk -F'\t' '!seen[$1]++'
+    )"
+
+    if [[ -z "$_offenders" ]]; then
+        log_okay "All scanned kegs load against brew glibc ($_provided)"
+        printf '%s\n' "$_provided" > "$_SCAN_STAMP"
+    else
+        log_warn "Kegs needing a newer glibc than the brew keg provides ($_provided):"
+        while IFS=$'\t' read -r _keg _need; do
+            log_warn "  $_keg → $_need"
+        done <<< "$_offenders"
+        log_warn "  Their binaries fail with \"version \`GLIBC_x.y' not found\"."
+        log_warn "  See docs/usage/troubleshooting.md (\"GLIBC_x.y not found\")."
+        rm -f "$_SCAN_STAMP"
+    fi
+    unset _provided _find_args _offenders _keg _need
+fi
+unset _GLIBC_LIBC _SCAN_STAMP
 
 log_okay "Linux packages installed at $_REAL_BREW_PREFIX"
 log_info "Compilers: gcc, g++, clang, clang++ → $_PLAT_BIN/"

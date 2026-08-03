@@ -250,6 +250,95 @@ in `.claude/rules/homebrew.md`.
 
 ---
 
+## `GLIBC_x.y not found` from a Homebrew binary (Linux)
+
+Symptom: a brew-installed binary refuses to start, blaming Homebrew's own libc:
+
+```
+.../opt/binutils/bin/as: .../opt/glibc/lib/libc.so.6: version `GLIBC_2.38' not found
+```
+
+Only *some* binaries are affected — the recently installed ones — and the error
+names whichever binary you happened to run, so it reads like a problem with that
+package. `ldd` disagrees and shows the system libc, because it resolves through
+the system loader while the binary itself runs under `brew/lib/ld.so`.
+
+Root cause: the glibc keg is older than the bottles. Homebrew's Linux bottles
+carry the glibc floor of the CI image that built them, and when homebrew-core
+moves that image it bumps the `glibc` formula in the same breath (Ubuntu 22.04 →
+24.04, glibc 2.35 → 2.39, July 2026). Nothing upgrades an installed glibc keg on
+its own — it isn't in the Brewfile — so every formula poured after the move lands
+with a floor the keg can't meet. Aug 2026: seven kegs (`binutils`, `gcc@15`,
+`texlab`, `tinymist`, `cadical`, `harper`, `juliaup`) broke at once, all poured
+by one `brew bundle` run days after the builder moved.
+
+Confirm:
+
+```sh
+brew outdated --formula --verbose glibc      # glibc (2.35_2) < 2.39_1
+ldd --version | head -1                      # host glibc
+jq -r '.built_on.os_version' "$(brew --cellar)"/<formula>/*/INSTALL_RECEIPT.json
+```
+
+**Fix:** rerun `install/linux-packages.sh`. It reconciles the keg against the
+formula before the bundle, and checks every keg installed since the last run
+against what the keg provides. The broken kegs need no reinstall — they were
+fine all along; only the loader under them was too old.
+
+Upgrading by hand needs one guard:
+
+```sh
+HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1 brew upgrade glibc
+```
+
+A bare `brew upgrade glibc` moves the keg in ~3 minutes and then spends hours
+source-rebuilding every dependent whose linkage it considers stale, holding a
+formula lock the whole time so every other brew command fails with "has already
+locked". The rebuild buys nothing: glibc is backward compatible, and the kegs
+built against the old one keep running.
+
+Homebrew refuses to build a glibc newer than the host's, so a host older than the
+formula can't be fixed this way. That combination has no in-place remedy: either
+the host glibc moves, or the keg goes and every formula is reinstalled against
+the host loader. The script warns rather than pretending.
+
+Related: `brew reinstall glibc` fails with `Errno::ENOENT ... gcc-13`. Reinstall
+unlinks the keg before building, which leaves `brew/lib/ld.so` dangling, and no
+brew binary — including the compiler — can start. Upgrades build the new keg
+first and are safe; a keg can only be rebuilt at the same version by rebuilding
+the prefix.
+
+---
+
+## A Homebrew binary can't find `libX.so.N` after an upgrade
+
+Symptom: one program stops starting, naming a library version that used to exist:
+
+```
+node: error while loading shared libraries: libllhttp.so.9.3: cannot open shared object file
+```
+
+Root cause: `brew upgrade <formula>` doesn't stop at the formula — it then rebuilds every
+dependent whose linkage the upgrade invalidated. Interrupt it in between (Ctrl-C, a
+killed terminal, a timeout) and you're left with the new dependency and the old
+dependent: the dependent's RPATH points at `opt/<dep>/lib`, which now holds only the new
+soname. Both kegs are usually still in the Cellar, so `brew list` looks healthy.
+
+Confirm:
+
+```sh
+brew list --versions <dep>                      # e.g. llhttp 9.3.1 9.4.3
+readelf -d "$(brew --prefix)/opt/<formula>/bin/<prog>" | grep RPATH
+```
+
+**Fix:** rebuild the dependent — `brew upgrade <formula>` (or `reinstall`). Don't relink
+the old dependency keg; that just moves the breakage to whatever wanted the new one.
+
+Prevention: pass `HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1` when you upgrade something
+with many dependents, so nothing half-finishes in the first place.
+
+---
+
 ## `nvm` or `node` not available in a script
 
 `nvm.sh` is lazy-loaded in interactive shells only. Non-interactive shells get `node`/`npm` via the PATH entry `.zprofile`/`.bash_profile` adds from the highest installed version. If `node` is missing in a script, either:
