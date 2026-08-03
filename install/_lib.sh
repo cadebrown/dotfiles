@@ -236,6 +236,24 @@ export OS ARCH DF_ROOT DF_PACKAGES DF_USE_PLAT \
        GOPATH GOBIN GOCACHE \
        ELAN_HOME JULIAUP_DEPOT_PATH JULIA_DEPOT_PATH
 
+# Node comes from nvm, ahead of whatever else is on PATH — the same order the
+# shell profiles establish, restated here because install scripts inherit the
+# caller's PATH and `brew shellenv` puts brew's bin in front of it.
+#
+# This is not cosmetic: native npm addons are ABI-locked to the Node major that
+# built them, so a global installed under nvm's node dies the moment Homebrew's
+# node runs it —
+#   better_sqlite3.node was compiled against NODE_MODULE_VERSION 141.
+#   This version of Node.js requires NODE_MODULE_VERSION 147
+# — and only for the subcommands that actually load the addon, which is how it
+# stayed hidden (`qmd collection show` passes, `qmd update` aborts).
+if [[ -d "$NVM_DIR/versions/node" ]]; then
+    _nvm_bin="$NVM_DIR/versions/node/$(ls "$NVM_DIR/versions/node" 2>/dev/null | sort -V | tail -1)/bin"
+    [[ -d "$_nvm_bin" ]] && PATH="$_nvm_bin:$PATH"
+    unset _nvm_bin
+    export PATH
+fi
+
 # Install scripts clone public repos and must not be affected by the user's
 # gitconfig (which may have url.insteadOf SSH rewrites, breaking clones on
 # machines without SSH keys — Docker, CI, fresh Linux boxes).

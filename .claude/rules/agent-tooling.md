@@ -152,6 +152,19 @@ and chezmoi-managed guidance files built from shared partials.
   1.94.0 even after rust.sh updated rustup to 1.97.1. `_cass_build_from_source` now installs
   nightly on demand and invokes `$CARGO_HOME/bin/cargo +nightly` explicitly. If cass still
   won't build, run `which -a cargo` for a stray brew rust and `brew uninstall rust`.
+- **npm globals belong to exactly one Node, and native addons enforce it.** Node's
+  `NODE_MODULE_VERSION` changes every major, so a package with native addons
+  (qmd → better-sqlite3, sqlite-vec, node-llama-cpp) only runs under the Node that
+  installed it. Two hazards, both live in Aug 2026: every `npm.txt` package had been
+  installed twice — once under nvm, once under Homebrew's node keg (a fossil from when
+  brew's node shadowed nvm's during bootstrap) — and upgrading brew's node 25 → 26 then
+  broke its copies with `ERR_DLOPEN_FAILED ... compiled against NODE_MODULE_VERSION 141
+  ... requires 147`. It hides well: only subcommands that load the addon fail, so
+  `qmd collection show` passes while `qmd update` aborts. `_lib.sh` now prepends nvm's
+  bin for every install script (`brew shellenv` otherwise puts brew's node first, and
+  the shebang is `#!/usr/bin/env node`), and the duplicate globals were removed with
+  `npm uninstall -g --prefix "$(brew --prefix)" <pkg>`. Check with
+  `npm ls -g --depth=0 --prefix "$(brew --prefix)"` — it should list only `npm` itself.
 - **Guard qmd collections with `collection show`, not by grepping `collection list`.**
   `list` prints a human-readable report and a grep guard can't tell "absent" from "that
   command failed" — with stderr discarded, one hiccup reads as absent, and the

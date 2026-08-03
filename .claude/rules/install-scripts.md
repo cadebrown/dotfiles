@@ -161,6 +161,11 @@ re-runs the install script.
   `disable` mlxserve rather than just skip the bootstrap. Applies to `macos-services.sh`
   and `memory.sh` (qmd, cass-watch, cass-semantic) alike. `launchctl print-disabled
   gui/$(id -u)` shows the overrides.
+- **`_lib.sh` puts nvm's node in front of the inherited PATH.** Install scripts get
+  whatever PATH the caller had, and `brew shellenv` leads with brew's bin — so any
+  script calling an npm global would run it under Homebrew's node, which is ABI-wrong
+  for addons installed by nvm's (see `.claude/rules/agent-tooling.md`). Sourcing
+  `_lib.sh` now normalizes that, matching the order the shell profiles already use.
 - **`nvm use` can't win a PATH fight it didn't start.** It rewrites an existing nvm entry
   *in place* instead of prepending, so once `brew shellenv` has put brew's bin ahead of
   nvm's (which bootstrap does), every `node`/`npm` in `node.sh` runs Homebrew's node keg

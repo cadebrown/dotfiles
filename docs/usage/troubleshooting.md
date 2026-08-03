@@ -310,6 +310,36 @@ the prefix.
 
 ---
 
+## `NODE_MODULE_VERSION` mismatch / `ERR_DLOPEN_FAILED` from an npm tool
+
+Symptom: an npm-installed CLI dies loading a native addon, usually mid-script:
+
+```
+Error: The module '.../node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+was compiled against a different Node.js version using NODE_MODULE_VERSION 141.
+This version of Node.js requires NODE_MODULE_VERSION 147.
+```
+
+Root cause: the package was installed under one Node major and is being run by
+another. Native addons are ABI-locked per major, and the bin shebang is
+`#!/usr/bin/env node` — so whichever Node is first on PATH wins. Two ways in:
+
+- **Two Node layers.** Globals installed under Homebrew's node keg *and* under nvm.
+  List them: `npm ls -g --depth=0 --prefix "$(brew --prefix)"` should show only `npm`.
+  Remove strays with `npm uninstall -g --prefix "$(brew --prefix)" <pkg>` — nvm is the
+  layer that owns npm globals.
+- **PATH order.** `brew shellenv` puts brew's bin ahead of nvm's; `install/_lib.sh`
+  restores nvm-first for install scripts, but an ad-hoc shell can still invert it.
+
+It hides well: only subcommands that actually load the addon fail. `qmd collection
+show` works while `qmd update` aborts, which reads like a broken index rather than a
+broken interpreter.
+
+**Fix:** run it under the Node that installed it (`command -v node` should be under
+`$NVM_DIR`), or reinstall the package under the current Node (`npm install -g <pkg>`).
+
+---
+
 ## A Homebrew binary can't find `libX.so.N` after an upgrade
 
 Symptom: one program stops starting, naming a library version that used to exist:
