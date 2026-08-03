@@ -153,6 +153,14 @@ export PATH="$ELAN_HOME/bin:$PATH"
 export JULIAUP_DEPOT_PATH="$_LOCAL_PLAT/julia/juliaup"
 export JULIA_DEPOT_PATH="$_LOCAL_PLAT/julia/depot"
 
+### TEX ###
+
+# MacTeX (Brewfile cask) installs outside any PATH dir — without this, pdflatex/
+# latexmk/chktex exist on disk but resolve to nothing. Appended, not prepended:
+# Linux gets the same binaries from TinyTeX symlinked into $_LOCAL_PLAT/bin,
+# which must keep winning on machines that have both.
+[ -d /Library/TeX/texbin ] && export PATH="$PATH:/Library/TeX/texbin"
+
 ### GO ###
 
 # GOBIN equals $_LOCAL_PLAT/bin (already on PATH), so `go install` binaries

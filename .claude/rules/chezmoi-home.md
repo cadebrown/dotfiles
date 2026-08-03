@@ -23,6 +23,9 @@ must render identically on every machine** — otherwise machines overwrite each
   (`home/dot_claude/output-styles/cade.md.tmpl`, system-prompt level); Codex,
   opencode, and pi include it directly in their always-on file. It is
   deliberately **not** in `agents-common.md`, so Claude doesn't load voice twice.
+- `math-common.md` — research-mathematics norms: the Lean proof gate, evidence
+  tiers (CAS/numeric output is evidence, never proof), and tool routing to the
+  lean-lsp/asta/arxiv/mathlas MCPs. Included by all four guidance files.
 - `locale-env.sh` — the OS-branched locale block (macOS: LANG+LC_ALL; Linux:
   LOCPATH → `unset LC_ALL` → LANG). Included by BOTH login profiles AND both
   interactive rc files — embedded terminals (VS Code/Cursor Remote-SSH) spawn
@@ -47,6 +50,10 @@ See [docs/usage/agents.md](../../docs/usage/agents.md).
 - Go env: `GOPATH=$LOCAL_PLAT/go` (module cache + workspace), `GOBIN=$ARCH_BIN`
   (binary install target — same dir as cargo/uv outputs, so no second PATH entry),
   `GOCACHE=$LOCAL_PLAT/go-build` (build cache, parallel to `CARGO_TARGET_DIR`).
+- TeX env: `/Library/TeX/texbin` is **appended**, not prepended. MacTeX installs
+  outside every PATH dir, so without the entry pdflatex/latexmk/chktex exist on
+  disk and resolve to nothing; appending keeps Linux's TinyTeX binaries (symlinked
+  into `$ARCH_BIN` by `latex.sh`) winning on a machine that somehow has both.
 - `$LOCAL_PLAT/venv/bin` was removed — Python CLI tools now use `uv tool install`
   (isolated venvs under `$LOCAL_PLAT/uv/tools/`).
 - On Linux, `LOCPATH` must be exported before `LANG` (the export triggers the

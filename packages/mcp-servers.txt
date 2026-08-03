@@ -176,10 +176,12 @@ mathlas stdio cmd: uvx mathlas-mcp
 # Registers unauthenticated until ~/.asta.env exists.
 asta http https://asta-tools.allen.ai/mcp/v1 auth=asta
 
-# lean-explore: semantic search across Lean libraries beyond Mathlib (local
-# backend — 3.7 GB index at ~/.lean_explore via `lean-explore data fetch`;
-# CLI itself is in pip.txt). API backend exists but needs a key.
-lean-explore stdio cmd: uvx lean-explore mcp serve --backend local
+# lean-explore: semantic search across Lean libraries beyond Mathlib (CLI itself
+# is in pip.txt). The API backend is keyless as of 1.29 (--api-key is accepted
+# and ignored). The local backend needs a 3.7 GB `lean-explore data fetch` whose
+# CDN is blocked on filtered corporate DNS — it writes the block page and exits
+# 0, so the failure only shows up later as "Essential data files are missing".
+lean-explore stdio cmd: uvx lean-explore mcp serve --backend api
 
 # wolfram: real Wolfram Language evaluation (AgentTools paclet, StartMCPServer)
 # — upgrades the wolfram-alpha/wolfram-language skills from "answers" to

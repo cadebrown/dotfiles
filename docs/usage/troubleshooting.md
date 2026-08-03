@@ -876,3 +876,55 @@ Related trap: pinning `cysignals` older than what passagemath wheels were
 built against fails later with `cysignals.signals does not export expected C
 function _do_raise_exception` — keep the resolver's cysignals (1.12.x), fix
 the handlers instead.
+
+## `pdflatex: command not found` on macOS with MacTeX installed
+
+**Symptom.** `brew list --cask` shows `mactex` and
+`/Library/TeX/texbin/pdflatex` exists and is executable, but `pdflatex`,
+`latexmk`, `chktex`, and `texcount` all report "command not found".
+
+**Root cause.** MacTeX installs into `/Library/TeX/texbin`, which is on no
+default PATH. Its installer drops a `/etc/paths.d/TeX` entry, but that only
+reaches `path_helper`-processed shells, and these profiles rebuild PATH
+themselves. `install/latex.sh` verified the binary by absolute path, so the
+step reported `[okay]` while nothing was actually reachable.
+
+**Confirm.**
+```bash
+ls /Library/TeX/texbin/pdflatex   # exists
+command -v pdflatex               # nothing
+```
+
+**Fix.** Handled by both shell profiles:
+```sh
+[ -d /Library/TeX/texbin ] && path=($path /Library/TeX/texbin)   # zprofile
+```
+Appended, not prepended, so Linux's TinyTeX binaries (symlinked into
+`$ARCH_BIN` by `latex.sh`) keep priority on a machine with both. Run
+`chezmoi apply ~/.zprofile ~/.bash_profile` and start a new shell.
+
+## `brew bundle` installs nothing new and exits 0
+
+**Symptom.** `brew bundle install` prints only `Using <formula>` lines and
+succeeds. Packages just added to the Brewfile never appear, and no error names
+them.
+
+**Root cause.** A cask-only package declared as `brew "..."` instead of
+`cask "..."`. Homebrew resolves the whole dependency graph before installing
+anything, so one unsatisfiable entry aborts the entire run — every other new
+package is collateral, which is what makes this read as a no-op rather than a
+failure. Hit Aug 2026 with `brew "quarto"`: homebrew-core has no quarto formula
+at all, only a cask.
+
+**Confirm.**
+```bash
+brew bundle check --file=packages/Brewfile --verbose
+# → Formula quarto needs to be installed or updated.
+brew info --formula quarto
+# → Error: No available formula ... Found a cask named "quarto" instead.
+```
+
+**Fix.** Move it into the `if OS.mac?` block as `cask "quarto"`. Casks are
+macOS-only, so a cask-only tool has no Homebrew route on Linux — install it
+another way there rather than leaving a `brew` line that breaks every bundle
+run. Check a new entry with `brew info --formula <name>` before committing.

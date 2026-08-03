@@ -57,8 +57,9 @@ brew "graphviz"
 brew "pandoc"
 brew "texlab"    # LaTeX LSP (integrates chktex)
 brew "harper"    # harper-ls/harper-cli — Automattic's local Rust grammar checker
-brew "quarto"    # notes/books/sites from one source; PDF via LaTeX or typst backend
 brew "tinymist"  # Typst LSP + CLI (preview/export; bundles typstyle)
+# quarto is macOS-cask-only (see the OS.mac? block) — homebrew-core has no
+# formula, and naming one aborts the whole `brew bundle` run, not just its line.
 
 ### Research mathematics ###
 # gp collides with the `gp='git push'` shell alias in interactive shells —
@@ -305,6 +306,7 @@ if OS.mac?
   # manual download from blackmagicdesign.com.
   cask "sage"
   cask "zotero"
+  cask "quarto"  # notes/books/sites from one source; PDF via LaTeX or typst backend
   cask "blender"
   cask "kdenlive"
   cask "touchdesigner"
