@@ -152,6 +152,13 @@ and chezmoi-managed guidance files built from shared partials.
   1.94.0 even after rust.sh updated rustup to 1.97.1. `_cass_build_from_source` now installs
   nightly on demand and invokes `$CARGO_HOME/bin/cargo +nightly` explicitly. If cass still
   won't build, run `which -a cargo` for a stray brew rust and `brew uninstall rust`.
+- **Guard qmd collections with `collection show`, not by grepping `collection list`.**
+  `list` prints a human-readable report and a grep guard can't tell "absent" from "that
+  command failed" — with stderr discarded, one hiccup reads as absent, and the
+  `collection add` that follows exits non-zero on an existing collection, killing
+  `memory.sh` under `set -e` (`Collection 'kb' already exists.` → `[fail] memory.sh
+  failed`, Aug 2026). `collection show <name>` answers by exit code (0/1), and a failed
+  add now degrades to a warning rather than taking the daemons down with it.
 - **Memory indexes are per-machine** — qmd (~/.cache/qmd) and cass (~/.cass) are
   local; only ~/kb (git) and dotfiles sync across machines. qmd on macOS needs
   Homebrew sqlite (system libsqlite3 blocks loadable extensions).

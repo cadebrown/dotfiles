@@ -243,11 +243,26 @@ fi
 if ! has qmd; then
     log_warn "qmd not found — run install/node.sh (npm.txt has @tobilu/qmd); skipping qmd setup"
 else
-    # Collections: kb + Claude auto-memory + dotfiles docs. Guarded by name.
-    _qmd_has() { qmd collection list 2>/dev/null | grep -q "$1"; }
-    _qmd_has "kb"           || run_logged qmd collection add "$HOME/kb" --name kb
-    _qmd_has "agent-memory" || run_logged qmd collection add "$HOME/.claude/projects" --name agent-memory --mask '**/memory/*.md'
-    _qmd_has "dotfiles-docs" || run_logged qmd collection add "$DF_ROOT/docs" --name dotfiles-docs --mask '**/*.md'
+    # Collections: kb + Claude auto-memory + dotfiles docs.
+    #
+    # `collection show` answers by exit code (0 present, 1 absent). The guard
+    # used to grep `collection list`, whose output is a human-readable report
+    # and whose stderr was discarded — so any hiccup in that one command read as
+    # "collection absent", and the add that followed exits non-zero on an
+    # existing collection and killed the whole script under set -e.
+    _qmd_add() {
+        local _name="$1"; shift
+        if qmd collection show "$_name" >/dev/null 2>&1; then
+            log_okay "  qmd collection $_name already indexed"
+        elif run_logged qmd collection add "$@" --name "$_name"; then
+            log_okay "  qmd collection $_name added"
+        else
+            log_warn "  qmd collection $_name could not be added — search will miss it until retried"
+        fi
+    }
+    _qmd_add kb "$HOME/kb"
+    _qmd_add agent-memory "$HOME/.claude/projects" --mask '**/memory/*.md'
+    _qmd_add dotfiles-docs "$DF_ROOT/docs" --mask '**/*.md'
 
     if [[ "$_mode" == "reindex" ]]; then
         run_logged qmd update
