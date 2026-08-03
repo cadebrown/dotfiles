@@ -12,10 +12,23 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 log_section "TeX distribution"
 
 if [[ "$OS" == "darwin" ]]; then
-    if [[ -x /Library/TeX/texbin/pdflatex ]]; then
-        log_okay "MacTeX present: $(/Library/TeX/texbin/pdflatex --version 2>/dev/null | head -1)"
-    else
+    _texbin=/Library/TeX/texbin
+    if [[ ! -x "$_texbin/pdflatex" ]]; then
         log_warn "MacTeX not found — installed via Brewfile (cask \"mactex\"); run homebrew.sh"
+        exit 0
+    fi
+    log_okay "MacTeX present: $("$_texbin/pdflatex" --version 2>/dev/null | head -1)"
+
+    if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+        # The cask only moves on yearly MacTeX releases, so package-level updates
+        # have to come from tlmgr, which writes root-owned /usr/local/texlive.
+        # Skip rather than block bootstrap on a password prompt.
+        if sudo -n true 2>/dev/null; then
+            log_info "Updating TeX Live packages (tlmgr)"
+            run_logged sudo -n "$_texbin/tlmgr" update --self --all || log_warn "tlmgr update failed"
+        else
+            log_warn "No sudo ticket — skipping tlmgr. Run: sudo tlmgr update --self --all"
+        fi
     fi
     exit 0
 fi
@@ -44,5 +57,10 @@ run_logged "$_tlmgr" path add
 # Paper-writing baseline beyond scheme-infraonly; everything else on demand.
 log_info "Installing base packages (latexmk chktex texcount latexdiff)"
 run_logged "$_tlmgr" install latexmk chktex texcount latexdiff || log_warn "tlmgr install failed for some packages — retry manually"
+
+if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+    log_info "Updating TeX Live packages (tlmgr)"
+    run_logged "$_tlmgr" update --self --all || log_warn "tlmgr update failed"
+fi
 
 log_okay "TeX ready: $("$ARCH_BIN/pdflatex" --version 2>/dev/null | head -1 || echo 'pdflatex pending shell restart')"

@@ -43,3 +43,30 @@ setup() {
 @test "latex.sh routes TinyTeX binaries into ARCH_BIN, not ~/.local/bin" {
     grep -q 'sys_bin "\$ARCH_BIN"' "$REPO/install/latex.sh"
 }
+
+# MacTeX installs to /Library/TeX/texbin, which is on no default PATH — without
+# this the binaries exist on disk and resolve to nothing.
+@test "both profiles put MacTeX's texbin on PATH" {
+    grep -q 'path=(\$path /Library/TeX/texbin)' "$REPO/home/dot_zprofile.tmpl"
+    grep -q 'PATH="\$PATH:/Library/TeX/texbin"' "$REPO/home/dot_bash_profile.tmpl"
+}
+
+@test "lean.sh and latex.sh act on upgrade mode" {
+    grep -q 'DF_MODE:-.* == "upgrade"' "$REPO/install/lean.sh"
+    grep -q 'elan" self update\|self update' "$REPO/install/lean.sh"
+    [ "$(grep -c 'DF_MODE:-.* == "upgrade"' "$REPO/install/latex.sh")" -eq 2 ]
+    grep -q 'tlmgr" update --self --all\|update --self --all' "$REPO/install/latex.sh"
+}
+
+# A Lean toolchain is ~1.5 GB and these tests never invoke lean or tlmgr.
+@test "docker entrypoint skips the lean and latex steps" {
+    grep -q 'DF_DO_LEAN=0' "$REPO/tests/entrypoint.sh"
+    grep -q 'DF_DO_LATEX=0' "$REPO/tests/entrypoint.sh"
+}
+
+@test "DF_DO_LEAN and DF_DO_LATEX default to on and are documented" {
+    grep -q 'DF_DO_LEAN:-1' "$REPO/bootstrap.sh"
+    grep -q 'DF_DO_LATEX:-1' "$REPO/bootstrap.sh"
+    grep -q 'DF_DO_LEAN' "$REPO/docs/reference/env-vars.md"
+    grep -q 'DF_DO_LATEX' "$REPO/docs/reference/env-vars.md"
+}

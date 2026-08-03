@@ -39,6 +39,14 @@ fi
 
 _elan="$ELAN_HOME/bin/elan"
 
+# Only elan itself. `elan update` is deliberately not run: every toolchain here
+# is an exact pin (ours below, projects' via lean-toolchain), so it would either
+# no-op or pull a surprise 1.5 GB for anyone tracking a channel.
+if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+    log_info "Updating elan"
+    run_logged "$_elan" self update || log_warn "elan self update failed"
+fi
+
 if "$_elan" toolchain list 2>/dev/null | grep -q "${DF_LEAN_TOOLCHAIN##*:}"; then
     log_okay "toolchain present: $DF_LEAN_TOOLCHAIN"
 else
