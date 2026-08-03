@@ -71,20 +71,26 @@ Paths below use `$LOCAL_PLAT`, which is `$HOME/.local` by default and `$HOME/.lo
    - Homebrew's `rustup` (code-signed), required on macOS Sequoia+ where the linker enforces `com.apple.provenance`
    - `cargo-binstall` downloads pre-built binaries from GitHub releases when available, falls back to source
    - Cargo tools install to `$LOCAL_PLAT/cargo/bin/`
-10. **Claude Code** native binary → `$ARCH_BIN/claude` + plugins + MCP servers + overlay skills
-11. **Codex CLI** native binary → `$ARCH_BIN/codex`, plus managed config + hooks under `~/.codex/`
-12. **Cursor / VS Code** — settings symlinked from `home/dot_cursor/`; extensions installed from `packages/{cursor,vscode}-extensions.txt`
-13. **CMake toolchain files** → `$LOCAL_PLAT/cmake/toolchains/`
+10. **Go CLI tools** from `packages/go.txt` → `$ARCH_BIN` (Go itself comes from the Brewfile)
+11. **Lean 4** via elan → `$LOCAL_PLAT/elan/`
+    - Toolchains are arch-specific (~1.5 GB each), so `ELAN_HOME` is PLAT-isolated like rustup
+    - Installs and defaults a pinned toolchain; projects override via their own `lean-toolchain` file
+12. **TeX** — MacTeX comes from the Brewfile cask; this step verifies it and puts `/Library/TeX/texbin` on PATH
+13. **Claude Code** native binary → `$ARCH_BIN/claude` + plugins + MCP servers + overlay skills
+14. **Codex CLI** native binary → `$ARCH_BIN/codex`, plus managed config + hooks under `~/.codex/`
+15. **Cursor / VS Code** — settings symlinked from `home/dot_cursor/`; extensions installed from `packages/{cursor,vscode}-extensions.txt`
+16. **CMake toolchain files** → `$LOCAL_PLAT/cmake/toolchains/`
     - Versioned files: `llvm-21.cmake`, `llvm-22.cmake`, `gcc-13.cmake`, `gcc-15.cmake`, plus shared `_brew.cmake`
     - `~/.profile` sets `CMAKE_TOOLCHAIN_FILE` to the highest installed LLVM toolchain automatically
     - Switch at runtime with the `tc` shell function (e.g. `tc gcc-15`, `tc llvm-22`)
-14. **Local LLM tooling** — HuggingFace cache + binary checks
+17. **Local LLM tooling** — HuggingFace cache + binary checks
     - Creates `$LOCAL_PLAT/.cache/huggingface` for mlx-lm weights
     - Verifies ollama / mlx-lm / mlx-openai-server / opencode binaries
-15. **Agent memory stack** — cass session-history search, ~/kb + qmd knowledge index, memory daemons
-16. **Blender MCP** addon — installs `addon.py` into the active Blender profile and enables it
-16. **Auth** (opt-in: `DF_DO_AUTH=1`) — guided service-token setup; see [Auth](auth.md)
-17. **Overlays** — runs `bootstrap.sh` of any `dotfiles-*/` overlay alongside this repo; see [Overlays](overlays.md)
+18. **Agent memory stack** — cass session-history search, ~/kb + qmd knowledge index, memory daemons
+19. **Agent skills** — installs `packages/agent-skills.txt` into the shared `~/.claude/skills` tree
+20. **Blender MCP** addon — installs `addon.py` into the active Blender profile and enables it
+21. **Auth** (opt-in: `DF_DO_AUTH=1`) — guided service-token setup; see [Auth](auth.md)
+22. **Overlays** — runs `bootstrap.sh` of any `dotfiles-*/` overlay alongside this repo; see [Overlays](overlays.md)
 
 Total time: ~2 minutes on subsequent runs (idempotent, mostly bottle pours); ~5–10 minutes on a fresh machine.
 
@@ -119,16 +125,21 @@ Paths use `$LOCAL_PLAT`, which is `$HOME/.local` by default (or `$HOME/.local/$P
    - Uses uv's Python for `node-gyp` fallbacks when an npm package has no prebuilt binary
 7. **Rust** via `sh.rustup.rs` → `$LOCAL_PLAT/rustup/` + `$LOCAL_PLAT/cargo/`
    - `cargo-binstall` downloads pre-built binaries from GitHub releases when available, falls back to source
-8. **Claude Code** native binary → `$ARCH_BIN/claude` + plugins + MCP servers
-9. **Codex CLI** native binary → `$ARCH_BIN/codex`
-10. **Cursor / VS Code** — extensions from `packages/{cursor,vscode}-extensions.txt`
-11. **CMake toolchain files** → `$LOCAL_PLAT/cmake/toolchains/` (`llvm-21/22.cmake`, `gcc-13/15.cmake`, `_brew.cmake`)
+8. **Go CLI tools** from `packages/go.txt` → `$ARCH_BIN`
+9. **Lean 4** via elan → `$LOCAL_PLAT/elan/` (pinned default toolchain; projects override via `lean-toolchain`)
+10. **TeX** via TinyTeX → `~/.TinyTeX`, with `tlmgr` `sys_bin` pointed at `$ARCH_BIN` so the PLAT layout holds
+    - ~200 MB base instead of multi-GB; missing packages install on demand with `tlmgr install <pkg>`
+11. **Claude Code** native binary → `$ARCH_BIN/claude` + plugins + MCP servers
+12. **Codex CLI** native binary → `$ARCH_BIN/codex`
+13. **Cursor / VS Code** — extensions from `packages/{cursor,vscode}-extensions.txt`
+14. **CMake toolchain files** → `$LOCAL_PLAT/cmake/toolchains/` (`llvm-21/22.cmake`, `gcc-13/15.cmake`, `_brew.cmake`)
     - `~/.profile` auto-sets `CMAKE_TOOLCHAIN_FILE` to the highest installed LLVM toolchain
     - Switch with the `tc` shell function (e.g. `tc gcc-15`, `tc llvm-22`)
-12. **Local LLM tooling** — HuggingFace cache + ollama/mlx-lm/mlx-openai-server/opencode binary checks
-13. **Agent memory stack** — cass session-history search, ~/kb + qmd knowledge index (daemons lazy-start from shell profiles)
-13. **Auth** (opt-in: `DF_DO_AUTH=1`) — guided token setup; see [Auth](auth.md)
-14. **Overlays** — runs `bootstrap.sh` of any `dotfiles-*/` overlay; see [Overlays](overlays.md)
+15. **Local LLM tooling** — HuggingFace cache + ollama/mlx-lm/mlx-openai-server/opencode binary checks
+16. **Agent memory stack** — cass session-history search, ~/kb + qmd knowledge index (daemons lazy-start from shell profiles)
+17. **Agent skills** — installs `packages/agent-skills.txt` into the shared `~/.claude/skills` tree
+18. **Auth** (opt-in: `DF_DO_AUTH=1`) — guided token setup; see [Auth](auth.md)
+19. **Overlays** — runs `bootstrap.sh` of any `dotfiles-*/` overlay; see [Overlays](overlays.md)
 
 Total time: ~5 minutes on a fast connection.
 
@@ -149,13 +160,19 @@ DF_DO_ZSH=0                  # skip oh-my-zsh
 DF_DO_NODE=0                 # skip nvm + Node.js + global npm packages
 DF_DO_RUST=0                 # skip rustup + cargo tools
 DF_DO_PYTHON=0               # skip uv + per-tool venvs
+DF_DO_GO=0                   # skip Go CLI tools from go.txt
+DF_DO_LEAN=0                 # skip the Lean 4 toolchain (elan + pinned toolchain)
+DF_DO_LATEX=0                # skip the TeX distribution (MacTeX verify / TinyTeX)
 DF_DO_CLAUDE=0               # skip Claude Code install + plugins + MCP servers
 DF_DO_CODEX=0                # skip Codex CLI install
+DF_DO_CLAUDE_DESKTOP=0       # skip Claude Desktop tracked preferences (macOS)
+DF_DO_CODEX_DESKTOP=0        # skip Codex desktop app tracked preferences (macOS)
 DF_DO_CURSOR=0               # skip Cursor settings symlinks + extension install
 DF_DO_VSCODE=0               # skip VS Code extension install
 DF_DO_CMAKE=0                # skip CMake toolchain file deployment
 DF_DO_LOCAL_LLM=0            # skip local LLM setup (HuggingFace cache + binary checks)
 DF_DO_MEMORY=0               # skip the agent memory stack (cass + qmd + ~/kb)
+DF_DO_SKILLS=0               # skip agent skills from agent-skills.txt
 DF_DO_BLENDER_MCP=0          # skip Blender MCP addon install
 DF_DO_AUTH=1                 # run interactive API token setup (default 0)
 DF_DO_OVERLAYS=0             # skip all overlay bootstraps (dotfiles-*/bootstrap.sh)

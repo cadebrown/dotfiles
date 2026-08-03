@@ -12,6 +12,7 @@ Every package layer has a declarative text file and an idempotent install script
 | Global npm | `packages/npm.txt` | `install/node.sh` | All |
 | Go CLI tools | `packages/go.txt` | `install/go.sh` | All (respects `# linux-only` / `# macos-only`) |
 | Claude plugins | `packages/claude-plugins.txt` | `install/claude.sh` | All |
+| Agent skills | `packages/agent-skills.txt` | `install/skills-sync.sh` | All (shared `~/.claude/skills` tree) |
 | MCP servers (Claude + Codex) | `packages/mcp-servers.txt` | `install/claude.sh`, `install/codex.sh` | All |
 | Codex CLI/config | `home/dot_codex/` | `install/codex.sh` | All |
 | Cursor extensions | `packages/cursor-extensions.txt` | `install/cursor.sh` | All |
@@ -156,6 +157,27 @@ Local LLM inference and coding agents are split across three layers:
 and verifies that the expected binaries are present. `install/opencode.sh` verifies the opencode binary; opencode's backend config is pure chezmoi (`opencode.json.tmpl`, MLX primary).
 
 See [Local AI coding](../usage/local-llm.md) for usage details.
+
+---
+
+## Research mathematics
+
+Two of these get their own install script because neither has a usable Homebrew
+path on no-sudo Linux; the rest are ordinary package-list entries.
+
+| Tool | Layer | Notes |
+|---|---|---|
+| Lean 4 + `lake` | `install/lean.sh` | elan (Lean's rustup) → `$LOCAL_PLAT/elan`. Toolchains are ~1.5 GB and arch-specific, hence PLAT-isolated. Pin lives in the script; override with `DF_LEAN_TOOLCHAIN`. |
+| TeX | `install/latex.sh` | macOS: `cask "mactex"`, verified by the script, with `/Library/TeX/texbin` appended to PATH by the shell profiles. Linux: TinyTeX, `tlmgr sys_bin` pointed at `$ARCH_BIN`. |
+| PARI/GP, FLINT, z3, minizinc, cadical, kissat | `packages/Brewfile` | `gp` collides with the `gp='git push'` alias — use `command gp`. |
+| Sage, Zotero | `packages/Brewfile` casks (macOS) | Homebrew core has no Sage formula; per-project passagemath wheels are the uv-native route. |
+| `juliaup` | `packages/Brewfile` | Depots are PLAT-isolated (`JULIA_DEPOT_PATH`); OSCAR.jl installs per-project via Pkg. |
+| `leanblueprint`, `marimo`, `paper-qa`, `papis`, … | `packages/pip.txt` | Standard `uv tool install` entries. |
+| `rga` (ripgrep-all) | `packages/cargo.txt` | Full-text search across a PDF/EPUB paper library. |
+
+Agent-side wiring (lean-lsp, arxiv, mathlas, asta MCP servers, and the
+verification-first norms in `math-common.md`) is covered in
+[Agent guidance](../usage/agents.md).
 
 ---
 

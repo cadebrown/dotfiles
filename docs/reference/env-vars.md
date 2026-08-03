@@ -50,16 +50,22 @@ Each `DF_DO_*` flag defaults to `1` (run). Set to `0` to skip.
 | `DF_DO_MACOS_SETTINGS` | 5.5 | Dock/Finder/keyboard/etc. defaults (macOS) |
 | `DF_DO_MACOS_QUICK_ACTIONS` | 5.6 | Finder Quick Actions install (macOS) |
 | `DF_DO_ZSH` | 3 | oh-my-zsh + plugins |
+| `DF_DO_PYTHON` | 6 | uv + per-tool isolated venvs |
 | `DF_DO_NODE` | 6 | nvm + Node.js + global npm packages |
 | `DF_DO_RUST` | 6 | rustup + cargo tools |
-| `DF_DO_PYTHON` | 6 | uv + per-tool isolated venvs |
+| `DF_DO_GO` | 6 | Go CLI tools from `go.txt` |
+| `DF_DO_LEAN` | 6 | Lean 4 toolchain (elan + the pinned default toolchain) |
+| `DF_DO_LATEX` | 6 | TeX distribution (MacTeX verify on macOS, TinyTeX on Linux) |
 | `DF_DO_CLAUDE` | 6 | Claude Code binary + plugins + MCP servers + overlay skills |
 | `DF_DO_CODEX` | 6 | Codex CLI binary + managed config + hooks |
+| `DF_DO_CLAUDE_DESKTOP` | 6 | Claude Desktop tracked preferences (macOS) |
+| `DF_DO_CODEX_DESKTOP` | 6 | Codex desktop app tracked preferences (macOS) |
 | `DF_DO_CURSOR` | 6 | Cursor settings symlinks + extensions |
 | `DF_DO_VSCODE` | 6 | VS Code extensions |
 | `DF_DO_CMAKE` | 6 | CMake toolchain file deployment |
 | `DF_DO_LOCAL_LLM` | 6.5 | Local LLM tooling (HuggingFace cache + binary checks) |
 | `DF_DO_MEMORY` | 6.6 | Agent memory stack (cass + qmd + ~/kb + daemons) |
+| `DF_DO_SKILLS` | 6.65 | Agent skills from `agent-skills.txt` |
 | `DF_DO_BLENDER_MCP` | 6.7 | Blender MCP addon install |
 | `DF_DO_AUTH` | 7 | **Default `0`**. Set to `1` to run interactive token setup. |
 | `DF_DO_OVERLAYS` | 8 | Skip all overlay bootstrap scripts |
@@ -79,6 +85,9 @@ These are exported by `_lib.sh` for install scripts to consume — don't overrid
 | `CARGO_HOME` | `_lib.sh` | `$LOCAL_PLAT/cargo` |
 | `CARGO_TARGET_DIR` | `_lib.sh` | `$LOCAL_PLAT/cargo-build` (workaround for macOS Sequoia ar/ld in `/var/folders/`) |
 | `NVM_DIR` | `_lib.sh` | `$LOCAL_PLAT/nvm` |
+| `ELAN_HOME` | `_lib.sh` | `$LOCAL_PLAT/elan` (Lean toolchains — arch-specific, ~1.5 GB each) |
+| `JULIAUP_DEPOT_PATH` | `_lib.sh` | `$LOCAL_PLAT/julia/juliaup` |
+| `JULIA_DEPOT_PATH` | `_lib.sh` | `$LOCAL_PLAT/julia/depot` (compiled per-arch artifacts) |
 | `UV_TOOL_BIN_DIR` | `_lib.sh` | `$ARCH_BIN` (where uv tool entrypoints land) |
 | `UV_TOOL_DIR` | `_lib.sh` | `$LOCAL_PLAT/uv/tools` (per-tool venvs) |
 | `UV_PYTHON_INSTALL_DIR` | `_lib.sh` | `$LOCAL_PLAT/uv/python` (uv-managed Python) |

@@ -28,7 +28,7 @@ These are non-negotiable and shape every decision in the repo:
 | Dotfile sources | `home/` | chezmoi templates → applied to `~/` |
 | Package lists | `packages/` | `Brewfile`, `cargo.txt`, `pip.txt`, `npm.txt`, `go.txt`, `mlx-models.txt`, `mcp-servers.txt`, `agent-skills.txt`, `claude-*.txt` |
 | Agent skills | `home/dot_claude/skills/` | Single source → `~/.claude/skills`; `~/.agents/skills` symlinks there (read by Codex/opencode/pi) |
-| Shared template partials | `home/.chezmoitemplates/` | `agents-common.md` (engineering norms) + `voice-common.md` (tone/estimates), shared by Claude/Codex/opencode/pi guidance files |
+| Shared template partials | `home/.chezmoitemplates/` | `agents-common.md` (engineering norms), `voice-common.md` (tone/estimates), `math-common.md` (verification-first research-math norms + tool routing), shared by Claude/Codex/opencode/pi guidance files |
 | Install scripts | `install/` | Each sources `_lib.sh`, each is idempotent |
 | Path vars + helpers | `install/_lib.sh` | **Read this first** — defines `PLAT`, `LOCAL_PLAT`, all tool paths, logging |
 | PLAT detection | `install/plat/` | `.plat_check.sh` (capability test) + `.plat_env.sh` (compiler flags) per target |
@@ -61,12 +61,14 @@ Shell profiles prepend tool paths on top of Homebrew. Highest priority first.
 or `$HOME/.local` (default).
 
 ```
+$_LOCAL_PLAT/elan/bin         Lean toolchain shims (lean, lake) via elan
 $_LOCAL_PLAT/cargo/bin        Rust tools (fd, sd, zoxide, etc.)
 $_LOCAL_PLAT/nvm/.../bin      Node.js via nvm
 $_LOCAL_PLAT/bin              chezmoi, uv, claude, plus go-installed binaries (GOBIN=here)
 ~/.local/bin                  arch-neutral scripts only (collapses to $_LOCAL_PLAT/bin in flat mode)
 /opt/homebrew/bin             Homebrew (macOS)
 /usr/bin                      system
+/Library/TeX/texbin           MacTeX (macOS) — appended last; Linux gets TeX from $_LOCAL_PLAT/bin
 ```
 
 **Never install the same tool in two layers** — installed-location paths win,

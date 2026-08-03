@@ -53,6 +53,7 @@ flowchart TD
 | 6 | various | See language-runtime table below. Each script is independent; failures cascade only via `die` (not `log_warn`). | Yes |
 | 6.5 | `install/local-llm.sh` + `install/opencode.sh` | Create `$LOCAL_PLAT/.cache/huggingface`; verify ollama/mlx-lm/mlx-openai-server/opencode binaries. | Yes |
 | 6.6 | `install/memory.sh` | Agent memory stack: cass binary (checksum-verified GitHub release) + session-history index, ~/kb knowledge repo, qmd collections/embeddings, memory daemons. | Yes |
+| 6.65 | `install/skills-sync.sh` | Install agent skills from `agent-skills.txt` into the shared `~/.claude/skills` tree. | Yes |
 | 6.7 | `install/blender-mcp.sh` | Download `addon.py` into Blender's user addons; enable headlessly. Skipped if Blender not installed. | Yes |
 | 7 | `install/auth.sh` | Walk every service, prompt `[k] keep / [u] update / [d] delete` per service. **Default off** — set `DF_DO_AUTH=1` to enable. | Yes |
 | 8 | overlay scripts | Run `bash $DF_ROOT/dotfiles-*/bootstrap.sh "$DF_MODE"` for each overlay. | Per overlay |
@@ -65,11 +66,13 @@ flowchart TD
 | 6b | `install/node.sh` | Install nvm to `$NVM_DIR`; install/upgrade Node v25; install `npm.txt` packages globally. | The parent bootstrap activates nvm before later agent/skill steps. |
 | 6c | `install/rust.sh` | Install rustup; install/update stable plus the rust-docs MCP nightly; `cargo binstall --locked` every entry in `cargo.txt`. | Prebuilt first, source fallback; self-update only in upgrade mode. |
 | 6d | `install/go.sh` | Install CLI tools from `go.txt` into `$ARCH_BIN`. | Go itself is owned by the Brewfile. |
-| 6e | `install/claude.sh` | Download Claude Code; install plugins; register MCP servers; deploy overlay skills. | Atomic binary replacement. |
-| 6f | `install/codex.sh` | Sync private config, hooks, rtk/chezmoi guards, MCP servers, and run the healthcheck. | The npm package is unpinned; the healthcheck catches config drift. |
-| 6g | desktop scripts | Merge tracked Claude/Codex Desktop preferences on macOS. | Preserve app-owned state. |
-| 6h | `install/cursor.sh` / `install/vscode.sh` | Sync Cursor MCP/settings and editor extensions. | Extension failures are warnings. |
-| 6i | `install/cmake.sh` | Copy CMake toolchain files into `$LOCAL_PLAT/cmake/toolchains/`. | Always overwrites deployed copies. |
+| 6e | `install/lean.sh` | Install elan to `$ELAN_HOME`; install and default the pinned Lean toolchain. | Pin bumped deliberately alongside Mathlib releases. Upgrade mode runs `elan self update` only — every toolchain is an exact pin. |
+| 6f | `install/latex.sh` | macOS: verify the MacTeX cask. Linux: install TinyTeX, route `sys_bin` into `$ARCH_BIN`, install latexmk/chktex/texcount/latexdiff. | Upgrade mode runs `tlmgr update --self --all` (macOS needs a sudo ticket; skipped without one). |
+| 6g | `install/claude.sh` | Download Claude Code; install plugins; register MCP servers; deploy overlay skills. | Atomic binary replacement. |
+| 6h | `install/codex.sh` | Sync private config, hooks, rtk/chezmoi guards, MCP servers, and run the healthcheck. | The npm package is unpinned; the healthcheck catches config drift. |
+| 6i | desktop scripts | Merge tracked Claude/Codex Desktop preferences on macOS. | Preserve app-owned state. |
+| 6j | `install/cursor.sh` / `install/vscode.sh` | Sync Cursor MCP/settings and editor extensions. | Extension failures are warnings. |
+| 6k | `install/cmake.sh` | Copy CMake toolchain files into `$LOCAL_PLAT/cmake/toolchains/`. | Always overwrites deployed copies. |
 
 ## Modes
 

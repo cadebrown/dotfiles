@@ -39,6 +39,24 @@ load at different levels per tool: Claude gets it via the `cade` output style
 directly next to `agents-common.md`. Keeping it out of `agents-common.md`
 means Claude never loads the voice guidance twice.
 
+### math-common.md
+
+`home/.chezmoitemplates/math-common.md` holds the research-mathematics norms,
+included by all four guidance files. Three things it fixes in place:
+
+- **The proof gate.** A claim counts as proved only when the exact intended
+  statement compiles in Lean with no `sorry`, survives `lake build`, passes an
+  axiom audit, and certifies under `lean4checker --fresh`. Misformalization —
+  proving the wrong statement — is the classic failure, not bad tactics, so
+  formalized statements get unit-tested against known examples first.
+- **Evidence tiers.** CAS output, notebook experiments, and numerical sweeps are
+  *evidence*, never proof, and have to be labeled as such. Literature claims
+  carry a source.
+- **Tool routing**, so agents reach for the verifying tool instead of guessing:
+  Lean state and search → the `lean-lsp` MCP; literature → `asta` and `arxiv`;
+  CAS checks → `wolframscript`; sequences → OEIS; constants → PSLQ via
+  `mathlas`. Registered for every harness from `packages/mcp-servers.txt`.
+
 ## Where each file lives
 
 | Tool | Source (chezmoi) | Deployed to |
