@@ -29,11 +29,13 @@ Complete reference for `DF_*` variables and the tool-standard ones this repo car
 |---|---|---|
 | `DF_SCRATCH` | (unset) | Path to scratch root. Setting this enables scratch mode (symlinks heavy `$HOME` dirs). |
 | `DF_SCRATCH_LINK` | `$HOME/scratch` | The `$HOME` symlink that points at scratch. Bootstrap creates this if `DF_SCRATCH` is set. |
-| `DF_LINKS` | `~/.local:~/.cache:~/.vscode:~/.vscode-server:~/.cursor:~/.cursor-server:~/.nv:~/.npm:~/.oh-my-zsh:~/.oh-my-zsh-custom` | Colon-separated top-level dirs to redirect to scratch. |
+| `DF_LINKS` | `~/.local:~/.cache:~/.cass:~/.vscode:~/.vscode-server:~/.cursor-server:~/.nv:~/.npm:~/.oh-my-zsh:~/.oh-my-zsh-custom:~/kb:~/.computelab:~/.agent-browser:~/.gradle:~/.TinyTeX` | Colon-separated top-level dirs to redirect to scratch. Not `~/.cursor` — chezmoi owns it. |
+| `DF_CONFIG_LINKS` | `Code` | Colon-separated `~/.config` subdir names to redirect to scratch (never `~/.config` itself — chezmoi owns it). |
+| `DF_CURSOR_LINKS` | `projects:worktrees` | Colon-separated `~/.cursor` subdir names to redirect to scratch (never `~/.cursor` itself — chezmoi owns it). |
 | `DF_CLAUDE_LINKS` | `projects:plugins:file-history` | Colon-separated `~/.claude` subdir names to redirect to scratch (never `~/.claude` itself — chezmoi owns it). Drop `projects` to keep history + memory on NFS. |
 | `DF_CODEX_LINKS` | `sessions:generated_images:cache:plugins:attachments:shell_snapshots:log:backups:.tmp:tmp` | Colon-separated `~/.codex` subdir names to redirect to scratch (never `~/.codex` itself). Top-level `*.sqlite` files ride along. Set empty to skip `~/.codex` entirely. |
 
-The three `*_LINKS` vars treat a set-but-empty value as "migrate nothing here"; unset restores the default.
+The five `*_LINKS` vars treat a set-but-empty value as "migrate nothing here"; unset restores the default.
 
 See [Scratch space](../setup/scratch.md).
 

@@ -59,6 +59,7 @@
 #   DF_SCRATCH       — env var to set scratch root
 #   DF_SCRATCH_LINK  — symlink in $HOME pointing to scratch (default: ~/scratch)
 #   DF_LINKS         — colon-separated top-level dirs to migrate (override above defaults)
+#   DF_CONFIG_LINKS  — colon-separated ~/.config subdir names to migrate
 #   DF_CLAUDE_LINKS  — colon-separated ~/.claude subdir names to migrate
 #   DF_CODEX_LINKS   — colon-separated ~/.codex subdir names to migrate (empty = skip;
 #                      its loose *.sqlite files ride along, and the whole ~/.codex
@@ -271,7 +272,19 @@ link_managed_subdirs() {
 log_info "Scratch: $SCRATCH"
 log_info "Paths:   $PATHS"
 
-_DEFAULT_LINKS="$HOME/.local:$HOME/.cache:$HOME/.cass:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom:$HOME/kb"
+# ~/.cursor is deliberately absent: chezmoi manages it as a real directory
+# (cli-config.json, hooks/, hooks.json), so `chezmoi apply` replaces any symlink
+# here with a real dir and orphans whatever was migrated — 304 MB sat unused on
+# scratch while Cursor wrote to the home copy (Aug 2026). Same rule as
+# ~/.claude / ~/.codex; ~/.cursor-server is unmanaged and stays.
+#
+# The cache-shaped entries below (.computelab, .agent-browser, .gradle, .TinyTeX)
+# are the ones that actually fill a small home volume — 1.2 GB of the 4.7 GB on a
+# 5 GB NFS home. .TinyTeX holds binaries, so it assumes every machine sharing this
+# scratch is the same OS/arch family; it lives in $PATHS rather than $LOCAL_PLAT
+# because tlmgr records absolute paths and a per-PLAT tree would need a reinstall
+# per CPU level.
+_DEFAULT_LINKS="$HOME/.local:$HOME/.cache:$HOME/.cass:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom:$HOME/kb:$HOME/.computelab:$HOME/.agent-browser:$HOME/.gradle:$HOME/.TinyTeX"
 DF_LINKS="${DF_LINKS-$_DEFAULT_LINKS}"
 unset _DEFAULT_LINKS
 
@@ -283,9 +296,29 @@ for _home_path in "${_link_paths[@]}"; do
 done
 unset _link_paths _home_path _name
 
-# ~/.claude and ~/.codex — migrate the heavy *unmanaged* entries, never the dirs
-# themselves. See the header note and link_managed_subdirs.
+# ~/.config, ~/.claude and ~/.codex — migrate the heavy *unmanaged* entries, never
+# the dirs themselves. See the header note and link_managed_subdirs.
 # Set-but-empty means "migrate nothing here" — hence ${VAR-default}, not ${VAR:-default}.
+
+# ~/.config/Code is VS Code's user data — workspaceStorage and CachedData, 285 MB
+# of it here, all of which VS Code rebuilds on demand. The directory above it is
+# chezmoi-managed, so only the subdir moves.
+_DEFAULT_CONFIG_LINKS="Code"
+DF_CONFIG_LINKS="${DF_CONFIG_LINKS-$_DEFAULT_CONFIG_LINKS}"
+unset _DEFAULT_CONFIG_LINKS
+[[ -n "$DF_CONFIG_LINKS" ]] && link_managed_subdirs "$HOME/.config" "$DF_CONFIG_LINKS"
+
+# ~/.cursor holds per-project agent history (projects/, worktrees/) that grows
+# without bound, under a directory chezmoi owns. Migrating the whole thing is what
+# went wrong before — `chezmoi apply` restored a real ~/.cursor and stranded the
+# scratch copy, so Cursor silently started over with an empty history while 300 MB
+# of it sat unreachable. Moving the subdirs merges that history back and keeps the
+# managed files where chezmoi expects them.
+_DEFAULT_CURSOR_LINKS="projects:worktrees"
+DF_CURSOR_LINKS="${DF_CURSOR_LINKS-$_DEFAULT_CURSOR_LINKS}"
+unset _DEFAULT_CURSOR_LINKS
+[[ -n "$DF_CURSOR_LINKS" ]] && link_managed_subdirs "$HOME/.cursor" "$DF_CURSOR_LINKS"
+
 _DEFAULT_CLAUDE_LINKS="projects:plugins:file-history"
 DF_CLAUDE_LINKS="${DF_CLAUDE_LINKS-$_DEFAULT_CLAUDE_LINKS}"
 unset _DEFAULT_CLAUDE_LINKS

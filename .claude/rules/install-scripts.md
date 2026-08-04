@@ -136,6 +136,14 @@ re-runs the install script.
   as a fixed set of `fail` lines on every `bootstrap upgrade` while the extensions
   worked fine. Verify a new `cursor-extensions.txt` ID with `cursor --install-extension`
   before adding it; Cursor and VS Code do not share a marketplace.
+- **`~/.cursor` was the third instance of the never-symlink rule, and it failed silently
+  for months.** It sat in `DF_LINKS` while `home/dot_cursor/` made it a chezmoi target,
+  so `chezmoi apply` restored a real directory and stranded the migrated copy: Cursor
+  began a fresh history in `$HOME` while 304 MB and 125 project dirs sat unreachable on
+  scratch. Nothing errors in that state — the only symptom is agent history that starts
+  over. It now migrates `projects`/`worktrees` one level down via `DF_CURSOR_LINKS`
+  (which merges the stranded tree back), same as `.claude`/`.codex`/`.config`. Before
+  adding anything to `DF_LINKS`, check `chezmoi managed | grep '^<dir>$'`.
 - **Never symlink a chezmoi-managed directory** — `~/.claude` and `~/.codex` both have
   source *directories* (`home/dot_claude/`, `home/dot_codex/`), so chezmoi's target state
   for those paths is "directory". `chezmoi apply` deletes whatever is there — symlink
