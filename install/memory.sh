@@ -39,6 +39,11 @@ fi
 export CASS_DATA_DIR="$HOME/.cass"
 export CASS_SEMANTIC_EMBEDDER="${CASS_SEMANTIC_EMBEDDER:-minilm}"
 export CASS_INDEX_STALL_ABORT_SECS="${CASS_INDEX_STALL_ABORT_SECS:-0}"
+# Aider histories are project-local, so discovery crawls this root. Defaulted to
+# $HOME it walks every TCC-protected dir on macOS and prompts once per scan.
+# Aider projects outside this root go unindexed — widen it if that changes.
+# Mirrors the cass-watch / cass-semantic LaunchAgents; keep the three in sync.
+[[ "$OS" == "darwin" ]] && export CASS_AIDER_DATA_ROOT="${CASS_AIDER_DATA_ROOT:-$HOME/dev}"
 
 ### cass — session-history search (L3) ###
 

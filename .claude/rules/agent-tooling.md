@@ -172,6 +172,22 @@ and chezmoi-managed guidance files built from shared partials.
   `memory.sh` under `set -e` (`Collection 'kb' already exists.` → `[fail] memory.sh
   failed`, Aug 2026). `collection show <name>` answers by exit code (0/1), and a failed
   add now degrades to a warning rather than taking the daemons down with it.
+- **cass's macOS TCC prompts come from the `aider` crawl, NOT from the connectors that
+  read `~/Library/Application Support`.** Aider histories are project-local, so discovery
+  crawls `CASS_AIDER_DATA_ROOT`, which **defaults to `$HOME`** — walking `~/Pictures`,
+  `~/Documents`, `~/Desktop`, `~/Downloads` and `~/Library`, and requesting Photos,
+  MediaLibrary, AddressBook, Calendar, AppData and AllFiles on every 300 s pass. cass is
+  ad-hoc signed, so "Allow" dies at the next binary update. `memory.sh` + both cass
+  LaunchAgents pin `CASS_AIDER_DATA_ROOT=$HOME/dev`; keep the three copies in sync.
+  **Don't "fix" this by excluding cursor/chatgpt/copilot** — measured 2026-08-05, a scan
+  that opens 13 Cursor `state.vscdb` files raises zero TCC requests, because Cursor is a
+  non-sandboxed Electron app with no registered container and its app-support dir isn't
+  protected. Excluding them costs cross-harness coverage and fixes nothing.
+  **Don't diagnose this from cass's own logs either**: they record paths cass opens
+  deliberately, not what a directory walk touches, so they look clean while prompts keep
+  firing — which is exactly how the wrong culprit got blamed. Use tccd:
+  `/usr/bin/log show --last 30m --predicate 'process == "tccd"' --info | rg 'Sub:\{.*/cass\}'`
+  (`/usr/bin/log` explicitly; `log` is a shell function here).
 - **Memory indexes are per-machine** — qmd (~/.cache/qmd) and cass (~/.cass) are
   local; only ~/kb (git) and dotfiles sync across machines. qmd on macOS needs
   Homebrew sqlite (system libsqlite3 blocks loadable extensions).

@@ -23,6 +23,13 @@ topology attestation every time. See install/memory.sh for the full reason.
     <dict>
         <key>CASS_DATA_DIR</key>
         <string>{{ .chezmoi.homeDir }}/.cass</string>
+        {{- if eq .chezmoi.os "darwin" }}
+        <!-- Bounds aider's project-local crawl; $HOME (the default) walks every
+             TCC-protected dir and prompts on each scan. Keep in sync with
+             dev.cade.cass-watch. -->
+        <key>CASS_AIDER_DATA_ROOT</key>
+        <string>{{ .chezmoi.homeDir }}/dev</string>
+        {{- end }}
         <key>CASS_SEMANTIC_EMBEDDER</key>
         <string>minilm</string>
         <!-- MiniLM backfill has no progress heartbeat. Retain stall

@@ -28,6 +28,13 @@ Cost: no idle process; brief spikes while indexing new sessions. To disable:
     <dict>
         <key>CASS_DATA_DIR</key>
         <string>{{ .chezmoi.homeDir }}/.cass</string>
+        {{- if eq .chezmoi.os "darwin" }}
+        <!-- Aider histories are project-local, so discovery crawls this root.
+             Unset it defaults to $HOME, which walks ~/Pictures, ~/Documents,
+             ~/Desktop, ~/Downloads and ~/Library — a TCC prompt per scan. -->
+        <key>CASS_AIDER_DATA_ROOT</key>
+        <string>{{ .chezmoi.homeDir }}/dev</string>
+        {{- end }}
         <key>PATH</key>
         <string>{{ .chezmoi.homeDir }}/.local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
     </dict>

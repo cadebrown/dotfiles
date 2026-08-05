@@ -882,6 +882,62 @@ deduping identical vectors before insert.
 
 ---
 
+## macOS keeps asking: "cass would like to access data from other apps"
+
+The prompt returns every few minutes, and "Allow" doesn't make it stop.
+
+The `dev.cade.cass-watch` LaunchAgent runs `cass index` every 300 s, and **the `aider`
+connector crawls `$HOME`**. Aider histories are project-local
+(`.aider.chat.history.md` in each repo), so discovery walks its root — and that root
+defaults to `$HOME`. The walk enters `~/Pictures`, `~/Music`, `~/Documents`,
+`~/Desktop`, `~/Downloads`, and `~/Library`, so it asks for Photos, MediaLibrary,
+AddressBook, Calendar, AppData — and AllFiles.
+
+It is tempting to blame the connectors that read `~/Library/Application Support`
+(`cursor`, `chatgpt`, `copilot`) — don't. Measured 2026-08-05: a scan that opens 13
+Cursor `state.vscdb` files raises **zero** TCC requests, because Cursor is a
+non-sandboxed Electron app with no registered container, so its app-support dir isn't
+protected. Excluding those connectors costs you cross-harness session coverage and
+fixes nothing.
+
+"Allow" doesn't make it stop because `cass` is ad-hoc signed (`codesign -dv` →
+`Signature=adhoc`, no Team ID), so a grant is pinned to the binary's cdhash and is
+voided at the next cass upgrade. There is also no System Settings pane for App Data
+grants, so a stale one can't be repaired from the UI.
+
+See exactly what cass is asking for — this is the diagnostic that matters, since the
+cass logs only record paths it opens deliberately, not what a directory walk touches:
+
+```bash
+/usr/bin/log show --last 30m --predicate 'process == "tccd"' --info \
+  | rg 'Sub:\{.*/\.local/bin/cass\}' | rg -o 'kTCCService[A-Za-z]+' | sort | uniq -c
+```
+
+(`/usr/bin/log` explicitly — `log` is a shell function in this repo's profiles.)
+
+**Fix — bound the crawl. That's the whole fix; leave every connector enabled:**
+
+```bash
+export CASS_AIDER_DATA_ROOT="$HOME/dev"   # aider discovery root, not $HOME
+```
+
+Applied on macOS by `install/memory.sh` and the `dev.cade.cass-watch` /
+`dev.cade.cass-semantic` LaunchAgents, so it survives a rebuild. Aider still indexes
+normally — just only under the given root, so aider projects elsewhere go unindexed.
+`CASS_AIDER_DATA_ROOT` takes a single path, so `$HOME` is the only "covers everything"
+value and it is what causes the problem.
+
+Verify with the `log show` command above: a scan should now produce no cass entries at
+all. Check a scan really ran, or the empty result proves nothing —
+`rg 'skipping disabled connectors' ~/.local/share/cass/stderr.log | tail -1`.
+
+The alternative to all of this is granting `~/.local/bin/cass` Full Disk Access
+(`kTCCServiceSystemPolicyAllFiles` is one of the things it asks for), which covers every
+service at once — but it must be re-added after every cass upgrade, and it hands a
+self-updating ad-hoc-signed binary read access to Mail, Messages, and Safari history.
+
+---
+
 ## `git push` blocked by gitleaks ("secrets detected")
 
 A global **pre-push** hook scans the commits being pushed for secrets with
