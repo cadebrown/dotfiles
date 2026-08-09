@@ -882,6 +882,56 @@ deduping identical vectors before insert.
 
 ---
 
+## Every `cass` command fails: `unable to open database file` (but sqlite3 opens it fine)
+
+```
+opening frankensqlite db readonly at /Users/cade/.cass/agent_search.db:
+unable to open database file: '/Users/cade/.cass/agent_search.db'
+```
+
+`cass doctor` reports `archive-db-unreadable`, `cass index --full` refuses to
+run ("index refused to modify an unhealthy canonical archive"), and the
+cass-watch/cass-semantic LaunchAgents crash-loop with exit 5 — yet
+`sqlite3 -readonly ~/.cass/agent_search.db "pragma quick_check;"` says `ok`.
+
+frankensqlite pins the database's file identity — device id + inode — in the
+`agent_search.db-fsqlite-ns-use` sidecar (record: 8-byte `FSQLNS01` magic,
+1-byte version, then tag/dev/ino big-endian). On macOS, APFS volume device ids
+are assigned at mount time and can change across reboots. After the id shifts,
+every read-only open compares recorded vs live identity and fails closed with
+`SQLITE_CANTOPEN`. A read-write open would rewrite the record and self-heal,
+but cass health-gates every mutating command behind a read-only open first, so
+nothing ever reaches the heal path.
+
+**Confirm.**
+
+```sh
+stat -f "dev=%d ino=%i" ~/.cass/agent_search.db   # live identity
+hexyl -n 40 ~/.cass/agent_search.db-fsqlite-ns-use
+# bytes 10..18 = recorded dev (BE), bytes 18..26 = recorded ino (BE)
+```
+
+Inode matches, device id doesn't → this bug. If the *inode* differs, the db
+file was actually replaced — stop and investigate before touching anything.
+
+**Fix.** Stop all cass processes, then patch the recorded dev to the live value
+(here only the last byte differed, `0x10` → `0x0d` at offset 17):
+
+```sh
+printf '\x0d' | dd of="$HOME/.cass/agent_search.db-fsqlite-ns-use" \
+  bs=1 seek=17 count=1 conv=notrunc
+cass doctor        # database failure should be gone
+cass index         # catch up the lexical index
+launchctl kickstart -k gui/501/dev.cade.cass-watch gui/501/dev.cade.cass-semantic
+```
+
+Recurs whenever the Data volume mounts with a different device id. Do **not**
+run `cass doctor --fix` for this: on 0.6.23 it enters unbounded recursion in
+the reconstruct path (observed: 1.6 h at 100% CPU, ~50 GB RSS, no output) —
+kill it if started; it only touches lock files before hanging.
+
+---
+
 ## macOS keeps asking: "cass would like to access data from other apps"
 
 The prompt returns every few minutes, and "Allow" doesn't make it stop.
