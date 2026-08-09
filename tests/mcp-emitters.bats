@@ -28,8 +28,8 @@ setup() {
     '
     [ "$status" -eq 0 ]
 
-    # 14 entries, comments/blanks skipped
-    [ "$(echo "$output" | jq 'length')" -eq 14 ]
+    # 15 entries, comments/blanks skipped
+    [ "$(echo "$output" | jq 'length')" -eq 15 ]
     # auth=asta extraction (the newest auth source — added with the math stack)
     [ "$(echo "$output" | jq -r '.[] | select(.name=="astasrv") | .auth')" = "asta" ]
     # stdio parsing keeps the full command string
@@ -39,6 +39,9 @@ setup() {
     # --codex-client-id is extracted; --client-id stays in extras
     [ "$(echo "$output" | jq -r '.[] | select(.name=="oauthsrv") | .codex_client_id')" = "codex-oauth-id" ]
     [ "$(echo "$output" | jq -r '.[] | select(.name=="oauthsrv") | .extras')" = "--client-id claude-oauth-id" ]
+    # --codex-bearer is extracted with its value; nothing leaks into extras
+    [ "$(echo "$output" | jq -r '.[] | select(.name=="bearersrv") | .codex_bearer')" = "FIXTURE_BEARER_TOKEN" ]
+    [ "$(echo "$output" | jq -r '.[] | select(.name=="bearersrv") | .extras')" = "" ]
     # raw URL is preserved (no substitution in the parser)
     [ "$(echo "$output" | jq -r '.[] | select(.name=="urlkey") | .url')" = 'https://key.example/{FIXTURE_KEY}/v2/mcp' ]
 }

@@ -1190,3 +1190,45 @@ bash install/linearmouse.sh         # push repo settings → app (default: apply
 Adding a new app to this pattern means deleting its `home/` chezmoi source
 (chezmoi then leaves the live file alone), adding the script, and wiring a
 `DF_DO_*` flag in `bootstrap.sh`.
+
+---
+
+## Codex MCP OAuth fails: "Authorization server response missing required issuer"
+
+**Symptom.** `codex mcp login <server>` (or first use of an OAuth MCP server in
+Codex) opens the browser, auth succeeds there, then the CLI dies with
+`failed to handle OAuth callback … Authorization server response missing
+required issuer: expected <server url>`. The same server connects fine from
+Claude Code.
+
+**Root cause.** A Codex regression, not a server or config problem. Codex
+0.143.0+ looks for an `iss` field in the token endpoint's JSON response body —
+where RFC 6749 doesn't put one — instead of using the RFC 9207 `iss` callback
+parameter it already validated. Spec-compliant authorization servers
+(Cloudflare's among them) fail the check. Tracked in
+[openai/codex#31573](https://github.com/openai/codex/issues/31573); introduced
+via a modelcontextprotocol/rust-sdk change.
+
+**Confirm.** `codex --version` ≥ 0.143.0, the issue above still open, and the
+server works from another harness. For Cloudflare specifically, prove the
+server itself is healthy with a direct handshake:
+
+```bash
+curl -s -X POST https://mcp.cloudflare.com/mcp \
+  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"probe","version":"0.0.0"}}}'
+# → {"result":{…"serverInfo":{"name":"cloudflare-api"…
+```
+
+**Fix.** Sidestep OAuth in Codex with a static bearer: the
+`--codex-bearer <ENV_VAR>` annotation in `packages/mcp-servers.txt` makes
+`install/codex.sh` emit `bearer_token_env_var = "<ENV_VAR>"` for that server
+while every other harness keeps OAuth. Cloudflare rides
+`--codex-bearer CLOUDFLARE_API_TOKEN` (from `~/.cloudflare.env`,
+`bash install/auth.sh cloudflare`); mcp.cloudflare.com accepts API-token
+bearers directly, verified with the handshake above. Caveat: the token's
+scopes bound what the tools can do — OAuth carried your full user grant, so
+mint a broader token if a tool call 403s. Remove the annotation once the
+upstream fix ships.

@@ -183,7 +183,7 @@ _check_plugins() {
 # TOML blocks, written to $1. Logs go to stdout via log_*; only TOML hits $1.
 _emit_mcp_blocks_to() {
     local out="$1" _name _kind _transport _cmd _head _tail _url
-    local _auth_source _client_id _codex_client_id _extras _arg _first _sub
+    local _auth_source _client_id _codex_client_id _codex_bearer _extras _arg _first _sub
 
     : > "$out"
 
@@ -192,7 +192,8 @@ _emit_mcp_blocks_to() {
     log_info "  Reading MCP servers (packages/mcp-servers.txt + overlays)"
     while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
        && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth_source \
-       && IFS= read -r _codex_client_id && IFS= read -r _extras; do
+       && IFS= read -r _codex_client_id && IFS= read -r _codex_bearer \
+       && IFS= read -r _extras; do
 
             printf '\n[mcp_servers.%s]\n' "$_name" >> "$out"
 
@@ -302,6 +303,16 @@ _emit_mcp_blocks_to() {
                     esac
                 fi
 
+                # Codex-only static bearer (--codex-bearer <ENV_VAR>): for
+                # servers whose OAuth flow is broken in Codex specifically —
+                # other harnesses keep OAuth. Env var comes from the sourced
+                # ~/.<service>.env files, like auth=tavily.
+                if [[ -n "$_codex_bearer" ]]; then
+                    printf 'bearer_token_env_var = "%s"\n' "$(_toml_escape "$_codex_bearer")" >> "$out"
+                    [[ -n "${!_codex_bearer:-}" ]] || log_warn "    $_name: \$$_codex_bearer unset — server unauthenticated until it is exported (bash install/auth.sh)"
+                    log_info "    $_name ($_transport, bearer via \$$_codex_bearer)"
+                fi
+
                 # Per-client OAuth: some servers need a client_id whose
                 # redirect_uri is registered per MCP client, so the id differs
                 # between Claude and Codex. Codex 0.134+ reads it from an
@@ -315,7 +326,7 @@ _emit_mcp_blocks_to() {
                     log_warn "    $_name: has --client-id but no --codex-client-id; Codex OAuth will fail until one is set"
                 fi
 
-                [[ -z "$_auth_source" && -z "$_client_id" && -z "$_codex_client_id" ]] && log_info "    $_name ($_transport)"
+                [[ -z "$_auth_source" && -z "$_client_id" && -z "$_codex_client_id" && -z "$_codex_bearer" ]] && log_info "    $_name ($_transport)"
             fi
 
             {
@@ -333,7 +344,7 @@ _emit_mcp_blocks_to() {
                     printf 'client_id = "%s"\n' "$(_toml_escape "$_codex_client_id")"
                 } >> "$out"
             fi
-    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .extras')
+    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .codex_bearer, .extras')
 }
 
 # One-time eviction of the retired managed rules file. Managed rules moved

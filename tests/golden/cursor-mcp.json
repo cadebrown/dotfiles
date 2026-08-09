@@ -9,6 +9,9 @@
     "bare": {
       "command": "solobinary"
     },
+    "bearersrv": {
+      "url": "https://bearer.example/mcp"
+    },
     "c7srv": {
       "headers": {
         "CONTEXT7_API_KEY": "fixture-fixture-c7"

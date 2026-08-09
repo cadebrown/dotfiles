@@ -39,6 +39,11 @@
 #                    google` (one `gcloud auth application-default login`).
 # Auth-managed entries cannot also pass --header / --client-id extras.
 #
+# --codex-bearer <ENV_VAR> (HTTP entries): Codex-only static bearer — Codex
+# emits bearer_token_env_var = "<ENV_VAR>" instead of running OAuth, while the
+# other harnesses keep their normal auth for the same server. For servers
+# whose OAuth flow is broken in Codex specifically.
+#
 # Tokens-at-rest note: Claude/Codex/opencode resolve gh+gcloud creds at
 # connection/launch time (headersHelper / codex() / opencode() wrappers). For
 # context7/tavily/exa, Claude and Cursor bake headers while Codex and opencode
@@ -58,7 +63,11 @@
 
 # Cloudflare: full API access (Pages, DNS, Workers, R2, Zero Trust, etc.)
 # Write tools are gated by permissions.ask rules in home/dot_claude/settings.json.
-cloudflare http https://mcp.cloudflare.com/mcp
+# Codex rides an API-token bearer (~/.cloudflare.env): Codex 0.143+ rejects
+# Cloudflare's spec-compliant OAuth response (issuer validation regression,
+# openai/codex#31573). Token scopes bound what the tools can do there. Drop
+# the flag when the fix ships.
+cloudflare http https://mcp.cloudflare.com/mcp --codex-bearer CLOUDFLARE_API_TOKEN
 
 # GitHub: PRs, issues, repo search, code review.
 # OAuth/DCR is unsupported by GitHub's IdP, so we authenticate via gh CLI.

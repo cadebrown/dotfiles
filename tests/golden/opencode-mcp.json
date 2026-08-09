@@ -14,6 +14,11 @@
     "enabled": true,
     "type": "local"
   },
+  "bearersrv": {
+    "enabled": true,
+    "type": "remote",
+    "url": "https://bearer.example/mcp"
+  },
   "c7srv": {
     "enabled": true,
     "headers": {

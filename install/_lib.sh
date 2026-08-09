@@ -329,11 +329,12 @@ overlay_package_files() {
 # mcp_servers_each — the ONE parser for packages/mcp-servers.txt (+ overlays).
 # Emits one normalized JSON object per entry on stdout:
 #   {"name","kind":"stdio"|"remote","transport","cmd","url","auth",
-#    "codex_client_id","extras"}
+#    "codex_client_id","codex_bearer","extras"}
 # Policy-free: no {VAR} substitution, no credential resolution — the per-tool
 # renderers (install/{claude,codex,opencode,cursor}.sh) own that. `extras` is
-# the passthrough token string minus auth= and --codex-client-id + its value,
-# i.e. exactly what `claude mcp add` should receive. Consume with:
+# the passthrough token string minus auth=, --codex-client-id, and
+# --codex-bearer (+ their values), i.e. exactly what `claude mcp add` should
+# receive. Consume with:
 #   while IFS= read -r _name && IFS= read -r _kind && ...; do ...
 #   done < <(mcp_servers_each | jq -r '.name, .kind, ...')
 # (one field per line — TSV would collapse empty fields under `read`).
@@ -341,7 +342,7 @@ overlay_package_files() {
 # from hand-rolled copies of this loop — extend it HERE, not in a renderer.
 mcp_servers_each() {
     local _file _line _name _transport _url _rest_extras
-    local _auth _codex_client_id _extras _grab_ccid _tok
+    local _auth _codex_client_id _codex_bearer _extras _grab_ccid _grab_cbear _tok
     while IFS= read -r _file; do
         while IFS= read -r _line; do
             [[ -z "$_line" || "$_line" == \#* ]] && continue
@@ -349,21 +350,25 @@ mcp_servers_each() {
             if [[ "$_transport" == "stdio" && "$_line" == *"cmd: "* ]]; then
                 jq -nc --arg n "$_name" --arg cmd "${_line#*cmd: }" \
                     '{name:$n, kind:"stdio", transport:"stdio", cmd:$cmd,
-                      url:"", auth:"", codex_client_id:"", extras:""}'
+                      url:"", auth:"", codex_client_id:"", codex_bearer:"", extras:""}'
             else
-                _auth="" _codex_client_id="" _extras="" _grab_ccid=0
+                _auth="" _codex_client_id="" _codex_bearer="" _extras="" _grab_ccid=0 _grab_cbear=0
                 for _tok in $_rest_extras; do
                     if (( _grab_ccid )); then _codex_client_id="$_tok"; _grab_ccid=0; continue; fi
+                    if (( _grab_cbear )); then _codex_bearer="$_tok"; _grab_cbear=0; continue; fi
                     case "$_tok" in
                         auth=*)            _auth="${_tok#auth=}" ;;
                         --codex-client-id) _grab_ccid=1 ;;
+                        --codex-bearer)    _grab_cbear=1 ;;
                         *)                 _extras="${_extras:+$_extras }$_tok" ;;
                     esac
                 done
                 jq -nc --arg n "$_name" --arg t "$_transport" --arg url "$_url" \
-                       --arg auth "$_auth" --arg ccid "$_codex_client_id" --arg ex "$_extras" \
+                       --arg auth "$_auth" --arg ccid "$_codex_client_id" \
+                       --arg cbear "$_codex_bearer" --arg ex "$_extras" \
                     '{name:$n, kind:"remote", transport:$t, cmd:"",
-                      url:$url, auth:$auth, codex_client_id:$ccid, extras:$ex}'
+                      url:$url, auth:$auth, codex_client_id:$ccid,
+                      codex_bearer:$cbear, extras:$ex}'
             fi
         done < "$_file"
     done < <(overlay_package_files "mcp-servers.txt")

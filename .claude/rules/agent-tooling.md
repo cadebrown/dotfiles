@@ -94,6 +94,19 @@ and chezmoi-managed guidance files built from shared partials.
   `bash install/auth.sh github`; to switch a machine to the keyring instead, clear
   `GITHUB_TOKEN` then `gh auth login`. After rotating, relaunch Claude Code — the running
   process caches the old env token at launch.
+- **Codex MCP OAuth is broken for spec-compliant servers (0.143.0+)** — Codex
+  expects `iss` in the token endpoint's response body (RFC 6749 puts it nowhere
+  near there) instead of using the validated RFC 9207 callback param, so OAuth
+  servers like Cloudflare's die with "Authorization server response missing
+  required issuer" (openai/codex#31573). The escape hatch is the
+  `--codex-bearer <ENV_VAR>` annotation in `packages/mcp-servers.txt`: parsed by
+  `mcp_servers_each` into its own field (like `--codex-client-id`), rendered
+  ONLY by `install/codex.sh` as `bearer_token_env_var` — Claude/opencode/cursor
+  keep OAuth for the same server. Cloudflare uses it with
+  `CLOUDFLARE_API_TOKEN` (mcp.cloudflare.com accepts API-token bearers;
+  verified 2026-08-06 with a direct initialize). Token scopes bound the tools
+  there — a 403 from a Codex cloudflare tool means the token needs more scopes,
+  not that auth broke. Drop the annotation when #31573 is fixed.
 - **Google MCP is split: Cloud = official ADC, Workspace = community server** —
   two different mechanisms for two different reasons.
   **Cloud** (`cloud-run`/`cloud-resmgr`/`cloud-storage`/`bigquery`): Google's
