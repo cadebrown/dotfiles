@@ -40,6 +40,11 @@ mutation-testing@trailofbits
 # verifiers + calibrated abstention — informal-proof complement to lean4.
 math-olympiad
 
+# Lean 4 proof-writing per Mathlib conventions (ToB, Aug 2026): design-top-down
+# / prove-bottom-up with sorry placeholders, lemma graduation, linter
+# cross-reference — the style layer on top of the lean4 workflow plugin.
+writing-lean-proofs@trailofbits
+
 # Codex bridge (OpenAI official): run the installed codex CLI as a delegate —
 # /codex:review, /codex:adversarial-review (second-model review!), /codex:rescue,
 # background job status/result/cancel. Uses ~/.openai.env or ChatGPT login.
