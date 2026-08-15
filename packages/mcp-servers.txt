@@ -96,6 +96,13 @@ qmd http http://localhost:8181/mcp
 # Blender: control Blender via MCP (requires addon.py installed in Blender — see github.com/ahujasid/blender-mcp)
 blender stdio cmd: uvx blender-mcp
 
+# Unity first-party MCP: NOT registered globally by design. It lives in the
+# com.unity.ai.assistant package (pre-release) — the editor auto-launches an MCP
+# bridge and clients spawn a relay from ~/.unity/relay/ over stdio, so it only
+# works per-project with the editor running. Wire it per-project following
+# docs.unity3d.com/Packages/com.unity.ai.assistant@latest (unity-mcp-get-started).
+# Community fallback with play-mode tests/builds: github.com/CoplayDev/unity-mcp.
+
 # === Web search & data retrieval (always-on) ===
 # Tavily: LLM-tuned web search + extract + crawl + map in one server.
 # 1000 credits/mo free (no card). Bearer auth (TAVILY_API_KEY).

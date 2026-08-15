@@ -327,6 +327,13 @@ if OS.mac?
   # Linux has no cask equivalent — headless boxes render without LaTeX.
   cask "mactex"
 
+  ### Game development ###
+  # Unity early-adopter track: Hub manages editor installs incl. open
+  # alpha/beta streams (Installs → Pre-releases; 6.8 = full-CoreCLR editor).
+  # First-party AI/MCP comes per-project via com.unity.ai.assistant —
+  # see the commented entry in packages/mcp-servers.txt.
+  cask "unity-hub"
+
   ### Games ###
   cask "openemu"
   cask "retroarch"
