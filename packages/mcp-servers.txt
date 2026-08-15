@@ -63,11 +63,10 @@
 
 # Cloudflare: full API access (Pages, DNS, Workers, R2, Zero Trust, etc.)
 # Write tools are gated by permissions.ask rules in home/dot_claude/settings.json.
-# Codex rides an API-token bearer (~/.cloudflare.env): Codex 0.143+ rejects
-# Cloudflare's spec-compliant OAuth response (issuer validation regression,
-# openai/codex#31573). Token scopes bound what the tools can do there. Drop
-# the flag when the fix ships.
-cloudflare http https://mcp.cloudflare.com/mcp --codex-bearer CLOUDFLARE_API_TOKEN
+# All four harnesses use OAuth (Cloudflare's AS advertises CIMD + DCR). Codex
+# needs 0.147.0+ — earlier versions dropped the RFC 9207 callback issuer
+# (openai/codex#31573); run `codex mcp login cloudflare` once after upgrading.
+cloudflare http https://mcp.cloudflare.com/mcp
 
 # GitHub: PRs, issues, repo search, code review.
 # OAuth/DCR is unsupported by GitHub's IdP, so we authenticate via gh CLI.

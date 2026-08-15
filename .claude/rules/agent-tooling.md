@@ -34,16 +34,25 @@ and chezmoi-managed guidance files built from shared partials.
 
 ## Gotchas
 
-- **MCP spec 2026-07-28 is Current, but nothing has shipped it — don't chase it.**
-  The revision drops the initialization handshake for per-request negotiation
-  (`io.modelcontextprotocol/protocolVersion` in `_meta`, `MCP-Protocol-Version` on
-  Streamable HTTP) and adds a mandatory `server/discover` RPC. It changes nothing in
-  this repo: `packages/mcp-servers.txt` carries URLs, commands, and auth source only —
-  the harnesses own protocol negotiation, and the spec's backward-compatibility path
-  keeps them on the handshake revisions. Verified 2026-08-01: deepwiki answers
-  `Unsupported protocol version: 2026-07-28. Supported versions: 2024-11-05,
-  2025-03-26, 2025-06-18, 2025-11-25`. Re-check when a server we use advertises it;
-  probe with
+- **MCP spec 2026-07-28 is shipping, but negotiation is the harnesses' job — this
+  repo still carries no protocol config.** The revision drops the initialization
+  handshake for per-request negotiation (`io.modelcontextprotocol/protocolVersion`
+  in `_meta`, `MCP-Protocol-Version` on Streamable HTTP), adds a mandatory
+  `server/discover` RPC, and replaces server-initiated requests (elicitation
+  included) with MRTR `input_required` results. Adoption as of 2026-08-15:
+  Cloudflare's product servers run it statelessly on `/mcp` (legacy clients still
+  accepted), github-mcp-server ≥ v1.9.0 negotiates it, and all four Tier-1 SDKs
+  speak it. Client side: opencode ≥ 1.18.9 negotiates automatically
+  (`@modelcontextprotocol/client` 2.0); pi-mcp-adapter has per-server
+  `protocolVersion` ("legacy" default / "auto" / "2026-07-28"); Codex gates it
+  behind `[features] mcp_2026_07_28` — protocol-only, stage UnderDevelopment,
+  leave OFF until it reaches Stable (the same bar multi_agent_v2 met before we
+  enabled it); Claude Code has not shipped the new wire protocol. On the auth
+  side the revision deprecates DCR in favor of CIMD (URL-based client IDs,
+  SEP-991) and mandates RFC 9207 issuer validation; CIMD clients today: Claude
+  Code (since 2.1.81), Codex 0.148-alpha ≥ .9; opencode (#25961 open) and
+  pi-mcp-adapter still register via DCR. `packages/mcp-servers.txt` stays
+  URL/command/auth-source only. Probe a server with
   `curl -sX POST <url> -H 'MCP-Protocol-Version: 2026-07-28' -d '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{}}'`.
 - **Claude plugin installs resolve against LOCAL marketplace clones** — with
   `DISABLE_AUTOUPDATER=1` the clones under `~/.claude/plugins/marketplaces/` never
@@ -76,7 +85,9 @@ and chezmoi-managed guidance files built from shared partials.
   there. Cursor is the exception: its sync-back hooks capture edits instead of
   blocking them.
 - **GitHub MCP can't use OAuth** — `api.githubcopilot.com/mcp` advertises OAuth, but
-  GitHub's IdP doesn't implement Dynamic Client Registration (RFC 7591), so Claude
+  GitHub's IdP implements neither Dynamic Client Registration (RFC 7591) nor CIMD
+  (no `registration_endpoint`, no `client_id_metadata_document_supported` in its AS
+  metadata — probed 2026-08-15), so Claude
   Code's `/mcp` Authenticate flow fails with "Incompatible auth server" (tracked in
   anthropics/claude-code#3433). GitHub's own install guide just recommends a static PAT,
   so `mcp-servers.txt` uses `auth=gh`: Claude resolves the token at connection time via
@@ -94,19 +105,20 @@ and chezmoi-managed guidance files built from shared partials.
   `bash install/auth.sh github`; to switch a machine to the keyring instead, clear
   `GITHUB_TOKEN` then `gh auth login`. After rotating, relaunch Claude Code — the running
   process caches the old env token at launch.
-- **Codex MCP OAuth is broken for spec-compliant servers (0.143.0+)** — Codex
-  expects `iss` in the token endpoint's response body (RFC 6749 puts it nowhere
-  near there) instead of using the validated RFC 9207 callback param, so OAuth
-  servers like Cloudflare's die with "Authorization server response missing
-  required issuer" (openai/codex#31573). The escape hatch is the
-  `--codex-bearer <ENV_VAR>` annotation in `packages/mcp-servers.txt`: parsed by
-  `mcp_servers_each` into its own field (like `--codex-client-id`), rendered
-  ONLY by `install/codex.sh` as `bearer_token_env_var` — Claude/opencode/cursor
-  keep OAuth for the same server. Cloudflare uses it with
-  `CLOUDFLARE_API_TOKEN` (mcp.cloudflare.com accepts API-token bearers;
-  verified 2026-08-06 with a direct initialize). Token scopes bound the tools
-  there — a 403 from a Codex cloudflare tool means the token needs more scopes,
-  not that auth broke. Drop the annotation when #31573 is fixed.
+- **Codex MCP OAuth against spec-compliant servers was broken 0.143–0.146,
+  fixed in 0.147.0** — the rmcp-era callback handling dropped the RFC 9207
+  `iss` param, so servers like Cloudflare's died with "Authorization server
+  response missing required issuer" (openai/codex#31573; fixed by the rmcp
+  3.0.0 client rework — the issue may still sit open administratively, so
+  judge by retest, not by issue state). Cloudflare's bearer annotation was
+  dropped 2026-08-15; OAuth needs a one-time `codex mcp login cloudflare` per
+  machine. The `--codex-bearer <ENV_VAR>` annotation in
+  `packages/mcp-servers.txt` REMAINS supported for the next broken flow:
+  parsed by `mcp_servers_each` into its own field (like `--codex-client-id`),
+  rendered ONLY by `install/codex.sh` as `bearer_token_env_var` — the other
+  harnesses keep OAuth for the same server. (mcp.cloudflare.com still accepts
+  API-token bearers if scope-bounded access is ever wanted again; with a
+  bearer, a 403 means missing token scopes, not broken auth.)
 - **Google MCP is split: Cloud = official ADC, Workspace = community server** —
   two different mechanisms for two different reasons.
   **Cloud** (`cloud-run`/`cloud-resmgr`/`cloud-storage`/`bigquery`): Google's
