@@ -9,16 +9,28 @@ log_section "Node.js (nvm)"
 # nvm goes under LOCAL_PLAT so each arch+OS gets its own node binaries
 # (nvm itself is shell scripts, but the node versions it installs are arch-specific)
 
-if [[ -s "$NVM_DIR/nvm.sh" ]]; then
-    log_okay "nvm already installed: $NVM_DIR"
-else
-    log_info "Installing nvm..."
-    ensure_dir "$NVM_DIR"
-    # PROFILE=/dev/null: don't touch shell configs (chezmoi manages those)
+# PROFILE=/dev/null: don't touch shell configs (chezmoi manages those)
+_nvm_install() {
+    local _nvm_script
     _nvm_script="$(mktemp)"
     curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/HEAD/install.sh -o "$_nvm_script"
     NVM_DIR="$NVM_DIR" PROFILE=/dev/null run_logged bash "$_nvm_script"
     rm -f "$_nvm_script"
+}
+
+if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+    # The installer updates an existing NVM_DIR in place; nvm has no
+    # self-update command of its own.
+    if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+        log_info "Upgrading nvm..."
+        _nvm_install
+    else
+        log_okay "nvm already installed: $NVM_DIR"
+    fi
+else
+    log_info "Installing nvm..."
+    ensure_dir "$NVM_DIR"
+    _nvm_install
 fi
 
 # shellcheck source=/dev/null
@@ -26,8 +38,17 @@ source "$NVM_DIR/nvm.sh"
 
 if nvm ls 25 2>/dev/null | grep -qE 'v25\.'; then
     if [[ "${DF_MODE:-}" == "upgrade" ]]; then
-        log_info "Upgrading Node.js v25 to latest 25.x..."
-        run_logged nvm install 25 --reinstall-packages-from=25 --latest-npm
+        # nvm install errors out ("Can not reinstall packages from the
+        # current version") when 25 is already at the latest release, so only
+        # run it when there is actually a newer 25.x.
+        _node_cur="$(nvm version 25)"
+        _node_remote="$(nvm version-remote 25)"
+        if [[ "$_node_cur" != "$_node_remote" ]]; then
+            log_info "Upgrading Node.js v25: $_node_cur → $_node_remote"
+            run_logged nvm install 25 --reinstall-packages-from=25 --latest-npm
+        else
+            log_okay "Node v25 already latest ($_node_cur)"
+        fi
     else
         log_okay "Node v25 already installed"
     fi

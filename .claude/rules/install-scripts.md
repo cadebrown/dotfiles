@@ -186,6 +186,17 @@ re-runs the install script.
 - **macOS Sequoia requires code-signed rustup** — the Homebrew `rustup` formula is signed;
   upstream `sh.rustup.rs` is not and will fail with linker provenance errors. `install/rust.sh`
   handles this, but don't change the macOS Rust install path without understanding why.
+- **`bootstrap.sh upgrade` only upgrades what a branch explicitly handles.**
+  Three tools sat stale for months because their scripts short-circuited on
+  "already installed": bootstrap skipped `chezmoi.sh` entirely (making its
+  upgrade branch dead code — it now always delegates in upgrade mode),
+  cargo-binstall **never** upgrades an installed crate (any version satisfies
+  the default `*` requirement; it skips with "already installed, use --force" —
+  upgrade mode now passes `--force` via `_install_force`), and `node.sh` had no
+  nvm-self-update branch (the nvm installer updates an existing `NVM_DIR` in
+  place; nvm has no self-update command). When adding an install script, an
+  idempotency guard needs a matching `DF_MODE=upgrade` answer, or upgrade mode
+  silently freezes that tool.
 - **cargo-binstall gnu prebuilts can outrun the host glibc** — GitHub's ubuntu-latest
   runners moved to 24.04 (glibc 2.39), so upstream gnu release binaries refuse to load
   on older hosts (Ubuntu 22.04 = 2.35 broke atuin/xan/yazi, July 2026). Homebrew's

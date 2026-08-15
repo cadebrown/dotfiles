@@ -147,8 +147,10 @@ CARGO_TXT="$DF_PACKAGES/cargo.txt"
 
 log_info "Installing/upgrading cargo tools from cargo.txt"
 
-# cargo binstall handles idempotency: skips if already at latest version,
-# upgrades if a newer release exists, installs if missing.
+# cargo binstall handles idempotency for installs, but it never upgrades on
+# its own — an installed crate satisfies the default `*` requirement and skips
+# with "already installed, use --force to override", regardless of newer
+# releases. Upgrade mode therefore force-reinstalls every crate.
 # Falls back to source compilation if no pre-built binary is available.
 #
 # DF_CARGO_STRATEGIES: override binstall strategy (e.g. "compile" to skip
@@ -157,6 +159,8 @@ log_info "Installing/upgrading cargo tools from cargo.txt"
 # GITHUB_TOKEN: if set, passed to binstall to authenticate GitHub API calls
 #   and raise the rate limit from 60 to 5000 req/hr.
 _binstall_flags=(--no-confirm --log-level warn --locked)
+_install_force=()
+[[ "${DF_MODE:-}" == "upgrade" ]] && _install_force=(--force)
 [[ -n "${DF_CARGO_STRATEGIES:-}" ]] && _binstall_flags+=(--strategies "$DF_CARGO_STRATEGIES")
 [[ -n "${GITHUB_TOKEN:-}" ]] && _binstall_flags+=(--github-token "$GITHUB_TOKEN")
 
@@ -184,8 +188,8 @@ while IFS= read -r pkg; do
     # 0.3.1 terminal-UI widget dependency) and trips crates that reject
     # unlocked builds.
     # (cargo-nextest's locked-tripwire). --locked honors the tested lockfile.
-    if run_logged cargo binstall "${_binstall_flags[@]}" "$pkg" \
-        || run_logged cargo install --locked "$pkg"; then
+    if run_logged cargo binstall "${_binstall_flags[@]}" "${_install_force[@]}" "$pkg" \
+        || run_logged cargo install --locked "${_install_force[@]}" "$pkg"; then
         # binstall "success" can still leave a binary the loader rejects
         # (gnu prebuilt wanting newer glibc — also hit when binstall skips an
         # already-latest-but-broken install). Heal in two steps: force-refetch

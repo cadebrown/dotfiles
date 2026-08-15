@@ -349,10 +349,11 @@ ensure_dir "$ARCH_BIN"
 
 # Check the install location specifically. A `has chezmoi` would also accept
 # Homebrew or system installs, which then run with the wrong sourceDir / data.
-if [[ -x "$CHEZMOI_BIN" ]]; then
+# Upgrade mode always delegates — chezmoi.sh owns the self-upgrade branch,
+# and short-circuiting here would leave chezmoi as the one stale tool.
+if [[ -x "$CHEZMOI_BIN" && "${DF_MODE:-}" != "upgrade" ]]; then
     log_okay "chezmoi already installed: $("$CHEZMOI_BIN" --version)"
 else
-    log_info "Installing chezmoi → $ARCH_BIN"
     run_logged bash "$DF_INSTALL_DIR/chezmoi.sh"
 fi
 
