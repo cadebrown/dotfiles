@@ -144,14 +144,12 @@ fi
 export NVM_DIR="$_LOCAL_PLAT/nvm"
 # Add default node to PATH for non-interactive shells (scripts, CI).
 # The full nvm is lazy-loaded in .zshrc for interactive use.
-if [ -d "$NVM_DIR/versions/node" ]; then
-    # Pick the highest installed node version using version-sort (sort -V).
-    # This makes `node`/`npm` available in non-interactive shells (scripts, CI)
-    # without sourcing the full nvm.sh (~4000 lines). The omz nvm plugin in
-    # .zshrc overrides this in interactive shells so `nvm use` works correctly.
-    _nvm_default_bin="$NVM_DIR/versions/node/$(ls "$NVM_DIR/versions/node/" | sort -V | tail -1)/bin"
-    [ -d "$_nvm_default_bin" ] && path=("$_nvm_default_bin" $path)
-    unset _nvm_default_bin
+if [ -r "$NVM_DIR/alias/default" ]; then
+    IFS= read -r _nvm_default < "$NVM_DIR/alias/default"
+    _nvm_default="${_nvm_default#v}"
+    _nvm_default_dir="$(printf '%s\n' "$NVM_DIR/versions/node"/v"$_nvm_default".* | sort -V | tail -1)"
+    [ -d "$_nvm_default_dir/bin" ] && path=("$_nvm_default_dir/bin" $path)
+    unset _nvm_default _nvm_default_dir
 fi
 
 ### RUST ###

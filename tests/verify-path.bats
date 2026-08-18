@@ -39,6 +39,12 @@ teardown() {
     ! grep -q -- '--reinstall-packages-from' "$REPO/install/node.sh"
     grep -q 'npm-allow-scripts.txt' "$REPO/install/node.sh"
     ! grep -q 'nvm/HEAD/install.sh' "$REPO/install/node.sh"
+
+    local profile
+    for profile in home/dot_zprofile.tmpl home/dot_bash_profile.tmpl; do
+        grep -q 'NVM_DIR/alias/default' "$REPO/$profile"
+        ! grep -q 'ls "$NVM_DIR/versions/node/"' "$REPO/$profile"
+    done
 }
 
 @test "Cargo installs target the native macOS architecture" {

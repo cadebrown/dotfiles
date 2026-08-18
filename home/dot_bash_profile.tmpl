@@ -125,10 +125,12 @@ export PATH="$HOME/.local/bin:$PATH"
 ### NODE (nvm) ###
 
 export NVM_DIR="$_LOCAL_PLAT/nvm"
-if [ -d "$NVM_DIR/versions/node" ]; then
-    _nvm_default_bin="$NVM_DIR/versions/node/$(ls "$NVM_DIR/versions/node/" | sort -V | tail -1)/bin"
-    [ -d "$_nvm_default_bin" ] && export PATH="$_nvm_default_bin:$PATH"
-    unset _nvm_default_bin
+if [ -r "$NVM_DIR/alias/default" ]; then
+    IFS= read -r _nvm_default < "$NVM_DIR/alias/default"
+    _nvm_default="${_nvm_default#v}"
+    _nvm_default_dir="$(printf '%s\n' "$NVM_DIR/versions/node"/v"$_nvm_default".* | sort -V | tail -1)"
+    [ -d "$_nvm_default_dir/bin" ] && export PATH="$_nvm_default_dir/bin:$PATH"
+    unset _nvm_default _nvm_default_dir
 fi
 
 ### RUST ###
