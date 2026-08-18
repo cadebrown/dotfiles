@@ -4,7 +4,7 @@ terraform {
   required_providers {
     cloudflare = {
       source  = "cloudflare/cloudflare"
-      version = "~> 4.52"
+      version = "~> 5.0"
     }
   }
 }
@@ -52,7 +52,9 @@ variable "github_repo" {
 provider "cloudflare" {}
 
 data "cloudflare_zone" "apex" {
-  name = var.zone_name
+  filter = {
+    name = var.zone_name
+  }
 }
 
 resource "cloudflare_pages_project" "site" {
@@ -60,19 +62,28 @@ resource "cloudflare_pages_project" "site" {
   name              = var.pages_project_name
   production_branch = var.pages_production_branch
 
-  build_config {
+  build_config = {
     # build.sh fetches pinned prebuilt mdbook + mdbook-mermaid, then runs `mdbook build docs`
     build_command   = "bash infra/cloudflare/build.sh"
     destination_dir = "docs/book"
     root_dir        = ""
   }
 
-  source {
+  source = {
     type = "github"
-    config {
+    config = {
       owner             = var.github_owner
       repo_name         = var.github_repo
       production_branch = var.pages_production_branch
+    }
+  }
+
+  deployment_configs = {
+    preview = {
+      fail_open = false
+    }
+    production = {
+      fail_open = false
     }
   }
 }
@@ -80,17 +91,22 @@ resource "cloudflare_pages_project" "site" {
 resource "cloudflare_pages_domain" "site" {
   account_id   = var.account_id
   project_name = cloudflare_pages_project.site.name
-  domain       = var.pages_custom_domain
+  name         = var.pages_custom_domain
 }
 
 # dotfiles.cade.io → <project>.pages.dev (proxied through Cloudflare)
-resource "cloudflare_record" "site" {
+resource "cloudflare_dns_record" "site" {
   zone_id = data.cloudflare_zone.apex.id
   type    = "CNAME"
-  name    = "dotfiles"
+  name    = var.pages_custom_domain
   content = cloudflare_pages_project.site.subdomain
   proxied = true
   ttl     = 1
+}
+
+moved {
+  from = cloudflare_record.site
+  to   = cloudflare_dns_record.site
 }
 
 output "pages_project_name" {

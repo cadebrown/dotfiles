@@ -14,8 +14,8 @@
 # API call, so it isn't rate-limited. Bump the pinned versions below to upgrade.
 set -euo pipefail
 
-MDBOOK_VERSION="0.5.3"
-MDBOOK_MERMAID_VERSION="0.17.0"
+MDBOOK_VERSION="0.5.4"
+MDBOOK_MERMAID_VERSION="0.17.1"
 TARGET="x86_64-unknown-linux-gnu"
 
 # Stage binaries in a throwaway dir and put it first on PATH.
