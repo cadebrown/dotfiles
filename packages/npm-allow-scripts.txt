@@ -1,0 +1,16 @@
+# npm-allow-scripts.txt - reviewed lifecycle scripts for global npm tools
+# Passed only to global install/rebuild commands; never persisted in ~/.npmrc.
+
+# Native dependencies used by qmd's local search and parser stack
+better-sqlite3
+node-llama-cpp
+tree-sitter-go
+tree-sitter-javascript
+tree-sitter-python
+tree-sitter-rust
+tree-sitter-typescript
+
+# Setup hooks pulled by declared agent tools
+@google/genai
+fsevents
+protobufjs

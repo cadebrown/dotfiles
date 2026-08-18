@@ -535,7 +535,16 @@ _PLAT_BIN="$(dirname "$_REAL_BREW_PREFIX")/bin"
 ensure_dir "$_PLAT_BIN"
 
 if [[ -d "$_REAL_BREW_PREFIX/opt/gcc/bin" ]]; then
-    _GCC_VER=$(ls "$_REAL_BREW_PREFIX/opt/gcc/bin"/gcc-* 2>/dev/null | grep -oP 'gcc-\K[0-9]+' | sort -n | tail -1)
+    _GCC_VER=""
+    for _gcc_bin in "$_REAL_BREW_PREFIX/opt/gcc/bin"/gcc-*; do
+        [[ -e "$_gcc_bin" ]] || continue
+        _candidate="${_gcc_bin##*-}"
+        [[ "$_candidate" =~ ^[0-9]+$ ]] || continue
+        if [[ -z "$_GCC_VER" || "$_candidate" -gt "$_GCC_VER" ]]; then
+            _GCC_VER="$_candidate"
+        fi
+    done
+    unset _gcc_bin _candidate
     if [[ -n "$_GCC_VER" ]]; then
         ln -sf "$_REAL_BREW_PREFIX/bin/gcc-$_GCC_VER" "$_PLAT_BIN/gcc"
         ln -sf "$_REAL_BREW_PREFIX/bin/g++-$_GCC_VER" "$_PLAT_BIN/g++"

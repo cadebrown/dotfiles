@@ -47,7 +47,7 @@ A single `packages/Brewfile` drives both platforms. On macOS, Homebrew installs 
 | --- | --- | --- | --- |
 | **Rust** | rustup + cargo-binstall | `$LOCAL_PLAT/rustup/`, `$LOCAL_PLAT/cargo/` | `packages/cargo.txt` |
 | **Node.js** | nvm (lazy-loaded in zsh) | `$LOCAL_PLAT/nvm/` | `packages/npm.txt` |
-| **Python** | uv tool install (per CLI tool) | `$LOCAL_PLAT/uv/tools/`, entrypoints in `$LOCAL_PLAT/bin/` | `packages/pip.txt` |
+| **Python** | uv tool install (per CLI tool) | `$LOCAL_PLAT/uv/tools/`, entrypoints in `$LOCAL_PLAT/bin/` | `packages/pip.txt` + full profile |
 
 Rust tools install via `cargo-binstall` (downloads pre-built binaries from GitHub releases when available, falls back to source). Python CLI tools each get their own isolated venv via `uv tool install` — no monolithic user-level environment. On macOS, rustup comes from Homebrew (code-signed, required on Sequoia+ where the linker enforces provenance).
 
@@ -104,7 +104,7 @@ Capability detection still runs in flat mode — `.plat_env.sh` tunes compiler f
 
 | | macOS | Linux |
 | --- | --- | --- |
-| Packages | Homebrew at `/opt/homebrew` | Homebrew at `~/.local/$PLAT/brew/` (custom prefix, bundled glibc) |
+| Packages | Homebrew at `/opt/homebrew` | Homebrew at `$LOCAL_PLAT/brew/` (custom prefix, bundled glibc) |
 | Rust | Homebrew `rustup` (code-signed for Sequoia) | `sh.rustup.rs` |
 | System settings | Dock, Finder, keyboard, trackpad, Safari, iTerm2 | -- |
 | Services | Colima (rootless Docker) | -- |

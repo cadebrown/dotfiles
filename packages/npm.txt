@@ -23,6 +23,10 @@
 # re-pin here (`@openai/codex@X.Y.Z`) until the config catches up.
 @openai/codex
 
+# JavaScript package manager used by workspace-based web projects. Install it
+# directly rather than letting Corepack and npm compete for the same shim.
+pnpm
+
 # qmd — local hybrid search (BM25+vectors+rerank, all-local GGUF models) over
 # markdown knowledge: ~/kb + auto-memory + dotfiles docs. Serves one warm MCP
 # daemon on :8181 for Claude+Codex+opencode. See install/memory.sh.

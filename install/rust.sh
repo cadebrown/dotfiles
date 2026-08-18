@@ -39,7 +39,7 @@ _glibc_broken_bins() {
 
 log_section "Rust"
 
-# RUSTUP_HOME and CARGO_HOME are set by _lib.sh to ~/.local/$PLAT/rustup and ~/.local/$PLAT/cargo
+# RUSTUP_HOME and CARGO_HOME are rooted under $LOCAL_PLAT by _lib.sh.
 
 ### rustup ###
 
@@ -124,6 +124,11 @@ else
     run_logged "$CARGO_HOME/bin/rustup" component add rust-analyzer
 fi
 
+if [[ "$DF_PROFILE" == "core" ]]; then
+    log_info "Core profile: skipping optional cargo.txt tools"
+    exit 0
+fi
+
 ### cargo-binstall ###
 # cargo-binstall downloads pre-compiled binaries from GitHub releases when available,
 # falling back to `cargo install` (source compilation) otherwise.
@@ -153,15 +158,21 @@ log_info "Installing/upgrading cargo tools from cargo.txt"
 # releases. Upgrade mode therefore force-reinstalls every crate.
 # Falls back to source compilation if no pre-built binary is available.
 #
-# DF_CARGO_STRATEGIES: override binstall strategy (e.g. "compile" to skip
-#   GitHub release fetchers entirely — useful behind a VPN where the release
-#   download endpoints time out before the compile fallback kicks in).
+# DF_CARGO_STRATEGIES: override prebuilt resolution. "compile" skips binstall
+#   and uses cargo install directly.
 # GITHUB_TOKEN: if set, passed to binstall to authenticate GitHub API calls
 #   and raise the rate limit from 60 to 5000 req/hr.
 _binstall_flags=(--no-confirm --log-level warn --locked)
 _install_force=()
+_compile_only=0
 [[ "${DF_MODE:-}" == "upgrade" ]] && _install_force=(--force)
-[[ -n "${DF_CARGO_STRATEGIES:-}" ]] && _binstall_flags+=(--strategies "$DF_CARGO_STRATEGIES")
+if [[ "${DF_CARGO_STRATEGIES:-}" == "compile" ]]; then
+    _compile_only=1
+elif [[ -n "${DF_CARGO_STRATEGIES:-}" ]]; then
+    _binstall_flags+=(--strategies "$DF_CARGO_STRATEGIES" --disable-strategies compile)
+else
+    _binstall_flags+=(--disable-strategies compile)
+fi
 [[ -n "${GITHUB_TOKEN:-}" ]] && _binstall_flags+=(--github-token "$GITHUB_TOKEN")
 
 # Linux: prefer musl prebuilts (static, zero glibc dependency) over gnu.
@@ -176,9 +187,22 @@ if [[ "$OS" == "linux" ]]; then
     _mach="$(uname -m)"
     _binstall_flags+=(--targets "${_mach}-unknown-linux-musl" --targets "${_mach}-unknown-linux-gnu")
     unset _mach
+elif [[ "$OS" == "darwin" ]]; then
+    # Rosetta-compatible x86 assets must not enter an Apple Silicon tool tree.
+    _binstall_flags+=(--targets "${ARCH}-apple-darwin")
 fi
 
 _ok=0 _fail=0
+
+_install_crate() {
+    local crate="$1"
+    if [[ "$_compile_only" == "1" ]]; then
+        run_logged cargo install --locked "${_install_force[@]}" "$crate"
+    else
+        run_logged cargo binstall "${_binstall_flags[@]}" "${_install_force[@]}" "$crate" \
+            || run_logged cargo install --locked "${_install_force[@]}" "$crate"
+    fi
+}
 
 while IFS= read -r pkg; do
     log_info "  binstall $pkg"
@@ -188,8 +212,7 @@ while IFS= read -r pkg; do
     # 0.3.1 terminal-UI widget dependency) and trips crates that reject
     # unlocked builds.
     # (cargo-nextest's locked-tripwire). --locked honors the tested lockfile.
-    if run_logged cargo binstall "${_binstall_flags[@]}" "${_install_force[@]}" "$pkg" \
-        || run_logged cargo install --locked "${_install_force[@]}" "$pkg"; then
+    if _install_crate "$pkg"; then
         # binstall "success" can still leave a binary the loader rejects
         # (gnu prebuilt wanting newer glibc — also hit when binstall skips an
         # already-latest-but-broken install). Heal in two steps: force-refetch

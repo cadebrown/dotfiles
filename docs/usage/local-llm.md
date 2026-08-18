@@ -129,7 +129,7 @@ for it; an ad-hoc pull (`ollama pull qwen3-coder:30b`) is one command away.
 
 | Trigger file | Script re-run |
 |---|---|
-| `packages/pip.txt` | `install/local-llm.sh` (verifies binaries) |
+| `packages/pip-full.txt` | `install/local-llm.sh` (verifies binaries) |
 | `home/dot_config/opencode/opencode.json.tmpl` | `install/opencode.sh` (binary check) |
 
 `chezmoi update` after pulling dotfile changes re-verifies the setup.

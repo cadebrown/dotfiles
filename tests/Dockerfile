@@ -7,6 +7,7 @@ ENV DF_EMAIL="test@example.com"
 # Base dependencies
 RUN apt-get update && apt-get install -y \
     curl \
+    file \
     git \
     jq \
     zsh \

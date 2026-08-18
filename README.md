@@ -27,6 +27,8 @@ git clone https://github.com/cadebrown/dotfiles ~/dotfiles
 ```
 
 Any step can be skipped with `DF_DO_*=0` env vars (e.g. `DF_DO_RUST=0`).
+Optional Python and Cargo tools use `DF_PROFILE=full` by default; set
+`DF_PROFILE=core` for the small bootstrap used by CI.
 
 ---
 
@@ -43,7 +45,7 @@ Any step can be skipped with `DF_DO_*=0` env vars (e.g. `DF_DO_RUST=0`).
 
 ### Packages
 
-A single `packages/Brewfile` drives both platforms. On macOS, Homebrew installs native bottles plus casks (GUI apps). On Linux, Homebrew installs to a custom per-CPU prefix (`~/.local/$PLAT/brew/`) with its own glibc -- fully self-contained, no sudo.
+A single `packages/Brewfile` drives both platforms. On macOS, Homebrew installs native bottles plus casks (GUI apps). On Linux, Homebrew installs under `~/.local/brew/` by default or `~/.local/$PLAT/brew/` when PLAT isolation is enabled, with its own glibc -- fully self-contained, no sudo.
 
 ### Languages
 
@@ -51,7 +53,7 @@ A single `packages/Brewfile` drives both platforms. On macOS, Homebrew installs 
 | --- | --- | --- | --- |
 | **Rust** | rustup + cargo-binstall | `$LOCAL_PLAT/rustup/`, `$LOCAL_PLAT/cargo/` | `packages/cargo.txt` |
 | **Node.js** | nvm (lazy-loaded in zsh) | `$LOCAL_PLAT/nvm/` | `packages/npm.txt` |
-| **Python** | uv + venv | `$LOCAL_PLAT/venv/` | `packages/pip.txt` |
+| **Python** | uv tool environments | `$LOCAL_PLAT/uv/tools/` | `packages/pip.txt` |
 
 Rust tools are installed via `cargo-binstall` -- pre-built binaries from GitHub releases when available, source compilation as fallback. On macOS, rustup comes from Homebrew (code-signed, required on Sequoia+).
 
@@ -80,11 +82,11 @@ Rust tools are installed via `cargo-binstall` -- pre-built binaries from GitHub 
 
 **macOS** uses Homebrew at `/opt/homebrew` with native bottles. Rust gets Homebrew's code-signed `rustup` (required on Sequoia+). System preferences are set via `defaults write`.
 
-**Linux** uses Homebrew at `~/.local/$PLAT/brew/` -- a custom per-CPU prefix with its own glibc 2.35, so binaries are self-contained. No sudo, no Docker, no container.
+**Linux** uses Homebrew at `$LOCAL_PLAT/brew/` -- a rootless prefix with its own glibc. No sudo, no Docker, no container.
 
 ### PLAT isolation
 
-Every compiled binary lives under `~/.local/$PLAT/` where `PLAT` is detected from CPU features at shell startup. On a shared NFS home, each machine gets its own isolated binaries. Text configs are shared freely.
+Compiled binaries live under `~/.local/` by default. Set `DF_USE_PLAT=1` on a shared NFS home to place them under `~/.local/$PLAT/`, giving each architecture its own isolated binaries while text configs remain shared.
 
 ```
 ~/.local/plat_Linux_x86-64-v4/    # AVX-512 (Ice Lake+, Zen 4+)
@@ -92,7 +94,7 @@ Every compiled binary lives under `~/.local/$PLAT/` where `PLAT` is detected fro
 ~/.local/plat_Darwin_arm64/        # Apple Silicon
 ```
 
-The shell profile detects the current machine's PLAT and puts only that directory's paths on PATH. One home, many machines, no conflicts. Each PLAT also gets CPU-specific compiler flags (`-march=x86-64-v3`, etc.) so tools compiled from source use the best available instructions.
+The shell profile always detects the current machine's PLAT for CPU-specific compiler flags (`-march=x86-64-v3`, etc.). With PLAT isolation enabled, it also puts only that machine's directory on PATH: one home, many machines, no binary conflicts.
 
 ---
 
@@ -115,7 +117,9 @@ dotfiles/
 │   ├── Brewfile               # Homebrew (macOS + Linux, single file)
 │   ├── cargo.txt              # Rust tools (cargo-binstall)
 │   ├── pip.txt                # Python packages (uv)
+│   ├── pip-full.txt           # Full-profile Python tools
 │   ├── npm.txt                # Global npm packages
+│   ├── npm-allow-scripts.txt  # Reviewed global npm lifecycle hooks
 │   ├── go.txt                 # Go CLI tools (`go install`)
 │   ├── claude-plugins.txt     # Claude Code plugins
 │   └── mcp-servers.txt        # MCP servers (shared by Claude + Codex)
@@ -168,7 +172,7 @@ bash install/rust.sh
 # Homebrew → packages/Brewfile, then:
 brew bundle --file=packages/Brewfile
 
-# Python → packages/pip.txt, then:
+# Python core → packages/pip.txt; optional full tools → packages/pip-full.txt
 bash install/python.sh
 ```
 

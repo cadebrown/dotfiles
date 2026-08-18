@@ -2,6 +2,13 @@
 # install/_lib.sh - shared helpers for all install scripts
 # Usage: source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
+# Bash 5.3 on macOS can deadlock while writing heredocs into pipelines.
+if [[ "${BASH_SOURCE[1]:-}" == "$0" && "$(uname -s)" == "Darwin" ]] \
+    && (( BASH_VERSINFO[0] > 5 || (BASH_VERSINFO[0] == 5 && BASH_VERSINFO[1] >= 3) )) \
+    && [[ "$BASH" != "/bin/bash" ]]; then
+    exec /bin/bash "$0" "$@"
+fi
+
 set -euo pipefail
 
 ### COLORS ###
@@ -73,6 +80,12 @@ trap '_on_error $LINENO' ERR
 # Root of the dotfiles repo (parent of install/)
 DF_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DF_PACKAGES="$DF_ROOT/packages"
+
+DF_PROFILE="${DF_PROFILE:-full}"
+case "$DF_PROFILE" in
+    core|full) ;;
+    *) die "DF_PROFILE must be 'core' or 'full' (got '$DF_PROFILE')" ;;
+esac
 
 ### PLATFORM ###
 
@@ -229,7 +242,7 @@ SCRATCH="${DF_SCRATCH:-}"
 PATHS="${SCRATCH:+$SCRATCH/.paths}"
 export DF_SCRATCH DF_SCRATCH_LINK SCRATCH PATHS
 
-export OS ARCH DF_ROOT DF_PACKAGES DF_USE_PLAT \
+export OS ARCH DF_ROOT DF_PACKAGES DF_PROFILE DF_USE_PLAT \
        PLAT LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR \
        UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR \
        NVM_DIR CONAN_HOME \
@@ -293,6 +306,7 @@ git_clone_url() {
 # install scripts can authenticate with GitHub APIs (cargo-binstall, gh, etc.).
 # Uses bash globbing — no error if no files match.
 for _envfile in "$HOME"/.*.env; do
+    # shellcheck disable=SC1090
     [[ -f "$_envfile" ]] && source "$_envfile"
 done
 unset _envfile
@@ -320,10 +334,22 @@ unset _overlay_dir
 overlay_package_files() {
     local name="$1" _dir
     [[ -f "$DF_PACKAGES/$name" ]] && printf '%s\n' "$DF_PACKAGES/$name"
-    for _dir in "${DF_OVERLAYS[@]}"; do
+    for _dir in "${DF_OVERLAYS[@]-}"; do
         [[ -f "$_dir/packages/$name" ]] && printf '%s\n' "$_dir/packages/$name"
     done
     return 0
+}
+
+# Print the base package list and, for the full profile, its disjoint
+# <stem>-full.<ext> companion. The same overlay rules apply to both files.
+profile_package_files() {
+    local name="$1" stem extension
+    overlay_package_files "$name"
+    [[ "$DF_PROFILE" == "full" ]] || return 0
+
+    stem="${name%.*}"
+    extension="${name##*.}"
+    overlay_package_files "${stem}-full.${extension}"
 }
 
 # mcp_servers_each — the ONE parser for packages/mcp-servers.txt (+ overlays).

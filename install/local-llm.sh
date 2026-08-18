@@ -6,7 +6,7 @@
 #
 # Binary installs handled upstream:
 #   ollama    -> packages/Brewfile  (install/homebrew.sh, step 4)
-#   mlx-lm    -> packages/pip.txt   (install/python.sh,   step 6)
+#   mlx-lm    -> packages/pip-full.txt (install/python.sh, step 6)
 #
 # Modes:
 #   default       -> dirs + binary checks (idempotent, fast)
@@ -41,7 +41,7 @@ log_okay "HF_HOME → $LOCAL_PLAT/.cache/huggingface"
 _missing=0
 
 # The whole local-inference stack is macOS-only: MLX needs Apple Metal
-# (packages/pip.txt marks mlx-lm / mlx-openai-server `# macos-only`) and ollama
+# (packages/pip-full.txt marks mlx-lm / mlx-openai-server `# macos-only`) and ollama
 # sits inside the Brewfile's `if OS.mac?` block. On Linux none of it is ever
 # installed, so checking is noise and pulling MLX models is impossible.
 if [[ "$OS" == "darwin" ]]; then

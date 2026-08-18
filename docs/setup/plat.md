@@ -104,7 +104,7 @@ If you skip PLAT but actually share `$HOME` across architectures, you get one of
 
 - **Wrong-arch binary on PATH** — Linux machine sees Apple Silicon `~/.local/bin/uv`; runs and immediately segfaults with `Bad CPU type` or `cannot execute binary file`.
 - **Cargo registry corruption** — two machines share `~/.local/cargo/registry/` and race-update the index Git repo. Eventually one machine's `cargo build` fails with "object file is broken."
-- **nvm node-version collisions** — one machine's `node v25.9.0` is x86_64 ELF; another machine sees the same path containing arm64. `node --version` segfaults.
+- **nvm node-version collisions** — one machine's Node 24 binary is x86_64 ELF; another machine sees the same path containing arm64. `node --version` fails.
 - **Brew prefix incompatibility** — Brew's bottle relocation embeds the prefix path in binaries. Running `brew install foo` on machine A then trying to use `foo` on machine B without re-installing fails because the embedded RPATH is for A's libgcc.
 
 PLAT is the heavy hammer that solves all of these by giving each architecture its own tree. The cost is disk space (a few GB × number of machines) and one extra path segment in `$_LOCAL_PLAT`.

@@ -11,10 +11,10 @@ no `sorry` — everything else (CAS output, notebooks, numerics) is evidence.
 |---|---|---|
 | **Proof** | Lean 4 via elan (`ELAN_HOME=$LOCAL_PLAT/elan`), default toolchain pinned by `DF_LEAN_TOOLCHAIN` | `install/lean.sh` (`DF_DO_LEAN`) |
 | **Agent norms** | Proof gate + tool routing shared by all harnesses | `home/.chezmoitemplates/math-common.md` |
-| **MCPs** | `lean-lsp` (pinned), `lean-explore` (local index), `asta`, `arxiv`, `mathlas`, `wolfram` (AgentTools paclet via `wolfram-mcp` wrapper) | `packages/mcp-servers.txt` |
+| **MCPs** | `lean-lsp` (pinned), `lean-explore` (API backend), `asta`, `arxiv`, `mathlas`, `wolfram` (AgentTools paclet via `wolfram-mcp` wrapper) | `packages/mcp-servers.txt` |
 | **Skills** | `math-lookup` (OEIS/LMFDB/zbMATH/PSLQ recipes), `doc-coauthoring`, shared `lean4` skill for non-Claude harnesses | `home/dot_claude/skills/`, `packages/agent-skills.txt` |
 | **CAS / compute** | PARI, FLINT, juliaup (depot under `$LOCAL_PLAT`), minizinc, cadical/kissat; heavy Python deps per-project | `packages/Brewfile`, project repos |
-| **Writing** | MacTeX (macOS) / TinyTeX (`install/latex.sh`, `DF_DO_LATEX`), Typst, Quarto, texlab + harper, Zotero + Better BibTeX | `packages/Brewfile`, `packages/pip.txt` |
+| **Writing** | MacTeX (macOS) / TinyTeX (`install/latex.sh`, `DF_DO_LATEX`), Typst, Quarto, texlab + harper, Zotero + Better BibTeX | `packages/Brewfile`, `packages/pip-full.txt` |
 | **Prover APIs** | Asta (free), Aristotle, Aleph — `bash install/auth.sh <service>` | `install/auth.sh` |
 
 ## The proof gate

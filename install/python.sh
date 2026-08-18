@@ -45,48 +45,51 @@ fi
 
 ### CLI tools ###
 #
-# Each tool from pip.txt is installed via `uv tool install`, giving it an
+# Each selected tool is installed via `uv tool install`, giving it an
 # isolated venv under $LOCAL_PLAT/uv/tools/ with its entrypoint in $ARCH_BIN.
 # UV_TOOL_BIN_DIR and UV_TOOL_DIR are set by _lib.sh.
 
-PIP_TXT="$DF_PACKAGES/pip.txt"
-[[ -f "$PIP_TXT" ]] || { log_warn "No pip.txt at $PIP_TXT — skipping"; exit 0; }
+if [[ ! -f "$DF_PACKAGES/pip.txt" ]]; then
+    log_warn "No pip.txt at $DF_PACKAGES/pip.txt — skipping"
+    exit 0
+fi
 
-log_info "Installing CLI tools from pip.txt"
+log_info "Installing CLI tools for the $DF_PROFILE profile"
 _installed=0
 _skipped=0
 _failed=0
 
-while IFS= read -r _line; do
-    # Extract optional # python=X.Y constraint before stripping comments
-    _py_ver="$(echo "$_line" | grep -oE 'python=[0-9]+\.[0-9]+' | cut -d= -f2 || true)"
-    # Extract optional # macos-only marker
-    _macos_only="$(echo "$_line" | grep -c 'macos-only' || true)"
-    _pkg="$(echo "$_line" | sed 's/#.*//;s/^[[:space:]]*//;s/[[:space:]]*$//')"
-    [[ -z "$_pkg" ]] && continue
+while IFS= read -r _pip_file; do
+    while IFS= read -r _line; do
+        # Extract optional # python=X.Y constraint before stripping comments
+        _py_ver="$(echo "$_line" | grep -oE 'python=[0-9]+\.[0-9]+' | cut -d= -f2 || true)"
+        # Extract optional # macos-only marker
+        _macos_only="$(echo "$_line" | grep -c 'macos-only' || true)"
+        _pkg="$(echo "$_line" | sed 's/#.*//;s/^[[:space:]]*//;s/[[:space:]]*$//')"
+        [[ -z "$_pkg" ]] && continue
 
-    # Skip macOS-only tools on Linux (e.g. mlx-lm requires Apple Metal/MLX framework)
-    if [[ "$_macos_only" -gt 0 && "$OS" != "darwin" ]]; then
-        log_debug "Skipping macOS-only package on $OS: $_pkg"
-        (( _skipped++ )) || true
-        continue
-    fi
-
-    _uv_args=()
-    [[ -n "$_py_ver" ]] && _uv_args=(--python "$_py_ver")
-
-    if uv tool list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "^$_pkg "; then
-        log_debug "Already installed: $_pkg"
-        (( _skipped++ )) || true
-    else
-        if uv tool install "$_pkg" "${_uv_args[@]}" 2>&1; then
-            (( _installed++ )) || true
-        else
-            log_warn "Failed to install: $_pkg"
-            (( _failed++ )) || true
+        if [[ "$_macos_only" -gt 0 && "$OS" != "darwin" ]]; then
+            log_debug "Skipping macOS-only package on $OS: $_pkg"
+            (( _skipped++ )) || true
+            continue
         fi
-    fi
-done < "$PIP_TXT"
+
+        _uv_args=()
+        [[ -n "$_py_ver" ]] && _uv_args=(--python "$_py_ver")
+
+        if uv tool list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "^$_pkg "; then
+            log_debug "Already installed: $_pkg"
+            (( _skipped++ )) || true
+        else
+            if uv tool install "$_pkg" "${_uv_args[@]}" 2>&1; then
+                (( _installed++ )) || true
+            else
+                log_warn "Failed to install: $_pkg"
+                (( _failed++ )) || true
+            fi
+        fi
+    done < "$_pip_file"
+done < <(profile_package_files "pip.txt")
 
 log_okay "Python tools: $_installed installed, $_skipped already present, $_failed failed"
 

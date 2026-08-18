@@ -64,11 +64,12 @@ Paths below use `$LOCAL_PLAT`, which is `$HOME/.local` by default and `$HOME/.lo
    - Includes `rustup` (Homebrew's code-signed build — required for macOS Sequoia+)
 5. **Services**: colima/ollama/mlxserve auto-start is opt-in (`DF_START_LOCAL_SERVICES=1`); off by default. At the default, colima/ollama are simply left alone, but mlxserve is stopped and `launchctl disable`d — launchd re-loads its plist at every login otherwise, so a hand-started mlxserve will not survive a bootstrap run. Docker CLI plugins are always linked.
 6. **macOS defaults**: Dock, Finder, keyboard, trackpad, screenshots, Safari, iTerm2 preferences
-7. **Python** via uv → `$LOCAL_PLAT/uv/tools/<tool>/` (one isolated venv per CLI tool), entrypoints in `$ARCH_BIN`
-8. **Node.js** via nvm → `$LOCAL_PLAT/nvm/`
+7. **Python** via uv → `$LOCAL_PLAT/uv/tools/<tool>/` (one isolated venv per CLI tool), entrypoints in `$ARCH_BIN`; `DF_PROFILE=core` skips `pip-full.txt`
+8. **Node.js 24 LTS** via pinned nvm → `$LOCAL_PLAT/nvm/`
    - Uses uv's Python for `node-gyp` fallbacks when an npm package has no prebuilt binary
 9. **Rust** toolchain → `$LOCAL_PLAT/rustup/` + `$LOCAL_PLAT/cargo/`
-   - Homebrew's `rustup` (code-signed), required on macOS Sequoia+ where the linker enforces `com.apple.provenance`
+    - Homebrew's `rustup` (code-signed), required on macOS Sequoia+ where the linker enforces `com.apple.provenance`
+    - `DF_PROFILE=core` keeps rustup and rust-analyzer but skips optional `cargo.txt` tools
    - `cargo-binstall` downloads pre-built binaries from GitHub releases when available, falls back to source
    - Cargo tools install to `$LOCAL_PLAT/cargo/bin/`
 10. **Go CLI tools** from `packages/go.txt` → `$ARCH_BIN` (Go itself comes from the Brewfile)

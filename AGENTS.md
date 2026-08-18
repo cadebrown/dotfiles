@@ -6,7 +6,7 @@ Personal dotfiles for macOS and Linux, managed with chezmoi and bootstrapped by 
 The repo is designed for:
 - cross-platform support
 - shared NFS home directories
-- PLAT-specific binary isolation under `~/.local/$PLAT/`
+- optional PLAT-specific binary isolation under `~/.local/$PLAT/` for shared homes
 - idempotent re-runs
 
 ## Read This First
@@ -27,7 +27,7 @@ The repo is designed for:
 
 ## High-Value Invariants
 
-- Compiled binaries belong under `~/.local/$PLAT/`, not shared arch-neutral paths.
+- Compiled binaries belong under `~/.local/` by default, or `~/.local/$PLAT/` when `DF_USE_PLAT=1`.
 - Linux setup must avoid sudo.
 - Install scripts must be idempotent.
 - Dotfile sources live in `home/`; rendered targets in `~/` are not the source of truth.

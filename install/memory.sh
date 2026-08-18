@@ -238,9 +238,9 @@ EOF
     env -u GIT_CONFIG_GLOBAL git -C "$HOME/kb" add -A
     env -u GIT_CONFIG_GLOBAL git -C "$HOME/kb" commit -qm "kb: initial layout" \
         || log_warn "kb: initial commit failed — set git identity and commit ~/kb manually"
-    log_okay "~/kb initialized (add a private remote to sync across machines)"
+    log_okay "$HOME/kb initialized (add a private remote to sync across machines)"
 else
-    log_okay "~/kb already a git repo"
+    log_okay "$HOME/kb already a git repo"
 fi
 
 ### qmd — knowledge search daemon (L2 search) ###

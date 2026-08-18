@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# install/node.sh - install Node.js v25 via nvm
+# install/node.sh - install Node.js LTS via nvm
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 log_section "Node.js (nvm)"
+
+NVM_VERSION="${DF_NVM_VERSION:-v0.40.6}"
+NODE_MAJOR="${DF_NODE_MAJOR:-24}"
+NPM_MAJOR="${DF_NPM_MAJOR:-11}"
 
 # nvm goes under LOCAL_PLAT so each arch+OS gets its own node binaries
 # (nvm itself is shell scripts, but the node versions it installs are arch-specific)
@@ -13,21 +17,12 @@ log_section "Node.js (nvm)"
 _nvm_install() {
     local _nvm_script
     _nvm_script="$(mktemp)"
-    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/HEAD/install.sh -o "$_nvm_script"
+    curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh" -o "$_nvm_script"
     NVM_DIR="$NVM_DIR" PROFILE=/dev/null run_logged bash "$_nvm_script"
     rm -f "$_nvm_script"
 }
 
-if [[ -s "$NVM_DIR/nvm.sh" ]]; then
-    # The installer updates an existing NVM_DIR in place; nvm has no
-    # self-update command of its own.
-    if [[ "${DF_MODE:-}" == "upgrade" ]]; then
-        log_info "Upgrading nvm..."
-        _nvm_install
-    else
-        log_okay "nvm already installed: $NVM_DIR"
-    fi
-else
+if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then
     log_info "Installing nvm..."
     ensure_dir "$NVM_DIR"
     _nvm_install
@@ -36,28 +31,37 @@ fi
 # shellcheck source=/dev/null
 source "$NVM_DIR/nvm.sh"
 
-if nvm ls 25 2>/dev/null | grep -qE 'v25\.'; then
+_nvm_current="v$(nvm --version)"
+if [[ "$_nvm_current" != "$NVM_VERSION" ]]; then
+    log_info "Updating nvm: $_nvm_current → $NVM_VERSION"
+    _nvm_install
+    # shellcheck source=/dev/null
+    source "$NVM_DIR/nvm.sh"
+else
+    log_okay "nvm $NVM_VERSION already installed: $NVM_DIR"
+fi
+unset _nvm_current
+
+if nvm ls "$NODE_MAJOR" 2>/dev/null | grep -qE "v${NODE_MAJOR}\."; then
     if [[ "${DF_MODE:-}" == "upgrade" ]]; then
-        # nvm install errors out ("Can not reinstall packages from the
-        # current version") when 25 is already at the latest release, so only
-        # run it when there is actually a newer 25.x.
-        _node_cur="$(nvm version 25)"
-        _node_remote="$(nvm version-remote 25)"
+        _node_cur="$(nvm version "$NODE_MAJOR")"
+        # nvm's legacy io.js lookup hangs under Bash 5.3; LTS-only resolution skips it.
+        _node_remote="$(NVM_LTS="*" nvm version-remote "$NODE_MAJOR")"
         if [[ "$_node_cur" != "$_node_remote" ]]; then
-            log_info "Upgrading Node.js v25: $_node_cur → $_node_remote"
-            run_logged nvm install 25 --reinstall-packages-from=25 --latest-npm
+            log_info "Upgrading Node.js v$NODE_MAJOR: $_node_cur → $_node_remote"
+            run_logged nvm install --lts "$NODE_MAJOR"
         else
-            log_okay "Node v25 already latest ($_node_cur)"
+            log_okay "Node v$NODE_MAJOR already latest ($_node_cur)"
         fi
     else
-        log_okay "Node v25 already installed"
+        log_okay "Node v$NODE_MAJOR already installed"
     fi
 else
-    log_info "Installing Node.js v25..."
-    run_logged nvm install 25
+    log_info "Installing Node.js v$NODE_MAJOR..."
+    run_logged nvm install --lts "$NODE_MAJOR"
 fi
 
-nvm alias default 25
+nvm alias default "$NODE_MAJOR"
 
 # Put nvm's bin at the front before activating. `nvm use` rewrites an existing
 # nvm entry in PATH *in place* rather than prepending, so it cannot recover the
@@ -67,10 +71,26 @@ nvm alias default 25
 # dependency upgrade left that keg unable to start (`libllhttp.so.9.3`), and it
 # took the whole script down while nvm's own node sat there working.
 _nvm_node="$(nvm which default 2>/dev/null || true)"
-[[ -x "$_nvm_node" ]] && export PATH="$(dirname "$_nvm_node"):$PATH"
+if [[ -x "$_nvm_node" ]]; then
+    _nvm_bin="$(dirname "$_nvm_node")"
+    PATH="$_nvm_bin:$PATH"
+    export PATH
+    unset _nvm_bin
+fi
 unset _nvm_node
 
 nvm use default --silent
+
+_npm_current="$(npm --version)"
+_npm_repair=0
+if [[ "${_npm_current%%.*}" != "$NPM_MAJOR" ]]; then
+    log_info "Aligning npm: $_npm_current → v$NPM_MAJOR"
+    run_logged npm install -g "npm@$NPM_MAJOR"
+    _npm_repair=1
+elif [[ "${DF_MODE:-}" == "upgrade" ]]; then
+    run_logged npm install -g "npm@$NPM_MAJOR"
+fi
+unset _npm_current
 
 log_okay "Node.js: $(node --version)"
 log_okay "npm:     $(npm --version)"
@@ -94,6 +114,19 @@ if [[ ! -f "$NPM_TXT" ]]; then
     exit 0
 fi
 
+_npm_allow_scripts=""
+if [[ -f "$DF_PACKAGES/npm-allow-scripts.txt" ]]; then
+    while IFS= read -r _script_pkg; do
+        if [[ -n "$_npm_allow_scripts" ]]; then
+            _npm_allow_scripts="${_npm_allow_scripts},${_script_pkg}"
+        else
+            _npm_allow_scripts="$_script_pkg"
+        fi
+    done < <(_read_package_list "$DF_PACKAGES/npm-allow-scripts.txt")
+fi
+_npm_allow_args=()
+[[ -n "$_npm_allow_scripts" ]] && _npm_allow_args=("--allow-scripts=$_npm_allow_scripts")
+
 _pkg_count=0
 _upgrade_count=0
 _qmd_stopped=0
@@ -111,6 +144,9 @@ while IFS= read -r pkg; do
         # Pinned: hold this exact version; upgrade mode does not move it.
         if npm list -g "${_name}@${_pin}" --depth=0 &>/dev/null; then
             log_okay "  $_name@$_pin (pinned, installed)"
+            if [[ "$_npm_repair" == "1" ]]; then
+                run_logged npm install -g "${_npm_allow_args[@]}" "${_name}@${_pin}"
+            fi
             # Never SILENTLY stale: in upgrade mode, surface the pin-vs-latest
             # delta loudly so a held package is a visible decision, not a
             # forgotten one. Nothing is pinned today; codex was, for binary/
@@ -123,12 +159,14 @@ while IFS= read -r pkg; do
             fi
         else
             log_info "  installing $_name@$_pin (pinned)"
-            run_logged npm install -g "${_name}@${_pin}"
+            run_logged npm install -g "${_npm_allow_args[@]}" "${_name}@${_pin}"
             log_okay "  $_name@$_pin"
             (( _pkg_count++ )) || true
         fi
     elif npm list -g "$_name" --depth=0 &>/dev/null; then
-        if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+        if [[ "$_npm_repair" == "1" ]]; then
+            run_logged npm install -g "${_npm_allow_args[@]}" "$_name"
+        elif [[ "${DF_MODE:-}" == "upgrade" ]]; then
             log_info "  upgrading $_name"
             # qmd runs a persistent MCP daemon that mmaps native addons; on an
             # NFS home npm can't unlink them mid-upgrade (EBUSY on .nfs*
@@ -139,7 +177,7 @@ while IFS= read -r pkg; do
                 log_info "  stopping qmd daemon for safe upgrade (NFS EBUSY guard)"
                 qmd_daemon_stop && _qmd_stopped=1
             fi
-            run_logged npm install -g "$_name@latest"
+            run_logged npm install -g "${_npm_allow_args[@]}" "$_name@latest"
             log_okay "  $_name (upgraded)"
             (( _upgrade_count++ )) || true
         else
@@ -147,7 +185,7 @@ while IFS= read -r pkg; do
         fi
     else
         log_info "  installing $_name"
-        run_logged npm install -g "$_name"
+        run_logged npm install -g "${_npm_allow_args[@]}" "$_name"
         log_okay "  $_name"
         (( _pkg_count++ )) || true
     fi

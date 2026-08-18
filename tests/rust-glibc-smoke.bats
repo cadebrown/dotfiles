@@ -85,3 +85,8 @@ _probe() {
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
+
+@test "binstall never compiles a musl target internally" {
+    grep -q -- '--disable-strategies compile' "$REPO_ROOT/install/rust.sh"
+    grep -q 'DF_CARGO_STRATEGIES:-.*== "compile"' "$REPO_ROOT/install/rust.sh"
+}

@@ -18,7 +18,7 @@
 #                             #   - rustup self-update + toolchain update
 #                             #   - cargo binstall (re-runs all of cargo.txt)
 #                             #   - go install @latest (re-runs all of go.txt)
-#                             #   - nvm install 25 (latest 25.x patch)
+#                             #   - Node 24 LTS + npm 11 refresh
 #                             #   - npm install -g <pkg>@latest for each pkg
 #                             #   - uv self update + uv tool upgrade --all
 #                             #   - oh-my-zsh core git pull (plus plugins)
@@ -66,6 +66,7 @@
 #   DF_DO_LEAN          — set to 0 to skip the Lean 4 toolchain (elan + default toolchain)
 #   DF_DO_LATEX         — set to 0 to skip the TeX distribution (MacTeX verify / TinyTeX on Linux)
 #   DF_DO_PYTHON        — set to 0 to skip Python install
+#   DF_PROFILE          — core or full (default: full); selects optional tool manifests
 #   DF_DO_CLAUDE        — set to 0 to skip Claude Code install
 #   DF_DO_CODEX         — set to 0 to skip Codex CLI install
 #   DF_DO_CLAUDE_DESKTOP — set to 0 to skip Claude Desktop preference apply (macOS)
@@ -332,6 +333,7 @@ if [[ -n "$_PLAT_NEW" && "$_PLAT_NEW" != "$PLAT" ]]; then
     # Source compile flags for the new PLAT (always relevant — they're orthogonal
     # to whether we directory-isolate by PLAT).
     _PLAT_ENV_SH="$DF_INSTALL_DIR/plat/$PLAT/.plat_env.sh"
+    # shellcheck disable=SC1090
     [[ -f "$_PLAT_ENV_SH" ]] && source "$_PLAT_ENV_SH"
     unset _PLAT_ENV_SH
 fi

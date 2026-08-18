@@ -1,0 +1,25 @@
+# pip-full.txt - optional workstation/research Python CLI tools
+# Usage: install/python.sh reads this after pip.txt when DF_PROFILE=full
+
+# Notebook environment
+jupyterlab
+
+# Local LLM inference
+mlx-lm  # macos-only (Apple MLX framework requires Metal GPU)
+mlx-openai-server  # macos-only python=3.12 (outlines-core 0.1.26 has no cp313/cp314 wheels; pinned via outlines<1.2)
+
+# iTerm2 split-pane CLI
+it2  # macos-only
+
+# Explainer video and interactive slides
+manim
+manim-slides
+whisperx
+
+# Research mathematics and publishing
+leanblueprint
+marimo
+arxiv-latex-cleaner
+papis
+paper-qa
+lean-explore

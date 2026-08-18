@@ -426,8 +426,8 @@ log_okay "Overlay skills: ${_ok} deployed, ${_skip} unchanged"
 # partial + Claude section) instead of leaving a hand-made symlink that fresh
 # machines never get. Skip if the user has placed a real file there.
 if [[ -e "$HOME/AGENTS.md" && ! -L "$HOME/AGENTS.md" ]]; then
-    log_warn "~/AGENTS.md is a real file — leaving it alone"
+    log_warn "$HOME/AGENTS.md is a real file — leaving it alone"
 else
     ln -sfn .claude/CLAUDE.md "$HOME/AGENTS.md"
-    log_okay "~/AGENTS.md → .claude/CLAUDE.md"
+    log_okay "$HOME/AGENTS.md → .claude/CLAUDE.md"
 fi

@@ -8,11 +8,11 @@ Every package layer has a declarative text file and an idempotent install script
 |---|---|---|---|
 | System packages | `packages/Brewfile` | `install/homebrew.sh` / `install/linux-packages.sh` | macOS (bottles) / Linux (native, no container) |
 | Rust tools | `packages/cargo.txt` | `install/rust.sh` | All |
-| Python packages | `packages/pip.txt` | `install/python.sh` | All |
-| Global npm | `packages/npm.txt` | `install/node.sh` | All |
+| Python packages | `packages/pip.txt`, `packages/pip-full.txt` | `install/python.sh` | All |
+| Global npm | `packages/npm.txt`, `packages/npm-allow-scripts.txt` | `install/node.sh` | All |
 | Go CLI tools | `packages/go.txt` | `install/go.sh` | All (respects `# linux-only` / `# macos-only`) |
 | Claude plugins | `packages/claude-plugins.txt` | `install/claude.sh` | All |
-| Agent skills | `packages/agent-skills.txt` | `install/skills-sync.sh` | All (shared `~/.claude/skills` tree) |
+| Agent skills | `packages/agent-skills.txt`, `packages/agent-skills.lock.json` | `install/skills-sync.sh` | All (shared `~/.claude/skills` tree) |
 | MCP servers (Claude + Codex) | `packages/mcp-servers.txt` | `install/claude.sh`, `install/codex.sh` | All |
 | Codex CLI/config | `home/dot_codex/` | `install/codex.sh` | All |
 | Cursor extensions | `packages/cursor-extensions.txt` | `install/cursor.sh` | All |
@@ -63,6 +63,10 @@ rebuilt from source against the host glibc.
 
 Re-run: `bash ~/dotfiles/install/node.sh`
 
+`npm-allow-scripts.txt` is the reviewed lifecycle-script allowlist for global
+tools. The installer passes it per command instead of persisting a policy in
+`~/.npmrc`.
+
 Currently ships [`pi`](https://pi.dev) — a multi-provider coding agent (Claude / OpenAI / Gemini / etc.). The official `pi.dev/install.sh` ultimately runs `npm install -g @earendil-works/pi-coding-agent`, so we list it here directly.
 
 Other CLI agents are installed via their native packagers:
@@ -78,7 +82,7 @@ managed config. Chezmoi also runs this sync when `home/dot_codex/create_private_
 ### 3. pip — Python packages
 
 ```sh
-# packages/pip.txt
+# packages/pip.txt (core) or packages/pip-full.txt (full profile)
 requests
 black
 numpy
@@ -88,6 +92,10 @@ some-macos-tool  # macos-only (requires Metal / only available on macOS)
 Re-run: `bash ~/dotfiles/install/python.sh`
 
 Each tool gets its own isolated venv via `uv tool install`, with entrypoints in `$LOCAL_PLAT/bin/`.
+
+`DF_PROFILE=full` is the default and installs both manifests. Use
+`DF_PROFILE=core` for a small bootstrap or CI environment; the core profile
+also keeps the Rust toolchain while skipping optional `cargo.txt` tools.
 
 **Comment conventions** parsed by `install/python.sh`:
 - `# macos-only` — skipped on Linux (e.g. `mlx-lm` requires Apple Metal/MLX framework)
@@ -150,7 +158,7 @@ Local LLM inference and coding agents are split across three layers:
 |---|---|---|
 | `ollama` | `packages/Brewfile` (macOS only) | Inference server; installed as Homebrew formula, managed as a LaunchAgent |
 | `opencode` | `packages/Brewfile` | TUI coding agent by the SST team |
-| `mlx-lm` | `packages/pip.txt` | Apple Silicon Metal inference; on-demand only |
+| `mlx-lm` | `packages/pip-full.txt` | Apple Silicon Metal inference; full profile only |
 | `just` | `packages/cargo.txt` | Command runner / Makefile alternative |
 
 `install/local-llm.sh` creates the PLAT-isolated HuggingFace cache directory (`$LOCAL_PLAT/.cache/huggingface`)
@@ -172,7 +180,7 @@ path on no-sudo Linux; the rest are ordinary package-list entries.
 | PARI/GP, FLINT, z3, minizinc, cadical, kissat | `packages/Brewfile` | `gp` collides with the `gp='git push'` alias — use `command gp`. |
 | Sage, Zotero | `packages/Brewfile` casks (macOS) | Homebrew core has no Sage formula; per-project passagemath wheels are the uv-native route. |
 | `juliaup` | `packages/Brewfile` | Depots are PLAT-isolated (`JULIA_DEPOT_PATH`); OSCAR.jl installs per-project via Pkg. |
-| `leanblueprint`, `marimo`, `paper-qa`, `papis`, … | `packages/pip.txt` | Standard `uv tool install` entries. |
+| `leanblueprint`, `marimo`, `paper-qa`, `papis`, … | `packages/pip-full.txt` | Full-profile `uv tool install` entries. |
 | `rga` (ripgrep-all) | `packages/cargo.txt` | Full-text search across a PDF/EPUB paper library. |
 
 Agent-side wiring (lean-lsp, arxiv, mathlas, asta MCP servers, and the
@@ -183,7 +191,7 @@ verification-first norms in `math-common.md`) is covered in
 
 ## Don't duplicate across layers
 
-**Do not install the same tool in both cargo.txt and Brewfile.** PLAT paths (`~/.local/$PLAT/`) come first on PATH — the Homebrew copy would install but never be used. If a tool is in `cargo.txt`, it must not be in `Brewfile`, and vice versa.
+**Do not install the same tool in both cargo.txt and Brewfile.** `$LOCAL_PLAT` paths come first on PATH — the Homebrew copy would install but never be used. If a tool is in `cargo.txt`, it must not be in `Brewfile`, and vice versa.
 
 ---
 
@@ -214,8 +222,9 @@ keg first, then checks the kegs installed since the last run against what the ke
 The keg is built for the architecture baseline, not the build host's CPU, so a prefix built on
 an AVX-512 node still runs on every other machine sharing the home.
 
-**Custom prefix tradeoff:** Installing to `~/.local/$PLAT/brew/` instead of the standard
-`/home/linuxbrew/.linuxbrew` enables per-CPU isolation on shared NFS homes, but bottles
+**Custom prefix tradeoff:** Installing to `$LOCAL_PLAT/brew/` instead of the standard
+`/home/linuxbrew/.linuxbrew` enables a rootless flat prefix by default and per-CPU
+isolation when PLAT mode is enabled, but bottles
 built for the standard prefix can't always be relocated:
 
 - **Relocatable packages** (jq, CLI tools with simple dependencies) pour as bottles — patchelf

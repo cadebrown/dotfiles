@@ -119,7 +119,7 @@ re-runs the install script.
 
 1. Source `_lib.sh` at the top
 2. Guard with `has tool && { log_okay "already installed"; exit 0; }`
-3. Install under `$LOCAL_PLAT/` (never `~/.local/bin/` for compiled binaries)
+3. Install under `$LOCAL_PLAT/`; `_lib.sh` selects flat or PLAT-isolated storage
 4. Add a `DF_DO_*` flag to `bootstrap.sh`
 
 ## Gotchas

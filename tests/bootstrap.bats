@@ -100,6 +100,14 @@ setup() {
     [[ "$output" == *"ipython"* ]] || [[ "$output" == *"conan"* ]]
 }
 
+@test "core profile excludes full Python tools" {
+    [[ "$DF_PROFILE" == "core" ]]
+    run uv tool list
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"manim "* ]]
+    [[ "$output" != *"whisperx "* ]]
+}
+
 # --- Local LLM config files ---
 
 @test "~/.config/opencode/opencode.json exists (deployed by chezmoi)" {

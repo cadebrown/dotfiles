@@ -48,22 +48,33 @@ for arg in "$@"; do
     esac
 done
 
-# Directories to check
-PLAT_DIRS=(
-    "$LOCAL_PLAT/bin"
-    "$LOCAL_PLAT/cargo/bin"
-    "$HOME/.local/bin"
-)
-[[ -d "$LOCAL_PLAT/venv/bin" ]] && PLAT_DIRS+=("$LOCAL_PLAT/venv/bin")
+# Directories to check. Flat mode makes LOCAL_PLAT/bin and ~/.local/bin the
+# same directory, so append uniquely or every binary becomes its own duplicate.
+PLAT_DIRS=()
+_append_unique_dir() {
+    local candidate="$1" existing
+    for existing in "${PLAT_DIRS[@]-}"; do
+        [[ "$existing" == "$candidate" ]] && return 0
+    done
+    PLAT_DIRS+=("$candidate")
+}
+
+_append_unique_dir "$LOCAL_PLAT/bin"
+_append_unique_dir "$LOCAL_PLAT/cargo/bin"
+_append_unique_dir "$HOME/.local/bin"
+[[ -d "$LOCAL_PLAT/venv/bin" ]] && _append_unique_dir "$LOCAL_PLAT/venv/bin"
 
 # If nvm has a default node, include it
 if [[ -d "$NVM_DIR/versions/node" ]]; then
     _nvm_bin="$NVM_DIR/versions/node/$(ls "$NVM_DIR/versions/node/" 2>/dev/null | sort -V | tail -1)/bin"
-    [[ -d "$_nvm_bin" ]] && PLAT_DIRS+=("$_nvm_bin")
+    [[ -d "$_nvm_bin" ]] && _append_unique_dir "$_nvm_bin"
 fi
 
 if [[ "$FULL_PATH" == "1" ]]; then
-    IFS=: read -ra PLAT_DIRS <<< "$PATH"
+    PLAT_DIRS=()
+    while IFS= read -r _path_dir; do
+        [[ -n "$_path_dir" ]] && _append_unique_dir "$_path_dir"
+    done < <(printf '%s' "$PATH" | tr ':' '\n')
 fi
 
 ERRORS=0
@@ -101,9 +112,10 @@ if [[ "$CHECK_ARCH" == "1" ]]; then
     done
     log_okay "$count binaries match $ARCH"
 
-    # Check ~/.local/bin for compiled binaries (should only contain arch-neutral scripts)
+    # In PLAT mode ~/.local/bin is shared across machines and must stay
+    # architecture-neutral. In flat mode it is the intended native binary dir.
     _local_bin="$HOME/.local/bin"
-    if [[ -d "$_local_bin" ]]; then
+    if [[ "$DF_USE_PLAT" == "1" && -d "$_local_bin" ]]; then
         _compiled=0
         for bin in "$_local_bin"/*; do
             [[ -f "$bin" && -x "$bin" ]] || continue
@@ -119,7 +131,7 @@ if [[ "$CHECK_ARCH" == "1" ]]; then
         if [[ "$_compiled" -gt 0 ]]; then
             ((ERRORS += _compiled))
         else
-            log_okay "~/.local/bin/ has no compiled binaries (arch-neutral only)"
+            log_okay "$HOME/.local/bin/ has no compiled binaries (arch-neutral only)"
         fi
     fi
 fi
@@ -160,18 +172,31 @@ fi
 # --- Duplicate detection ---
 if [[ "$CHECK_DUPES" == "1" ]]; then
     log_section "Duplicate detection"
-    declare -A seen_bins
+    seen_names=()
+    seen_paths=()
+    seen_count=0
     dupes=0
     for dir in "${PLAT_DIRS[@]}"; do
         [[ -d "$dir" ]] || continue
         for bin in "$dir"/*; do
             [[ -f "$bin" || -L "$bin" ]] || continue
             name="$(basename "$bin")"
-            if [[ -n "${seen_bins[$name]:-}" ]]; then
-                log_warn "Duplicate: $name (${seen_bins[$name]} wins over $bin)"
+            previous=""
+            index=0
+            while [[ "$index" -lt "$seen_count" ]]; do
+                if [[ "${seen_names[$index]}" == "$name" ]]; then
+                    previous="${seen_paths[$index]}"
+                    break
+                fi
+                ((index++)) || true
+            done
+            if [[ -n "$previous" ]]; then
+                log_warn "Duplicate: $name ($previous wins over $bin)"
                 ((dupes++)) || true
             else
-                seen_bins[$name]="$bin"
+                seen_names[$seen_count]="$name"
+                seen_paths[$seen_count]="$bin"
+                ((seen_count++)) || true
             fi
         done
     done

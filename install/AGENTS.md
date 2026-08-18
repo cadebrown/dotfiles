@@ -14,7 +14,7 @@ Instructions for `install/` scripts and bootstrap-related setup logic.
 - Every install script must source `_lib.sh`.
 - Keep scripts idempotent: check current state first, install only what is missing.
 - Use exported path variables from `_lib.sh`; do not invent parallel path logic.
-- Preserve PLAT isolation under `~/.local/$PLAT/`.
+- Preserve flat-mode paths and PLAT isolation under `~/.local/$PLAT/` when enabled.
 - Linux paths must remain rootless.
 - If a script is gated in bootstrap, keep its `DF_DO_*` behavior coherent with the docs.
 

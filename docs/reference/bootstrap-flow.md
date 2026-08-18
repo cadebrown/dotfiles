@@ -62,9 +62,9 @@ flowchart TD
 
 | Sub-step | Script | What | Notes |
 |---|---|---|---|
-| 6a | `install/python.sh` | Install uv to `$ARCH_BIN`; `uv tool install` every entry in `pip.txt` (each gets isolated venv). | Runs before Node so node-gyp can use uv's Python. |
-| 6b | `install/node.sh` | Install nvm to `$NVM_DIR`; install/upgrade Node v25; install `npm.txt` packages globally. | The parent bootstrap activates nvm before later agent/skill steps. |
-| 6c | `install/rust.sh` | Install rustup; install/update stable plus the rust-docs MCP nightly; `cargo binstall --locked` every entry in `cargo.txt`. | Prebuilt first, source fallback; self-update only in upgrade mode. |
+| 6a | `install/python.sh` | Install uv to `$ARCH_BIN`; install `pip.txt` plus `pip-full.txt` when `DF_PROFILE=full` (each tool gets an isolated venv). | Runs before Node so node-gyp can use uv's Python. |
+| 6b | `install/node.sh` | Install pinned nvm; install/upgrade Node 24 LTS; install `npm.txt` packages globally. | The parent bootstrap activates nvm before later agent/skill steps. |
+| 6c | `install/rust.sh` | Install rustup and rust-analyzer; in the full profile, install the rust-docs MCP nightly and every entry in `cargo.txt`. | Prebuilt first, host-target source fallback; self-update only in upgrade mode. |
 | 6d | `install/go.sh` | Install CLI tools from `go.txt` into `$ARCH_BIN`. | Go itself is owned by the Brewfile. |
 | 6e | `install/lean.sh` | Install elan to `$ELAN_HOME`; install and default the pinned Lean toolchain. | Pin bumped deliberately alongside Mathlib releases. Upgrade mode runs `elan self update` only — every toolchain is an exact pin. |
 | 6f | `install/latex.sh` | macOS: verify the MacTeX cask. Linux: install TinyTeX, route `sys_bin` into `$ARCH_BIN`, install latexmk/chktex/texcount/latexdiff. | Upgrade mode runs `tlmgr update --self --all` (macOS needs a sudo ticket; skipped without one). |
@@ -80,7 +80,7 @@ flowchart TD
 |---|---|
 | `install` (default) | Full idempotent setup. `DF_DO_SCRATCH=1` (run scratch step). |
 | `update` | Same steps, but: `git pull --ff-only` in step 0.5, `DF_DO_SCRATCH=0` (assume scratch is already set up), tools self-update where they support it. |
-| `upgrade` | Same as `update`, plus: `DF_BREW_UPGRADE=1` (greedy cask refresh), rustup self-update, `nvm install 25 --reinstall-packages-from=25 --latest-npm`, `npm install -g <pkg>@latest` per package, `uv self update + uv tool upgrade --all`, oh-my-zsh git pull, VS Code/Cursor extension `--force` reinstall. Claude Code and Codex CLI *always* re-download to latest regardless of mode. |
+| `upgrade` | Same as `update`, plus: `DF_BREW_UPGRADE=1` (greedy cask refresh), rustup self-update, Node 24 LTS/npm refresh, `npm install -g <pkg>@latest` per package, `uv self update + uv tool upgrade --all`, oh-my-zsh git pull, and bulk editor extension updates. Claude Code and Codex CLI *always* refresh to latest regardless of mode. |
 
 ## Reading the source
 
