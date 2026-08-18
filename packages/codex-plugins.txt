@@ -15,8 +15,5 @@ plugin-eval@openai-curated
 # User project mix: full-stack web, games
 build-web-apps@openai-curated
 game-studio@openai-curated
-
-# Dropped from the openai-curated snapshot as of codex-cli 0.144.6 (re-add if a
-# future codex-cli restores them):
-#   openai-developers
-#   build-web-data-visualization
+openai-developers@openai-curated
+build-web-data-visualization@openai-curated

@@ -56,7 +56,8 @@ Root cause: `openai-curated` is a snapshot **bundled with codex-cli**, and codex
 is unpinned (`packages/npm.txt`), so its curated plugin set changes across
 versions. A selector in `packages/codex-plugins.txt` that a newer codex-cli no
 longer ships can't install — the entry is stale. (`openai-developers` and
-`build-web-data-visualization` were dropped as of codex-cli 0.144.6.)
+`build-web-data-visualization` were temporarily absent in codex-cli 0.144.6 and
+returned in 0.147.0.)
 
 Confirm — list what the installed codex actually offers:
 

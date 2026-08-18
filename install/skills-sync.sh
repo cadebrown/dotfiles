@@ -11,7 +11,7 @@
 # the pinned #ref in agent-skills.txt and remove the dir to force reinstall.
 #
 # Idempotent: rows are skipped when the skill's SKILL.md already exists.
-# `check` is read-only and verifies both declared skills and lockfile drift.
+# `check` is read-only and verifies names plus installed content digests.
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
@@ -19,12 +19,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 log_section "Agent skills sync"
 
 _SKILLS_DIR="$HOME/.claude/skills"
+_DIGEST_LOCK="$DF_PACKAGES/agent-skills.lock.json"
 _ok=0 _skip=0 _fail=0
 _mode="${1:-sync}"
 
 case "$_mode" in
-    sync|check) ;;
-    *) die "Usage: skills-sync.sh [sync|check]" ;;
+    sync|check|lock) ;;
+    *) die "Usage: skills-sync.sh [sync|check|lock]" ;;
 esac
 
 _lockfile() {
@@ -35,6 +36,19 @@ _lockfile() {
     fi
 }
 
+_skill_tree_hash() {
+    local _skill_dir="$1" _hash_tmp _hash
+    _hash_tmp="$(mktemp -d)"
+    git init --bare -q "$_hash_tmp/repo"
+    if GIT_DIR="$_hash_tmp/repo" GIT_WORK_TREE="$_skill_dir" git add -Af . 2>/dev/null; then
+        _hash="$(GIT_DIR="$_hash_tmp/repo" git write-tree 2>/dev/null || true)"
+    else
+        _hash=""
+    fi
+    rm -rf "$_hash_tmp"
+    printf '%s\n' "$_hash"
+}
+
 _declared_dirs() {
     local _file
     while IFS= read -r _file; do
@@ -42,8 +56,35 @@ _declared_dirs() {
     done < <(overlay_package_files "agent-skills.txt")
 }
 
+_locked_dirs() {
+    awk '!/^[[:space:]]*(#|$)/ { print $1 }' "$DF_PACKAGES/agent-skills.txt"
+}
+
+_write_digest_lock() {
+    local _tmp _dir _hash
+    has git || die "git is required to hash installed skills"
+    has jq || die "jq is required to write $_DIGEST_LOCK"
+    _tmp="$(mktemp -d)"
+
+    while IFS= read -r _dir; do
+        [[ -d "$_SKILLS_DIR/$_dir" ]] || die "Cannot lock missing skill: $_dir"
+        _hash="$(_skill_tree_hash "$_SKILLS_DIR/$_dir")"
+        [[ -n "$_hash" ]] || die "Could not hash installed skill: $_dir"
+        printf '%s\t%s\n' "$_dir" "$_hash" >> "$_tmp/digests"
+    done < <(_locked_dirs | sort -u)
+
+    jq -Rn '
+        [inputs | split("\t") | {(.[0]): .[1]}]
+        | (add // {}) as $skills
+        | {version: 1, skills: $skills}
+    ' < "$_tmp/digests" > "$_tmp/lock.json"
+    mv "$_tmp/lock.json" "$_DIGEST_LOCK"
+    rm -rf "$_tmp"
+    log_okay "Wrote installed skill digests: $_DIGEST_LOCK"
+}
+
 _check_registry() {
-    local _lock _tmp _dir _missing=0 _extra=0
+    local _lock _tmp _dir _expected _actual _missing=0 _extra=0 _unlocked=0 _modified=0
     _lock="$(_lockfile)"
     _tmp="$(mktemp -d)"
     _declared_dirs | sort -u > "$_tmp/declared"
@@ -62,22 +103,57 @@ _check_registry() {
             log_warn "unmanaged lockfile skill: $_dir (declare it or remove it deliberately)"
             (( _extra++ )) || true
         done < <(comm -23 "$_tmp/locked" "$_tmp/declared")
+
     fi
 
-    if (( _missing == 0 && _extra == 0 )); then
+    if [[ -f "$_DIGEST_LOCK" ]] && has jq && has git; then
+        jq -r '.skills // {} | keys[]' "$_DIGEST_LOCK" | sort -u > "$_tmp/digests"
+        _locked_dirs | sort -u > "$_tmp/lockable"
+        while IFS= read -r _dir; do
+            [[ -n "$_dir" ]] || continue
+            log_warn "stale skill digest: $_dir (no longer declared)"
+            (( _extra++ )) || true
+        done < <(comm -23 "$_tmp/digests" "$_tmp/lockable")
+
+        while IFS= read -r _dir; do
+            [[ -n "$_dir" ]] || continue
+            log_warn "missing skill digest: $_dir"
+            (( _unlocked++ )) || true
+        done < <(comm -13 "$_tmp/digests" "$_tmp/lockable")
+
+        while IFS= read -r _dir; do
+            [[ -d "$_SKILLS_DIR/$_dir" ]] || continue
+            _expected="$(jq -r --arg name "$_dir" '.skills[$name] // ""' "$_DIGEST_LOCK")"
+            if [[ -z "$_expected" ]]; then
+                log_warn "unlocked installed skill: $_dir"
+                (( _unlocked++ )) || true
+                continue
+            fi
+            _actual="$(_skill_tree_hash "$_SKILLS_DIR/$_dir")"
+            if [[ -z "$_actual" || "$_actual" != "$_expected" ]]; then
+                log_warn "modified installed skill: $_dir (content differs from committed digest)"
+                (( _modified++ )) || true
+            fi
+        done < "$_tmp/lockable"
+    else
+        log_warn "missing skill digest lock: $_DIGEST_LOCK"
+        _unlocked=1
+    fi
+
+    if (( _missing == 0 && _extra == 0 && _unlocked == 0 && _modified == 0 )); then
         rm -rf "$_tmp"
         log_okay "Agent skill registry matches the installed tree"
         return 0
     fi
     rm -rf "$_tmp"
-    log_warn "Agent skill drift: $_missing missing, $_extra unmanaged"
+    log_warn "Agent skill drift: $_missing missing, $_extra unmanaged, $_unlocked unlocked, $_modified modified"
     return 1
 }
 
-if [[ "$_mode" == "check" ]]; then
-    _check_registry
-    exit $?
-fi
+case "$_mode" in
+    check) _check_registry; exit $? ;;
+    lock) _write_digest_lock; exit 0 ;;
+esac
 
 has npx || { log_warn "npx not found — run install/node.sh first; skipping"; exit 0; }
 

@@ -69,3 +69,13 @@ setup() {
     [[ -f "$REPO/home/dot_claude/agents/researcher.md" ]]
     [[ -f "$REPO/home/dot_claude/agents/reviewer.md" ]]
 }
+
+@test "agent skill digest lock covers every declared skill" {
+    local declared locked
+    declared="$(mktemp)"
+    locked="$(mktemp)"
+    awk '!/^[[:space:]]*(#|$)/ { print $1 }' "$REPO/packages/agent-skills.txt" | sort -u > "$declared"
+    jq -r '.skills | keys[]' "$REPO/packages/agent-skills.lock.json" | sort -u > "$locked"
+    run diff -u "$declared" "$locked"
+    [ "$status" -eq 0 ]
+}
