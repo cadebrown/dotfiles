@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install validation tools
+        uses: taiki-e/install-action@v2.86.2
+        with:
+          tool: |
+            actionlint@1.7.12
+            gitleaks@8.30.1
+            mdbook@0.5.4
+            mdbook-mermaid@0.17.1
+
+      - name: Install Bats
+        run: sudo apt-get update && sudo apt-get install -y bats
+
+      - name: Check shell syntax
+        run: bash -n bootstrap.sh install/*.sh
+
+      - name: Run ShellCheck
+        run: shellcheck -S warning bootstrap.sh install/*.sh
+
+      - name: Run fast Bats tests
+        env:
+          REPO: ${{ github.workspace }}
+        run: |
+          ln -s "$GITHUB_WORKSPACE" "$HOME/dotfiles"
+          bats \
+            tests/agents.bats \
+            tests/brew-glibc.bats \
+            tests/lean.bats \
+            tests/mcp-emitters.bats \
+            tests/netrc.bats \
+            tests/profiles.bats \
+            tests/rust-glibc-smoke.bats \
+            tests/verify-path.bats
+
+      - name: Build documentation
+        run: mdbook build docs
+
+      - name: Scan secrets
+        run: gitleaks git --no-banner --redact .
+
+      - name: Lint workflows
+        run: actionlint
+
+  infrastructure:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: opentofu/setup-opentofu@v2.0.2
+        with:
+          tofu_version: 1.12.5
+
+      - name: Check formatting
+        working-directory: infra/cloudflare
+        run: tofu fmt -check
+
+      - name: Initialize without backend
+        working-directory: infra/cloudflare
+        run: tofu init -backend=false
+
+      - name: Validate configuration
+        working-directory: infra/cloudflare
+        run: tofu validate
+
+  bootstrap:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run core-profile bootstrap suite
+        run: ./tests/run.sh
