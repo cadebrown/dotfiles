@@ -90,7 +90,7 @@ brew "ffmpeg"
 # required — only Tex/MathTex need it; text (Pango), shapes, plots, and
 # animations render without a TeX install, so we skip the multi-GB TeX dep and
 # add it per-project if formula typesetting is ever needed. The `manim` package
-# itself is in pip.txt (uv tool). pkg-config lets its build find these libs.
+# itself is in pip-full.txt (uv tool). pkg-config lets its build find these libs.
 brew "cairo"
 brew "pango"
 brew "pkg-config"
@@ -335,7 +335,6 @@ if OS.mac?
   cask "unity-hub"
 
   ### Games ###
-  cask "openemu"
   cask "retroarch"
   cask "nestopia"
   cask "slippi-dolphin"
