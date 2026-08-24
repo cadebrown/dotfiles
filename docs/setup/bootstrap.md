@@ -128,19 +128,21 @@ Paths use `$LOCAL_PLAT`, which is `$HOME/.local` by default (or `$HOME/.local/$P
    - `cargo-binstall` downloads pre-built binaries from GitHub releases when available, falls back to source
 8. **Go CLI tools** from `packages/go.txt` → `$ARCH_BIN`
 9. **Lean 4** via elan → `$LOCAL_PLAT/elan/` (pinned default toolchain; projects override via `lean-toolchain`)
-10. **TeX** via TinyTeX → `~/.TinyTeX`, with `tlmgr` `sys_bin` pointed at `$ARCH_BIN` so the PLAT layout holds
+10. **Julia** via Juliaup, with release channels and depots under `$LOCAL_PLAT/julia/`
+11. **TeX** via TinyTeX → `$LOCAL_PLAT/tex/.TinyTeX`, with `tlmgr` `sys_bin` pointed at `$ARCH_BIN`
     - ~200 MB base instead of multi-GB; missing packages install on demand with `tlmgr install <pkg>`
-11. **Claude Code** native binary → `$ARCH_BIN/claude` + plugins + MCP servers
-12. **Codex CLI** native binary → `$ARCH_BIN/codex`
-13. **Cursor / VS Code** — extensions from `packages/{cursor,vscode}-extensions.txt`
-14. **CMake toolchain files** → `$LOCAL_PLAT/cmake/toolchains/` (`llvm-21/22.cmake`, `gcc-13/15.cmake`, `_brew.cmake`)
+12. **Quarto** via the macOS cask or a checksum-verified rootless Linux archive
+13. **Claude Code** native binary → `$ARCH_BIN/claude` + plugins + MCP servers
+14. **Codex CLI** native binary → `$ARCH_BIN/codex`
+15. **Cursor / VS Code** — extensions from `packages/{cursor,vscode}-extensions.txt`
+16. **CMake toolchain files** → `$LOCAL_PLAT/cmake/toolchains/` (`llvm-21/22.cmake`, `gcc-13/15.cmake`, `_brew.cmake`)
     - `~/.profile` auto-sets `CMAKE_TOOLCHAIN_FILE` to the highest installed LLVM toolchain
     - Switch with the `tc` shell function (e.g. `tc gcc-15`, `tc llvm-22`)
-15. **Local LLM tooling** — HuggingFace cache + ollama/mlx-lm/mlx-openai-server/opencode binary checks
-16. **Agent memory stack** — cass session-history search, ~/kb + qmd knowledge index (daemons lazy-start from shell profiles)
-17. **Agent skills** — installs `packages/agent-skills.txt` into the shared `~/.claude/skills` tree
-18. **Auth** (opt-in: `DF_DO_AUTH=1`) — guided token setup; see [Auth](auth.md)
-19. **Overlays** — runs `bootstrap.sh` of any `dotfiles-*/` overlay; see [Overlays](overlays.md)
+17. **Local LLM tooling** — HuggingFace cache + ollama/mlx-lm/mlx-openai-server/opencode binary checks
+18. **Agent memory stack** — cass session-history search, ~/kb + qmd knowledge index (daemons lazy-start from shell profiles)
+19. **Agent skills** — installs `packages/agent-skills.txt` into the shared `~/.claude/skills` tree
+20. **Auth** (opt-in: `DF_DO_AUTH=1`) — guided token setup; see [Auth](auth.md)
+21. **Overlays** — runs `bootstrap.sh` of any `dotfiles-*/` overlay; see [Overlays](overlays.md)
 
 Total time: ~5 minutes on a fast connection.
 
@@ -162,8 +164,10 @@ DF_DO_NODE=0                 # skip nvm + Node.js + global npm packages
 DF_DO_RUST=0                 # skip rustup + cargo tools
 DF_DO_PYTHON=0               # skip uv + per-tool venvs
 DF_DO_GO=0                   # skip Go CLI tools from go.txt
+DF_DO_JULIA=0                # skip Julia release-channel management
 DF_DO_LEAN=0                 # skip the Lean 4 toolchain (elan + pinned toolchain)
 DF_DO_LATEX=0                # skip the TeX distribution (MacTeX verify / TinyTeX)
+DF_DO_QUARTO=0               # skip Quarto verification/install
 DF_DO_CLAUDE=0               # skip Claude Code install + plugins + MCP servers
 DF_DO_CODEX=0                # skip Codex CLI install
 DF_DO_CLAUDE_DESKTOP=0       # skip Claude Desktop tracked preferences (macOS)
@@ -179,7 +183,8 @@ DF_DO_BLENDER_MCP=0          # skip Blender MCP addon install
 DF_DO_AUTH=1                 # run interactive API token setup (default 0)
 DF_DO_OVERLAYS=0             # skip all overlay bootstraps (dotfiles-*/bootstrap.sh)
 DF_USE_PLAT=1                # opt in to per-PLAT directory isolation (default 0; flat layout)
-DF_BREW_UPGRADE=0            # skip Homebrew upgrades (macOS default: 1, Linux default: 0)
+DF_BREW_UPGRADE=0            # skip Homebrew upgrades (default except in upgrade mode)
+DF_STRICT_UPGRADE=0          # report stale tools without failing upgrade
 ```
 
 The complete reference lives at [Env vars](../reference/env-vars.md).

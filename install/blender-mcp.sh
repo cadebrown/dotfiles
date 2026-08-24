@@ -33,7 +33,7 @@ log_info "Blender: $_BLENDER"
 
 # Detect major.minor (e.g. "4.2") — Blender stores per-version config dirs
 _VERSION="$("$_BLENDER" --version 2>/dev/null \
-    | awk '/^Blender/ {split($2, v, "."); printf "%s.%s", v[1], v[2]; exit}')"
+    | awk '/^Blender/ && !seen++ {split($2, v, "."); printf "%s.%s", v[1], v[2]}')"
 if [[ -z "$_VERSION" ]]; then
     log_warn "Could not detect Blender version — skipping"
     exit 0

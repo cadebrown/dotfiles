@@ -4,6 +4,10 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
+# Homebrew's automatic fan-out can open a dozen large bottle/cask transfers at
+# once. Bound it for predictable progress on ordinary workstation links.
+export HOMEBREW_DOWNLOAD_CONCURRENCY="${DF_BREW_DOWNLOAD_CONCURRENCY:-4}"
+
 log_section "Homebrew"
 
 [[ "$OS" == "darwin" ]] || { log_warn "Not on macOS — skipping"; exit 0; }
@@ -35,17 +39,11 @@ run_logged brew update
 log_info "Checking Brewfile"
 
 # DF_BREW_UPGRADE controls whether existing packages are upgraded.
-# macOS default: upgrade (bottles are fast, casks like Cursor/VS Code benefit).
+# Existing packages only upgrade in explicit upgrade mode (bootstrap exports
+# DF_BREW_UPGRADE=1 there). Install/update reconcile missing declarations.
 # Override: DF_BREW_UPGRADE=0 to skip upgrades, DF_BREW_UPGRADE=1 to force.
-_brew_upgrade="${DF_BREW_UPGRADE:-1}"
-_bundle_flags=""
-[[ "$_brew_upgrade" == "0" ]] && _bundle_flags="--no-upgrade"
-
-if [[ -z "$_bundle_flags" ]]; then
-    log_info "Installing + upgrading Brewfile packages"
-else
-    log_info "Installing Brewfile packages (upgrades disabled)"
-fi
+_brew_upgrade="${DF_BREW_UPGRADE:-0}"
+log_info "Installing missing Brewfile packages"
 
 # Trust + tap the Brewfile's third-party taps so brew bundle can resolve them.
 ensure_brewfile_taps "$BREWFILE"
@@ -67,18 +65,29 @@ if brew list --formula docker-completion &>/dev/null; then
         log_warn "Could not remove docker-completion — run 'brew link --overwrite docker' if bundle fails"
 fi
 
-# Non-fatal: a single cask download failure (e.g. slow mirror) should not
-# abort the entire bootstrap. Re-run homebrew.sh to retry failed packages.
-# shellcheck disable=SC2086
-run_logged brew bundle install $_bundle_flags --file="$BREWFILE" || log_warn "Some Brewfile packages failed — re-run homebrew.sh to retry"
+# Reconcile declarations without allowing a cask prompt to block formula work.
+run_logged brew bundle install --no-upgrade --file="$BREWFILE" \
+    || log_warn "Some Brewfile packages failed — re-run homebrew.sh to retry"
 
 # brew bundle skips casks marked `auto_updates: true` (Cursor, VS Code, iTerm2,
 # etc.) even with upgrades enabled — those casks self-update in place, leaving
 # Homebrew's metadata stale. When upgrades are on, sweep them with --greedy so
 # the cask record matches the running app version.
 if [[ "$_brew_upgrade" != "0" ]]; then
-    log_info "Upgrading auto-updating casks (--greedy)"
-    run_logged brew upgrade --cask --greedy || log_warn "Some greedy cask upgrades failed"
+    log_info "Upgrading Homebrew formulae"
+    run_logged brew upgrade --formula --yes || log_warn "Some formula upgrades failed"
+
+    # Some auto-updating casks ask Homebrew to inspect privileged launchd state.
+    # Only enter that path when sudo is already cached; otherwise the prompt is
+    # hidden inside run_logged and an unattended upgrade appears to hang.
+    _upgrade_casks="${DF_BREW_UPGRADE_CASKS:-auto}"
+    if [[ "$_upgrade_casks" == "1" ]] \
+        || { [[ "$_upgrade_casks" == "auto" ]] && sudo -n true 2>/dev/null; }; then
+        log_info "Upgrading auto-updating casks (--greedy)"
+        run_logged brew upgrade --cask --greedy --yes || log_warn "Some greedy cask upgrades failed"
+    elif [[ "$_upgrade_casks" != "0" ]]; then
+        log_info "Cask upgrades deferred: cache sudo first with 'sudo -v', or set DF_BREW_UPGRADE_CASKS=1"
+    fi
 
     # Mac App Store apps (Xcode, GarageBand, iMovie, …) are installed outside
     # Homebrew and never upgraded by brew. `mas` (Brewfile) bridges that gap so
@@ -90,4 +99,4 @@ if [[ "$_brew_upgrade" != "0" ]]; then
     fi
 fi
 
-log_okay "Homebrew packages up to date"
+log_okay "Homebrew packages reconciled"

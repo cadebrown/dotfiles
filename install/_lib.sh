@@ -148,7 +148,8 @@ unset _PLAT_SCRIPT_DIR
 # When PLAT isolation is on, a matching spec is required (the directory name
 # embeds $PLAT). When off, missing spec is fine — capability flags just don't
 # get tuned. Both cases are non-fatal in flat mode.
-if [[ "$DF_USE_PLAT" == "1" && -z "$PLAT" ]]; then
+if [[ "$DF_USE_PLAT" == "1" && -z "$PLAT" \
+      && "${DF_DEFER_PLAT_REQUIRE:-0}" != "1" ]]; then
     die "DF_USE_PLAT=1 but no matching plat spec in $DF_ROOT/install/plat/ for $(uname -s) $(uname -m)"
 fi
 
@@ -249,6 +250,25 @@ export OS ARCH DF_ROOT DF_PACKAGES DF_PROFILE DF_USE_PLAT \
        GOPATH GOBIN GOCACHE \
        ELAN_HOME JULIAUP_DEPOT_PATH JULIA_DEPOT_PATH
 
+# resolve_nvm_default_bin — print the bin directory selected by nvm's default
+# alias. install/node.sh keeps that alias on the supported LTS major; resolving
+# it here keeps bootstrap and login shells on the same Node/npm global tree even
+# when an older experimental major is still installed beside it.
+resolve_nvm_default_bin() {
+    local _default _dir
+    [[ -r "$NVM_DIR/alias/default" ]] || return 1
+    IFS= read -r _default < "$NVM_DIR/alias/default"
+    _default="${_default#v}"
+    [[ "$_default" =~ ^[0-9]+([.][0-9]+){0,2}$ ]] || return 1
+
+    _dir="$NVM_DIR/versions/node/v$_default"
+    if [[ ! -d "$_dir/bin" ]]; then
+        _dir="$(printf '%s\n' "$NVM_DIR/versions/node/v${_default}".* 2>/dev/null | sort -V | tail -1)"
+    fi
+    [[ -d "$_dir/bin" ]] || return 1
+    printf '%s/bin\n' "$_dir"
+}
+
 # Node comes from nvm, ahead of whatever else is on PATH — the same order the
 # shell profiles establish, restated here because install scripts inherit the
 # caller's PATH and `brew shellenv` puts brew's bin in front of it.
@@ -260,9 +280,8 @@ export OS ARCH DF_ROOT DF_PACKAGES DF_PROFILE DF_USE_PLAT \
 #   This version of Node.js requires NODE_MODULE_VERSION 147
 # — and only for the subcommands that actually load the addon, which is how it
 # stayed hidden (`qmd collection show` passes, `qmd update` aborts).
-if [[ -d "$NVM_DIR/versions/node" ]]; then
-    _nvm_bin="$NVM_DIR/versions/node/$(ls "$NVM_DIR/versions/node" 2>/dev/null | sort -V | tail -1)/bin"
-    [[ -d "$_nvm_bin" ]] && PATH="$_nvm_bin:$PATH"
+if _nvm_bin="$(resolve_nvm_default_bin 2>/dev/null)"; then
+    PATH="$_nvm_bin:$PATH"
     unset _nvm_bin
     export PATH
 fi
@@ -352,10 +371,26 @@ profile_package_files() {
     overlay_package_files "${stem}-full.${extension}"
 }
 
-# mcp_servers_each — the ONE parser for packages/mcp-servers.txt (+ overlays).
+# mcp_profile_enabled PROFILE — true for core entries and profiles selected in
+# DF_MCP_PROFILES. The opt-in list accepts colon, comma, or whitespace separators.
+mcp_profile_enabled() {
+    local _want="${1:-core}" _enabled _profiles="${DF_MCP_PROFILES:-}"
+    [[ "$_want" == "core" ]] && return 0
+    _profiles="${_profiles//:/ }"
+    _profiles="${_profiles//,/ }"
+    for _enabled in $_profiles; do
+        [[ "$_enabled" == "$_want" || "$_enabled" == "*" ]] && return 0
+    done
+    return 1
+}
+
+# mcp_servers_each [--all] — the ONE parser for packages/mcp-servers.txt (+ overlays).
 # Emits one normalized JSON object per entry on stdout:
 #   {"name","kind":"stdio"|"remote","transport","cmd","url","auth",
-#    "codex_client_id","codex_bearer","extras"}
+#    "codex_client_id","codex_bearer","profile","risk","extras"}
+# Untagged rows remain core/read entries. profile=<name> makes a row opt-in via
+# DF_MCP_PROFILES; --all returns every profile for validation and inventory.
+# risk is read, local-write, or external-write.
 # Policy-free: no {VAR} substitution, no credential resolution — the per-tool
 # renderers (install/{claude,codex,opencode,cursor}.sh) own that. `extras` is
 # the passthrough token string minus auth=, --codex-client-id, and
@@ -367,38 +402,71 @@ profile_package_files() {
 # Tested by tests/mcp-emitters.bats; four emitters once diverged silently
 # from hand-rolled copies of this loop — extend it HERE, not in a renderer.
 mcp_servers_each() {
-    local _file _line _name _transport _url _rest_extras
-    local _auth _codex_client_id _codex_bearer _extras _grab_ccid _grab_cbear _tok
+    local _include_all=0 _file _line _name _transport _url _cmd _metadata
+    local _kind _auth _codex_client_id _codex_bearer _profile _risk _extras
+    local _grab_ccid _grab_cbear _tok
+    [[ "${1:-}" == "--all" ]] && _include_all=1
     while IFS= read -r _file; do
         while IFS= read -r _line; do
             [[ -z "$_line" || "$_line" == \#* ]] && continue
-            read -r _name _transport _url _rest_extras <<< "$_line"
+            _cmd="" _url="" _kind="remote"
+            _auth="" _codex_client_id="" _codex_bearer="" _profile="core" _risk="read" _extras=""
+            _grab_ccid=0 _grab_cbear=0
+
+            read -r _name _transport _url _metadata <<< "$_line"
             if [[ "$_transport" == "stdio" && "$_line" == *"cmd: "* ]]; then
-                jq -nc --arg n "$_name" --arg cmd "${_line#*cmd: }" \
-                    '{name:$n, kind:"stdio", transport:"stdio", cmd:$cmd,
-                      url:"", auth:"", codex_client_id:"", codex_bearer:"", extras:""}'
+                _kind="stdio"
+                _cmd="${_line#*cmd: }"
+                _metadata="${_line%%cmd: *}"
+                read -r _name _transport _metadata <<< "$_metadata"
+                _url=""
             else
-                _auth="" _codex_client_id="" _codex_bearer="" _extras="" _grab_ccid=0 _grab_cbear=0
-                for _tok in $_rest_extras; do
+                _metadata="${_metadata:-}"
+            fi
+
+            for _tok in $_metadata; do
+                    if [[ "$_kind" == "stdio" ]]; then
+                        case "$_tok" in
+                            profile=*) _profile="${_tok#profile=}" ;;
+                            risk=*)    _risk="${_tok#risk=}" ;;
+                            *) log_fail "Unsupported stdio MCP metadata for $_name: $_tok"; return 1 ;;
+                        esac
+                        continue
+                    fi
                     if (( _grab_ccid )); then _codex_client_id="$_tok"; _grab_ccid=0; continue; fi
                     if (( _grab_cbear )); then _codex_bearer="$_tok"; _grab_cbear=0; continue; fi
                     case "$_tok" in
                         auth=*)            _auth="${_tok#auth=}" ;;
+                        profile=*)         _profile="${_tok#profile=}" ;;
+                        risk=*)            _risk="${_tok#risk=}" ;;
                         --codex-client-id) _grab_ccid=1 ;;
                         --codex-bearer)    _grab_cbear=1 ;;
                         *)                 _extras="${_extras:+$_extras }$_tok" ;;
                     esac
-                done
-                jq -nc --arg n "$_name" --arg t "$_transport" --arg url "$_url" \
-                       --arg auth "$_auth" --arg ccid "$_codex_client_id" \
-                       --arg cbear "$_codex_bearer" --arg ex "$_extras" \
-                    '{name:$n, kind:"remote", transport:$t, cmd:"",
-                      url:$url, auth:$auth, codex_client_id:$ccid,
-                      codex_bearer:$cbear, extras:$ex}'
-            fi
+            done
+
+            [[ "$_profile" =~ ^[a-z0-9][a-z0-9-]*$ ]] \
+                || { log_fail "Invalid MCP profile for $_name: $_profile"; return 1; }
+            case "$_risk" in
+                read|local-write|external-write) ;;
+                *) log_fail "Invalid MCP risk for $_name: $_risk"; return 1 ;;
+            esac
+            (( _include_all )) || mcp_profile_enabled "$_profile" || continue
+
+            jq -nc --arg n "$_name" --arg k "$_kind" --arg t "$_transport" \
+                   --arg cmd "$_cmd" --arg url "$_url" --arg auth "$_auth" \
+                   --arg ccid "$_codex_client_id" --arg cbear "$_codex_bearer" \
+                   --arg profile "$_profile" --arg risk "$_risk" --arg ex "$_extras" \
+                '{name:$n, kind:$k, transport:$t, cmd:$cmd, url:$url, auth:$auth,
+                  codex_client_id:$ccid, codex_bearer:$cbear, profile:$profile,
+                  risk:$risk, extras:$ex}'
         done < "$_file"
     done < <(overlay_package_files "mcp-servers.txt")
     return 0
+}
+
+mcp_registry_validate() {
+    mcp_servers_each --all >/dev/null
 }
 
 # mcp_url_substitute URL — expand every {VAR} placeholder from the
@@ -499,15 +567,17 @@ download() {
 
     if has curl; then
         if [[ -n "$_auth_header" ]]; then
-            curl -fsSL -H "$_auth_header" "$url" -o "$dest"
+            curl --retry 4 --retry-all-errors --retry-delay 2 \
+                --connect-timeout 20 -fsSL -H "$_auth_header" "$url" -o "$dest"
         else
-            curl -fsSL "$url" -o "$dest"
+            curl --retry 4 --retry-all-errors --retry-delay 2 \
+                --connect-timeout 20 -fsSL "$url" -o "$dest"
         fi
     elif has wget; then
         if [[ -n "$_auth_header" ]]; then
-            wget -q --header="$_auth_header" "$url" -O "$dest"
+            wget -q --tries=4 --timeout=20 --header="$_auth_header" "$url" -O "$dest"
         else
-            wget -q "$url" -O "$dest"
+            wget -q --tries=4 --timeout=20 "$url" -O "$dest"
         fi
     else
         die "Neither curl nor wget found — cannot download files"

@@ -35,14 +35,19 @@ fi
 
 # --- Linux: TinyTeX ---
 
-_tinytex_root="$HOME/.TinyTeX"
+_tinytex_parent="$LOCAL_PLAT/tex"
+_tinytex_root="$_tinytex_parent/.TinyTeX"
 _tlmgr_glob=("$_tinytex_root"/bin/*/tlmgr)
 
 if [[ -x "${_tlmgr_glob[0]:-}" ]]; then
     log_okay "TinyTeX already installed: $_tinytex_root"
 else
     log_info "Installing TinyTeX → $_tinytex_root"
-    run_logged sh -c "curl -sL https://yihui.org/tinytex/install-bin-unix.sh | sh"
+    ensure_dir "$_tinytex_parent"
+    _tinytex_installer="$(mktemp)"
+    download https://yihui.org/tinytex/install-bin-unix.sh "$_tinytex_installer"
+    run_logged env TINYTEX_DIR="$_tinytex_parent" sh "$_tinytex_installer" --no-path
+    rm -f "$_tinytex_installer"
     _tlmgr_glob=("$_tinytex_root"/bin/*/tlmgr)
     [[ -x "${_tlmgr_glob[0]:-}" ]] || die "TinyTeX install failed (no tlmgr under $_tinytex_root/bin)"
 fi

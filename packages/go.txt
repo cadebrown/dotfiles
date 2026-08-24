@@ -11,7 +11,7 @@
 #   # macos-only — skip on Linux
 # Lines without a marker install on both platforms.
 #
-# Idempotency: `go install` uses GOCACHE; unchanged versions short-circuit.
+# Idempotency: install/update hold existing binaries; upgrade re-resolves @latest.
 # Binaries land in $GOBIN (= $LOCAL_PLAT/bin), so they sit alongside the
 # uv- and cargo-installed CLIs.
 

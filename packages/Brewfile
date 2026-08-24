@@ -67,6 +67,7 @@ brew "tinymist"  # Typst LSP + CLI (preview/export; bundles typstyle)
 brew "pari"      # PARI/GP — number theory CAS
 brew "flint"     # FLINT number-theory library (Arb merged in 3.x); feeds python-flint
 brew "juliaup"   # Julia version manager; OSCAR.jl installed per-project via Pkg
+brew "r"         # R runtime; research packages stay project-local via renv
 # SAT/SMT/CP solvers: z3 was previously only a transitive keg — declared now.
 # cadical emits LRAT proofs (Lean's bv_decide kernel-checks these); cvc5 comes
 # per-project via pip (not in homebrew-core).
@@ -111,14 +112,16 @@ brew "zstd"
 brew "cmake"
 brew "ninja"
 brew "meson"
+brew "shfmt"     # shell formatter; keeps Bash/Zsh install scripts mechanically checkable
 brew "gcc"
 brew "gcc@13"
 brew "gcc@15"
 brew "llvm"   # clang, clang++, lldb, llvm-ar, opt, etc.
 brew "llvm@21"
-brew "llvm@22"
+brew "llvm@22"  # pinned major selected by the checked-in CMake toolchain files
 brew "lld"    # LLVM linker (now a separate formula)
 brew "mold"   # fast modern linker
+brew "osv-scanner" # dependency vulnerability scanner; network use is opt-in at scan time
 if OS.linux?
   # Explicit, not transitive: the shell profiles put opt/binutils/bin at the
   # front of PATH so nvcc gets an assembler new enough for its `.base64`
@@ -201,6 +204,7 @@ brew "surrealdb/tap/surreal"
 
 if OS.mac?
   ### Languages & Runtimes (macOS) ###
+  brew "rustup"  # code-signed bootstrap; toolchains remain under LOCAL_PLAT
   brew "openjdk"
   # .NET SDK. Cask, not formula — the pkg installer needs sudo, so `bootstrap
   # upgrade` prompts when this one is outdated. It also links `dotnet`/`dnx`

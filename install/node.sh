@@ -6,9 +6,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 log_section "Node.js (nvm)"
 
-NVM_VERSION="${DF_NVM_VERSION:-v0.40.6}"
+NVM_VERSION="${DF_NVM_VERSION:-v0.40.7}"
 NODE_MAJOR="${DF_NODE_MAJOR:-24}"
-NPM_MAJOR="${DF_NPM_MAJOR:-11}"
+NPM_MAJOR="${DF_NPM_MAJOR:-12}"
 
 # nvm goes under LOCAL_PLAT so each arch+OS gets its own node binaries
 # (nvm itself is shell scripts, but the node versions it installs are arch-specific)
@@ -124,8 +124,8 @@ if [[ -f "$DF_PACKAGES/npm-allow-scripts.txt" ]]; then
         fi
     done < <(_read_package_list "$DF_PACKAGES/npm-allow-scripts.txt")
 fi
-_npm_allow_args=()
-[[ -n "$_npm_allow_scripts" ]] && _npm_allow_args=("--allow-scripts=$_npm_allow_scripts")
+_npm_install_cmd=(npm install -g)
+[[ -n "$_npm_allow_scripts" ]] && _npm_install_cmd+=("--allow-scripts=$_npm_allow_scripts")
 
 _pkg_count=0
 _upgrade_count=0
@@ -145,7 +145,7 @@ while IFS= read -r pkg; do
         if npm list -g "${_name}@${_pin}" --depth=0 &>/dev/null; then
             log_okay "  $_name@$_pin (pinned, installed)"
             if [[ "$_npm_repair" == "1" ]]; then
-                run_logged npm install -g "${_npm_allow_args[@]}" "${_name}@${_pin}"
+                run_logged "${_npm_install_cmd[@]}" "${_name}@${_pin}"
             fi
             # Never SILENTLY stale: in upgrade mode, surface the pin-vs-latest
             # delta loudly so a held package is a visible decision, not a
@@ -159,13 +159,13 @@ while IFS= read -r pkg; do
             fi
         else
             log_info "  installing $_name@$_pin (pinned)"
-            run_logged npm install -g "${_npm_allow_args[@]}" "${_name}@${_pin}"
+            run_logged "${_npm_install_cmd[@]}" "${_name}@${_pin}"
             log_okay "  $_name@$_pin"
             (( _pkg_count++ )) || true
         fi
     elif npm list -g "$_name" --depth=0 &>/dev/null; then
         if [[ "$_npm_repair" == "1" ]]; then
-            run_logged npm install -g "${_npm_allow_args[@]}" "$_name"
+            run_logged "${_npm_install_cmd[@]}" "$_name"
         elif [[ "${DF_MODE:-}" == "upgrade" ]]; then
             log_info "  upgrading $_name"
             # qmd runs a persistent MCP daemon that mmaps native addons; on an
@@ -177,7 +177,7 @@ while IFS= read -r pkg; do
                 log_info "  stopping qmd daemon for safe upgrade (NFS EBUSY guard)"
                 qmd_daemon_stop && _qmd_stopped=1
             fi
-            run_logged npm install -g "${_npm_allow_args[@]}" "$_name@latest"
+            run_logged "${_npm_install_cmd[@]}" "$_name@latest"
             log_okay "  $_name (upgraded)"
             (( _upgrade_count++ )) || true
         else
@@ -185,7 +185,7 @@ while IFS= read -r pkg; do
         fi
     else
         log_info "  installing $_name"
-        run_logged npm install -g "${_npm_allow_args[@]}" "$_name"
+        run_logged "${_npm_install_cmd[@]}" "$_name"
         log_okay "  $_name"
         (( _pkg_count++ )) || true
     fi

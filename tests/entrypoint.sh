@@ -36,10 +36,11 @@ echo ""
 # DF_DO_PACKAGES=0: Homebrew Linux needs Docker-in-Docker, not available here
 # DF_DO_CLAUDE=0:  Claude plugins require a running claude binary + auth
 # DF_DO_MEMORY=0 / DF_DO_SKILLS=0: avoid model downloads and remote skill installs
-# DF_DO_LEAN=0 / DF_DO_LATEX=0: ~1.5 GB toolchain + a TeX tree per run, and
-#   lean.bats is static (it reads the scripts, never invokes lean or tlmgr).
+# DF_DO_JULIA=0 / DF_DO_LEAN=0 / DF_DO_LATEX=0: large language toolchains are
+#   covered by static contract tests rather than downloaded on every test run.
+# DF_DO_QUARTO=0: the archive installer is covered by the same contract tests.
 DF_DO_PACKAGES=0 DF_DO_CLAUDE=0 DF_DO_MEMORY=0 DF_DO_SKILLS=0 \
-    DF_DO_LEAN=0 DF_DO_LATEX=0 \
+    DF_DO_QUARTO=0 DF_DO_JULIA=0 DF_DO_LEAN=0 DF_DO_LATEX=0 \
     bash "$DOTFILES/bootstrap.sh"
 
 echo ""

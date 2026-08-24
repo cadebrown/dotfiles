@@ -17,6 +17,7 @@
 - [Local AI coding](usage/local-llm.md)
 - [Game development](usage/gamedev.md)
 - [Research mathematics](usage/math.md)
+- [Scientific review](usage/scientific-review.md)
 - [Agent guidance (CLAUDE.md / AGENTS.md)](usage/agents.md)
 - [Troubleshooting](usage/troubleshooting.md)
 

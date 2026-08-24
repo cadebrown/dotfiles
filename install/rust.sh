@@ -33,6 +33,26 @@ _glibc_broken_bins() {
     return 0
 }
 
+_link_homebrew_rustup_proxies() {
+    local _prefix="$1" _proxy _source _dest
+    ensure_dir "$CARGO_HOME/bin"
+
+    for _proxy in rustup cargo rustc rustdoc rustfmt rust-analyzer \
+        cargo-clippy cargo-fmt cargo-miri clippy-driver rls \
+        rust-gdb rust-gdbgui rust-lldb; do
+        _source="$_prefix/bin/$_proxy"
+        _dest="$CARGO_HOME/bin/$_proxy"
+        [[ -x "$_source" ]] || continue
+        if [[ -e "$_dest" && ! -L "$_dest" ]]; then
+            continue
+        fi
+        ln -sfn "$_source" "$_dest"
+    done
+
+    [[ -x "$CARGO_HOME/bin/rustup" && -x "$CARGO_HOME/bin/rustc" \
+        && -x "$CARGO_HOME/bin/cargo" ]]
+}
+
 # Source-guard: tests/rust-glibc-smoke.bats sources this file for
 # _glibc_broken_bins — everything below only runs when executed directly.
 [[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
@@ -46,36 +66,42 @@ log_section "Rust"
 if [[ "$OS" == "darwin" ]]; then
     # macOS: Homebrew's rustup is code-signed, which is required for the macOS
     # linker to open compiled object files (com.apple.provenance enforcement).
-    RUSTUP_INIT="/opt/homebrew/bin/rustup-init"
-    RUSTUP_BIN="/opt/homebrew/bin/rustup"
+    # The keg is intentionally unlinked and no longer ships rustup-init, so
+    # expose its per-proxy wrappers from the PLAT-local Cargo bin directory.
+    _rustup_prefix="$(brew --prefix rustup 2>/dev/null || true)"
+    _brew_rustup_bin="${_rustup_prefix:+$_rustup_prefix/bin/rustup}"
 
-    if [[ ! -x "$RUSTUP_BIN" ]]; then
-        log_warn "Homebrew rustup not found — run install/homebrew.sh first"
-        exit 1
+    if [[ -z "$_rustup_prefix" || ! -x "$_brew_rustup_bin" ]]; then
+        die "Homebrew rustup not found — packages/Brewfile must install it before rust.sh"
     fi
+    _link_homebrew_rustup_proxies "$_rustup_prefix" \
+        || die "Homebrew rustup proxy setup failed under $CARGO_HOME/bin"
+    RUSTUP_BIN="$CARGO_HOME/bin/rustup"
 
-    if [[ -x "$CARGO_HOME/bin/rustc" ]]; then
+    if "$RUSTUP_BIN" toolchain list 2>/dev/null | grep -Eq '^stable'; then
         log_okay "Rust toolchain already in PLAT dir: $("$CARGO_HOME/bin/rustc" --version 2>/dev/null)"
         log_info "Updating stable toolchain"
-        # In upgrade mode, also let rustup self-update.
-        _rustup_flags=(--no-self-update)
-        [[ "${DF_MODE:-}" == "upgrade" ]] && _rustup_flags=()
-        run_logged "$RUSTUP_BIN" update stable "${_rustup_flags[@]}"
-        unset _rustup_flags
+        _rustup_cmd=("$RUSTUP_BIN" update stable)
+        _rustup_cmd+=(--no-self-update)
+        run_logged "${_rustup_cmd[@]}"
+        unset _rustup_cmd
     else
-        log_info "Initializing Rust toolchain (Homebrew rustup) → $RUSTUP_HOME"
-        run_logged "$RUSTUP_INIT" -y --no-modify-path --default-toolchain stable
+        log_info "Installing stable toolchain (Homebrew rustup) → $RUSTUP_HOME"
+        run_logged "$RUSTUP_BIN" set profile default
+        run_logged "$RUSTUP_BIN" toolchain install stable --no-self-update
+        run_logged "$RUSTUP_BIN" default stable
         log_okay "rustup initialized"
     fi
+    unset _rustup_prefix _brew_rustup_bin
 else
     # Linux: install rustup-init directly — Homebrew not available or not needed
     if [[ -x "$CARGO_HOME/bin/rustup" ]]; then
         log_okay "rustup already installed: $("$CARGO_HOME/bin/rustup" --version 2>&1)"
         log_info "Updating stable toolchain"
-        _rustup_flags=(--no-self-update)
-        [[ "${DF_MODE:-}" == "upgrade" ]] && _rustup_flags=()
-        run_logged "$CARGO_HOME/bin/rustup" update stable "${_rustup_flags[@]}"
-        unset _rustup_flags
+        _rustup_cmd=("$CARGO_HOME/bin/rustup" update stable)
+        [[ "${DF_MODE:-}" == "upgrade" ]] || _rustup_cmd+=(--no-self-update)
+        run_logged "${_rustup_cmd[@]}"
+        unset _rustup_cmd
     else
         log_info "Installing rustup → $CARGO_HOME/bin"
         ensure_dir "$CARGO_HOME/bin"
@@ -85,6 +111,19 @@ else
         rm -f "$_rustup_script"
         log_okay "rustup installed"
     fi
+fi
+
+# A floating nightly is an explicit rolling channel. Update it in upgrade mode,
+# but leave dated nightlies and exact project toolchains untouched.
+if [[ "${DF_MODE:-}" == "upgrade" ]] \
+    && "$CARGO_HOME/bin/rustup" toolchain list 2>/dev/null | grep -Eq '^nightly(-[^ ]+)?( |$)' \
+    && "$CARGO_HOME/bin/rustup" toolchain list 2>/dev/null | grep -Eq '^nightly-(aarch64|x86_64|arm|i686)-'; then
+    log_info "Updating floating nightly toolchain"
+    run_logged "$CARGO_HOME/bin/rustup" update nightly --no-self-update
+elif [[ "${DF_MODE:-}" == "upgrade" ]] \
+    && "$CARGO_HOME/bin/rustup" toolchain list 2>/dev/null | grep -Eq '^nightly( |$)'; then
+    log_info "Updating floating nightly toolchain"
+    run_logged "$CARGO_HOME/bin/rustup" update nightly --no-self-update
 fi
 
 # Ensure cargo is on PATH for this session
@@ -163,9 +202,7 @@ log_info "Installing/upgrading cargo tools from cargo.txt"
 # GITHUB_TOKEN: if set, passed to binstall to authenticate GitHub API calls
 #   and raise the rate limit from 60 to 5000 req/hr.
 _binstall_flags=(--no-confirm --log-level warn --locked)
-_install_force=()
 _compile_only=0
-[[ "${DF_MODE:-}" == "upgrade" ]] && _install_force=(--force)
 if [[ "${DF_CARGO_STRATEGIES:-}" == "compile" ]]; then
     _compile_only=1
 elif [[ -n "${DF_CARGO_STRATEGIES:-}" ]]; then
@@ -196,11 +233,18 @@ _ok=0 _fail=0
 
 _install_crate() {
     local crate="$1"
+    local _cargo_cmd=(cargo install --locked)
+    local _binstall_cmd=(cargo binstall "${_binstall_flags[@]}")
+    if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+        _cargo_cmd+=(--force)
+        _binstall_cmd+=(--force)
+    fi
+    _cargo_cmd+=("$crate")
+    _binstall_cmd+=("$crate")
     if [[ "$_compile_only" == "1" ]]; then
-        run_logged cargo install --locked "${_install_force[@]}" "$crate"
+        run_logged "${_cargo_cmd[@]}"
     else
-        run_logged cargo binstall "${_binstall_flags[@]}" "${_install_force[@]}" "$crate" \
-            || run_logged cargo install --locked "${_install_force[@]}" "$crate"
+        run_logged "${_binstall_cmd[@]}" || run_logged "${_cargo_cmd[@]}"
     fi
 }
 

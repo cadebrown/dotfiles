@@ -20,7 +20,6 @@ Some shared filesystems give you a tiny home quota and a much larger "scratch" p
    ├── .computelab   ──symlink──▶            ├── .computelab/
    ├── .agent-browser ─symlink──▶            ├── .agent-browser/
    ├── .gradle       ──symlink──▶            ├── .gradle/
-   ├── .TinyTeX      ──symlink──▶            ├── .TinyTeX/
    ├── .oh-my-zsh    ──symlink──▶            ├── .oh-my-zsh/
    │                                         ├── .cursor/
    ├── .cursor/      ◀── real dir            │   ├── projects/   ◀── agent history
@@ -105,7 +104,7 @@ ln -s /local/disk/$USER ~/scratch
 |---|---|---|
 | `DF_SCRATCH` | (unset) | Path to scratch root. Setting this enables scratch mode. |
 | `DF_SCRATCH_LINK` | `~/scratch` | Symlink in `$HOME` pointing at scratch. Bootstrap creates this if `DF_SCRATCH` is set. |
-| `DF_LINKS` | `~/.local:~/.cache:~/.cass:~/.vscode:~/.vscode-server:~/.cursor-server:~/.nv:~/.npm:~/.oh-my-zsh:~/.oh-my-zsh-custom:~/kb:~/.computelab:~/.agent-browser:~/.gradle:~/.TinyTeX` | Colon-separated list of top-level dirs to symlink to scratch. Override to customize. Not `~/.cursor` — chezmoi owns it. |
+| `DF_LINKS` | `~/.local:~/.cache:~/.cass:~/.vscode:~/.vscode-server:~/.cursor-server:~/.nv:~/.npm:~/.oh-my-zsh:~/.oh-my-zsh-custom:~/kb:~/.computelab:~/.agent-browser:~/.gradle` | Colon-separated list of top-level dirs to symlink to scratch. TinyTeX is already below `$LOCAL_PLAT`; `~/.cursor` is chezmoi-owned. |
 | `DF_CONFIG_LINKS` | `Code` | Colon-separated `~/.config` subdir names to redirect to scratch (never `~/.config` itself — chezmoi owns it). |
 | `DF_CURSOR_LINKS` | `projects:worktrees` | Colon-separated `~/.cursor` subdir names to redirect to scratch (never `~/.cursor` itself). |
 | `DF_CLAUDE_LINKS` | `projects:plugins:file-history` | Colon-separated `~/.claude` subdir names to redirect to scratch (never `~/.claude` itself — chezmoi owns it). Drop `projects` to keep conversation history + memory on NFS. |

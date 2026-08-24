@@ -176,10 +176,11 @@ path on no-sudo Linux; the rest are ordinary package-list entries.
 | Tool | Layer | Notes |
 |---|---|---|
 | Lean 4 + `lake` | `install/lean.sh` | elan (Lean's rustup) → `$LOCAL_PLAT/elan`. Toolchains are ~1.5 GB and arch-specific, hence PLAT-isolated. Pin lives in the script; override with `DF_LEAN_TOOLCHAIN`. |
-| TeX | `install/latex.sh` | macOS: `cask "mactex"`, verified by the script, with `/Library/TeX/texbin` appended to PATH by the shell profiles. Linux: TinyTeX, `tlmgr sys_bin` pointed at `$ARCH_BIN`. |
+| TeX | `install/latex.sh` | macOS: `cask "mactex"`. Linux: TinyTeX under `$LOCAL_PLAT/tex/.TinyTeX`, with `tlmgr sys_bin` pointed at `$ARCH_BIN`. |
 | PARI/GP, FLINT, z3, minizinc, cadical, kissat | `packages/Brewfile` | `gp` collides with the `gp='git push'` alias — use `command gp`. |
 | Sage, Zotero | `packages/Brewfile` casks (macOS) | Homebrew core has no Sage formula; per-project passagemath wheels are the uv-native route. |
-| `juliaup` | `packages/Brewfile` | Depots are PLAT-isolated (`JULIA_DEPOT_PATH`); OSCAR.jl installs per-project via Pkg. |
+| Julia / `juliaup` | `packages/Brewfile` + `install/julia.sh` | The rolling release channel and depots are PLAT-isolated; OSCAR.jl stays project-local. |
+| R | `packages/Brewfile` | Statistical runtime; project packages stay reproducible through `renv`. |
 | `leanblueprint`, `marimo`, `paper-qa`, `papis`, … | `packages/pip-full.txt` | Full-profile `uv tool install` entries. |
 | `rga` (ripgrep-all) | `packages/cargo.txt` | Full-text search across a PDF/EPUB paper library. |
 

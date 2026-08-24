@@ -66,6 +66,13 @@ atuin
 # Rust test runner: parallel, per-test process isolation (pre-built: github.com/nextest-rs/nextest)
 cargo-nextest
 
+# GitHub Actions and pre-commit security linter (pre-built: github.com/zizmorcore/zizmor)
+zizmor
+
+# WebAssembly binary inspection, validation, mutation, and component tooling
+# (pre-built: github.com/bytecodealliance/wasm-tools)
+wasm-tools
+
 # Unit-aware scientific calculator (pre-built: github.com/sharkdp/numbat)
 # Crate is numbat-cli; the bare `numbat` crate is the library and has no binary.
 numbat-cli

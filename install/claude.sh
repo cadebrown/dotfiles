@@ -41,7 +41,8 @@ fi
 _BUCKET="https://downloads.claude.ai/claude-code-releases"
 
 log_info "Fetching latest version tag..."
-_version=$(curl -fsSL "$_BUCKET/latest")
+_version=$(curl --retry 4 --retry-all-errors --retry-delay 2 \
+    --connect-timeout 20 -fsSL "$_BUCKET/latest")
 log_info "Latest: $_version"
 
 _dest="$ARCH_BIN/claude"
@@ -60,7 +61,8 @@ else
     log_info "Downloading claude $_version for $_platform..."
     ensure_dir "$ARCH_BIN"
 
-    _manifest=$(curl -fsSL "$_BUCKET/$_version/manifest.json")
+    _manifest=$(curl --retry 4 --retry-all-errors --retry-delay 2 \
+        --connect-timeout 20 -fsSL "$_BUCKET/$_version/manifest.json")
     if has jq; then
         _checksum=$(echo "$_manifest" | jq -r ".platforms[\"$_platform\"].checksum // empty")
     else
@@ -272,10 +274,13 @@ _register_mcps() {
     # Entries come from the shared parser (mcp_servers_each in _lib.sh);
     # this function only builds Claude's desired shape + reconciles it.
     log_info "Reading MCP servers (packages/mcp-servers.txt + overlays)"
-    local _name _kind _transport _cmd _url _auth_source _codex_client_id _extra
+    local _name _kind _transport _cmd _url _auth_source _codex_client_id
+    local _profile _risk _extra
+    mcp_registry_validate || die "invalid MCP registry"
     while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
        && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth_source \
-       && IFS= read -r _codex_client_id && IFS= read -r _extra; do
+       && IFS= read -r _codex_client_id && IFS= read -r _profile \
+       && IFS= read -r _risk && IFS= read -r _extra; do
         _json="" _label=""
 
         if [[ "$_kind" == "stdio" ]]; then
@@ -365,7 +370,7 @@ _register_mcps() {
             (( _skip++ )) || true
             continue
         fi
-        log_info "  $_name ($_label)"
+        log_info "  $_name ($_label, risk=$_risk)"
         if _register_server "$_name" "$_json"; then
             log_okay "  registered $_name"
             (( _ok++ )) || true
@@ -373,7 +378,7 @@ _register_mcps() {
             log_warn "  fail  $_name"
             (( _fail++ )) || true
         fi
-    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .extras')
+    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .profile, .risk, .extras')
 }
 
 _ok=0 _skip=0 _fail=0
@@ -392,7 +397,7 @@ log_section "Claude Code overlay skills"
 _SKILLS_DEST="$HOME/.claude/skills"
 _ok=0 _skip=0
 
-for _dir in "${DF_OVERLAYS[@]}"; do
+for _dir in "${DF_OVERLAYS[@]-}"; do
     _skills_src="$_dir/home/dot_claude/skills"
     [[ -d "$_skills_src" ]] || continue
     log_info "Scanning overlay skills in $_dir"

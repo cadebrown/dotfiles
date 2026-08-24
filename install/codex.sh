@@ -183,9 +183,11 @@ _check_plugins() {
 # TOML blocks, written to $1. Logs go to stdout via log_*; only TOML hits $1.
 _emit_mcp_blocks_to() {
     local out="$1" _name _kind _transport _cmd _head _tail _url
-    local _auth_source _client_id _codex_client_id _codex_bearer _extras _arg _first _sub
+    local _auth_source _client_id _codex_client_id _codex_bearer _profile _risk
+    local _extras _arg _first _sub _approval
 
     : > "$out"
+    mcp_registry_validate || die "invalid MCP registry"
 
     # Entries come from the shared parser (mcp_servers_each in _lib.sh);
     # this function only renders Codex's TOML schema + auth policy.
@@ -193,7 +195,7 @@ _emit_mcp_blocks_to() {
     while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
        && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth_source \
        && IFS= read -r _codex_client_id && IFS= read -r _codex_bearer \
-       && IFS= read -r _extras; do
+       && IFS= read -r _profile && IFS= read -r _risk && IFS= read -r _extras; do
 
             printf '\n[mcp_servers.%s]\n' "$_name" >> "$out"
 
@@ -333,8 +335,11 @@ _emit_mcp_blocks_to() {
                 printf 'startup_timeout_sec = 20\n'
                 printf 'tool_timeout_sec = 60\n'
                 printf 'required = false\n'
-                # Full-auto mode: all MCP tools run without an approval prompt.
-                printf 'default_tools_approval_mode = "approve"\n'
+                # Codex's writes mode keeps read tools automatic and asks only
+                # for tools the server marks as mutating.
+                _approval="approve"
+                [[ "$_risk" == "external-write" ]] && _approval="writes"
+                printf 'default_tools_approval_mode = "%s"\n' "$_approval"
             } >> "$out"
 
             # OAuth sub-table — must trail the parent table's bare keys.
@@ -344,7 +349,7 @@ _emit_mcp_blocks_to() {
                     printf 'client_id = "%s"\n' "$(_toml_escape "$_codex_client_id")"
                 } >> "$out"
             fi
-    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .codex_bearer, .extras')
+    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .codex_bearer, .profile, .risk, .extras')
 }
 
 # One-time eviction of the retired managed rules file. Managed rules moved
@@ -557,9 +562,20 @@ _trust_hook() {
     chmod 600 "$_config"
 }
 
+_toml_section_key_matches() {
+    local _file="$1" _section="$2" _key="$3" _value="$4"
+    awk -v section="$_section" -v want="${_key} = \"${_value}\"" '
+        $0 == section { in_section = 1; next }
+        in_section && /^\[/ { exit 1 }
+        in_section && $0 == want { found = 1; exit }
+        END { exit(found ? 0 : 1) }
+    ' "$_file"
+}
+
 _check_setup() {
     local _config _rules _hooks _guard _profile _pfile _guard_rc _hook_hash
-    local _want_model _mcp_name
+    local _want_model _mcp_name _mcp_risk _mcp_approval
+    local _g _h _n_groups _n_hooks _hook_key
     log_section "Codex Healthcheck"
 
     _config="$HOME/.codex/config.toml"
@@ -588,10 +604,10 @@ _check_setup() {
         || die "Codex default permissions are not unrestricted"
     ! grep -q '^sandbox_mode = ' "$_config" \
         || die "Legacy sandbox_mode disables permission profiles in $_config"
-    grep -q '^default_tools_approval_mode = "approve"' "$_config" \
-        || die "MCP tools are not configured for prompt-free execution in $_config"
     grep -q '^\[apps\._default\]$' "$_config" \
         || die "App defaults missing in $_config"
+    _toml_section_key_matches "$_config" '[apps._default]' default_tools_approval_mode writes \
+        || die "External app writes are not configured to request approval in $_config"
     grep -q '^destructive_enabled = true$' "$_config" \
         || die "Destructive app tools are not enabled in $_config"
     grep -q '^open_world_enabled = true$' "$_config" \
@@ -601,22 +617,34 @@ _check_setup() {
     grep -q 'bearer_token_env_var = "GH_TOKEN"' "$_config" \
         || die "GitHub MCP missing bearer_token_env_var in $_config (auth=gh)"
 
-    # MCP servers: every name in the shared list (+ overlays) must have a
-    # generated block — derived, so list edits can't go stale here.
-    while IFS= read -r _mcp_name; do
+    # Active MCP profiles only: every selected server must exist and its
+    # server-level default must match the registry risk policy.
+    mcp_registry_validate || die "Invalid packages/mcp-servers.txt registry"
+    while IFS= read -r _mcp_name && IFS= read -r _mcp_risk; do
         grep -q "^\[mcp_servers\.${_mcp_name}\]$" "$_config" \
             || die "Missing [mcp_servers.$_mcp_name] in $_config (generated from packages/mcp-servers.txt)"
-    done < <(while IFS= read -r _file; do
-                 awk '!/^[[:space:]]*(#|$)/{print $1}' "$_file"
-             done < <(overlay_package_files "mcp-servers.txt"))
+        _mcp_approval="approve"
+        [[ "$_mcp_risk" == "external-write" ]] && _mcp_approval="writes"
+        _toml_section_key_matches "$_config" "[mcp_servers.$_mcp_name]" \
+            default_tools_approval_mode "$_mcp_approval" \
+            || die "Wrong approval mode for MCP $_mcp_name (risk=$_mcp_risk)"
+    done < <(mcp_servers_each | jq -r '.name, .risk')
 
     grep -q '"command": "~/.local/bin/df-chezmoi-guard"' "$_hooks" \
         || die "Codex hook does not use shared chezmoi guard"
     ! grep -q 'format-hook' "$_hooks" \
         || die "Stale Codex format-hook still present in $_hooks"
-    _hook_hash="$(_managed_pre_tool_hook_hash "$_hooks")"
-    grep -q "trusted_hash = \"$_hook_hash\"" "$_config" \
-        || die "Codex hook trust hash is stale in $_config"
+    _n_groups="$(jq '.hooks.PreToolUse | length' "$_hooks")"
+    for (( _g=0; _g<_n_groups; _g++ )); do
+        _n_hooks="$(jq --argjson g "$_g" '.hooks.PreToolUse[$g].hooks | length' "$_hooks")"
+        for (( _h=0; _h<_n_hooks; _h++ )); do
+            _hook_key="$HOME/.codex/hooks.json:pre_tool_use:${_g}:${_h}"
+            _hook_hash="$(_managed_pre_tool_hook_hash "$_hooks" "$_g" "$_h")"
+            _toml_section_key_matches "$_config" "[hooks.state.\"$_hook_key\"]" \
+                trusted_hash "$_hook_hash" \
+                || die "Codex hook trust hash is stale for [$_g:$_h] in $_config"
+        done
+    done
 
     codex debug prompt-input "healthcheck" >/dev/null \
         || die "Codex config parse failed for default profile"

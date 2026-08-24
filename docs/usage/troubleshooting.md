@@ -172,6 +172,31 @@ Manual one-off: `brew tap owner/tap`, then rerun `install/homebrew.sh`.
 
 ---
 
+## Rust fails after Homebrew says its packages are satisfied
+
+Symptom: `install/rust.sh` reports `Homebrew rustup not found` even though
+`brew list rustup` and `brew --prefix rustup` succeed.
+
+Root cause: Homebrew's keg-only `rustup` formula removed `rustup-init`. Older
+bootstrap runs left `~/.local/cargo/bin/rustup` pointing at the removed
+`/opt/homebrew/bin/rustup-init`, and `rust.sh` incorrectly required that removed
+binary before accepting the installed formula.
+
+Confirm:
+
+```sh
+brew info rustup | grep -E 'keg-only|no longer provides'
+readlink ~/.local/cargo/bin/rustup
+ls "$(brew --prefix rustup)/bin/rustup"
+```
+
+**Fix:** update the checkout and run `bash ~/dotfiles/install/rust.sh`. The
+installer now links Homebrew's individual keg wrappers into the managed Cargo
+bin directory and initializes stable with `rustup toolchain install`; it does
+not depend on `rustup-init`.
+
+---
+
 ## Cask upgrade fails: `It seems there is already an App at '/Applications/X.app'`
 
 Symptom: `bootstrap.sh upgrade` reports `Some greedy cask upgrades failed`, and

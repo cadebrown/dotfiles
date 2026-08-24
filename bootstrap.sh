@@ -18,7 +18,7 @@
 #                             #   - rustup self-update + toolchain update
 #                             #   - cargo binstall (re-runs all of cargo.txt)
 #                             #   - go install @latest (re-runs all of go.txt)
-#                             #   - Node 24 LTS + npm 11 refresh
+#                             #   - Node 24 LTS + npm 12 refresh
 #                             #   - npm install -g <pkg>@latest for each pkg
 #                             #   - uv self update + uv tool upgrade --all
 #                             #   - oh-my-zsh core git pull (plus plugins)
@@ -48,7 +48,9 @@
 #   DF_SCRATCH            — scratch root on local disk (enables scratch mode)
 #   DF_SCRATCH_LINK       — ~/scratch symlink (default: $HOME/scratch)
 #   DF_LINKS              — colon-separated paths to redirect to scratch (default: ~/.local:~/.cache)
-#   DF_BREW_UPGRADE       — control Homebrew upgrades (macOS default: 1, Linux default: 0)
+#   DF_BREW_UPGRADE       — control Homebrew upgrades (default: 0; upgrade mode: 1)
+#   DF_BREW_DOWNLOAD_CONCURRENCY — simultaneous Homebrew downloads (default: 4)
+#   DF_BREW_UPGRADE_CASKS — 0/1/auto; auto requires a cached sudo ticket
 #   DF_DIRS               — colon-separated home dirs to create (default: dev:bones:misc)
 #   DF_DEBUG              — set to 1 for verbose debug output with timing
 #   DF_DO_SCRATCH       — set to 0 to skip scratch space symlink setup
@@ -63,8 +65,10 @@
 #   DF_DO_NODE          — set to 0 to skip Node install + global npm packages
 #   DF_DO_RUST          — set to 0 to skip Rust install
 #   DF_DO_GO            — set to 0 to skip Go-installed CLI tools (packages/go.txt)
+#   DF_DO_JULIA         — set to 0 to skip Julia release-channel management
 #   DF_DO_LEAN          — set to 0 to skip the Lean 4 toolchain (elan + default toolchain)
 #   DF_DO_LATEX         — set to 0 to skip the TeX distribution (MacTeX verify / TinyTeX on Linux)
+#   DF_DO_QUARTO        — set to 0 to skip Quarto verification/install
 #   DF_DO_PYTHON        — set to 0 to skip Python install
 #   DF_PROFILE          — core or full (default: full); selects optional tool manifests
 #   DF_DO_CLAUDE        — set to 0 to skip Claude Code install
@@ -100,6 +104,7 @@ export DF_MODE
 if [[ "$DF_MODE" == "upgrade" ]]; then
     DF_BREW_UPGRADE="${DF_BREW_UPGRADE:-1}"
 fi
+export DF_BREW_UPGRADE
 
 # update/upgrade skip scratch setup and repo clone
 if [[ "$DF_MODE" != "install" ]]; then
@@ -108,20 +113,33 @@ fi
 
 DF_REPO="${DF_REPO:-cadebrown/dotfiles}"
 
+# BASH_SOURCE is empty when this file is piped into bash. Keep that distinction
+# explicit: a remote bootstrap must clone into a known path rather than treating
+# the caller's current directory as the repository.
+_BOOTSTRAP_SOURCE="${BASH_SOURCE[0]:-}"
+_BOOTSTRAP_LOCAL=0
+if [[ -n "$_BOOTSTRAP_SOURCE" && -f "$_BOOTSTRAP_SOURCE" ]]; then
+    _BOOTSTRAP_LOCAL=1
+fi
+
 # Temp dir for any files fetched during bootstrap (curl | bash mode)
 _BOOTSTRAP_TMP="$(mktemp -d)"
 trap 'rm -rf "$_BOOTSTRAP_TMP"' EXIT
 
-# Source _lib.sh — works both from repo and via curl | bash
-_LIB="$(dirname "${BASH_SOURCE[0]}")/install/_lib.sh"
-if [[ -f "$_LIB" ]]; then
+# Source _lib.sh — works both from repo and via curl | bash.
+if [[ "$_BOOTSTRAP_LOCAL" == "1" ]]; then
+    _LIB="$(cd "$(dirname "$_BOOTSTRAP_SOURCE")" && pwd)/install/_lib.sh"
     # shellcheck source=install/_lib.sh
     source "$_LIB"
 else
     # Running via curl | bash — fetch _lib.sh temporarily
     curl -fsSL "https://raw.githubusercontent.com/${DF_REPO}/main/install/_lib.sh" \
         -o "$_BOOTSTRAP_TMP/_lib.sh"
+    # The temporary download has no install/plat tree. Require the matching
+    # platform only after the real repository has been cloned and re-sourced.
+    export DF_DEFER_PLAT_REQUIRE=1
     source "$_BOOTSTRAP_TMP/_lib.sh"
+    unset DF_DEFER_PLAT_REQUIRE
 fi
 
 DF_INSTALL_DIR="$DF_ROOT/install"
@@ -249,8 +267,15 @@ fi
 
 log_section "0.5 — dotfiles repo"
 
-# Default: use the directory containing this script (works for local clones)
-DF_PATH="${DF_PATH:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+# Local runs use the script directory. Piped runs have no script path and clone
+# to ~/dotfiles unless the caller explicitly supplies DF_PATH.
+if [[ -z "${DF_PATH:-}" ]]; then
+    if [[ "$_BOOTSTRAP_LOCAL" == "1" ]]; then
+        DF_PATH="$(cd "$(dirname "$_BOOTSTRAP_SOURCE")" && pwd)"
+    else
+        DF_PATH="$HOME/dotfiles"
+    fi
+fi
 DF_LINK="${DF_LINK:-$HOME/dotfiles}"
 
 # Clone if DF_PATH has no git repo yet
@@ -294,50 +319,18 @@ if [[ "$DF_LINK" != "$DF_PATH" ]]; then
     unset _want
 fi
 
-# Point DF_INSTALL_DIR at the real repo (important for curl | bash runs after clone)
+# Re-source the real library after cloning. Besides the install directory, this
+# rebinds DF_ROOT/DF_PACKAGES/overlays and performs authoritative PLAT detection.
 DF_INSTALL_DIR="$DF_PATH/install"
+# shellcheck source=install/_lib.sh
+source "$DF_INSTALL_DIR/_lib.sh"
+DF_INSTALL_DIR="$DF_ROOT/install"
 
-### 0.3 — PLAT re-detection ###
-#
-# Now that DF_INSTALL_DIR points to the real repo, re-run PLAT detection using
-# install/plat/.plat_check.sh scripts. On a curl|bash first run, _lib.sh was
-# sourced from a temp dir with no plat scripts and fell back to old format.
-# This step upgrades PLAT to the new format and migrates any existing old dir.
+### 0.6 — authoritative platform paths ###
+# The real _lib.sh source above performs PLAT detection and derives every
+# architecture-specific path from the cloned repository.
 
-log_section "0.3 — PLAT detection"
-
-_PLAT_SCAN="$DF_INSTALL_DIR/plat"
-_PLAT_NEW=""
-if [[ -d "$_PLAT_SCAN" ]]; then
-    _PLAT_OS_RAW="$(uname -s)"
-    while IFS= read -r _pd; do
-        _chk="$_pd/.plat_check.sh"
-        if [[ -f "$_chk" ]] && /bin/sh "$_chk" 2>/dev/null; then
-            _PLAT_NEW="$(basename "$_pd")"
-            break
-        fi
-    done < <(ls -1d "$_PLAT_SCAN"/plat_"${_PLAT_OS_RAW}"_*/ 2>/dev/null | sort -r)
-    unset _PLAT_OS_RAW _pd _chk
-fi
-unset _PLAT_SCAN
-
-if [[ -n "$_PLAT_NEW" && "$_PLAT_NEW" != "$PLAT" ]]; then
-    log_info "PLAT upgraded: $PLAT → $_PLAT_NEW"
-    PLAT="$_PLAT_NEW"
-    export PLAT
-
-    # Re-resolve LOCAL_PLAT (honors DF_USE_PLAT) using the real, symlink-resolved root.
-    _resolve_local_plat
-    _re_derive_plat_vars
-
-    # Source compile flags for the new PLAT (always relevant — they're orthogonal
-    # to whether we directory-isolate by PLAT).
-    _PLAT_ENV_SH="$DF_INSTALL_DIR/plat/$PLAT/.plat_env.sh"
-    # shellcheck disable=SC1090
-    [[ -f "$_PLAT_ENV_SH" ]] && source "$_PLAT_ENV_SH"
-    unset _PLAT_ENV_SH
-fi
-unset _PLAT_NEW
+log_section "0.6 — platform paths"
 
 log_okay "PLAT=${PLAT:-<none>} (DF_USE_PLAT=$DF_USE_PLAT)"
 log_okay "LOCAL_PLAT=$LOCAL_PLAT"
@@ -475,6 +468,12 @@ else
     log_info "Skipping packages (DF_DO_PACKAGES=0)"
 fi
 
+if [[ "${DF_DO_QUARTO:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/quarto.sh" || die "quarto.sh failed"
+else
+    log_info "Skipping Quarto (DF_DO_QUARTO=0)"
+fi
+
 ### 5. macOS services ###
 
 log_section "5 — macOS services"
@@ -539,6 +538,12 @@ if [[ "${DF_DO_GO:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/go.sh" || die "go.sh failed"
 else
     log_info "Skipping Go (DF_DO_GO=0)"
+fi
+
+if [[ "${DF_DO_JULIA:-1}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/julia.sh" || die "julia.sh failed"
+else
+    log_info "Skipping Julia (DF_DO_JULIA=0)"
 fi
 
 if [[ "${DF_DO_LEAN:-1}" != "0" ]]; then
@@ -699,6 +704,17 @@ unset _overlay_bs _overlay_name _ran_any
 ### done ###
 
 log_section "bootstrap complete"
+
+if [[ "$DF_MODE" == "upgrade" ]]; then
+    log_section "version audit"
+    if [[ "${DF_STRICT_UPGRADE:-1}" == "0" ]]; then
+        bash "$DF_INSTALL_DIR/audit-versions.sh"
+    else
+        bash "$DF_INSTALL_DIR/audit-versions.sh" --strict \
+            || die "Version audit found missing or stale managed toolchains"
+    fi
+fi
+
 _elapsed=$(( SECONDS - _BOOTSTRAP_START ))
 log_okay "Done in ${_elapsed}s! Open a new shell or: source ~/.zprofile"
 log_info ""

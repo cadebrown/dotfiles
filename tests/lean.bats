@@ -37,7 +37,7 @@ setup() {
 }
 
 @test "lean-lsp MCP entry is version-pinned" {
-    grep -Eq '^lean-lsp stdio cmd: uvx lean-lsp-mcp==[0-9.]+' "$REPO/packages/mcp-servers.txt"
+    grep -Eq '^lean-lsp stdio .*cmd: uvx lean-lsp-mcp==[0-9.]+' "$REPO/packages/mcp-servers.txt"
 }
 
 @test "latex.sh routes TinyTeX binaries into ARCH_BIN, not ~/.local/bin" {

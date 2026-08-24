@@ -30,9 +30,9 @@ teardown() {
 }
 
 @test "Node installer pins nvm and targets the supported LTS major" {
-    grep -q 'DF_NVM_VERSION:-v0.40.6' "$REPO/install/node.sh"
+    grep -q 'DF_NVM_VERSION:-v0.40.7' "$REPO/install/node.sh"
     grep -q 'DF_NODE_MAJOR:-24' "$REPO/install/node.sh"
-    grep -q 'DF_NPM_MAJOR:-11' "$REPO/install/node.sh"
+    grep -q 'DF_NPM_MAJOR:-12' "$REPO/install/node.sh"
     grep -q 'NVM_LTS="\*" nvm version-remote' "$REPO/install/node.sh"
     grep -q 'nvm install --lts' "$REPO/install/node.sh"
     ! grep -q -- '--latest-npm' "$REPO/install/node.sh"

@@ -9,7 +9,7 @@ Complete reference for `DF_*` variables and the tool-standard ones this repo car
 | `DF_NAME` | (prompts) | Display name. Pre-seed to skip the chezmoi prompt on first run. |
 | `DF_EMAIL` | (prompts) | Email. Pre-seed to skip the chezmoi prompt on first run. |
 | `DF_REPO` | `cadebrown/dotfiles` | GitHub `owner/repo` slug used by curl-bootstrap. Override to fork. |
-| `DF_PATH` | (auto-detect) | Where the dotfiles repo lives on disk. Defaults to the script's parent dir. |
+| `DF_PATH` | (auto-detect) | Where the repo lives. Local runs use the script directory; piped runs clone to `$HOME/dotfiles`. |
 | `DF_LINK` | `$HOME/dotfiles` | Symlink in `$HOME` that points at `DF_PATH`. |
 | `DF_DIRS` | `dev:bones:misc` | Colon-separated list of subdirs created in `$HOME` by `install/dirs.sh`. |
 
@@ -18,7 +18,11 @@ Complete reference for `DF_*` variables and the tool-standard ones this repo car
 | Var | Default | What it does |
 |---|---|---|
 | `DF_USE_PLAT` | `0` | Per-PLAT directory isolation. `1` enables `$LOCAL_PLAT=$HOME/.local/$PLAT`; `0` collapses to `$HOME/.local`. Accepts `1\|true\|yes\|on` (case-insensitive). See [PLAT isolation](../setup/plat.md). |
-| `DF_BREW_UPGRADE` | `1` (macOS), `0` (Linux) | Whether to run `brew upgrade` and `brew upgrade --cask --greedy`. Auto-set to `1` in `upgrade` mode. |
+| `DF_BREW_UPGRADE` | `0` | Whether to upgrade existing formulae/casks. Auto-set to `1` in `upgrade` mode on both platforms. |
+| `DF_BREW_DOWNLOAD_CONCURRENCY` | `4` | Maximum simultaneous Homebrew bottle/cask downloads. |
+| `DF_BREW_UPGRADE_CASKS` | `auto` | Upgrade greedy casks only when sudo is already cached; set `0` to skip or run `sudo -v`/set `1` to permit prompts. |
+| `DF_STRICT_UPGRADE` | `1` | Run `install/audit-versions.sh --strict` after `bootstrap.sh upgrade`; set `0` for a report-only audit. |
+| `DF_MCP_PROFILES` | (unset) | Colon/comma/space-separated opt-in MCP profiles such as `research-scite`, `biomed`, or `publish`. Core servers are always rendered. |
 | `DF_DEBUG` | `0` | Set to `1` for verbose `[dbug]` output with timing info on every `run_logged` command. |
 | `DF_FORCE` | `0` | Used by `install/plat-decommission.sh` to skip the deletion confirmation prompt. |
 | `DF_CARGO_STRATEGIES` | (unset) | Override `cargo binstall --strategies`. E.g. `compile` to skip GitHub release fetchers (useful behind a VPN). |
@@ -29,7 +33,7 @@ Complete reference for `DF_*` variables and the tool-standard ones this repo car
 |---|---|---|
 | `DF_SCRATCH` | (unset) | Path to scratch root. Setting this enables scratch mode (symlinks heavy `$HOME` dirs). |
 | `DF_SCRATCH_LINK` | `$HOME/scratch` | The `$HOME` symlink that points at scratch. Bootstrap creates this if `DF_SCRATCH` is set. |
-| `DF_LINKS` | `~/.local:~/.cache:~/.cass:~/.vscode:~/.vscode-server:~/.cursor-server:~/.nv:~/.npm:~/.oh-my-zsh:~/.oh-my-zsh-custom:~/kb:~/.computelab:~/.agent-browser:~/.gradle:~/.TinyTeX` | Colon-separated top-level dirs to redirect to scratch. Not `~/.cursor` — chezmoi owns it. |
+| `DF_LINKS` | `~/.local:~/.cache:~/.cass:~/.vscode:~/.vscode-server:~/.cursor-server:~/.nv:~/.npm:~/.oh-my-zsh:~/.oh-my-zsh-custom:~/kb:~/.computelab:~/.agent-browser:~/.gradle` | Colon-separated top-level dirs to redirect to scratch. TinyTeX lives below `$LOCAL_PLAT`; `~/.cursor` is chezmoi-owned. |
 | `DF_CONFIG_LINKS` | `Code` | Colon-separated `~/.config` subdir names to redirect to scratch (never `~/.config` itself — chezmoi owns it). |
 | `DF_CURSOR_LINKS` | `projects:worktrees` | Colon-separated `~/.cursor` subdir names to redirect to scratch (never `~/.cursor` itself — chezmoi owns it). |
 | `DF_CLAUDE_LINKS` | `projects:plugins:file-history` | Colon-separated `~/.claude` subdir names to redirect to scratch (never `~/.claude` itself — chezmoi owns it). Drop `projects` to keep history + memory on NFS. |
@@ -56,8 +60,10 @@ Each `DF_DO_*` flag defaults to `1` (run). Set to `0` to skip.
 | `DF_DO_NODE` | 6 | nvm + Node.js + global npm packages |
 | `DF_DO_RUST` | 6 | rustup + cargo tools |
 | `DF_DO_GO` | 6 | Go CLI tools from `go.txt` |
+| `DF_DO_JULIA` | 6 | Juliaup release channel and PLAT-isolated depots |
 | `DF_DO_LEAN` | 6 | Lean 4 toolchain (elan + the pinned default toolchain) |
 | `DF_DO_LATEX` | 6 | TeX distribution (MacTeX verify on macOS, TinyTeX on Linux) |
+| `DF_DO_QUARTO` | 4 | Quarto cask verification on macOS or rootless release install on Linux |
 | `DF_DO_CLAUDE` | 6 | Claude Code binary + plugins + MCP servers + overlay skills |
 | `DF_DO_CODEX` | 6 | Codex CLI binary + managed config + hooks |
 | `DF_DO_CLAUDE_DESKTOP` | 6 | Claude Desktop tracked preferences (macOS) |

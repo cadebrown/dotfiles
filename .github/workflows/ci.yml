@@ -13,18 +13,20 @@ concurrency:
 
 jobs:
   quality:
+    name: Quality
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Install validation tools
-        uses: taiki-e/install-action@v2.86.2
+        uses: taiki-e/install-action@b6b84cf49ebfe0176417bdce007c624f0db37f20 # v2.86.2
         with:
           tool: |
             mdbook@0.5.4
             mdbook-mermaid@0.17.1
+            zizmor@1.29.0
 
       - name: Install Go validation tools
         env:
@@ -51,12 +53,15 @@ jobs:
           ln -s "$GITHUB_WORKSPACE" "$HOME/dotfiles"
           bats \
             tests/agents.bats \
+            tests/bootstrap-remote.bats \
             tests/brew-glibc.bats \
             tests/lean.bats \
             tests/mcp-emitters.bats \
             tests/netrc.bats \
+            tests/platform-upgrade.bats \
             tests/profiles.bats \
             tests/rust-glibc-smoke.bats \
+            tests/toolchains.bats \
             tests/verify-path.bats
 
       - name: Build documentation
@@ -66,16 +71,43 @@ jobs:
         run: gitleaks git --no-banner --redact .
 
       - name: Lint workflows
-        run: actionlint
+        run: |
+          actionlint
+          zizmor --pedantic .github/workflows
 
-  infrastructure:
-    runs-on: ubuntu-24.04
+  macos-smoke:
+    name: macOS smoke
+    runs-on: macos-15
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: opentofu/setup-opentofu@v2.0.2
+      - name: Install test tools
+        run: brew install bats-core jq shellcheck
+
+      - name: Check shell and platform contracts
+        run: |
+          bash -n bootstrap.sh install/*.sh
+          shellcheck -S warning bootstrap.sh install/*.sh
+          env PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+            /bin/bash "$(brew --prefix bats-core)/bin/bats" \
+              tests/agents.bats \
+              tests/bootstrap-remote.bats \
+              tests/mcp-emitters.bats \
+              tests/platform-upgrade.bats \
+              tests/toolchains.bats \
+              tests/verify-path.bats
+
+  infrastructure:
+    name: Infrastructure
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
           tofu_version: 1.12.5
 
@@ -92,9 +124,14 @@ jobs:
         run: tofu validate
 
   bootstrap:
-    runs-on: ubuntu-24.04
+    name: Bootstrap (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 

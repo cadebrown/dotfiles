@@ -74,14 +74,16 @@ while IFS= read -r _pip_file; do
             continue
         fi
 
-        _uv_args=()
-        [[ -n "$_py_ver" ]] && _uv_args=(--python "$_py_ver")
+        # Keep the command array non-empty: macOS system Bash treats an empty
+        # array expansion as unbound under `set -u`.
+        _uv_cmd=(uv tool install "$_pkg")
+        [[ -n "$_py_ver" ]] && _uv_cmd+=(--python "$_py_ver")
 
         if uv tool list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "^$_pkg "; then
             log_debug "Already installed: $_pkg"
             (( _skipped++ )) || true
         else
-            if uv tool install "$_pkg" "${_uv_args[@]}" 2>&1; then
+            if "${_uv_cmd[@]}" 2>&1; then
                 (( _installed++ )) || true
             else
                 log_warn "Failed to install: $_pkg"

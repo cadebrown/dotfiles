@@ -205,6 +205,10 @@ if has cass || [[ -x "$ARCH_BIN/cass" ]]; then
         log_info "cass: refreshing lexical session index"
         run_logged "$_cass" index \
             || log_warn "cass index failed — run 'cass doctor'"
+    elif [[ "$OS" == "darwin" ]]; then
+        # The archive can be hundreds of gigabytes. Keep workstation bootstrap
+        # bounded and let the dedicated daily LaunchAgent own first-time vectors.
+        log_info "cass: semantic index absent — deferring rebuild to dev.cade.cass-semantic"
     else
         log_info "cass: building initial semantic session index"
         run_logged "$_cass" index --semantic \

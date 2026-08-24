@@ -1,0 +1,4 @@
+interface:
+  display_name: "Scientific Review"
+  short_description: "Evidence-led scientific literature review"
+  default_prompt: "Use $scientific-review to audit this claim against the literature and produce a claim-evidence matrix."

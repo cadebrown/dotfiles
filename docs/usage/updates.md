@@ -10,7 +10,13 @@
 ~/dotfiles/bootstrap.sh           # full install (same as first run, idempotent)
 ```
 
-`update` pulls the repo, applies chezmoi, refreshes zsh plugins, and re-runs all install scripts (which skip already-installed tools). `upgrade` does the same but also enables Homebrew upgrades and forces cargo-binstall to re-check for newer binaries.
+`update` pulls the repo, applies chezmoi, refreshes zsh plugins, and reconciles missing tools while holding existing Homebrew and Go packages. `upgrade` also refreshes Homebrew, Go, Rust/Cargo, Node/npm, uv tools, Julia, TeX, and extensions, then runs the strict JSON toolchain audit.
+
+Run the read-only audit independently with:
+
+```sh
+bash ~/dotfiles/install/audit-versions.sh | jq .
+```
 
 ---
 

@@ -2,7 +2,7 @@
 # Comment line above, blank line below.
 
 plainsrv http https://plain.example/mcp
-ghsrv http https://gh.example/mcp auth=gh
+ghsrv http https://gh.example/mcp auth=gh risk=external-write
 gcsrv http https://gc.example/mcp auth=gcloud
 c7srv http https://c7.example/mcp auth=context7
 tavsrv http https://tav.example/mcp auth=tavily
@@ -14,5 +14,10 @@ misskey http https://key.example/{FIXTURE_MISSING}/v2/mcp
 oauthsrv http https://oauth.example/mcp --client-id claude-oauth-id --codex-client-id codex-oauth-id
 bearersrv http https://bearer.example/mcp --codex-bearer FIXTURE_BEARER_TOKEN
 mystery http https://mystery.example/mcp auth=doesnotexist
-tool stdio cmd: uvx some-tool --flag val
+tool stdio risk=local-write cmd: uvx some-tool --flag val
 bare stdio cmd: solobinary
+
+# Opt-in profiles are absent unless DF_MCP_PROFILES selects them.
+scitesrv http https://scite.example/mcp profile=research-scite risk=external-write
+biomedsrv http https://biomed.example/mcp profile=biomed
+publishsrv http https://publish.example/mcp profile=publish risk=external-write

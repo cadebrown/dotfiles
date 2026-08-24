@@ -24,12 +24,12 @@ setup() {
         source "'"$REPO_ROOT"'/install/_lib.sh"
         source "'"$BATS_TEST_DIRNAME"'/lib-mcp-fixture.sh"
         mcp_fixture_env
-        mcp_servers_each | jq -s -S .
+        mcp_servers_each --all | jq -s -S .
     '
     [ "$status" -eq 0 ]
 
-    # 15 entries, comments/blanks skipped
-    [ "$(echo "$output" | jq 'length')" -eq 15 ]
+    # 18 entries, comments/blanks skipped, including three opt-in profiles.
+    [ "$(echo "$output" | jq 'length')" -eq 18 ]
     # auth=asta extraction (the newest auth source — added with the math stack)
     [ "$(echo "$output" | jq -r '.[] | select(.name=="astasrv") | .auth')" = "asta" ]
     # stdio parsing keeps the full command string
@@ -44,6 +44,39 @@ setup() {
     [ "$(echo "$output" | jq -r '.[] | select(.name=="bearersrv") | .extras')" = "" ]
     # raw URL is preserved (no substitution in the parser)
     [ "$(echo "$output" | jq -r '.[] | select(.name=="urlkey") | .url')" = 'https://key.example/{FIXTURE_KEY}/v2/mcp' ]
+    # Risk/profile metadata is normalized for remote and stdio entries.
+    [ "$(echo "$output" | jq -r '.[] | select(.name=="ghsrv") | .risk')" = "external-write" ]
+    [ "$(echo "$output" | jq -r '.[] | select(.name=="tool") | .risk')" = "local-write" ]
+    [ "$(echo "$output" | jq -r '.[] | select(.name=="scitesrv") | .profile')" = "research-scite" ]
+    [ "$(echo "$output" | jq -r '.[] | select(.name=="plainsrv") | .profile')" = "core" ]
+}
+
+@test "mcp profiles are opt-in and independently selectable" {
+    source "$REPO_ROOT/install/_lib.sh"
+    mcp_fixture_env
+
+    run bash -c '
+        source "'"$REPO_ROOT"'/install/_lib.sh"
+        source "'"$BATS_TEST_DIRNAME"'/lib-mcp-fixture.sh"
+        mcp_fixture_env
+        mcp_servers_each | jq -r .name
+    '
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"scitesrv"* ]]
+    [[ "$output" != *"biomedsrv"* ]]
+    [[ "$output" != *"publishsrv"* ]]
+
+    run bash -c '
+        source "'"$REPO_ROOT"'/install/_lib.sh"
+        source "'"$BATS_TEST_DIRNAME"'/lib-mcp-fixture.sh"
+        mcp_fixture_env
+        export DF_MCP_PROFILES="research-scite:publish"
+        mcp_servers_each | jq -r .name
+    '
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"scitesrv"* ]]
+    [[ "$output" != *"biomedsrv"* ]]
+    [[ "$output" == *"publishsrv"* ]]
 }
 
 @test "mcp_url_substitute expands placeholders and reports missing vars" {
@@ -89,4 +122,26 @@ setup() {
     mcp_fixture_env
     _emit_mcp_blocks_to "$BATS_TEST_TMPDIR/codex.toml" >/dev/null 2>&1
     diff -u "$BATS_TEST_DIRNAME/golden/codex-mcp.toml" "$BATS_TEST_TMPDIR/codex.toml"
+}
+
+@test "codex approval mode follows MCP risk" {
+    source "$REPO_ROOT/install/codex.sh"
+    mcp_fixture_env
+    _emit_mcp_blocks_to "$BATS_TEST_TMPDIR/codex-risk.toml" >/dev/null 2>&1
+
+    run awk '
+        /^\[mcp_servers\.ghsrv\]$/ { found=1; next }
+        /^\[/ && found { exit }
+        found && /^default_tools_approval_mode/ { print; exit }
+    ' "$BATS_TEST_TMPDIR/codex-risk.toml"
+    [ "$status" -eq 0 ]
+    [ "$output" = 'default_tools_approval_mode = "writes"' ]
+
+    run awk '
+        /^\[mcp_servers\.plainsrv\]$/ { found=1; next }
+        /^\[/ && found { exit }
+        found && /^default_tools_approval_mode/ { print; exit }
+    ' "$BATS_TEST_TMPDIR/codex-risk.toml"
+    [ "$status" -eq 0 ]
+    [ "$output" = 'default_tools_approval_mode = "approve"' ]
 }

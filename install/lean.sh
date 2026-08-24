@@ -23,7 +23,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 log_section "Lean 4 toolchain (elan)"
 
 # Pin the default; bump deliberately alongside Mathlib releases.
-DF_LEAN_TOOLCHAIN="${DF_LEAN_TOOLCHAIN:-leanprover/lean4:v4.32.2}"
+DF_LEAN_TOOLCHAIN="${DF_LEAN_TOOLCHAIN:-leanprover/lean4:v4.33.1}"
 
 ensure_dir "$ELAN_HOME"
 

@@ -278,13 +278,10 @@ log_info "Paths:   $PATHS"
 # scratch while Cursor wrote to the home copy (Aug 2026). Same rule as
 # ~/.claude / ~/.codex; ~/.cursor-server is unmanaged and stays.
 #
-# The cache-shaped entries below (.computelab, .agent-browser, .gradle, .TinyTeX)
-# are the ones that actually fill a small home volume — 1.2 GB of the 4.7 GB on a
-# 5 GB NFS home. .TinyTeX holds binaries, so it assumes every machine sharing this
-# scratch is the same OS/arch family; it lives in $PATHS rather than $LOCAL_PLAT
-# because tlmgr records absolute paths and a per-PLAT tree would need a reinstall
-# per CPU level.
-_DEFAULT_LINKS="$HOME/.local:$HOME/.cache:$HOME/.cass:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom:$HOME/kb:$HOME/.computelab:$HOME/.agent-browser:$HOME/.gradle:$HOME/.TinyTeX"
+# These cache-shaped entries are the ones that actually fill a small home
+# volume. TinyTeX is absent because install/latex.sh now keeps its compiled tree
+# below LOCAL_PLAT, which is already redirected by the ~/.local entry.
+_DEFAULT_LINKS="$HOME/.local:$HOME/.cache:$HOME/.cass:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom:$HOME/kb:$HOME/.computelab:$HOME/.agent-browser:$HOME/.gradle"
 DF_LINKS="${DF_LINKS-$_DEFAULT_LINKS}"
 unset _DEFAULT_LINKS
 

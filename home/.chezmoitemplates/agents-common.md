@@ -31,6 +31,10 @@ Problem-solving approach:
 
 Work autonomously. Take on long, multi-step tasks and drive them to completion — research blockers, try approaches, and recover from errors yourself instead of stopping at the first obstacle. Check in when you're genuinely blocked on a decision only I can make, or before something hard to reverse; otherwise keep going.
 
+Treat authorization as a boundary, not a speed bump. Read-only inspection and
+in-scope local edits may proceed automatically. Ask before external writes,
+destructive actions, purchases, or a material expansion of the requested scope.
+
 Commit messages use conventional-commits format — `type(scope): summary`, imperative mood, summary under ~70 chars. Capture what *semantically* changed and what was surprising — assumptions that turned out wrong, designs that shifted mid-implementation. The diff shows the what; the message explains the why and the unexpected.
 
 **Comments — sparse by default.** Most code needs none; good names and structure carry it. Prefer no comment over one that restates the code.
@@ -125,13 +129,13 @@ Tool output is the dominant context cost. Habits:
 ## Memory layers
 
 Beyond this file there are three memory layers. Read order for nontrivial
-work: auto-memory loads itself; query the KB before re-deriving anything;
+work: harness memory loads itself; query the KB before re-deriving anything;
 search history when past work is referenced.
 
-1. **Auto-memory** (Claude Code only) — per-project notes in
-   `~/.claude/projects/<proj>/memory/`, maintained by Claude's native memory.
-   When running as Claude Code, record durable *project-specific* facts there
-   and nowhere else.
+1. **Harness memory** — use the current agent's native project/session memory
+   when it is available (Claude under `~/.claude/projects/`, Codex under
+   `~/.codex/memories/`). Keep durable project-specific facts in that harness's
+   memory rather than duplicating them in the global instructions.
 2. **Knowledge base** — `~/kb`, a git-synced markdown repo of cross-project
    knowledge: decisions, how-tos, environment quirks, research findings.
    Search it with the qmd MCP tools (`query`/`get`) when available, else

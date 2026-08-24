@@ -27,17 +27,19 @@ _mode="${1:-install}"
 # Schema: local  {type:"local",  command:[...], enabled}
 #         remote {type:"remote", url, headers?, enabled}
 _emit_opencode_mcp() {
-    local _stream _name _kind _transport _cmd _url _auth _ccid _extras _def
+    local _stream _name _kind _transport _cmd _url _auth _ccid _profile _risk _extras _def
     # No `trap ... RETURN` cleanup: bash fires RETURN traps when any sourced
     # script finishes, which would delete the accumulator mid-loop if a
     # `source` ever lands in this function (bit install/cursor.sh for real).
     _stream="$(mktemp)"
+    mcp_registry_validate || die "invalid MCP registry"
 
     # Entries come from the shared parser (mcp_servers_each in _lib.sh);
     # this function only renders opencode's schema + auth policy.
     while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
        && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth \
-       && IFS= read -r _ccid && IFS= read -r _extras; do
+       && IFS= read -r _ccid && IFS= read -r _profile && IFS= read -r _risk \
+       && IFS= read -r _extras; do
         if [[ "$_kind" == "stdio" ]]; then
             _def="$(jq -nc --arg cmd "$_cmd" \
                 '{type:"local", command:($cmd|split(" ")), enabled:true}')"
@@ -58,7 +60,7 @@ _emit_opencode_mcp() {
             esac
         fi
         jq -nc --arg n "$_name" --argjson def "$_def" '{name:$n, def:$def}' >> "$_stream"
-    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .extras')
+    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .profile, .risk, .extras')
 
     jq -s 'reduce .[] as $e ({}; .[$e.name] = $e.def)' "$_stream"
     rm -f "$_stream"

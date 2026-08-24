@@ -39,18 +39,21 @@ _sync_cursor_mcp() {
     log_section "Cursor MCP servers"
 
     local _out="$HOME/.cursor/mcp.json" _stream _count=0
-    local _name _kind _transport _cmd _url _auth _ccid _extras _missing _hname _hval _def
+    local _name _kind _transport _cmd _url _auth _ccid _profile _risk _extras
+    local _missing _hname _hval _def
     # NB: no `trap ... RETURN` for cleanup — bash fires RETURN traps when any
     # sourced script finishes, so a `.`/`source` anywhere in this function
     # would silently delete the accumulator mid-loop (this happened: only
     # servers after the last in-loop `. ~/.<svc>.env` survived into mcp.json).
     _stream="$(mktemp)"
+    mcp_registry_validate || die "invalid MCP registry"
 
     # Entries come from the shared parser (mcp_servers_each in _lib.sh);
     # this function only renders Cursor's schema + auth policy.
     while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
        && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth \
-       && IFS= read -r _ccid && IFS= read -r _extras; do
+       && IFS= read -r _ccid && IFS= read -r _profile && IFS= read -r _risk \
+       && IFS= read -r _extras; do
             if [[ "$_kind" == "stdio" ]]; then
                 _def="$(jq -nc --arg cmd "$_cmd" \
                     '($cmd|split(" ")) as $w | {command:$w[0]}
@@ -97,7 +100,7 @@ _sync_cursor_mcp() {
 
             jq -nc --arg n "$_name" --argjson def "$_def" '{name:$n, def:$def}' >> "$_stream"
             (( ++_count ))
-    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .extras')
+    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .profile, .risk, .extras')
 
     local _tmp; _tmp="$(mktemp)"
     jq -s '{mcpServers: (reduce .[] as $e ({}; .[$e.name] = $e.def))}' "$_stream" > "$_tmp" \

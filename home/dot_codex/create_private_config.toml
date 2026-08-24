@@ -48,7 +48,8 @@ context_size = "high"
 
 # Apps/connectors have gates separate from the shell approval policy.
 [apps._default]
-default_tools_approval_mode = "approve"
+# Read tools stay automatic; tools declared as writes request confirmation.
+default_tools_approval_mode = "writes"
 default_tools_enabled = true
 destructive_enabled = true
 open_world_enabled = true
