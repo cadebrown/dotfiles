@@ -172,6 +172,206 @@ Manual one-off: `brew tap owner/tap`, then rerun `install/homebrew.sh`.
 
 ---
 
+## Brew bundle reports `Upgrading X has failed!` after installing X
+
+Symptom: `bootstrap.sh upgrade` pours and links a formula successfully, then
+reports `Upgrading <formula> has failed!`. Nearby errors name a vanished file in
+`~/.cache/Homebrew/downloads/`, such as `No such file or directory @
+dir_s_rmdir - ...bottle_manifest.json`. Several unrelated formulae can fail this
+way in one run.
+
+Root cause: Homebrew Bundle defaults to as many as four package workers. Those
+workers launch separate `brew install` or `brew upgrade` processes that share
+one download cache and run install cleanup against it. One worker can remove a
+cache entry after another has inspected it, turning successful installs into
+nonzero exits. Homebrew tracks the broader parallel-worker race as
+[Homebrew/brew#23328](https://github.com/Homebrew/brew/issues/23328); the
+[Homebrew manpage](https://docs.brew.sh/Manpage) documents the `auto` job
+default and the sequential override.
+
+Confirm after the original bootstrap process has exited:
+
+```sh
+formula=tree
+brew list --versions "$formula"
+brew outdated --formula "$formula"
+brew linkage --test "$formula"
+```
+
+If the new version is listed, `brew outdated` prints nothing, and linkage
+passes, the install succeeded and only its cleanup path failed.
+
+**Fix:** update the checkout and rerun `bootstrap.sh upgrade`. The shared
+installer environment now disables Bundle package jobs; downloads and each
+source build can still run concurrently, but package installs and cleanup are
+serialized. Manual one-off:
+
+```sh
+brew bundle install --jobs=1 --file="$HOME/dotfiles/packages/Brewfile"
+```
+
+Do not start the retry while the first bootstrap is still running.
+
+---
+
+## Brew cleanup fails with `Device or resource busy .../.nfs...`
+
+Symptom: an upgrade prints a formula's beer-mug success line, then fails while
+cleanup removes an unrelated old keg:
+
+```text
+Error: Device or resource busy @ apply2files - .../Cellar/expat/<version>/lib/.nfs...
+```
+
+Root cause: NFS renames an unlinked-but-open file to `.nfs*` and keeps it until
+the last process closes it. Any Homebrew executable or shared library can be a
+holder: this first appeared with the Bash running bootstrap, then with dozens of
+long-lived `dbus-daemon` processes mapping an old `libexpat.so`. Homebrew runs
+formula cleanup after installs and, every 30 days, a full cleanup. That cleanup
+exception changes the command's exit status after the package succeeds, so
+Bundle misleadingly reports `Upgrading <formula> has failed!` for each later
+package too.
+
+Confirm which processes still hold the file:
+
+```sh
+lsof /path/from/the/error/.nfs...
+```
+
+**Fix:** wait for the original bootstrap to exit, update the checkout, and retry.
+On an NFS Homebrew prefix, `linux-packages.sh` sets the documented
+[`HOMEBREW_NO_INSTALL_CLEANUP`](https://docs.brew.sh/Manpage#environment)
+switch for the run. Installs and upgrades still happen, but cleanup cannot turn
+their success into failure. The switch does not disable an explicit cleanup;
+after every process shown by `lsof` has exited, reclaim the retired keg with:
+
+```sh
+brew cleanup expat
+```
+
+Old kegs consume some disk until that maintenance succeeds. Do not delete the
+`.nfs*` file manually or terminate unrelated holders just to make cleanup pass.
+
+---
+
+## Ruby upgrade fails with `No such file or directory .../lib/ruby/gems/...`
+
+Symptom: upgrading `vim`, `ccache`, or another Ruby dependent builds Ruby and
+RubyGems successfully, then fails in `Gem::Uninstaller`:
+
+```text
+Errno::ENOENT: No such file or directory @ rb_check_realpath_internal -
+.../brew/lib/ruby/gems/4.0.0
+```
+
+Root cause: the formula adds the versioned `ruby@X.Y` path for gem compatibility.
+On a custom-prefix source upgrade, that path still resolves to the previous keg
+and appears before the new keg in RUNPATH. The new executable therefore loads
+the old `libruby` during setup. Its Homebrew RubyGems configuration points to a
+global `Gem.dir` which unlinking has just removed, and RubyGems aborts when
+`File.realpath` resolves the missing directory. Merely recreating that directory
+lets setup continue but leaves the new executable running the old Ruby engine
+until the old keg is deleted.
+
+**Fix:** `install/patch-homebrew-ruby.sh` patches the local formula before Brew
+Bundle runs. It puts the new keg's library directory first in RPATH while
+retaining Homebrew's versioned fallback. The patch is idempotent and is
+reapplied after every formula refresh.
+
+If a bootstrap using an older checkout is already building Ruby, creating the
+missing directory can salvage that attempt, but it does not repair the stale
+RUNPATH:
+
+```sh
+mkdir -p "$(brew --prefix)/lib/ruby/gems/4.0.0"
+```
+
+Use the ABI version printed in the error, then rerun with the formula patch so
+the installed executable loads the matching `libruby`.
+
+---
+
+## OpenSSH upgrade fails with `inreplace failed ... sshd_config`
+
+Symptom: OpenSSH finishes `make install`, then Homebrew aborts while replacing
+its Cellar prefix in the persistent configuration:
+
+```text
+Error: inreplace failed
+.../brew/etc/ssh/sshd_config:
+  expected replacement of ".../Cellar/openssh/<version>" with ".../opt/openssh"
+```
+
+Root cause: Homebrew preserves files under `etc` across upgrades. After the
+first install, `sshd_config` already contains `opt/openssh`; a later install has
+no Cellar path left to replace, but the formula treats that valid no-op as an
+error.
+
+**Fix:** `install/patch-homebrew-openssh.sh` guards the replacement with a
+content check. It leaves an already-normalized configuration untouched, while
+the formula's test still rejects any Cellar path that remains.
+
+---
+
+## Brew has the current keg but still uses an older version
+
+Symptom: `brew list --versions glib` or another formula lists the current
+version, and `brew outdated` prints nothing, but `opt/<formula>`, `bin/<tool>`,
+or `pkg-config` still resolves an older keg. This can follow an interrupted or
+failed upgrade.
+
+Inspect both the selected keg and the current keg's receipt:
+
+```sh
+formula=glib
+prefix=$(brew --prefix)
+brew info --json=v2 "$formula" | jq '.formulae[0] | {linked_keg, installed}'
+readlink -f "$prefix/opt/$formula"
+ls "$prefix/Cellar/$formula"/*/INSTALL_RECEIPT.json
+```
+
+If the current keg has an install receipt, its direct executable works, and
+`brew linkage --test "$formula"` passes, preview and repair only the links:
+
+```sh
+brew link --overwrite --dry-run "$formula"
+brew link --overwrite "$formula"
+```
+
+If its receipt is absent or `brew info --json=v2` reports a null install time,
+the keg is incomplete. Do not force-link it; rebuild it:
+
+```sh
+HOMEBREW_NO_INSTALL_CLEANUP=1 brew reinstall --build-from-source "$formula"
+```
+
+This run found both forms: Fish 4.8.1 was complete but its `bin/fish` symlink
+still named 4.5.0, while GLib 2.88.3 lacked a receipt and had to be rebuilt.
+
+---
+
+## Brew Bundle reports a circular `libtiff, webp` dependency
+
+Symptom: `brew bundle check` refuses to sort its graph even though both current
+formulae are installed:
+
+```text
+Formulae dependency graph sorting found a circular dependency:
+  libtiff, webp
+```
+
+Root cause: the installed WebP receipt can retain an old `libtiff` dependency,
+while the current libtiff formula depends on WebP. Generated keg receipts are
+installation records; do not hand-edit them. Reinstalling WebP regenerates its
+receipt from the current one-way dependency graph:
+
+```sh
+HOMEBREW_NO_INSTALL_CLEANUP=1 brew reinstall --build-from-source webp
+brew bundle check --file="$HOME/dotfiles/packages/Brewfile"
+```
+
+---
+
 ## Rust fails after Homebrew says its packages are satisfied
 
 Symptom: `install/rust.sh` reports `Homebrew rustup not found` even though

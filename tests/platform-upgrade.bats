@@ -55,6 +55,102 @@ setup() {
         "$REPO/install/homebrew.sh"
 }
 
+@test "Homebrew bundle package jobs are serialized" {
+    grep -q '^export HOMEBREW_BUNDLE_NO_JOBS=1$' "$REPO/install/_lib.sh"
+}
+
+@test "Linux Homebrew disables automatic cleanup for NFS prefixes" {
+    run env LC_ALL=C LANG=C bash -c '
+        source "$1/install/linux-packages.sh"
+        stat() { printf "%s\n" nfs; }
+        unset HOMEBREW_NO_INSTALL_CLEANUP
+        _configure_brew_cleanup "$2"
+        printf "%s\n" "${HOMEBREW_NO_INSTALL_CLEANUP:-}"
+    ' _ "$REPO" "$BATS_TEST_TMPDIR"
+
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
+}
+
+@test "Linux Homebrew keeps automatic cleanup for local prefixes" {
+    run env LC_ALL=C LANG=C bash -c '
+        source "$1/install/linux-packages.sh"
+        stat() { printf "%s\n" ext2; }
+        unset HOMEBREW_NO_INSTALL_CLEANUP
+        _configure_brew_cleanup "$2"
+        test -z "${HOMEBREW_NO_INSTALL_CLEANUP:-}"
+    ' _ "$REPO" "$BATS_TEST_TMPDIR"
+
+    [ "$status" -eq 0 ]
+}
+
+@test "Ruby formula patch puts the new keg before the previous Ruby RPATH" {
+    local fake_home="$BATS_TEST_TMPDIR/ruby-patch-home"
+    local formula="$fake_home/.local/brew/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/r/ruby.rb"
+    mkdir -p "$(dirname "$formula")"
+    cat >"$formula" <<'RUBY'
+class Ruby < Formula
+  def install
+    paths = %w[libyaml openssl@3].map { |f| formula_opt_prefix(f) }
+    # Add versioned Ruby RPATH so user-installed gems can work when user is switched to versioned Ruby
+    paths << versioned_opt_prefix if OS.linux? && !versioned_formula?
+
+    if build.stable?
+      resource("rubygems").stage do
+        ENV.prepend_path "PATH", bin
+
+        mkdir_p HOMEBREW_PREFIX/"lib/ruby/gems/#{api_version}"
+        system bin/"ruby", "setup.rb", "--prefix=#{buildpath}/vendor_gem"
+      end
+    end
+  end
+end
+RUBY
+
+    run env HOME="$fake_home" DF_USE_PLAT=0 LC_ALL=C LANG=C \
+        bash "$REPO/install/patch-homebrew-ruby.sh"
+
+    [ "$status" -eq 0 ]
+    grep -Fq 'ENV.prepend "LDFLAGS", "-Wl,-rpath,#{lib}" if OS.linux?' "$formula"
+    run grep -F 'mkdir_p HOMEBREW_PREFIX/' "$formula"
+    [ "$status" -eq 1 ]
+
+    run env HOME="$fake_home" DF_USE_PLAT=0 LC_ALL=C LANG=C \
+        bash "$REPO/install/patch-homebrew-ruby.sh"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"already applied"* ]]
+    [ "$(grep -Fc 'ENV.prepend "LDFLAGS"' "$formula")" -eq 1 ]
+}
+
+@test "OpenSSH formula patch accepts an already-normalized sshd_config" {
+    local fake_home="$BATS_TEST_TMPDIR/openssh-patch-home"
+    local formula="$fake_home/.local/brew/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/o/openssh.rb"
+    mkdir -p "$(dirname "$formula")"
+    cat >"$formula" <<'RUBY'
+class Openssh < Formula
+  def install
+    # Don't hardcode Cellar paths in configuration files
+    inreplace etc/"ssh/sshd_config", prefix, opt_prefix
+  end
+end
+RUBY
+
+    run env HOME="$fake_home" DF_USE_PLAT=0 LC_ALL=C LANG=C \
+        bash "$REPO/install/patch-homebrew-openssh.sh"
+
+    [ "$status" -eq 0 ]
+    grep -Fq 'sshd_config = etc/"ssh/sshd_config"' "$formula"
+    grep -Fq 'if sshd_config.read.include?(prefix.to_s)' "$formula"
+
+    run env HOME="$fake_home" DF_USE_PLAT=0 LC_ALL=C LANG=C \
+        bash "$REPO/install/patch-homebrew-openssh.sh"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"already applied"* ]]
+    [ "$(grep -Fc 'sshd_config = etc/' "$formula")" -eq 1 ]
+}
+
 @test "unattended cask upgrades require cached sudo" {
     grep -q 'DF_BREW_UPGRADE_CASKS:-auto' "$REPO/install/homebrew.sh"
     grep -q 'sudo -n true' "$REPO/install/homebrew.sh"

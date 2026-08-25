@@ -485,6 +485,9 @@ mcp_url_substitute() {
     return 0
 }
 
+# Bundle package workers share the cache and install cleanup; keep reconciliation sequential.
+export HOMEBREW_BUNDLE_NO_JOBS=1
+
 # ensure_brewfile_taps FILE
 # Trust AND tap every third-party tap referenced by a Brewfile so `brew
 # bundle` can resolve its formulae/casks. Two distinct Homebrew refusals:

@@ -52,6 +52,13 @@ _glibc_offenders() {
             END { for (f in seen) print f "\tGLIBC_" need[f] }'
 }
 
+# Mapped files become undeletable .nfs files, so cleanup must be a separate transaction.
+_configure_brew_cleanup() {
+    if [[ "$(stat -f -c '%T' "$1" 2>/dev/null || true)" == nfs* ]]; then
+        export HOMEBREW_NO_INSTALL_CLEANUP=1
+    fi
+}
+
 # Source-guard: tests/brew-glibc.bats sources this file for the helpers above —
 # everything below only runs when executed directly.
 [[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
@@ -95,6 +102,7 @@ eval "$($_REAL_BREW_PREFIX/bin/brew shellenv)"
 export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_ENV_HINTS=1
 [[ -n "$_GIT_PATH" ]] && export HOMEBREW_GIT_PATH="$_GIT_PATH"
 unset _GIT_PATH
+_configure_brew_cleanup "$_REAL_BREW_PREFIX"
 
 # Temporarily allow the JSON API for initial formula lookups (glibc, gcc@13).
 # ~/.profile exports HOMEBREW_NO_INSTALL_FROM_API=1 so that the patches block
@@ -343,6 +351,17 @@ else
     # python@3.14: fixes uuid module and test_datetime PGO build failures on custom prefix.
     # See install/patch-homebrew-python.sh for full details.
     [[ -f "$DF_INSTALL_DIR/patch-homebrew-python.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-python.sh"
+
+    # ruby: puts the new keg's lib directory before the previous versioned Ruby
+    # path. Otherwise a source-built executable loads the old libruby during
+    # RubyGems setup and can fail while resolving the old global Gem.dir.
+    # See install/patch-homebrew-ruby.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-ruby.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-ruby.sh"
+
+    # openssh: persistent etc/ssh/sshd_config already contains opt paths after
+    # the first install, so a required Cellar-prefix replacement must be guarded.
+    # See install/patch-homebrew-openssh.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-openssh.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-openssh.sh"
 
     # mesa: installs pyyaml from its binary wheel instead of building from source.
     # venv.pip_install always passes --no-binary=:all:, forcing a source build;
