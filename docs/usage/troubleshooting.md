@@ -144,6 +144,43 @@ the known-unavailable set and the Anysphere forks to use instead).
 
 ---
 
+## Cursor reports `ENOENT` for `User/settings.json` and ignores user settings
+
+Symptom: Cursor logs or displays an error such as:
+
+```text
+ENOENT: no such file or directory, open '.../Cursor/User/settings.json'
+```
+
+The native file is still a symlink, but its managed target is missing or empty:
+
+```sh
+ls -l "$HOME/Library/Application Support/Cursor/User/settings.json"
+jq -e 'type == "object"' ~/.config/cursor/settings.json
+git diff -- home/dot_config/cursor/settings.json
+```
+
+Root cause: Cursor writes the symlinked settings file non-atomically. The Cursor
+agent hook could run after the file was truncated but before the replacement
+contents arrived, and `chezmoi add` then copied the empty file into the repo.
+The hook's `jq` cleanup also accepted empty input as success, preserving the
+damage. A later failed rewrite can leave the native symlink dangling.
+
+**Fix:** update the checkout. The hook now accepts only a complete settings
+object or keybindings array, then validates the chezmoi source after import and
+restores its previous contents if the file changed during the copy. To recover
+an already-empty source after confirming the diff contains no wanted edits:
+
+```sh
+git restore --source=HEAD -- home/dot_config/cursor/settings.json
+chezmoi apply ~/.config/cursor/settings.json ~/.cursor/hooks/sync-dotfiles-cursor.sh
+```
+
+If an open window still shows defaults after the native symlink resolves, run
+`Developer: Reload Window` from Cursor's command palette.
+
+---
+
 ## Brew bundle fails: `No available formula … This command requires the tap`
 
 Symptom: `brew bundle` errors with `No available formula with the name

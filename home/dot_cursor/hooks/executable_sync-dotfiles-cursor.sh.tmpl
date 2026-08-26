@@ -23,7 +23,7 @@ _df_prepend_path "/opt/homebrew/bin"
 _df_prepend_path "/usr/local/bin"
 export PATH
 
-DF_ROOT="{{ .chezmoi.workingTree }}"
+DF_ROOT="${DF_ROOT:-{{ .chezmoi.workingTree }}}"
 export DF_ROOT
 
 _before_submit=0
@@ -40,6 +40,19 @@ if [[ -f "$_STAMP" ]] && [[ "$_DEBOUNCE" =~ ^[0-9]+$ ]] && ((_DEBOUNCE > 0)); th
   fi
 fi
 
+_cursor_json_complete() {
+  local _file="$1" _open _close _first _last
+  [[ -s "$_file" ]] || return 1
+  case "${_file##*/}" in
+    settings.json)    _open="{"; _close="}" ;;
+    keybindings.json) _open="["; _close="]" ;;
+    *) return 1 ;;
+  esac
+  _first="$(awk '!/^[[:space:]]*(\/\/|$)/ { sub(/^[[:space:]]*/, ""); print substr($0, 1, 1); exit }' "$_file")"
+  _last="$(awk '!/^[[:space:]]*(\/\/|$)/ { line=$0 } END { sub(/[[:space:]]*\/\/.*$/, "", line); sub(/[[:space:]]*$/, "", line); print substr(line, length(line), 1) }' "$_file")"
+  [[ "$_first" == "$_open" && "$_last" == "$_close" ]]
+}
+
 _sync() {
   if [[ "$_skip_sync" == 1 ]]; then
     return 0
@@ -49,19 +62,49 @@ _sync() {
     return 0
   fi
 
-  local f _any=0 _err
+  local f _source _backup _source_existed _any=0 _err
   for f in "${HOME}/.config/cursor/settings.json" "${HOME}/.config/cursor/keybindings.json"; do
     [[ -f "$f" ]] || continue
-    _any=1
-    if ! _err="$(chezmoi add "$f" 2>&1)"; then
-      printf '%s\n' "[df-cursor-hook] chezmoi add failed ($f): ${_err//$'\n'/ }" >&2
+    if ! _cursor_json_complete "$f"; then
+      printf '%s\n' "[df-cursor-hook] refusing invalid Cursor JSON ($f)" >&2
+      continue
     fi
+
+    _source="${DF_ROOT}/home/dot_config/cursor/${f##*/}"
+    _backup="$(mktemp)"
+    _source_existed=0
+    if [[ -f "$_source" ]]; then
+      cp -p "$_source" "$_backup"
+      _source_existed=1
+    fi
+
+    if ! _err="$(chezmoi add "$f" 2>&1)"; then
+      if [[ "$_source_existed" == 1 ]]; then
+        mv "$_backup" "$_source"
+      else
+        rm -f "$_source" "$_backup"
+      fi
+      printf '%s\n' "[df-cursor-hook] chezmoi add failed ($f): ${_err//$'\n'/ }" >&2
+      continue
+    fi
+    if ! _cursor_json_complete "$_source"; then
+      if [[ "$_source_existed" == 1 ]]; then
+        mv "$_backup" "$_source"
+      else
+        rm -f "$_source" "$_backup"
+      fi
+      printf '%s\n' "[df-cursor-hook] rejected unstable Cursor JSON ($f)" >&2
+      continue
+    fi
+    rm -f "$_backup"
+    _any=1
   done
 
   # Strip per-machine keys from the synced source so they don't pollute the repo.
   local _settings_src="${DF_ROOT}/home/dot_config/cursor/settings.json"
   if [[ -f "$_settings_src" ]] && command -v jq >/dev/null 2>&1; then
-    if ! jq 'del(."remote.SSH.remotePlatform")' "$_settings_src" > "$_settings_src.tmp"; then
+    if ! jq -e 'if type == "object" then del(."remote.SSH.remotePlatform") else error("expected object") end' \
+        "$_settings_src" > "$_settings_src.tmp"; then
       rm -f "$_settings_src.tmp"
     else
       mv "$_settings_src.tmp" "$_settings_src"
