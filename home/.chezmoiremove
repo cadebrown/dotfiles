@@ -41,3 +41,8 @@
 .config/git/hooks/prepare-commit-msg
 .config/git/hooks/pre-push.pre-entire
 .config/entire
+
+# Cass indexing became manual (August 2026). Remove the old five-minute
+# lexical and daily semantic LaunchAgents from machines that deployed them.
+Library/LaunchAgents/dev.cade.cass-watch.plist
+Library/LaunchAgents/dev.cade.cass-semantic.plist

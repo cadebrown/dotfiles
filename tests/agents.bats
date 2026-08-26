@@ -66,31 +66,16 @@ setup() {
         "$REPO/home/dot_local/bin/executable_df-agent-doctor"
 }
 
-@test "cass indexes semantic vectors with bounded periodic refreshes" {
-    # HNSW build dropped deliberately (commit 995cde2) — plain semantic index.
-    grep -q 'index --full --semantic' "$REPO/install/memory.sh"
-    grep -q 'index --semantic' "$REPO/install/memory.sh"
+@test "cass indexing is manual and semantic work is bounded" {
+    grep -q 'models backfill.*--tier quality' "$REPO/install/memory.sh"
+    grep -q 'index --full' "$REPO/install/memory.sh"
+    ! grep -q 'index --semantic' "$REPO/install/memory.sh"
+    ! grep -q 'nohup.*cass.*index' "$REPO/install/memory.sh"
     ! grep -q -- '--build-hnsw' "$REPO/install/memory.sh"
-    ! grep -Eq '"\$_cass" watch|"\$ARCH_BIN/cass" watch' "$REPO/install/memory.sh"
-
-    plist="$REPO/home/Library/LaunchAgents/dev.cade.cass-watch.plist.tmpl"
-    grep -q '<string>index</string>' "$plist"
-    ! grep -q '<string>--watch</string>' "$plist"
-    ! grep -q '<string>--semantic</string>' "$plist"
-    grep -q '<key>StartInterval</key>' "$plist"
-    grep -q '<integer>300</integer>' "$plist"
-    semantic="$REPO/home/Library/LaunchAgents/dev.cade.cass-semantic.plist.tmpl"
-    grep -q '<string>--semantic</string>' "$semantic"
-    ! grep -q -- '--build-hnsw' "$semantic"
-    grep -q '<key>StartCalendarInterval</key>' "$semantic"
-    grep -q '<key>CASS_SEMANTIC_EMBEDDER</key>' "$semantic"
-    grep -q '<string>minilm</string>' "$semantic"
-    grep -q '<key>CASS_INDEX_STALL_ABORT_SECS</key>' "$semantic"
-    grep -q 'CASS_INDEX_STALL_ABORT_SECS.*0' "$REPO/install/memory.sh"
-    grep -q 'semantic index absent — deferring rebuild to dev.cade.cass-semantic' \
-        "$REPO/install/memory.sh"
-    ! grep -Eq 'cass (watch|index --semantic)' "$REPO/home/dot_bash_profile.tmpl"
-    ! grep -Eq 'cass (watch|index --semantic)' "$REPO/home/dot_zprofile.tmpl"
+    [ ! -e "$REPO/home/Library/LaunchAgents/dev.cade.cass-watch.plist.tmpl" ]
+    [ ! -e "$REPO/home/Library/LaunchAgents/dev.cade.cass-semantic.plist.tmpl" ]
+    grep -q '^Library/LaunchAgents/dev\.cade\.cass-watch\.plist$' "$REPO/home/.chezmoiremove"
+    grep -q '^Library/LaunchAgents/dev\.cade\.cass-semantic\.plist$' "$REPO/home/.chezmoiremove"
 }
 
 @test "qmd persists the intended embedding model" {

@@ -17,13 +17,19 @@
 # ~/kb is a git repo and IS the thing you sync across machines.
 #
 # Modes:
-#   default      -> install/verify cass + qmd config + daemons (idempotent)
-#   reindex      -> additionally force qmd re-embed (-f) and full cass index
+#   setup     -> install/verify cass + qmd config + daemon (no cass indexing)
+#   index     -> refresh the cass lexical index
+#   semantic  -> process one bounded cass semantic batch
+#   reindex   -> force qmd re-embed and rebuild the cass lexical index
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 _mode="${1:-setup}"
+case "$_mode" in
+    setup|index|semantic|reindex) ;;
+    *) die "Usage: memory.sh [setup|index|semantic|reindex]" ;;
+esac
 
 log_section "Agent memory stack ($_mode)"
 
@@ -38,11 +44,10 @@ if [[ -n "${CASS_DATA_DIR:-}" && "$CASS_DATA_DIR" != "$HOME/.cass" ]]; then
 fi
 export CASS_DATA_DIR="$HOME/.cass"
 export CASS_SEMANTIC_EMBEDDER="${CASS_SEMANTIC_EMBEDDER:-minilm}"
-export CASS_INDEX_STALL_ABORT_SECS="${CASS_INDEX_STALL_ABORT_SECS:-0}"
 # Aider histories are project-local, so discovery crawls this root. Defaulted to
 # $HOME it walks every TCC-protected dir on macOS and prompts once per scan.
 # Aider projects outside this root go unindexed — widen it if that changes.
-# Mirrors the cass-watch / cass-semantic LaunchAgents; keep the three in sync.
+# Manual cass index modes inherit this bounded discovery root.
 [[ "$OS" == "darwin" ]] && export CASS_AIDER_DATA_ROOT="${CASS_AIDER_DATA_ROOT:-$HOME/dev}"
 
 ### cass — session-history search (L3) ###
@@ -177,42 +182,34 @@ if has cass || [[ -x "$ARCH_BIN/cass" ]]; then
             || log_warn "cass: model install failed — lexical-only until retried"
     fi
 
-    # No --build-hnsw: duplicate tool-stub vectors fail cass's topology attestation
-    # deterministically (see docs/usage/troubleshooting.md), and HNSW only backs
-    # `--approximate`. Restore the flag if cass starts deduping identical vectors.
-    #
-    # The dev.cade.cass-watch LaunchAgent runs `cass index` every 300s. cass
-    # keeps an index-run.lock in its data dir, but it does not stop a second run
-    # from reinitializing the WAL under a live reader — `cass doctor` reports
-    # "WAL frame salt mismatch" and one of the two runs dies.
-    # Routine modes yield — the watcher reindexes within 5 minutes anyway.
-    # `reindex` is explicit user intent, so it waits the watcher out instead.
+    # cass indexing is deliberately manual. Raw session archives can be large,
+    # so install/upgrade must not wait for derived lexical or semantic assets.
     if [[ "$_mode" == "reindex" ]]; then
-        _waited=0
-        while pgrep -f "cass index" >/dev/null 2>&1 && (( _waited < 60 )); do
-            [[ $_waited -eq 0 ]] && log_info "cass: waiting for the cass-watch index to finish"
-            sleep 2; _waited=$(( _waited + 2 ))
-        done
-        (( _waited >= 60 )) && log_warn "cass: watcher still indexing after 60s — rebuilding anyway"
-        log_info "cass: full index rebuild"
-        run_logged "$_cass" index --full --semantic \
-            || log_warn "cass index failed — run 'cass doctor'"
-    elif pgrep -f "cass index" >/dev/null 2>&1; then
-        log_info "cass: index already running (cass-watch LaunchAgent) — skipping this pass"
-    elif has jq && "$_cass" status --json 2>/dev/null | jq -e '.semantic.available == true' >/dev/null; then
-        # Semantic indexing currently re-embeds the full archive. Keep routine
-        # bootstrap cheap; the daily LaunchAgent refreshes vectors on macOS.
-        log_info "cass: refreshing lexical session index"
-        run_logged "$_cass" index \
-            || log_warn "cass index failed — run 'cass doctor'"
-    elif [[ "$OS" == "darwin" ]]; then
-        # The archive can be hundreds of gigabytes. Keep workstation bootstrap
-        # bounded and let the dedicated daily LaunchAgent own first-time vectors.
-        log_info "cass: semantic index absent — deferring rebuild to dev.cade.cass-semantic"
+        if pgrep -f "cass index" >/dev/null 2>&1; then
+            log_warn "cass: index already running — not starting a concurrent rebuild"
+        else
+            log_info "cass: full lexical index rebuild"
+            run_logged "$_cass" index --full \
+                || log_warn "cass index failed — run 'cass doctor'"
+        fi
+    elif [[ "$_mode" == "index" ]]; then
+        if pgrep -f "cass index" >/dev/null 2>&1; then
+            log_warn "cass: index already running — not starting a concurrent refresh"
+        else
+            log_info "cass: refreshing lexical session index"
+            run_logged "$_cass" index \
+                || log_warn "cass index failed — run 'cass doctor'"
+        fi
+    elif [[ "$_mode" == "semantic" ]]; then
+        if pgrep -f "cass index" >/dev/null 2>&1; then
+            log_warn "cass: lexical index is running — retry the semantic batch after it finishes"
+        else
+            log_info "cass: processing one bounded semantic batch"
+            run_logged "$_cass" models backfill --tier quality --embedder fastembed --batch-conversations 64 \
+                || log_warn "cass semantic batch failed — run 'cass doctor'"
+        fi
     else
-        log_info "cass: building initial semantic session index"
-        run_logged "$_cass" index --semantic \
-            || log_warn "cass index failed — run 'cass doctor'"
+        log_info "cass: indexing is manual (memory.sh index / memory.sh semantic)"
     fi
 fi
 
@@ -276,10 +273,12 @@ else
     if [[ "$_mode" == "reindex" ]]; then
         run_logged qmd update
         run_logged qmd embed -f
-    else
+    elif [[ "$_mode" == "setup" ]]; then
         # Incremental: cheap when nothing changed. Models download on first use.
         run_logged qmd update
         run_logged qmd embed || log_warn "qmd embed failed — vector search degraded to BM25 until retried"
+    else
+        log_info "qmd: unchanged for cass $_mode"
     fi
 fi
 
@@ -289,32 +288,21 @@ if [[ "$OS" == "darwin" ]]; then
     # launchd does NOT create parent dirs for StandardOut/ErrorPath — without
     # these the jobs fail to spawn silently.
     ensure_dir "$HOME/.local/share/qmd"
-    ensure_dir "$HOME/.local/share/cass"
-    # LaunchAgents are deployed by chezmoi; (re)load them idempotently.
-    for _agent in dev.cade.qmd dev.cade.cass-watch dev.cade.cass-semantic; do
+    # Cass indexing used to be scheduled. Remove loaded legacy jobs; chezmoi
+    # removes their plist files via home/.chezmoiremove.
+    for _agent in dev.cade.cass-watch dev.cade.cass-semantic; do
+        if launchctl print "gui/$(id -u)/$_agent" >/dev/null 2>&1; then
+            launchctl bootout "gui/$(id -u)/$_agent" >/dev/null 2>&1 \
+                && log_okay "removed scheduled $_agent"
+        fi
+    done
+    # The qmd MCP daemon remains automatic; it serves requests but does not
+    # schedule cass indexing.
+    for _agent in dev.cade.qmd; do
         _plist="$HOME/Library/LaunchAgents/$_agent.plist"
         [[ -f "$_plist" ]] || { log_warn "$_agent.plist missing — run chezmoi apply"; continue; }
         if launchctl print "gui/$(id -u)/$_agent" >/dev/null 2>&1; then
-            # Reload cass jobs when an older semantic-every-five-minutes or
-            # removed `--watch` argument vector is still registered.
-            _job="$(launchctl print "gui/$(id -u)/$_agent" 2>/dev/null || true)"
-            if [[ "$_agent" == "dev.cade.cass-watch" ]] \
-               && { grep -q -- '--semantic' <<<"$_job" \
-                    || grep -q -- '--watch' <<<"$_job"; }; then
-                log_info "reloading stale $_agent argument vector"
-                launchctl bootout "gui/$(id -u)/$_agent" >/dev/null 2>&1 || true
-                launchctl bootstrap "gui/$(id -u)" "$_plist" \
-                    && log_okay "reloaded $_agent"
-            elif [[ "$_agent" == "dev.cade.cass-semantic" ]] \
-                 && { ! grep -q -- '--semantic' <<<"$_job" \
-                      || ! grep -q 'minilm' <<<"$_job"; }; then
-                log_info "reloading stale $_agent argument vector"
-                launchctl bootout "gui/$(id -u)/$_agent" >/dev/null 2>&1 || true
-                launchctl bootstrap "gui/$(id -u)" "$_plist" \
-                    && log_okay "reloaded $_agent"
-            else
-                log_okay "$_agent already loaded"
-            fi
+            log_okay "$_agent already loaded"
         else
             # Clear any disabled override first: bootstrap on a disabled label
             # returns success but launchd never runs the job.
@@ -331,10 +319,6 @@ else
     if has qmd && ! qmd_daemon_running; then
         qmd_daemon_start && log_okay "started qmd mcp daemon"
     fi
-    if [[ -x "$ARCH_BIN/cass" ]] && ! pgrep -f "cass index" >/dev/null 2>&1; then
-        (nohup "$ARCH_BIN/cass" index >/dev/null 2>&1 &) \
-            && log_okay "started bounded cass lexical refresh"
-    fi
 fi
 
-log_okay "Memory stack ready (qmd MCP on localhost:8181; cass index at $CASS_DATA_DIR)"
+log_okay "Memory stack ready (qmd MCP on localhost:8181; cass archive at $CASS_DATA_DIR)"
