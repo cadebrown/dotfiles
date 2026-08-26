@@ -7,13 +7,10 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
-# Print the crate's binaries that fail to start with a dynamic-loader error
-# (gnu prebuilts from modern CI runners can require a newer glibc than the
-# host provides; ld.so then refuses to load them at exec time, so binstall
-# reports success but every invocation fails). musl and source builds never
-# trip this. Bin names come from cargo's install registry — binstall updates
-# it too, and bins often differ from crate names (yazi-fm → yazi).
-_glibc_broken_bins() {
+# Print the crate's binaries that fail to start with a dynamic-loader error.
+# Bin names come from cargo's install registry because they often differ from
+# crate names (yazi-fm → yazi).
+_loader_broken_bins() {
     local _crate="$1" _bin _err
     has jq || return 0
     [[ -f "$CARGO_HOME/.crates2.json" ]] || return 0
@@ -24,13 +21,26 @@ _glibc_broken_bins() {
         else
             _err="$("$CARGO_HOME/bin/$_bin" --version </dev/null 2>&1 >/dev/null)" || true
         fi
-        if [[ "$_err" == *"GLIBC_"* || "$_err" == *"libc.so"* ]]; then
+        if [[ "$_err" == *"GLIBC_"* || "$_err" == *"libc.so"* \
+            || "$_err" == *"error while loading shared libraries"* ]]; then
             printf '%s\n' "$_bin"
         fi
     done < <(jq -r --arg c "$_crate " \
         '.installs | to_entries[] | select(.key | startswith($c)) | .value.bins[]' \
         "$CARGO_HOME/.crates2.json" 2>/dev/null)
     return 0
+}
+
+_source_install_crate() {
+    local crate="$1"
+    shift
+    local _cmd=(cargo install --locked "$@" "$crate")
+
+    if [[ "$crate" == "rust-docs-mcp" ]]; then
+        run_logged env LIBGIT2_NO_PKG_CONFIG=1 "${_cmd[@]}"
+    else
+        run_logged "${_cmd[@]}"
+    fi
 }
 
 _link_homebrew_rustup_proxies() {
@@ -54,7 +64,7 @@ _link_homebrew_rustup_proxies() {
 }
 
 # Source-guard: tests/rust-glibc-smoke.bats sources this file for
-# _glibc_broken_bins — everything below only runs when executed directly.
+# Loader/source-install helpers above are unit tested by sourcing this file.
 [[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
 
 log_section "Rust"
@@ -233,18 +243,18 @@ _ok=0 _fail=0
 
 _install_crate() {
     local crate="$1"
-    local _cargo_cmd=(cargo install --locked)
+    local _source_flags=()
     local _binstall_cmd=(cargo binstall "${_binstall_flags[@]}")
     if [[ "${DF_MODE:-}" == "upgrade" ]]; then
-        _cargo_cmd+=(--force)
+        _source_flags+=(--force)
         _binstall_cmd+=(--force)
     fi
-    _cargo_cmd+=("$crate")
     _binstall_cmd+=("$crate")
     if [[ "$_compile_only" == "1" ]]; then
-        run_logged "${_cargo_cmd[@]}"
+        _source_install_crate "$crate" "${_source_flags[@]}"
     else
-        run_logged "${_binstall_cmd[@]}" || run_logged "${_cargo_cmd[@]}"
+        run_logged "${_binstall_cmd[@]}" \
+            || _source_install_crate "$crate" "${_source_flags[@]}"
     fi
 }
 
@@ -262,17 +272,17 @@ while IFS= read -r pkg; do
         # already-latest-but-broken install). Heal in two steps: force-refetch
         # (musl-first targets may land a static build), else build from
         # source, which links the host glibc by construction.
-        if [[ "$OS" == "linux" ]] && _bad="$(_glibc_broken_bins "$pkg")" && [[ -n "$_bad" ]]; then
-            log_warn "  $pkg prebuilt needs newer glibc (${_bad//$'\n'/, }) — refetching"
+        if [[ "$OS" == "linux" ]] && _bad="$(_loader_broken_bins "$pkg")" && [[ -n "$_bad" ]]; then
+            log_warn "  $pkg has unresolved runtime libraries (${_bad//$'\n'/, }) — refetching"
             run_logged cargo binstall "${_binstall_flags[@]}" --force "$pkg" || true
-            _bad="$(_glibc_broken_bins "$pkg")"
+            _bad="$(_loader_broken_bins "$pkg")"
             if [[ -n "$_bad" ]]; then
                 log_warn "  $pkg has no runnable prebuilt — building from source"
-                if run_logged cargo install --locked --force "$pkg"; then
+                if _source_install_crate "$pkg" --force; then
                     log_okay "  ok    $pkg (source build)"
                     (( _ok++ )) || true
                 else
-                    log_warn "  fail  $pkg (prebuilt incompatible with host glibc, source build failed)"
+                    log_warn "  fail  $pkg (prebuilt loader failure, source build failed)"
                     (( _fail++ )) || true
                 fi
                 continue
