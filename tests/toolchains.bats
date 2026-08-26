@@ -48,4 +48,5 @@ setup() {
 @test "container bootstrap skips heavyweight toolchains covered by contract tests" {
     grep -q 'DF_DO_QUARTO=0 DF_DO_JULIA=0 DF_DO_LEAN=0 DF_DO_LATEX=0' \
         "$REPO/tests/entrypoint.sh"
+    grep -q 'DF_DO_OVERLAYS="${DF_DO_OVERLAYS:-0}"' "$REPO/tests/entrypoint.sh"
 }
