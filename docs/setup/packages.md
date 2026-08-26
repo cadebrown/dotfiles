@@ -67,6 +67,11 @@ Re-run: `bash ~/dotfiles/install/node.sh`
 tools. The installer passes it per command instead of persisting a policy in
 `~/.npmrc`.
 
+nvm owns Node, npm, and npm's global prefix under the PLAT-specific `$NVM_DIR`.
+Keep `~/.npmrc` for registry/auth and npm behavior only; do not set `prefix` or
+`globalconfig`. `packages/npm.txt` is the source of truth for global CLIs, and
+`install/node.sh` reconciles them into the supported default Node LTS tree.
+
 Currently ships [`pi`](https://pi.dev) — a multi-provider coding agent (Claude / OpenAI / Gemini / etc.). The official `pi.dev/install.sh` ultimately runs `npm install -g @earendil-works/pi-coding-agent`, so we list it here directly.
 
 Other CLI agents are installed via their native packagers:

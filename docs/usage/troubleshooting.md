@@ -201,10 +201,20 @@ brew linkage --test "$formula"
 If the new version is listed, `brew outdated` prints nothing, and linkage
 passes, the install succeeded and only its cleanup path failed.
 
+Graphviz has a second version of this symptom. Netpbm fetches its source and
+manual from Subversion. Bundle can queue those SVN fetches before it finishes
+installing Graphviz's Subversion dependency, record `You must: brew install
+svn`, then install Subversion, retry both checkouts, and successfully build
+Netpbm and Graphviz. The early fetch result still makes Bundle print `Upgrading
+graphviz has failed!` after the successful install.
+
 **Fix:** update the checkout and rerun `bootstrap.sh upgrade`. The shared
 installer environment now disables Bundle package jobs; downloads and each
 source build can still run concurrently, but package installs and cleanup are
-serialized. Manual one-off:
+serialized. On Linux it also installs a working Subversion before a Brewfile
+containing Graphviz, then runs `brew bundle check` after any nonzero Bundle exit.
+If that check passes, it retries Bundle once and reports recovery only when the
+clean retry exits zero. Manual one-off:
 
 ```sh
 brew bundle install --jobs=1 --file="$HOME/dotfiles/packages/Brewfile"
@@ -254,40 +264,135 @@ Old kegs consume some disk until that maintenance succeeds. Do not delete the
 
 ---
 
-## Ruby upgrade fails with `No such file or directory .../lib/ruby/gems/...`
+## Ruby upgrade writes outside its new keg during `make install`
 
 Symptom: upgrading `vim`, `ccache`, or another Ruby dependent builds Ruby and
-RubyGems successfully, then fails in `Gem::Uninstaller`:
+then fails under the global Homebrew Ruby directory:
 
 ```text
-Errno::ENOENT: No such file or directory @ rb_check_realpath_internal -
-.../brew/lib/ruby/gems/4.0.0
+Dir.mkdir: Permission denied @ dir_s_mkdir - .../brew/lib/ruby
 ```
 
-Root cause: the formula adds the versioned `ruby@X.Y` path for gem compatibility.
-On a custom-prefix source upgrade, that path still resolves to the previous keg
-and appears before the new keg in RUNPATH. The new executable therefore loads
-the old `libruby` during setup. Its Homebrew RubyGems configuration points to a
-global `Gem.dir` which unlinking has just removed, and RubyGems aborts when
-`File.realpath` resolves the missing directory. Merely recreating that directory
-lets setup continue but leaves the new executable running the old Ruby engine
-until the old keg is deleted.
+The same contamination can later surface as `Errno::ENOENT` under
+`.../brew/lib/ruby/gems/...` during RubyGems setup.
+
+Root cause: the formula adds the versioned `ruby@X.Y` path as a compatibility
+fallback. `runruby` supplies the build directory through `LD_LIBRARY_PATH`, but
+Homebrew's GCC emits `DT_RPATH`, which the dynamic loader searches first. During
+`make install`, the new Cellar lib directory is not populated yet, so the build
+executable falls through to the previous keg's `libruby`. The source `RUBYLIB`
+also lacks RubyGems' optional `defaults/operating_system.rb`; its `require` can
+therefore find the previous keg's file. Those old Homebrew defaults redirect
+`Gem.default_dir` and `Gem.ruby` outside the new keg. The Linux filesystem
+sandbox correctly rejects that write; the prefix permissions are not broken.
 
 **Fix:** `install/patch-homebrew-ruby.sh` patches the local formula before Brew
-Bundle runs. It puts the new keg's library directory first in RPATH while
-retaining Homebrew's versioned fallback. The patch is idempotent and is
-reapplied after every formula refresh.
+Bundle runs. It enables new ELF dtags so `DT_RUNPATH` yields to the build-tree
+library path, retains the new keg before the versioned fallback after install,
+and adds a build-local empty RubyGems packager-default file so the previous
+keg's override cannot leak in. The formula replaces that empty file with the
+current Homebrew configuration after installation.
 
-If a bootstrap using an older checkout is already building Ruby, creating the
-missing directory can salvage that attempt, but it does not repair the stale
-RUNPATH:
+This formula-local `DT_RUNPATH` is a deliberate exception to the prefix's usual
+`DT_RPATH` policy: the build runner must let its temporary `LD_LIBRARY_PATH`
+select the new build-tree `libruby`.
 
-```sh
-mkdir -p "$(brew --prefix)/lib/ruby/gems/4.0.0"
+Do not `chmod` the prefix or disable Homebrew's Linux sandbox. Wait for any
+active Homebrew process to exit, then rerun `~/dotfiles/bootstrap.sh upgrade` so
+the formula refresh and patch happen in the intended order.
+
+---
+
+## apache-serf cannot find `asm/socket.h`
+
+Symptom: a source build of `apache-serf` invokes a brewed GCC directly and
+fails through Homebrew's glibc headers:
+
+```text
+glibc/include/bits/socket.h: fatal error: asm/socket.h: No such file or directory
 ```
 
-Use the ABI version printed in the error, then rerun with the formula patch so
-the installed executable loads the matching `libruby`.
+Root cause: Homebrew's standard build environment already puts the installed
+`linux-headers@6.8` include directory in `CPATH`. Serf's `SConstruct` creates a
+new SCons child environment that does not inherit that variable, so the direct
+GCC command loses the kernel-header path. Adding the path to superenv or CPATH
+again does not cross this second environment boundary.
+
+**Fix:** `install/patch-homebrew-apache-serf.sh` adds a direct Linux dependency
+on `linux-headers@6.8` and passes its stable `opt_include` path through Serf's
+supported `CPPFLAGS` SCons variable. The patch fails closed if the formula
+structure changes instead of silently starting another known-broken source
+build.
+
+A trailing Clang warning about which GCC installation it may prefer is separate
+from this GCC compile failure. Wait for any active Homebrew process to exit,
+then rerun `~/dotfiles/bootstrap.sh upgrade` so the refreshed formula is patched
+before Bundle starts.
+
+---
+
+## Gecode patch reports that its configure target moved
+
+Symptom: bootstrap records this degradation even though MiniZinc may still
+finish installing:
+
+```text
+gecode configure patch target not found — formula may have changed
+```
+
+Root cause: Homebrew changed the Gecode formula from Autotools flags such as
+`--enable-qt` to CMake settings such as `GECODE_ENABLE_GIST`. The dependency
+guard could still apply while the old configure anchor no longer existed,
+leaving a partial formula edit and a misleading successful patch status.
+
+**Fix:** `install/patch-homebrew-gecode.sh` recognizes both formula shapes,
+forbids the upstream bottle on Linux, and sets Gist and Qt off while retaining
+the macOS bottle and GUI. The bottle gate matters because build flags cannot
+change a bottle that already contains `libgecodegist` and Qt dependencies. The
+installer rebuilds an existing Gist-bearing keg from source and requires both
+`brew linkage --test gecode` and the absence of `libgecodegist.so`; a moved
+anchor stops source builds instead of leaving a partial formula edit.
+
+---
+
+## Clang cannot load `libz3` during an in-progress upgrade
+
+Symptom: a formula failure ends with a separate loader error such as:
+
+```text
+clang: error while loading shared libraries: libz3.so.4.15: cannot open shared object file
+```
+
+Root cause: Bundle upgraded Z3 before unversioned LLVM. The installed LLVM still
+needs Z3's previous major SONAME, while `opt/z3` already selects the new keg.
+This is independent of a formula that was compiled with GCC and usually repairs
+itself when the same Bundle run reaches LLVM.
+
+The Linux installer reconciles this pair before Bundle: it upgrades an outdated
+LLVM in upgrade mode, reinstalls a current keg whose linkage is broken, and
+checks both `brew linkage` and the unversioned Clang executable again after
+Bundle.
+
+Do not point the old SONAME at the new major library or repoint `opt/z3` during
+the active transaction. After all Homebrew processes exit, rerun
+`~/dotfiles/bootstrap.sh upgrade`. For a manual check, run:
+
+```sh
+"$(brew --prefix)/bin/clang" --version
+```
+
+If it still reports the old Z3 SONAME, upgrade an outdated LLVM or reinstall a
+current but broken keg, then verify its linkage:
+
+```sh
+if [[ -n "$(brew outdated --formula llvm)" ]]; then
+    brew upgrade llvm
+else
+    brew reinstall llvm
+fi
+brew linkage --test llvm
+"$(brew --prefix)/bin/clang" --version
+```
 
 ---
 
@@ -566,6 +671,44 @@ broken interpreter.
 
 ---
 
+## nvm rejects `prefix` or `globalconfig` in `~/.npmrc`
+
+Symptom: `install/node.sh` stops during `nvm use` or after installing a Node
+version:
+
+```text
+Your user’s .npmrc file (${HOME}/.npmrc)
+has a `globalconfig` and/or a `prefix` setting, which are incompatible with nvm.
+```
+
+Root cause: a legacy `prefix=~/.npm` sends every global package to one shared
+tree. nvm instead gives each Node version its own global prefix under `$NVM_DIR`;
+mixing the two makes package binaries and native addons run under the wrong Node
+ABI. `globalconfig` can redirect npm to another file containing the same
+conflict.
+
+**Fix:** rerun `install/node.sh`. Before loading nvm it atomically removes an
+active `prefix` from the user `.npmrc`, preserves the remaining npm policy, and
+keeps the file private. If `.npmrc` sets `globalconfig`, the installer leaves it
+unchanged and stops: copy any needed registry/auth/policy from the referenced
+file into `~/.npmrc`, remove the `globalconfig` line, then rerun. nvm owns the
+Node/npm prefix; `packages/npm.txt` owns the global CLI set. Do not export
+`NPM_CONFIG_PREFIX` or add another npm `prefix` for this setup.
+
+Verify the selected runtime and global tree agree:
+
+```sh
+source "$NVM_DIR/nvm.sh"
+nvm use default --silent
+command -v node
+npm prefix -g
+dirname "$(dirname "$(nvm which default)")"
+```
+
+The last two paths must match.
+
+---
+
 ## A Homebrew binary can't find `libX.so.N` after an upgrade
 
 Symptom: one program stops starting, naming a library version that used to exist:
@@ -597,17 +740,13 @@ with many dependents, so nothing half-finishes in the first place.
 
 ## `nvm` or `node` not available in a script
 
-`nvm.sh` is lazy-loaded in interactive shells only. Non-interactive shells get `node`/`npm` via the PATH entry `.zprofile`/`.bash_profile` adds from the highest installed version. If `node` is missing in a script, either:
+`nvm.sh` is lazy-loaded in interactive shells only. Login profiles put the bin
+directory selected by nvm's `default` alias on PATH. A standalone
+non-interactive script should activate that same alias explicitly:
 
 ```sh
-# Option 1: source profile at the top of your script (zsh)
-source ~/.zprofile
-
-# Option 1b: source profile at the top of your script (bash)
-source ~/.bash_profile
-
-# Option 2: use the full path
-NODE="$NVM_DIR/versions/node/$(ls $NVM_DIR/versions/node | sort -V | tail -1)/bin/node"
+source "$NVM_DIR/nvm.sh"
+nvm use default --silent
 ```
 
 ---
@@ -1073,8 +1212,8 @@ sqlite3 ~/.cass/agent_search.db \
   "delete from conversation_tail_state
    where conversation_id not in (select id from conversations);"
 
-# 5. rebuild vectors
-cass index --semantic
+# 5. rebuild vectors in bounded batches; repeat until the backlog is empty
+bash ~/dotfiles/install/memory.sh semantic
 ```
 
 Skipping step 3 is the usual failure — the run exits 0, having ingested nothing.
@@ -1100,8 +1239,8 @@ attestation rejects the graph.
 It is deterministic: retrying fails identically, which is why the serial rebuild
 also failed and why `retryable=true` in the error is misleading.
 
-**Fix:** drop `--build-hnsw` (already done in `memory.sh` and the cass-semantic
-LaunchAgent). HNSW only backs `--approximate`; exact search over ~100k vectors is
+**Fix:** drop `--build-hnsw` (the manual `memory.sh semantic` mode does not use
+it). HNSW only backs `--approximate`; exact search over ~100k vectors is
 fast enough, and the flag has never once succeeded on this archive — every
 `semantic_manifest.json` here records `"hnsw": null`. Restore it if cass starts
 deduping identical vectors before insert.
@@ -1117,7 +1256,7 @@ unable to open database file: '/Users/cade/.cass/agent_search.db'
 
 `cass doctor` reports `archive-db-unreadable`, `cass index --full` refuses to
 run ("index refused to modify an unhealthy canonical archive"), and the
-cass-watch/cass-semantic LaunchAgents crash-loop with exit 5 — yet
+older cass-watch/cass-semantic LaunchAgents may crash-loop with exit 5 — yet
 `sqlite3 -readonly ~/.cass/agent_search.db "pragma quick_check;"` says `ok`.
 
 frankensqlite pins the database's file identity — device id + inode — in the
@@ -1147,8 +1286,8 @@ file was actually replaced — stop and investigate before touching anything.
 printf '\x0d' | dd of="$HOME/.cass/agent_search.db-fsqlite-ns-use" \
   bs=1 seek=17 count=1 conv=notrunc
 cass doctor        # database failure should be gone
-cass index         # catch up the lexical index
-launchctl kickstart -k gui/501/dev.cade.cass-watch gui/501/dev.cade.cass-semantic
+bash ~/dotfiles/install/memory.sh index
+bash ~/dotfiles/install/memory.sh semantic  # one bounded vector batch
 ```
 
 Recurs whenever the Data volume mounts with a different device id. Do **not**
@@ -1162,7 +1301,8 @@ kill it if started; it only touches lock files before hanging.
 
 The prompt returns every few minutes, and "Allow" doesn't make it stop.
 
-The `dev.cade.cass-watch` LaunchAgent runs `cass index` every 300 s, and **the `aider`
+Older dotfiles deployed a `dev.cade.cass-watch` LaunchAgent that ran `cass index`
+every 300 s, and **the `aider`
 connector crawls `$HOME`**. Aider histories are project-local
 (`.aider.chat.history.md` in each repo), so discovery walks its root — and that root
 defaults to `$HOME`. The walk enters `~/Pictures`, `~/Music`, `~/Documents`,
@@ -1197,9 +1337,9 @@ cass logs only record paths it opens deliberately, not what a directory walk tou
 export CASS_AIDER_DATA_ROOT="$HOME/dev"   # aider discovery root, not $HOME
 ```
 
-Applied on macOS by `install/memory.sh` and the `dev.cade.cass-watch` /
-`dev.cade.cass-semantic` LaunchAgents, so it survives a rebuild. Aider still indexes
-normally — just only under the given root, so aider projects elsewhere go unindexed.
+Applied on macOS by the manual `install/memory.sh` index modes. Current dotfiles
+remove the old scheduled LaunchAgents. Aider still indexes normally — just only
+under the given root, so aider projects elsewhere go unindexed.
 `CASS_AIDER_DATA_ROOT` takes a single path, so `$HOME` is the only "covers everything"
 value and it is what causes the problem.
 

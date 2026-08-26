@@ -146,14 +146,16 @@ Both stores are local (`~/.cache/qmd`, `~/.cass` — on scratch when configured)
 only `~/kb` and the dotfiles repo sync across machines. qmd's index is fully
 rebuildable from `~/kb`; **cass is not** — it keeps transcripts the harnesses
 later rotate away, so for those conversations it is the only remaining copy.
-That is why it lives at `~/.cass` rather than under `~/.cache`. On macOS qmd has a persistent LaunchAgent; cass refreshes its lexical
-index every five minutes and its full MiniLM/HNSW index daily (persistent watch
-mode can wedge upstream). Linux starts bounded lexical refreshes lazily from
-the shell profiles; `memory.sh reindex` refreshes semantic vectors explicitly.
+That is why it lives at `~/.cass` rather than under `~/.cache`. qmd keeps a
+persistent MCP daemon, but cass indexing is manual on every platform so a large
+session archive never blocks bootstrap or consumes resources on a schedule.
 
-Re-index after bulk changes: `bash install/memory.sh reindex` (forces qmd
-re-embed and a full cass rebuild). Agent-facing usage rules live in the
-`## Memory layers` section of `agents-common.md`.
+Run `bash install/memory.sh index` for a lexical refresh. Run
+`bash install/memory.sh semantic` for one resumable 64-conversation semantic
+batch; repeat it when you want more history embedded. After bulk changes,
+`bash install/memory.sh reindex` forces the qmd embedding and cass lexical
+indexes to rebuild. Agent-facing usage rules live in the `## Memory layers`
+section of `agents-common.md`.
 
 ## Remote clipboard
 

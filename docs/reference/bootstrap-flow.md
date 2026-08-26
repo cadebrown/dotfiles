@@ -56,7 +56,7 @@ flowchart TD
 | 5.6 | `install/macos-quick-actions.sh` | Deploy `*.workflow` bundles to `~/Library/Services/`; flush `pbs`. | Yes |
 | 6 | various | See language-runtime table below. Each script is independent; failures cascade only via `die` (not `log_warn`). | Yes |
 | 6.5 | `install/local-llm.sh` + `install/opencode.sh` | Create `$LOCAL_PLAT/.cache/huggingface`; verify ollama/mlx-lm/mlx-openai-server/opencode binaries. | Yes |
-| 6.6 | `install/memory.sh` | Agent memory stack: cass binary (checksum-verified GitHub release) + session-history index, ~/kb knowledge repo, qmd collections/embeddings, memory daemons. | Yes |
+| 6.6 | `install/memory.sh` | Agent memory stack: cass binary/archive setup (indexing is manual), ~/kb knowledge repo, qmd collections/embeddings, qmd daemon. | Yes |
 | 6.65 | `install/skills-sync.sh` | Install agent skills from `agent-skills.txt` into the shared `~/.claude/skills` tree. | Yes |
 | 6.7 | `install/blender-mcp.sh` | Download `addon.py` into Blender's user addons; enable headlessly. Skipped if Blender not installed. | Yes |
 | 7 | `install/auth.sh` | Walk every service, prompt `[k] keep / [u] update / [d] delete` per service. **Default off** — set `DF_DO_AUTH=1` to enable. | Yes |

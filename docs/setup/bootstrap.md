@@ -87,7 +87,7 @@ Paths below use `$LOCAL_PLAT`, which is `$HOME/.local` by default and `$HOME/.lo
 17. **Local LLM tooling** — HuggingFace cache + binary checks
     - Creates `$LOCAL_PLAT/.cache/huggingface` for mlx-lm weights
     - Verifies ollama / mlx-lm / mlx-openai-server / opencode binaries
-18. **Agent memory stack** — cass session-history search, ~/kb + qmd knowledge index, memory daemons
+18. **Agent memory stack** — cass session-history archive, ~/kb + qmd knowledge index; cass indexing stays manual
 19. **Agent skills** — installs `packages/agent-skills.txt` into the shared `~/.claude/skills` tree
 20. **Blender MCP** addon — installs `addon.py` into the active Blender profile and enables it
 21. **Auth** (opt-in: `DF_DO_AUTH=1`) — guided service-token setup; see [Auth](auth.md)
@@ -104,7 +104,7 @@ Total time: ~2 minutes on subsequent runs (idempotent, mostly bottle pours); ~5�
 | Requirement | Notes |
 |---|---|
 | x86\_64 or aarch64 | — |
-| `git` and `curl` | Pre-installed on most systems |
+| `git`, `curl`, and `python3` | Pre-installed on most systems; Python runs the Homebrew formula patch layer before uv is installed |
 | Internet access | — |
 
 No sudo required. No Docker or Podman needed.
@@ -139,7 +139,7 @@ Paths use `$LOCAL_PLAT`, which is `$HOME/.local` by default (or `$HOME/.local/$P
     - `~/.profile` auto-sets `CMAKE_TOOLCHAIN_FILE` to the highest installed LLVM toolchain
     - Switch with the `tc` shell function (e.g. `tc gcc-15`, `tc llvm-22`)
 17. **Local LLM tooling** — HuggingFace cache + ollama/mlx-lm/mlx-openai-server/opencode binary checks
-18. **Agent memory stack** — cass session-history search, ~/kb + qmd knowledge index (daemons lazy-start from shell profiles)
+18. **Agent memory stack** — cass session-history archive, ~/kb + qmd knowledge index; cass indexing stays manual
 19. **Agent skills** — installs `packages/agent-skills.txt` into the shared `~/.claude/skills` tree
 20. **Auth** (opt-in: `DF_DO_AUTH=1`) — guided token setup; see [Auth](auth.md)
 21. **Overlays** — runs `bootstrap.sh` of any `dotfiles-*/` overlay; see [Overlays](overlays.md)
