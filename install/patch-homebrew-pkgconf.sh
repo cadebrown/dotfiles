@@ -30,7 +30,7 @@
 #   on_linux do
 #     ENV['ac_cv_c_undeclared_builtin_options'] = \
 #       '-Wimplicit-function-declaration -Werror=implicit-function-declaration'
-#     ENV.prepend_path 'CPATH', Formula['linux-headers@6.8'].include.to_s
+#     ENV.prepend_path 'CPATH', Formula['linux-headers@6.8'].opt_include.to_s
 #   end
 #
 # (1) Autoconf reads ac_cv_* variables as pre-cached answers, skipping the
@@ -96,7 +96,7 @@ _INJECT='  def install
       # does not declare the dependency. Using CPATH (not CPPFLAGS) because pkgconf
       # libtool Makefile does not consistently propagate $(CPPFLAGS) to .lo compile
       # rules. GCC always checks CPATH regardless of Makefile structure.
-      ENV.prepend_path "CPATH", Formula["linux-headers@6.8"].include.to_s
+      ENV.prepend_path "CPATH", Formula["linux-headers@6.8"].opt_include.to_s
     end
 '
 
@@ -104,7 +104,12 @@ _result=$(python3 -c "
 import sys
 path, anchor, inject = sys.argv[1], sys.argv[2], sys.argv[3]
 txt = open(path).read()
-if 'ac_cv_c_undeclared_builtin_options' in txt:
+old_path = 'Formula[\"linux-headers@6.8\"].include.to_s'
+new_path = 'Formula[\"linux-headers@6.8\"].opt_include.to_s'
+if old_path in txt:
+    open(path,'w').write(txt.replace(old_path, new_path, 1))
+    print('migrated_opt')
+elif 'ac_cv_c_undeclared_builtin_options' in txt:
     print('already')
 elif anchor in txt:
     open(path,'w').write(txt.replace(anchor, inject, 1))
@@ -114,6 +119,7 @@ else:
 " "$PKGCONF_RB" "$_ANCHOR" "$_INJECT")
 case "$_result" in
     already)  log_okay "pkgconf patch (probe bypass + linux-headers CPATH) already applied" ;;
+    migrated_opt) log_okay "Migrated: pkgconf linux-headers path now follows the installed opt keg" ;;
     patched)  log_okay "Patched: pkgconf probe bypass + linux-headers CPATH added for Linux" ;;
     notfound) log_warn "pkgconf patch target not found — formula may have changed; check pkgconf.rb" ;;
 esac

@@ -59,11 +59,143 @@ _configure_brew_cleanup() {
     fi
 }
 
-# Source-guard: tests/brew-glibc.bats sources this file for the helpers above —
-# everything below only runs when executed directly.
+_brew_formula_state() {
+    local _formula="$1" _formulae
+    _formulae="$(brew list --formula 2>/dev/null)" || return 1
+    if grep -Fxq "$_formula" <<<"$_formulae"; then
+        printf '%s\n' installed
+    else
+        printf '%s\n' missing
+    fi
+}
+
+_brew_llvm_state() {
+    _brew_formula_state llvm
+}
+
+_verify_brew_llvm() {
+    local _prefix="$1" _required="${2:-0}" _state
+    if ! _state="$(_brew_llvm_state)"; then
+        log_warn "Could not list installed Homebrew formulae"
+        return 1
+    fi
+    if [[ "$_state" == "missing" ]]; then
+        [[ "$_required" == "0" ]] && return 0
+        log_warn "Required unversioned LLVM is not installed"
+        return 1
+    fi
+    brew linkage --test llvm || return 1
+    "$_prefix/bin/clang" --version >/dev/null
+}
+
+_reconcile_brew_llvm_z3() {
+    local _prefix="$1" _upgrade_mode="$2" _outdated="" _state
+    if ! _state="$(_brew_llvm_state)"; then
+        log_warn "Could not list installed Homebrew formulae"
+        return 1
+    fi
+    [[ "$_state" == "missing" ]] && return 0
+
+    if [[ "$_upgrade_mode" == "1" ]]; then
+        if ! _outdated="$(brew outdated --formula llvm 2>/dev/null)"; then
+            log_warn "Could not determine whether LLVM is outdated"
+            return 1
+        fi
+    fi
+
+    if [[ -n "$_outdated" ]]; then
+        log_info "Upgrading LLVM before Bundle so LLVM and Z3 move together..."
+        brew upgrade llvm
+    elif ! _verify_brew_llvm "$_prefix" &>/dev/null; then
+        log_info "Reinstalling LLVM to repair broken dependency linkage..."
+        brew reinstall llvm
+    fi
+
+    if ! _verify_brew_llvm "$_prefix" 1; then
+        log_warn "Unversioned LLVM is still broken — refusing to start source builds"
+        return 1
+    fi
+}
+
+_verify_brew_gecode() {
+    local _required="${1:-0}" _state _prefix
+    _state="$(_brew_formula_state gecode)" || return 1
+    if [[ "$_state" == "missing" ]]; then
+        [[ "$_required" == "0" ]] && return 0
+        log_warn "Required Gecode is not installed"
+        return 1
+    fi
+    brew linkage --test gecode || return 1
+    _prefix="$(brew --prefix gecode 2>/dev/null)" || return 1
+    [[ ! -e "$_prefix/lib/libgecodegist.so" ]]
+}
+
+_reconcile_brew_gecode() {
+    local _state
+    _state="$(_brew_formula_state gecode)" || {
+        log_warn "Could not determine whether Gecode is installed"
+        return 1
+    }
+    [[ "$_state" == "missing" ]] && return 0
+    _verify_brew_gecode &>/dev/null && return 0
+
+    log_info "Rebuilding Gecode without Qt; the upstream Linux bottle contains Gist"
+    brew reinstall --build-from-source gecode
+    if ! _verify_brew_gecode 1; then
+        log_warn "Gecode still has broken runtime linkage after its source rebuild"
+        return 1
+    fi
+}
+
+_ensure_brew_subversion_for_brewfile() {
+    local _brewfile="$1" _state
+    grep -Eq '^[[:space:]]*brew[[:space:]]+"graphviz"([[:space:]],|[[:space:]]*$)' "$_brewfile" || return 0
+
+    _state="$(_brew_formula_state subversion)" || {
+        log_warn "Could not determine whether Subversion is installed"
+        return 1
+    }
+    if [[ "$_state" == "installed" ]] && command -v svn >/dev/null 2>&1 \
+        && svn --version --quiet >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if [[ "$_state" == "installed" ]]; then
+        log_info "Reinstalling Subversion before Netpbm's SVN resource fetch"
+        brew reinstall subversion
+    else
+        log_info "Installing Subversion before Netpbm's SVN resource fetch"
+        brew install subversion
+    fi
+    command -v svn >/dev/null 2>&1 && svn --version --quiet >/dev/null 2>&1
+}
+
+_run_brew_bundle() {
+    local _brewfile="$1" _exit=0
+    shift
+
+    brew bundle install "$@" --file="$_brewfile" 2>&1 || _exit=$?
+    [[ "$_exit" -eq 0 ]] && return 0
+    [[ "$_exit" -lt 128 ]] || return "$_exit"
+
+    brew bundle check "$@" --file="$_brewfile" || return "$_exit"
+
+    log_info "brew bundle returned $_exit after satisfying the Brewfile; retrying once"
+    _exit=0
+    brew bundle install "$@" --file="$_brewfile" 2>&1 || _exit=$?
+    [[ "$_exit" -eq 0 ]] || return "$_exit"
+    log_okay "brew bundle retry completed cleanly"
+}
+
+# Source-guard: tests source this file for the helpers above; everything below
+# only runs when executed directly.
 [[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
 
 [[ "$OS" == "linux" ]] || { log_warn "Not on Linux — skipping"; exit 0; }
+if [[ "${DF_PATCH_BREW_ALL:-1}" != "0" ]] && ! command -v python3 >/dev/null 2>&1; then
+    log_fail "python3 is required for Linux Homebrew formula patches"
+    exit 1
+fi
 
 DF_INSTALL_DIR="${DF_INSTALL_DIR:-$DF_ROOT/install}"
 
@@ -352,9 +484,8 @@ else
     # See install/patch-homebrew-python.sh for full details.
     [[ -f "$DF_INSTALL_DIR/patch-homebrew-python.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-python.sh"
 
-    # ruby: puts the new keg's lib directory before the previous versioned Ruby
-    # path. Otherwise a source-built executable loads the old libruby during
-    # RubyGems setup and can fail while resolving the old global Gem.dir.
+    # ruby: makes build-tree libruby override the previous versioned Ruby and
+    # masks the previous keg's RubyGems packager defaults during make install.
     # See install/patch-homebrew-ruby.sh for full details.
     [[ -f "$DF_INSTALL_DIR/patch-homebrew-ruby.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-ruby.sh"
 
@@ -393,6 +524,11 @@ else
     # prefix (Cython get_requires_for_build_wheel subprocess killed by illegal instruction).
     # See install/patch-homebrew-systemd.sh for full details.
     [[ -f "$DF_INSTALL_DIR/patch-homebrew-systemd.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-systemd.sh"
+
+    # apache-serf: its SCons environment drops stdenv's CPATH before invoking
+    # gcc directly, so pass linux-headers through SCons's CPPFLAGS variable.
+    # See install/patch-homebrew-apache-serf.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-apache-serf.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-apache-serf.sh"
 
     # ncurses: adds linux-headers@6.8 CPATH (via stdenv patch) and also has its own
     # per-formula CPATH entry for belt-and-suspenders. ncurses subdirectory Makefiles
@@ -445,6 +581,16 @@ _brew_upgrade="${DF_BREW_UPGRADE:-0}"
 _bundle_flags="--no-upgrade"
 [[ "$_brew_upgrade" == "1" ]] && _bundle_flags=""
 
+# Z3 and LLVM use matching major SONAMEs. Repair interrupted upgrades and move
+# outdated LLVM with its dependency before unrelated source builds start.
+_reconcile_brew_llvm_z3 "$_REAL_BREW_PREFIX" "$_brew_upgrade"
+
+if [[ "${DF_PATCH_BREW_ALL:-1}" != "0" && "${DF_PATCH_BREW_GECODE:-1}" != "0" ]]; then
+    _reconcile_brew_gecode
+fi
+
+_ensure_brew_subversion_for_brewfile "$_BREWFILE_TMP"
+
 if [[ -z "$_bundle_flags" ]]; then
     log_info "Running brew bundle (with upgrades)..."
     log_warn "Linux upgrades can be slow — source builds for Python/Perl/git/vim"
@@ -455,12 +601,24 @@ fi
 # Trust + tap the Brewfile's third-party taps so brew bundle can resolve them.
 ensure_brewfile_taps "$_BREWFILE_TMP"
 
-# shellcheck disable=SC2086
 _bundle_exit=0
-brew bundle install $_bundle_flags --file="$_BREWFILE_TMP" 2>&1 || _bundle_exit=$?
+# shellcheck disable=SC2086
+_run_brew_bundle "$_BREWFILE_TMP" $_bundle_flags || _bundle_exit=$?
 if [[ "$_bundle_exit" -ne 0 ]]; then
     log_warn "brew bundle completed with failures (exit $_bundle_exit) — some packages may not be installed"
     log_warn "Run 'brew bundle install --file=~/dotfiles/packages/Brewfile' to retry"
+fi
+
+if [[ "${DF_PATCH_BREW_ALL:-1}" != "0" && "${DF_PATCH_BREW_GECODE:-1}" != "0" ]]; then
+    if ! _verify_brew_gecode 1; then
+        log_warn "Bundle left Gecode with broken runtime linkage"
+        exit 1
+    fi
+fi
+
+if ! _verify_brew_llvm "$_REAL_BREW_PREFIX" 1; then
+    log_warn "Bundle left unversioned LLVM with broken linkage"
+    exit 1
 fi
 
 ### LOCALE (brew glibc needs its own locale archive) ###

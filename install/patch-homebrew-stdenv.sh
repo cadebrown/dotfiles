@@ -44,7 +44,7 @@
 #       rescue ::FormulaUnavailableError
 #         nil
 #       end
-#       prepend_path "CPATH", linux_headers.include if linux_headers
+#       prepend_path "CPATH", linux_headers.opt_include if linux_headers
 #     The rescue guard makes this a no-op before linux-headers@6.8 is installed.
 #
 # (2) Pre-sets the autoconf cache variable to skip the broken gnulib probe:
@@ -89,22 +89,16 @@ fi
 
 STDENV_RB="$LOCAL_PLAT/brew/Homebrew/Library/Homebrew/extend/os/linux/extend/ENV/std.rb"
 
-[[ -f "$STDENV_RB" ]] || { log_warn "std.rb not found at $STDENV_RB — skipping"; exit 0; }
+[[ -f "$STDENV_RB" ]] || {
+    log_warn "std.rb not found at $STDENV_RB — refusing to start source builds"
+    exit 1
+}
 
 log_section "Patching Homebrew stdenv for Linux (linux-headers CPATH + gnulib probe fix)"
 
-_ORIG='        prepend_path "CPATH", HOMEBREW_PREFIX/"include"
-        prepend_path "LIBRARY_PATH", HOMEBREW_PREFIX/"lib"
-        prepend_path "LD_RUN_PATH", HOMEBREW_PREFIX/"lib"
+_ANCHOR='        return unless formula'
 
-        return unless formula'
-
-# v1: linux-headers CPATH only, no gnulib probe fix
-_LINUX_HEADERS_ONLY='        prepend_path "CPATH", HOMEBREW_PREFIX/"include"
-        prepend_path "LIBRARY_PATH", HOMEBREW_PREFIX/"lib"
-        prepend_path "LD_RUN_PATH", HOMEBREW_PREFIX/"lib"
-
-        # linux-headers@6.8 provides kernel headers required by Homebrew glibc
+_HEADER_FIX='        # linux-headers@6.8 provides kernel headers required by Homebrew glibc
         # transitively (bits/errno.h → linux/errno.h, bits/local_lim.h →
         # linux/limits.h, etc.). Any formula built from source on a custom prefix
         # needs these headers. linux-headers@6.8 is keg-only so it is not in
@@ -116,63 +110,53 @@ _LINUX_HEADERS_ONLY='        prepend_path "CPATH", HOMEBREW_PREFIX/"include"
         rescue ::FormulaUnavailableError
           nil
         end
-        prepend_path "CPATH", linux_headers.include if linux_headers
+        prepend_path "CPATH", linux_headers.opt_include if linux_headers'
 
-        return unless formula'
-
-# v2 (correct): linux-headers CPATH + gnulib probe bypass
-_FULL_FIX='        prepend_path "CPATH", HOMEBREW_PREFIX/"include"
-        prepend_path "LIBRARY_PATH", HOMEBREW_PREFIX/"lib"
-        prepend_path "LD_RUN_PATH", HOMEBREW_PREFIX/"lib"
-
-        # linux-headers@6.8 provides kernel headers required by Homebrew glibc
-        # transitively (bits/errno.h → linux/errno.h, bits/local_lim.h →
-        # linux/limits.h, etc.). Any formula built from source on a custom prefix
-        # needs these headers. linux-headers@6.8 is keg-only so it is not in
-        # HOMEBREW_PREFIX/include — add it explicitly.
-        # The rescue guard makes this a no-op if linux-headers@6.8 is not yet
-        # installed (e.g. during bootstrap before it has been installed).
-        linux_headers = begin
-          ::Formula["linux-headers@6.8"]
-        rescue ::FormulaUnavailableError
-          nil
-        end
-        prepend_path "CPATH", linux_headers.include if linux_headers
-
-        # Pre-set the autoconf cache variable for the broken gnulib
-        # AC_C_UNDECLARED_BUILTIN_OPTIONS probe. In Homebrew'"'"'s build
+_PROBE_FIX='        # Pre-set the autoconf cache variable for the broken gnulib
+        # AC_C_UNDECLARED_BUILTIN_OPTIONS probe. In the Homebrew build
         # environment, GCC treats memcpy/strchr as compiler builtins so the
         # probe compiles silently regardless of flags, and configure aborts with
         # "cannot make gcc-NN report undeclared builtins". Many packages bundle
-        # gnulib (m4, pkgconf, libx11, etc.) and hit this. Pre-setting the
+        # gnulib (m4, pkgconf, libx11, attr, etc.) and hit this. Pre-setting the
         # autoconf cache variable skips the probe entirely for all of them.
         self["ac_cv_c_undeclared_builtin_options"] = \
-          "-Wimplicit-function-declaration -Werror=implicit-function-declaration"
-
-        return unless formula'
+          "-Wimplicit-function-declaration -Werror=implicit-function-declaration"'
 
 _result=$(python3 -c "
 import sys
-path = sys.argv[1]
-orig, linux_headers_only, full_fix = sys.argv[2], sys.argv[3], sys.argv[4]
-txt = open(path).read()
-if full_fix in txt:
+path, anchor, header_fix, probe_fix = sys.argv[1:5]
+original = open(path).read()
+txt = original
+old_header = 'linux_headers.include if linux_headers'
+new_header = 'linux_headers.opt_include if linux_headers'
+probe_marker = 'ac_cv_c_undeclared_builtin_options'
+migrated = old_header in txt
+txt = txt.replace(old_header, new_header, 1)
+missing = []
+if new_header not in txt:
+    missing.append(header_fix)
+if probe_marker not in txt:
+    missing.append(probe_fix)
+if missing:
+    if anchor not in txt:
+        print('notfound')
+        raise SystemExit
+    txt = txt.replace(anchor, '\n\n'.join(missing) + '\n\n' + anchor, 1)
+if txt == original:
     print('already')
-elif linux_headers_only in txt:
-    open(path,'w').write(txt.replace(linux_headers_only, full_fix, 1))
-    print('migrated')
-elif orig in txt:
-    open(path,'w').write(txt.replace(orig, full_fix, 1))
-    print('patched')
 else:
-    print('notfound')
-" "$STDENV_RB" "$_ORIG" "$_LINUX_HEADERS_ONLY" "$_FULL_FIX")
+    open(path, 'w').write(txt)
+    print('patched' if missing else 'migrated')
+" "$STDENV_RB" "$_ANCHOR" "$_HEADER_FIX" "$_PROBE_FIX")
 case "$_result" in
     already)  log_okay "Homebrew stdenv full patch (linux-headers + gnulib probe fix) already applied" ;;
-    migrated) log_okay "Migrated: stdenv patch updated to also include gnulib probe bypass" ;;
+    migrated) log_okay "Migrated: stdenv linux-headers path now follows the installed opt keg" ;;
     patched)  log_okay "Patched: linux-headers CPATH + gnulib probe bypass added to stdenv" ;;
-    notfound) log_warn "stdenv patch target not found — std.rb may have changed; check manually" ;;
+    notfound)
+        log_warn "stdenv patch target not found — refusing to start source builds"
+        exit 1
+        ;;
 esac
-unset _ORIG _LINUX_HEADERS_ONLY _FULL_FIX _result
+unset _ANCHOR _HEADER_FIX _PROBE_FIX _result
 
 log_okay "std.rb patch done"

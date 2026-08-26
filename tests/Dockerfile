@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     file \
     git \
     jq \
+    python3 \
     zsh \
     ca-certificates \
     libatomic1 \

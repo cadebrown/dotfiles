@@ -37,7 +37,7 @@
 #   on_linux do
 #     ENV['ac_cv_c_undeclared_builtin_options'] = \
 #       '-Wimplicit-function-declaration -Werror=implicit-function-declaration'
-#     ENV.prepend_path 'CPATH', Formula['linux-headers@6.8'].include.to_s
+#     ENV.prepend_path 'CPATH', Formula['linux-headers@6.8'].opt_include.to_s
 #   end
 #
 # (1) Autoconf reads ac_cv_* variables as pre-cached answers, skipping the
@@ -133,7 +133,7 @@ _CPATH_FIX='  def install
       # does not declare the dependency. Using CPATH (not CPPFLAGS) because m4
       # gnulib subdirectory Makefiles do not propagate $(CPPFLAGS) to compile
       # rules. GCC always checks CPATH regardless of Makefile structure.
-      ENV.prepend_path "CPATH", Formula["linux-headers@6.8"].include.to_s
+      ENV.prepend_path "CPATH", Formula["linux-headers@6.8"].opt_include.to_s
     end
     system "./configure", "--disable-dependency-tracking", "--prefix=#{prefix}"'
 
@@ -142,7 +142,12 @@ import sys
 path = sys.argv[1]
 orig, probe_only, cppflags_fix, cpath_fix = sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
 txt = open(path).read()
-if cpath_fix in txt:
+old_path = 'Formula[\"linux-headers@6.8\"].include.to_s'
+new_path = 'Formula[\"linux-headers@6.8\"].opt_include.to_s'
+if old_path in txt:
+    open(path,'w').write(txt.replace(old_path, new_path, 1))
+    print('migrated_opt')
+elif cpath_fix in txt:
     print('already')
 elif cppflags_fix in txt:
     open(path,'w').write(txt.replace(cppflags_fix, cpath_fix, 1))
@@ -158,6 +163,7 @@ else:
 " "$M4_RB" "$_ORIG" "$_PROBE_ONLY_FIX" "$_CPPFLAGS_FIX" "$_CPATH_FIX")
 case "$_result" in
     already)           log_okay "m4 full patch (probe bypass + linux-headers CPATH) already applied" ;;
+    migrated_opt)      log_okay "Migrated: m4 linux-headers path now follows the installed opt keg" ;;
     migrated_cppflags) log_okay "Migrated: m4 linux-headers changed from CPPFLAGS to CPATH" ;;
     migrated_probe)    log_okay "Migrated: m4 patch updated from probe-only to probe + CPATH" ;;
     patched)           log_okay "Patched: m4 probe bypass + linux-headers CPATH added for Linux" ;;

@@ -23,15 +23,18 @@
 #
 # ─── WHAT THE PATCH DOES ────────────────────────────────────────────────────────
 #
-# Two edits, both guarded by OS.mac? so macOS keeps Gist:
+# Three edits, all guarded so macOS keeps its upstream bottle and Gist:
 #
+#   Linux bottle              →  source build (the bottle already contains Gist)
 #   depends_on "qtbase"        →  depends_on "qtbase" if OS.mac?
-#   --enable-qt (in args)      →  --enable-qt on macOS, --disable-gist
-#                                 --disable-qt on Linux
+#   GIST=ON / QT=ON            →  ON on macOS, OFF on Linux
 #
-# Dropping the depends_on is the load-bearing half: Homebrew installs declared
-# dependencies whatever the configure flags say, so leaving it would still build
-# Qt.
+# The patch also recognizes the older Autotools formula and converts its
+# --enable-qt flag to --disable-gist/--disable-qt on Linux.
+#
+# Both the bottle policy and dependency edit are load-bearing. Configure flags
+# cannot change an already-built bottle, and Homebrew installs every declared
+# dependency regardless of those flags.
 #
 # ─── SIDE EFFECTS ───────────────────────────────────────────────────────────────
 #
@@ -65,58 +68,102 @@ fi
 
 GECODE_RB="$LOCAL_PLAT/brew/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/g/gecode.rb"
 
-[[ -f "$GECODE_RB" ]] || { log_warn "gecode.rb not found at $GECODE_RB — skipping"; exit 0; }
+if [[ ! -f "$GECODE_RB" ]]; then
+    log_warn "gecode.rb not found at $GECODE_RB — refusing to start source builds"
+    exit 1
+fi
 
 log_section "Patching gecode formula for Linux (no Gist, no Qt)"
 
-### Patch 1: drop the qtbase dependency on Linux ###
+_DEP_ANCHOR='  depends_on "qtbase"'
 
-_ORIG='  depends_on "qtbase"'
+_POUR_FIX='  pour_bottle? do
+    reason "Linux bottle contains Gist and requires Qt"
+    satisfy { OS.mac? }
+  end'
 
-_FIX='  # Gist (Gecode'"'"'s graphical search-tree explorer) is the only thing here that
+_DEP_FIX='  # Gist (Gecode'"'"'s graphical search-tree explorer) is the only thing here that
   # wants Qt, and qtbase does not link on a custom Linux prefix: it compiles
   # against the system ICU headers and links Homebrew'"'"'s keg-only icu4c, so
   # libQt6Core dies on `undefined reference to ucol_setAttribute_74`. Headless
   # nodes have no use for Gist; minizinc drives gecode from the command line.
   depends_on "qtbase" if OS.mac?'
 
-_result=$(python3 -c "
-import sys
-path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
-txt = open(path).read()
-if new in txt:    print('already')
-elif old in txt:  open(path,'w').write(txt.replace(old, new, 1)); print('patched')
-else:             print('notfound')
-" "$GECODE_RB" "$_ORIG" "$_FIX")
-case "$_result" in
-    already)  log_okay "gecode qtbase dependency already guarded" ;;
-    patched)  log_okay "Patched: gecode drops the qtbase dependency on Linux" ;;
-    notfound) log_warn "gecode depends_on patch target not found — formula may have changed" ;;
-esac
+_CMAKE_ANCHOR='    args = %w[
+      -DGECODE_ENABLE_EXAMPLES=OFF
+      -DGECODE_ENABLE_GIST=ON
+      -DGECODE_ENABLE_MPFR=OFF
+      -DGECODE_ENABLE_QT=ON
+    ]'
 
-### Patch 2: configure without Gist/Qt on Linux ###
+_CMAKE_FIX='    args = %W[
+      -DGECODE_ENABLE_EXAMPLES=OFF
+      -DGECODE_ENABLE_GIST=#{OS.mac? ? "ON" : "OFF"}
+      -DGECODE_ENABLE_MPFR=OFF
+      -DGECODE_ENABLE_QT=#{OS.mac? ? "ON" : "OFF"}
+    ]'
 
-_ORIG='      --disable-mpfr
+_AUTOTOOLS_ANCHOR='      --disable-mpfr
       --enable-qt
     ]'
 
-_FIX='      --disable-mpfr
+_AUTOTOOLS_FIX='      --disable-mpfr
     ]
     args += OS.mac? ? %w[--enable-qt] : %w[--disable-gist --disable-qt]'
 
-_result=$(python3 -c "
+_result=$(python3 -c '
 import sys
-path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
-txt = open(path).read()
-if new in txt:    print('already')
-elif old in txt:  open(path,'w').write(txt.replace(old, new, 1)); print('patched')
-else:             print('notfound')
-" "$GECODE_RB" "$_ORIG" "$_FIX")
+
+path, pour_fix, dep_anchor, dep_fix, cmake_anchor, cmake_fix, autotools_anchor, autotools_fix = sys.argv[1:]
+text = open(path).read()
+original = text
+missing = []
+
+if pour_fix not in text:
+    dependency = "\n  depends_on "
+    if "\n  pour_bottle?" in text:
+        missing.append("Linux bottle policy")
+    elif dependency in text:
+        text = text.replace(dependency, "\n" + pour_fix + "\n" + dependency, 1)
+    else:
+        missing.append("formula dependency anchor")
+
+if dep_fix not in text:
+    lines = text.splitlines()
+    guarded_dependency = dep_anchor + " if OS.mac?"
+    if dep_anchor in lines:
+        text = text.replace("\n" + dep_anchor + "\n", "\n" + dep_fix + "\n", 1)
+    elif guarded_dependency in lines:
+        pass
+    else:
+        missing.append("Qt dependency")
+
+if cmake_fix not in text and autotools_fix not in text:
+    if cmake_anchor in text:
+        text = text.replace(cmake_anchor, cmake_fix, 1)
+    elif autotools_anchor in text:
+        text = text.replace(autotools_anchor, autotools_fix, 1)
+    else:
+        missing.append("Gist/Qt build flags")
+
+if missing:
+    print("notfound:" + ",".join(missing))
+elif text == original:
+    print("already")
+else:
+    open(path, "w").write(text)
+    print("patched")
+' "$GECODE_RB" "$_POUR_FIX" "$_DEP_ANCHOR" "$_DEP_FIX" "$_CMAKE_ANCHOR" "$_CMAKE_FIX" "$_AUTOTOOLS_ANCHOR" "$_AUTOTOOLS_FIX")
+
 case "$_result" in
-    already)  log_okay "gecode configure flags already patched" ;;
-    patched)  log_okay "Patched: gecode configures --disable-gist --disable-qt on Linux" ;;
-    notfound) log_warn "gecode configure patch target not found — formula may have changed" ;;
+    already) log_okay "gecode no-Gist/no-Qt Linux patch already applied" ;;
+    patched) log_okay "Patched: gecode builds from source without Qt or Gist on Linux" ;;
+    notfound:*)
+        log_warn "gecode patch target not found (${_result#notfound:}) — refusing to start source builds"
+        exit 1
+        ;;
 esac
-unset _ORIG _FIX _result
+
+unset _POUR_FIX _DEP_ANCHOR _DEP_FIX _CMAKE_ANCHOR _CMAKE_FIX _AUTOTOOLS_ANCHOR _AUTOTOOLS_FIX _result
 
 log_okay "gecode.rb patch done"

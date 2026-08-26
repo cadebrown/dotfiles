@@ -28,7 +28,7 @@
 #
 # to:
 #   on_linux do
-#     ENV.prepend_path "CPATH", Formula["linux-headers@6.8"].include.to_s
+#     ENV.prepend_path "CPATH", Formula["linux-headers@6.8"].opt_include.to_s
 #   end
 #   system "make", "PREFIX=#{prefix}"
 #   system "make", "install", "PREFIX=#{prefix}"
@@ -100,7 +100,7 @@ _CPATH_FIX='  def install
       # fails with: fatal error: linux/errno.h: No such file or directory
       # Using CPATH (not CPPFLAGS) because the cc65 Makefile uses $(CC) $(CFLAGS)
       # without $(CPPFLAGS). GCC always checks CPATH regardless of the Makefile.
-      ENV.prepend_path "CPATH", Formula["linux-headers@6.8"].include.to_s
+      ENV.prepend_path "CPATH", Formula["linux-headers@6.8"].opt_include.to_s
     end
     system "make", "PREFIX=#{prefix}"
     system "make", "install", "PREFIX=#{prefix}"
@@ -111,7 +111,12 @@ import sys
 path = sys.argv[1]
 orig, cppflags_fix, cpath_fix = sys.argv[2], sys.argv[3], sys.argv[4]
 txt = open(path).read()
-if cpath_fix in txt:
+old_path = 'Formula[\"linux-headers@6.8\"].include.to_s'
+new_path = 'Formula[\"linux-headers@6.8\"].opt_include.to_s'
+if old_path in txt:
+    open(path,'w').write(txt.replace(old_path, new_path, 1))
+    print('migrated_opt')
+elif cpath_fix in txt:
     print('already')
 elif cppflags_fix in txt:
     # Migrate from old CPPFLAGS patch to correct CPATH patch
@@ -125,6 +130,7 @@ else:
 " "$CC65_RB" "$_ORIG" "$_CPPFLAGS_FIX" "$_CPATH_FIX")
 case "$_result" in
     already)  log_okay "cc65 linux-headers CPATH patch already applied" ;;
+    migrated_opt) log_okay "Migrated: cc65 linux-headers path now follows the installed opt keg" ;;
     migrated) log_okay "Migrated: cc65 patch updated from CPPFLAGS to CPATH" ;;
     patched)  log_okay "Patched: linux-headers@6.8 CPATH added for Linux" ;;
     notfound) log_warn "cc65 patch target not found — formula may have changed; check cc65.rb" ;;

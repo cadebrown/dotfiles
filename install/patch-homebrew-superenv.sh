@@ -63,7 +63,7 @@
 #   rescue ::FormulaUnavailableError
 #     nil
 #   end
-#   paths << linux_headers.include if linux_headers
+#   paths << linux_headers.opt_include if linux_headers
 #
 # Patch 2 (super.rb): adds to setup_build_environment:
 #
@@ -128,27 +128,22 @@ else
 fi
 unset _SHIM_DIR
 
-[[ -f "$SUPERENV_RB" ]] || { log_warn "super.rb not found at $SUPERENV_RB — skipping"; exit 0; }
+[[ -f "$SUPERENV_RB" ]] || {
+    log_warn "super.rb not found at $SUPERENV_RB — refusing to start source builds"
+    exit 1
+}
 
 log_section "Patching Homebrew superenv for Linux (linux-headers isystem + gnulib probe + glibc -L)"
+
+_critical_patch_failed=0
 
 # ── Patch 1: homebrew_extra_isystem_paths ────────────────────────────────────
 # Add linux-headers@6.8 to the isystem paths that the shim adds to every gcc call.
 
-_ISYSTEM_ORIG='      sig { returns(T::Array[::Pathname]) }
-      def homebrew_extra_isystem_paths
-        paths = []
-        # Add paths for GCC headers when building against versioned glibc because we have to use -nostdinc.
-        if deps.any? { |d| d.name.match?(/^glibc@.+$/) }
-          gcc_include_dir = Utils.safe_popen_read(cc, "--print-file-name=include").chomp
-          gcc_include_fixed_dir = Utils.safe_popen_read(cc, "--print-file-name=include-fixed").chomp
-          paths << gcc_include_dir << gcc_include_fixed_dir
-        end
-        paths.map { |p| ::Pathname.new(p) }
-      end'
+_ISYSTEM_ANCHOR='      def homebrew_extra_isystem_paths
+        paths = []'
 
-_ISYSTEM_FIX='      sig { returns(T::Array[::Pathname]) }
-      def homebrew_extra_isystem_paths
+_ISYSTEM_INJECT='      def homebrew_extra_isystem_paths
         paths = []
         # linux-headers@6.8 provides kernel headers required by Homebrew glibc
         # transitively (bits/errno.h → linux/errno.h, bits/local_lim.h →
@@ -162,54 +157,42 @@ _ISYSTEM_FIX='      sig { returns(T::Array[::Pathname]) }
         rescue ::FormulaUnavailableError
           nil
         end
-        paths << linux_headers.include if linux_headers
-        # Add paths for GCC headers when building against versioned glibc because we have to use -nostdinc.
-        if deps.any? { |d| d.name.match?(/^glibc@.+$/) }
-          gcc_include_dir = Utils.safe_popen_read(cc, "--print-file-name=include").chomp
-          gcc_include_fixed_dir = Utils.safe_popen_read(cc, "--print-file-name=include-fixed").chomp
-          paths << gcc_include_dir << gcc_include_fixed_dir
-        end
-        paths.map { |p| ::Pathname.new(p) }
-      end'
+        paths << linux_headers.opt_include if linux_headers'
 
 _isystem_result=$(python3 -c "
 import sys
-path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+path, anchor, inject = sys.argv[1], sys.argv[2], sys.argv[3]
 txt = open(path).read()
-if new in txt:    print('already')
-elif old in txt:  open(path,'w').write(txt.replace(old, new, 1)); print('patched')
-else:             print('notfound')
-" "$SUPERENV_RB" "$_ISYSTEM_ORIG" "$_ISYSTEM_FIX")
+old_marker = 'paths << linux_headers.include if linux_headers'
+new_marker = 'paths << linux_headers.opt_include if linux_headers'
+if new_marker in txt:
+    print('already')
+elif old_marker in txt:
+    open(path, 'w').write(txt.replace(old_marker, new_marker, 1))
+    print('migrated')
+elif anchor in txt:
+    open(path, 'w').write(txt.replace(anchor, inject, 1))
+    print('patched')
+else:
+    print('notfound')
+" "$SUPERENV_RB" "$_ISYSTEM_ANCHOR" "$_ISYSTEM_INJECT")
 case "$_isystem_result" in
     already)  log_okay "superenv linux-headers isystem patch already applied" ;;
+    migrated) log_okay "Migrated: superenv linux-headers path now follows the installed opt keg" ;;
     patched)  log_okay "Patched: linux-headers@6.8 added to homebrew_extra_isystem_paths" ;;
-    notfound) log_warn "superenv isystem patch target not found — super.rb may have changed; check manually" ;;
+    notfound)
+        log_warn "superenv isystem patch target not found — super.rb may have changed; check manually"
+        _critical_patch_failed=1
+        ;;
 esac
-unset _ISYSTEM_ORIG _ISYSTEM_FIX _isystem_result
+unset _ISYSTEM_ANCHOR _ISYSTEM_INJECT _isystem_result
 
 # ── Patch 2: setup_build_environment — gnulib probe fix ──────────────────────
 # Pre-set ac_cv_c_undeclared_builtin_options to skip the broken gnulib probe.
 
-_PROBE_ORIG='        self["JEMALLOC_SYS_WITH_LG_PAGE"] = "16"
+_PROBE_ANCHOR='        self["HOMEBREW_OPTIMIZATION_LEVEL"] = "O2"'
 
-        # Workaround patchelf.rb bug causing segfaults and preventing bottling on ARM64/AArch64
-        # https://github.com/Homebrew/homebrew-core/issues/163826
-        self["CGO_ENABLED"] = "0"'
-
-# Note: this inserts the probe fix BEFORE the ARM64-specific block, which is
-# guarded by `return unless ::Hardware::CPU.arm64?` so it runs on all arches.
-_PROBE_SEARCH='        self["HOMEBREW_OPTIMIZATION_LEVEL"] = "O2"
-        self["HOMEBREW_DYNAMIC_LINKER"] = determine_dynamic_linker_path
-        self["HOMEBREW_RPATH_PATHS"] = determine_rpath_paths(formula)
-        m4_path_deps = ["libtool", "bison"]
-        self["M4"] = "#{HOMEBREW_PREFIX}/opt/m4/bin/m4" if deps.any? { m4_path_deps.include?(it.name) }
-        return unless ::Hardware::CPU.arm64?'
-
-_PROBE_FIX='        self["HOMEBREW_OPTIMIZATION_LEVEL"] = "O2"
-        self["HOMEBREW_DYNAMIC_LINKER"] = determine_dynamic_linker_path
-        self["HOMEBREW_RPATH_PATHS"] = determine_rpath_paths(formula)
-        m4_path_deps = ["libtool", "bison"]
-        self["M4"] = "#{HOMEBREW_PREFIX}/opt/m4/bin/m4" if deps.any? { m4_path_deps.include?(it.name) }
+_PROBE_INJECT='        self["HOMEBREW_OPTIMIZATION_LEVEL"] = "O2"
 
         # Pre-set the autoconf cache variable for the broken gnulib
         # AC_C_UNDECLARED_BUILTIN_OPTIONS probe. In Homebrew'"'"'s build
@@ -219,24 +202,36 @@ _PROBE_FIX='        self["HOMEBREW_OPTIMIZATION_LEVEL"] = "O2"
         # gnulib (m4, pkgconf, libx11, attr, etc.) and hit this. Pre-setting the
         # autoconf cache variable skips the probe entirely for all of them.
         self["ac_cv_c_undeclared_builtin_options"] = \
-          "-Wimplicit-function-declaration -Werror=implicit-function-declaration"
-
-        return unless ::Hardware::CPU.arm64?'
+          "-Wimplicit-function-declaration -Werror=implicit-function-declaration"'
 
 _probe_result=$(python3 -c "
 import sys
-path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+path, anchor, inject = sys.argv[1], sys.argv[2], sys.argv[3]
 txt = open(path).read()
-if new in txt:    print('already')
-elif old in txt:  open(path,'w').write(txt.replace(old, new, 1)); print('patched')
-else:             print('notfound')
-" "$SUPERENV_RB" "$_PROBE_SEARCH" "$_PROBE_FIX")
+marker = 'ac_cv_c_undeclared_builtin_options'
+if marker in txt:
+    print('already')
+elif anchor in txt:
+    open(path, 'w').write(txt.replace(anchor, inject, 1))
+    print('patched')
+else:
+    print('notfound')
+" "$SUPERENV_RB" "$_PROBE_ANCHOR" "$_PROBE_INJECT")
 case "$_probe_result" in
     already)  log_okay "superenv gnulib probe bypass patch already applied" ;;
     patched)  log_okay "Patched: ac_cv_c_undeclared_builtin_options pre-set in superenv" ;;
-    notfound) log_warn "superenv probe patch target not found — super.rb may have changed; check manually" ;;
+    notfound)
+        log_warn "superenv probe patch target not found — super.rb may have changed; check manually"
+        _critical_patch_failed=1
+        ;;
 esac
-unset _PROBE_SEARCH _PROBE_FIX _probe_result
+unset _PROBE_ANCHOR _PROBE_INJECT _probe_result
+
+if [[ "$_critical_patch_failed" == "1" ]]; then
+    log_warn "Critical superenv patches are incomplete — refusing to start source builds"
+    exit 1
+fi
+unset _critical_patch_failed
 
 # ── Patch 3: llvm_clang++ shim — add -L for glibc alongside -rpath-link ──────
 # The shim adds -Wl,-rpath-link=/brew/opt/glibc/lib for DT_NEEDED resolution,
