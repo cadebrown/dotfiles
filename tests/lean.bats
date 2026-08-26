@@ -44,6 +44,10 @@ setup() {
     grep -q 'sys_bin "\$ARCH_BIN"' "$REPO/install/latex.sh"
 }
 
+@test "TinyTeX installer keeps its positional archive destination empty" {
+    grep -Fq 'sh "$_tinytex_installer" "" --no-path' "$REPO/install/latex.sh"
+}
+
 # MacTeX installs to /Library/TeX/texbin, which is on no default PATH — without
 # this the binaries exist on disk and resolve to nothing.
 @test "both profiles put MacTeX's texbin on PATH" {
