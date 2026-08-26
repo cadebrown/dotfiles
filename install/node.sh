@@ -4,11 +4,49 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
+_reconcile_nvm_npmrc() {
+    local _npmrc="${1:-$HOME/.npmrc}" _tmp
+
+    [[ -f "$_npmrc" ]] || return 0
+    if grep -Eiq '^[[:space:]]*globalconfig[[:space:]]*=' "$_npmrc"; then
+        log_fail "$_npmrc sets globalconfig; move any needed registry/auth policy into $_npmrc, remove globalconfig, and rerun"
+        return 1
+    fi
+    if ! grep -Eiq '^[[:space:]]*prefix[[:space:]]*=' "$_npmrc"; then
+        return 0
+    fi
+    if [[ -L "$_npmrc" ]]; then
+        log_fail "$_npmrc is a symlink; remove its npm prefix in the source file"
+        return 1
+    fi
+
+    _tmp="$(mktemp "${_npmrc}.tmp.XXXXXX")"
+    if ! awk '
+        {
+            key = tolower($0)
+            sub(/^[[:space:]]*/, "", key)
+            if (key ~ /^prefix[[:space:]]*=/) next
+            print
+        }
+    ' "$_npmrc" >"$_tmp"; then
+        rm -f "$_tmp"
+        return 1
+    fi
+    chmod 600 "$_tmp"
+    mv -f "$_tmp" "$_npmrc"
+    log_info "Removed npm prefix from $_npmrc; nvm owns the global prefix"
+}
+
+# Source-guard: tests source this file for the helper above.
+[[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
+
 log_section "Node.js (nvm)"
 
 NVM_VERSION="${DF_NVM_VERSION:-v0.40.7}"
 NODE_MAJOR="${DF_NODE_MAJOR:-24}"
 NPM_MAJOR="${DF_NPM_MAJOR:-12}"
+
+_reconcile_nvm_npmrc
 
 # nvm goes under LOCAL_PLAT so each arch+OS gets its own node binaries
 # (nvm itself is shell scripts, but the node versions it installs are arch-specific)
