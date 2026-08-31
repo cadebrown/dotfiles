@@ -98,7 +98,7 @@ function gsm { if [[ $# -eq 0 ]]; then git submodule update --init --recursive; 
 
 # Replace Oh My Zsh's raw worktree aliases with the branch-aware helper.
 unalias gwt gwta gwtls gwtmv gwtrm 2>/dev/null
-alias gwt='git wt'
+alias gwt='git-wt'
 alias gwtn='git wt new'
 alias gwta='git wt add'
 alias gwtls='git wt list'

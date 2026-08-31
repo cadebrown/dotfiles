@@ -154,5 +154,6 @@ gwt help add
 gwt help init
 ```
 
-The equivalent forms `git wt --help` and `git wt <command> --help` work in any
-shell.
+The equivalent forms `gwt --help`, `git-wt --help`, and
+`git wt <command> --help` work in any shell. Git reserves `git wt --help` for
+manual-page lookup, so use `git wt help` for the top-level menu.
