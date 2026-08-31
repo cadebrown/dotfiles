@@ -89,7 +89,7 @@ _verify_brew_llvm() {
 }
 
 _reconcile_brew_llvm_z3() {
-    local _prefix="$1" _upgrade_mode="$2" _outdated="" _state
+    local _prefix="$1" _upgrade_mode="$2" _outdated_formulae="" _state
     if ! _state="$(_brew_llvm_state)"; then
         log_warn "Could not list installed Homebrew formulae"
         return 1
@@ -97,13 +97,13 @@ _reconcile_brew_llvm_z3() {
     [[ "$_state" == "missing" ]] && return 0
 
     if [[ "$_upgrade_mode" == "1" ]]; then
-        if ! _outdated="$(brew outdated --formula llvm 2>/dev/null)"; then
+        if ! _outdated_formulae="$(brew outdated --quiet --formula 2>/dev/null)"; then
             log_warn "Could not determine whether LLVM is outdated"
             return 1
         fi
     fi
 
-    if [[ -n "$_outdated" ]]; then
+    if grep -Fxq llvm <<<"$_outdated_formulae"; then
         log_info "Upgrading LLVM before Bundle so LLVM and Z3 move together..."
         brew upgrade llvm
     elif ! _verify_brew_llvm "$_prefix" &>/dev/null; then

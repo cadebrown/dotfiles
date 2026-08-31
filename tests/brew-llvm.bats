@@ -24,6 +24,7 @@ SH
     export BREW_TEST_CLANG_HEALTHY=1
     export BREW_TEST_REPAIR_SUCCEEDS=1
     export BREW_TEST_LIST_ERROR=0
+    export BREW_TEST_OUTDATED_ERROR=0
     export BREW_TEST_LOG="$TEST_LOG"
     export BREW_TEST_STATE="$TEST_STATE"
 }
@@ -40,9 +41,18 @@ _run_helper() {
                     [[ "$BREW_TEST_INSTALLED" == "1" ]] && printf "%s\n" "llvm"
                     return 0
                     ;;
-                "outdated --formula llvm")
+                "outdated --quiet --formula")
+                    [[ "$BREW_TEST_OUTDATED_ERROR" == "0" ]] || return 2
                     if [[ "$BREW_TEST_OUTDATED" == "1" ]]; then
                         printf "%s\n" "llvm"
+                    fi
+                    return 0
+                    ;;
+                "outdated --formula llvm")
+                    [[ "$BREW_TEST_OUTDATED_ERROR" == "0" ]] || return 2
+                    if [[ "$BREW_TEST_OUTDATED" == "1" ]]; then
+                        printf "%s\n" "llvm"
+                        return 1
                     fi
                     return 0
                     ;;
@@ -96,6 +106,16 @@ _run_reconcile() {
     _run_reconcile 1
 
     [ "$status" -eq 0 ]
+    ! grep -Eq '^(upgrade|reinstall) llvm$' "$TEST_LOG"
+}
+
+@test "failure to query outdated formulae stops before mutation" {
+    export BREW_TEST_OUTDATED_ERROR=1
+
+    _run_reconcile 1
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Could not determine whether LLVM is outdated"* ]]
     ! grep -Eq '^(upgrade|reinstall) llvm$' "$TEST_LOG"
 }
 
