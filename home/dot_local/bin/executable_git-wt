@@ -317,7 +317,7 @@ init_rollback() {
     INIT_ACTIVE=0
 
     if [[ -n "${INIT_DESTINATION:-}" && -d "$INIT_DESTINATION" ]]; then
-        for item in "${INIT_MOVED_ITEMS[@]}"; do
+        for item in "${INIT_MOVED_ITEMS[@]+"${INIT_MOVED_ITEMS[@]}"}"; do
             if [[ -e "$INIT_DESTINATION/$item" || -L "$INIT_DESTINATION/$item" ]]; then
                 if [[ -e "$INIT_ROOT/$item" || -L "$INIT_ROOT/$item" ]] \
                     || ! mv -- "$INIT_DESTINATION/$item" "$INIT_ROOT/"; then
@@ -328,7 +328,7 @@ init_rollback() {
         shopt -s dotglob nullglob
         remaining_items=("$INIT_DESTINATION"/*)
         shopt -u dotglob nullglob
-        for item in "${remaining_items[@]}"; do
+        for item in "${remaining_items[@]+"${remaining_items[@]}"}"; do
             [[ "${item##*/}" == ".git" ]] || rollback_incomplete=1
         done
     fi
@@ -477,7 +477,7 @@ cmd_init() {
     [[ ! -e "$INIT_ROOT/$top" && ! -L "$INIT_ROOT/$top" ]] \
         || die "primary path conflicts with repository content: $top; use --path to choose another"
 
-    for branch in "${extra_branches[@]}"; do
+    for branch in "${extra_branches[@]+"${extra_branches[@]}"}"; do
         validate_branch "$branch"
         git show-ref --verify --quiet "refs/heads/$branch" \
             || die "extra local branch does not exist: $branch"
@@ -485,7 +485,7 @@ cmd_init() {
             || die "extra branch is already the primary worktree: $branch"
         paths_overlap "$primary_path" "$branch" \
             && die "primary and extra worktree paths overlap: $primary_path and $branch"
-        for checked_path in "${checked_extra_paths[@]}"; do
+        for checked_path in "${checked_extra_paths[@]+"${checked_extra_paths[@]}"}"; do
             paths_overlap "$checked_path" "$branch" \
                 && die "extra worktree paths overlap: $checked_path and $branch"
         done
@@ -557,7 +557,7 @@ cmd_init() {
     INIT_ACTIVE=0
     trap - EXIT INT TERM
 
-    for branch in "${extra_branches[@]}"; do
+    for branch in "${extra_branches[@]+"${extra_branches[@]}"}"; do
         if ! git --git-dir="$INIT_COMMON" worktree add "$INIT_ROOT/$branch" "$branch" >&2; then
             printf '%s: warning: failed to add worktree for %s\n' "$PROGRAM" "$branch" >&2
         fi
