@@ -88,6 +88,8 @@ jobs:
         run: brew install bats-core jq shellcheck
 
       - name: Check shell and platform contracts
+        env:
+          REPO: ${{ github.workspace }}
         run: |
           bash -n bootstrap.sh install/*.sh home/dot_local/bin/executable_git-wt
           shellcheck -S warning bootstrap.sh install/*.sh home/dot_local/bin/executable_git-wt
