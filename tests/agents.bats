@@ -3,7 +3,7 @@
 # a bootstrap silently installs a degraded configuration.
 
 setup() {
-    REPO="$HOME/dotfiles"
+    REPO="${REPO:-$HOME/dotfiles}"
 }
 
 @test "agent installers and doctor have valid shell syntax" {

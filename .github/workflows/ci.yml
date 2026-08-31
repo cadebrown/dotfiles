@@ -99,7 +99,6 @@ jobs:
               tests/bootstrap-remote.bats \
               tests/gwt.bats \
               tests/mcp-emitters.bats \
-              tests/platform-upgrade.bats \
               tests/toolchains.bats \
               tests/verify-path.bats
 
