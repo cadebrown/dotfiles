@@ -41,6 +41,10 @@ setup() {
     [ -n "$output" ]
 }
 
+@test "git worktree helper is installed in PLAT bin" {
+    [[ -x "$ARCH_BIN/git-wt" ]]
+}
+
 # --- chezmoi idempotency ---
 
 @test "chezmoi diff is empty (apply is idempotent)" {

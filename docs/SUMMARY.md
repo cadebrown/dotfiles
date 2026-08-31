@@ -13,6 +13,7 @@
 # Usage
 
 - [Day-to-day workflow](usage/updates.md)
+- [Git worktrees](usage/git-worktrees.md)
 - [AeroSpace window management](usage/aerospace.md)
 - [Local AI coding](usage/local-llm.md)
 - [Game development](usage/gamedev.md)

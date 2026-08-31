@@ -6,4 +6,6 @@ Library/**
 .local/**
 {{ end }}
 
+.local/bin/git-wt
+
 AGENTS.md

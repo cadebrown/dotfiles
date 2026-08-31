@@ -403,6 +403,10 @@ if [[ ! -d "$DF_INSTALL_DIR" ]]; then
     DF_INSTALL_DIR="$(dirname "$("$CHEZMOI_BIN" source-path)")/install"
 fi
 
+### 2.5 — Git helpers ###
+
+bash "$DF_INSTALL_DIR/git-tools.sh"
+
 ### 2.7 — path sanity check ###
 
 log_section "2.7 — path sanity check"

@@ -41,10 +41,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y bats
 
       - name: Check shell syntax
-        run: bash -n bootstrap.sh install/*.sh
+        run: bash -n bootstrap.sh install/*.sh home/dot_local/bin/executable_git-wt
 
       - name: Run ShellCheck
-        run: shellcheck -S warning bootstrap.sh install/*.sh
+        run: shellcheck -S warning bootstrap.sh install/*.sh home/dot_local/bin/executable_git-wt
 
       - name: Run fast Bats tests
         env:
@@ -55,6 +55,7 @@ jobs:
             tests/agents.bats \
             tests/bootstrap-remote.bats \
             tests/brew-glibc.bats \
+            tests/gwt.bats \
             tests/lean.bats \
             tests/mcp-emitters.bats \
             tests/netrc.bats \
@@ -88,12 +89,13 @@ jobs:
 
       - name: Check shell and platform contracts
         run: |
-          bash -n bootstrap.sh install/*.sh
-          shellcheck -S warning bootstrap.sh install/*.sh
+          bash -n bootstrap.sh install/*.sh home/dot_local/bin/executable_git-wt
+          shellcheck -S warning bootstrap.sh install/*.sh home/dot_local/bin/executable_git-wt
           env PATH=/usr/bin:/bin:/usr/sbin:/sbin \
             /bin/bash "$(brew --prefix bats-core)/bin/bats" \
               tests/agents.bats \
               tests/bootstrap-remote.bats \
+              tests/gwt.bats \
               tests/mcp-emitters.bats \
               tests/platform-upgrade.bats \
               tests/toolchains.bats \

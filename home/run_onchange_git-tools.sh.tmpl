@@ -1,0 +1,7 @@
+#!/bin/bash
+# Git helper hash: {{ include "dot_local/bin/executable_git-wt" | sha256sum }}
+# installer hash:  {{ include "../install/git-tools.sh" | sha256sum }}
+
+set -euo pipefail
+DOTFILES="$CHEZMOI_SOURCE_DIR/.."
+bash "$DOTFILES/install/git-tools.sh"

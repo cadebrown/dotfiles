@@ -14,6 +14,7 @@
 
 [push]
     autoSetupRemote = true
+    useForceIfIncludes = true
 
 [core]
     pager = delta
@@ -60,6 +61,18 @@
 
 [fetch]
     prune = true
+
+[worktree]
+    guessRemote = true
+
+[checkout]
+    defaultRemote = origin
+
+[gwt "github.com"]
+    user = cadebrown
+
+[gwt "gitlab-master.nvidia.com"]
+    user = cadeb
 
 # prefer SSH for GitHub
 [url "git@github.com:"]
