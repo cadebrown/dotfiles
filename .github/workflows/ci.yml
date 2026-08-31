@@ -21,7 +21,7 @@ jobs:
           persist-credentials: false
 
       - name: Install validation tools
-        uses: taiki-e/install-action@b6b84cf49ebfe0176417bdce007c624f0db37f20 # v2.86.2
+        uses: taiki-e/install-action@37f7c5781271959fb65b6b35224e28652ff2b63d # v2.87.0
         with:
           tool: |
             mdbook@0.5.4
