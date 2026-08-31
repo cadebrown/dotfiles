@@ -46,7 +46,7 @@ NVM_VERSION="${DF_NVM_VERSION:-v0.40.7}"
 NODE_MAJOR="${DF_NODE_MAJOR:-24}"
 NPM_MAJOR="${DF_NPM_MAJOR:-12}"
 
-_reconcile_nvm_npmrc
+_reconcile_nvm_npmrc "$HOME/.npmrc"
 
 # nvm goes under LOCAL_PLAT so each arch+OS gets its own node binaries
 # (nvm itself is shell scripts, but the node versions it installs are arch-specific)

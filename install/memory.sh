@@ -298,22 +298,22 @@ if [[ "$OS" == "darwin" ]]; then
     done
     # The qmd MCP daemon remains automatic; it serves requests but does not
     # schedule cass indexing.
-    for _agent in dev.cade.qmd; do
-        _plist="$HOME/Library/LaunchAgents/$_agent.plist"
-        [[ -f "$_plist" ]] || { log_warn "$_agent.plist missing — run chezmoi apply"; continue; }
-        if launchctl print "gui/$(id -u)/$_agent" >/dev/null 2>&1; then
-            log_okay "$_agent already loaded"
+    _agent=dev.cade.qmd
+    _plist="$HOME/Library/LaunchAgents/$_agent.plist"
+    if [[ ! -f "$_plist" ]]; then
+        log_warn "$_agent.plist missing — run chezmoi apply"
+    elif launchctl print "gui/$(id -u)/$_agent" >/dev/null 2>&1; then
+        log_okay "$_agent already loaded"
+    else
+        # Clear any disabled override first: bootstrap on a disabled label
+        # returns success but launchd never runs the job.
+        launchctl enable "gui/$(id -u)/$_agent" 2>/dev/null || true
+        if launchctl bootstrap "gui/$(id -u)" "$_plist" 2>/dev/null; then
+            log_okay "loaded $_agent"
         else
-            # Clear any disabled override first: bootstrap on a disabled label
-            # returns success but launchd never runs the job.
-            launchctl enable "gui/$(id -u)/$_agent" 2>/dev/null || true
-            if launchctl bootstrap "gui/$(id -u)" "$_plist" 2>/dev/null; then
-                log_okay "loaded $_agent"
-            else
-                log_warn "could not load $_agent (launchctl bootstrap failed)"
-            fi
+            log_warn "could not load $_agent (launchctl bootstrap failed)"
         fi
-    done
+    fi
 else
     # No launchd: lazy-start (also done by shell profiles on login).
     if has qmd && ! qmd_daemon_running; then
