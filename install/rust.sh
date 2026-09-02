@@ -7,28 +7,72 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
-# Print the crate's binaries that fail to start with a dynamic-loader error.
+_cargo_usage_error_is_healthy() {
+    local _crate="$1" _bin="$2" _error="$3"
+    [[ "$_crate" == "ripgrep_all" ]] || return 1
+    case "$_bin" in
+        rga-preproc)  [[ "$_error" == *"Specified input file not found"* ]] ;;
+        rga-fzf)      [[ "$_error" == *"inappropriate ioctl for device"* \
+                            && "$_error" == *"fzf output not two line"* ]] ;;
+        rga-fzf-open) [[ "$_error" == *"Error: no filename"* ]] ;;
+        *) return 1 ;;
+    esac
+}
+
+# Print the crate's binaries that fail their bounded startup check.
 # Bin names come from cargo's install registry because they often differ from
 # crate names (yazi-fm → yazi).
 _loader_broken_bins() {
-    local _crate="$1" _bin _err
+    local _crate="$1" _bin _err _rc
     has jq || return 0
     [[ -f "$CARGO_HOME/.crates2.json" ]] || return 0
     while IFS= read -r _bin; do
         [[ -x "$CARGO_HOME/bin/$_bin" ]] || continue
-        if has timeout; then
-            _err="$(timeout 10 "$CARGO_HOME/bin/$_bin" --version </dev/null 2>&1 >/dev/null)" || true
+        if _err="$(run_bounded "${DF_TOOL_SMOKE_TIMEOUT:-10}" \
+            "$CARGO_HOME/bin/$_bin" --version </dev/null 2>&1 >/dev/null)"; then
+            _rc=0
         else
-            _err="$("$CARGO_HOME/bin/$_bin" --version </dev/null 2>&1 >/dev/null)" || true
+            _rc=$?
         fi
-        if [[ "$_err" == *"GLIBC_"* || "$_err" == *"libc.so"* \
-            || "$_err" == *"error while loading shared libraries"* ]]; then
+        if (( _rc != 0 )); then
+            if _err="$(run_bounded "${DF_TOOL_SMOKE_TIMEOUT:-10}" \
+                "$CARGO_HOME/bin/$_bin" --help </dev/null 2>&1 >/dev/null)"; then
+                _rc=0
+            else
+                _rc=$?
+            fi
+        fi
+        if (( _rc != 0 )) && _cargo_usage_error_is_healthy "$_crate" "$_bin" "$_err"; then
+            _rc=0
+        fi
+        if (( _rc != 0 )); then
             printf '%s\n' "$_bin"
         fi
     done < <(jq -r --arg c "$_crate " \
         '.installs | to_entries[] | select(.key | startswith($c)) | .value.bins[]' \
         "$CARGO_HOME/.crates2.json" 2>/dev/null)
     return 0
+}
+
+# Print declared binaries that are absent or not executable. A successful
+# cargo install must also leave a registry receipt; otherwise there is no
+# trustworthy crate-to-entrypoint mapping to validate.
+_missing_cargo_bins() {
+    local _crate="$1" _bins _bin
+    if ! has jq || [[ ! -f "$CARGO_HOME/.crates2.json" ]]; then
+        printf '%s\n' '<receipt>'
+        return 0
+    fi
+    _bins="$(jq -r --arg c "$_crate " \
+        '.installs | to_entries[] | select(.key | startswith($c)) | .value.bins[]' \
+        "$CARGO_HOME/.crates2.json" 2>/dev/null || true)"
+    if [[ -z "$_bins" ]]; then
+        printf '%s\n' '<receipt>'
+        return 0
+    fi
+    while IFS= read -r _bin; do
+        [[ -x "$CARGO_HOME/bin/$_bin" ]] || printf '%s\n' "$_bin"
+    done <<< "$_bins"
 }
 
 _source_install_crate() {
@@ -41,6 +85,24 @@ _source_install_crate() {
     else
         run_logged "${_cmd[@]}"
     fi
+}
+
+# rust-docs-mcp 0.2.3 probes github.com with a request shape that returns 403
+# on NVIDIA's network even when HTTPS and Git access both work. Accept only
+# that exact isolated diagnostic after independent HTTPS and Git probes pass.
+_rust_docs_doctor_passed() {
+    local _output="$1"
+    [[ "$_output" == *"❌ Network: crates.io reachable (200 OK) but GitHub unreachable (403 Forbidden)"* ]] \
+        || return 1
+    [[ "$_output" == *"[ERROR] Doctor found 1 issue."* ]] || return 1
+    [[ "$_output" == *"✅ Rust toolchain:"* \
+        && "$_output" == *"✅ Nightly toolchain:"* \
+        && "$_output" == *"✅ Rustdoc JSON:"* \
+        && "$_output" == *"✅ Git:"* \
+        && "$_output" == *"✅ Cache directory:"* ]] || return 1
+    download_stdout https://github.com/ >/dev/null \
+        && git ls-remote https://github.com/rust-lang/rust.git HEAD 2>/dev/null \
+            | grep -q $'\tHEAD$'
 }
 
 _link_homebrew_rustup_proxies() {
@@ -197,7 +259,7 @@ fi
 ### cargo tools ###
 
 CARGO_TXT="$DF_PACKAGES/cargo.txt"
-[[ -f "$CARGO_TXT" ]] || { log_warn "No cargo.txt at $CARGO_TXT — skipping"; exit 0; }
+[[ -f "$CARGO_TXT" ]] || die "Required cargo manifest missing: $CARGO_TXT"
 
 log_info "Installing/upgrading cargo tools from cargo.txt"
 
@@ -258,6 +320,16 @@ _install_crate() {
     fi
 }
 
+_repair_crate() {
+    local crate="$1"
+    if [[ "$_compile_only" == "1" ]]; then
+        _source_install_crate "$crate" --force
+    else
+        run_logged cargo binstall "${_binstall_flags[@]}" --force "$crate" \
+            || _source_install_crate "$crate" --force
+    fi
+}
+
 while IFS= read -r pkg; do
     log_info "  binstall $pkg"
     # --locked on the source fallback: cargo install ignores the crate's
@@ -267,36 +339,42 @@ while IFS= read -r pkg; do
     # unlocked builds.
     # (cargo-nextest's locked-tripwire). --locked honors the tested lockfile.
     if _install_crate "$pkg"; then
-        # binstall "success" can still leave a binary the loader rejects
+        _install_failed=0
+        _missing="$(_missing_cargo_bins "$pkg")"
+        if [[ -n "$_missing" ]]; then
+            log_warn "  $pkg is missing declared entrypoints (${_missing//$'\n'/, }) — reinstalling"
+            _repair_crate "$pkg" || _install_failed=1
+        fi
+        # binstall "success" can still leave a binary that cannot start
         # (gnu prebuilt wanting newer glibc — also hit when binstall skips an
         # already-latest-but-broken install). Heal in two steps: force-refetch
         # (musl-first targets may land a static build), else build from
         # source, which links the host glibc by construction.
-        if [[ "$OS" == "linux" ]] && _bad="$(_loader_broken_bins "$pkg")" && [[ -n "$_bad" ]]; then
-            log_warn "  $pkg has unresolved runtime libraries (${_bad//$'\n'/, }) — refetching"
-            run_logged cargo binstall "${_binstall_flags[@]}" --force "$pkg" || true
+        if _bad="$(_loader_broken_bins "$pkg")" && [[ -n "$_bad" ]]; then
+            log_warn "  $pkg has failed runtime checks (${_bad//$'\n'/, }) — refetching"
+            _repair_crate "$pkg" || _install_failed=1
             _bad="$(_loader_broken_bins "$pkg")"
             if [[ -n "$_bad" ]]; then
                 log_warn "  $pkg has no runnable prebuilt — building from source"
-                if _source_install_crate "$pkg" --force; then
-                    log_okay "  ok    $pkg (source build)"
-                    (( _ok++ )) || true
-                else
-                    log_warn "  fail  $pkg (prebuilt loader failure, source build failed)"
-                    (( _fail++ )) || true
-                fi
-                continue
+                _source_install_crate "$pkg" --force || _install_failed=1
             fi
         fi
-        log_okay "  ok    $pkg"
-        (( _ok++ )) || true
+        _missing="$(_missing_cargo_bins "$pkg")"
+        _bad="$(_loader_broken_bins "$pkg")"
+        if [[ "$_install_failed" == "1" || -n "$_missing" || -n "$_bad" ]]; then
+            [[ "$_install_failed" == "1" ]] && log_warn "  fail  $pkg (repair installation failed)"
+            [[ -n "$_missing" ]] && log_warn "  fail  $pkg (missing entrypoints: ${_missing//$'\n'/, })"
+            [[ -n "$_bad" ]] && log_warn "  fail  $pkg (runtime checks failed: ${_bad//$'\n'/, })"
+            (( _fail++ )) || true
+        else
+            log_okay "  ok    $pkg"
+            (( _ok++ )) || true
+        fi
     else
         log_warn "  fail  $pkg"
         (( _fail++ )) || true
     fi
 done < <(_read_package_list "$CARGO_TXT")
-
-log_okay "cargo tools: ${_ok} ok, ${_fail} failed"
 
 ### rust-docs-mcp pinned nightly ###
 # rust-docs-mcp (cargo.txt → the `rust-docs` MCP server) generates rustdoc
@@ -304,14 +382,47 @@ log_okay "cargo tools: ${_ok} ok, ${_fail} failed"
 # inside the binary and moves with releases, so ask its doctor: the pin only
 # appears in the output while missing — nothing to do once installed.
 if [[ -x "$CARGO_HOME/bin/rust-docs-mcp" ]]; then
-    _rdm_pin="$("$CARGO_HOME/bin/rust-docs-mcp" doctor 2>&1 \
-        | grep -oE 'nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1 || true)"
-    if [[ -n "$_rdm_pin" ]]; then
-        log_info "Installing rust-docs-mcp pinned toolchain $_rdm_pin"
-        run_logged "$CARGO_HOME/bin/rustup" toolchain install "$_rdm_pin" --profile minimal \
-            || log_warn "rust-docs-mcp toolchain install failed — run 'rust-docs-mcp doctor'"
+    _rdm_doctor() {
+        local _gh_token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+        if [[ -z "$_gh_token" ]] && has gh; then
+            _gh_token="$(gh auth token 2>/dev/null || true)"
+        fi
+        if [[ -n "$_gh_token" ]]; then
+            GH_TOKEN="$_gh_token" GITHUB_TOKEN="$_gh_token" \
+                "$CARGO_HOME/bin/rust-docs-mcp" doctor
+        else
+            "$CARGO_HOME/bin/rust-docs-mcp" doctor
+        fi
+    }
+
+    _rdm_output=""
+    if _rdm_output="$(_rdm_doctor 2>&1)"; then
+        log_okay "rust-docs-mcp doctor passed"
+    elif _rust_docs_doctor_passed "$_rdm_output"; then
+        log_warn "rust-docs-mcp doctor has a false GitHub 403; independent HTTPS and Git probes passed"
+        log_okay "rust-docs-mcp runtime checks passed"
     else
-        log_okay "rust-docs-mcp rustdoc toolchain satisfied"
+        _rdm_pin="$(printf '%s\n' "$_rdm_output" \
+            | grep -oE 'nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1 || true)"
+        if [[ -n "$_rdm_pin" ]]; then
+            log_info "Installing rust-docs-mcp pinned toolchain $_rdm_pin"
+            run_logged "$CARGO_HOME/bin/rustup" toolchain install "$_rdm_pin" --profile minimal \
+                || log_fail "rust-docs-mcp toolchain install failed"
+        fi
+        if _rdm_output="$(_rdm_doctor 2>&1)"; then
+            log_okay "rust-docs-mcp doctor passed after repair"
+        elif _rust_docs_doctor_passed "$_rdm_output"; then
+            log_warn "rust-docs-mcp doctor has a false GitHub 403 after repair; independent HTTPS and Git probes passed"
+            log_okay "rust-docs-mcp runtime checks passed after repair"
+        else
+            log_fail "rust-docs-mcp doctor failed after repair"
+            printf '%s\n' "$_rdm_output" >&2
+            (( _fail++ )) || true
+        fi
     fi
-    unset _rdm_pin
+    unset -f _rdm_doctor
+    unset _rdm_pin _rdm_output
 fi
+
+log_okay "cargo tools: ${_ok} ok, ${_fail} failed"
+(( _fail == 0 )) || die "$(_read_package_list "$CARGO_TXT" | wc -l | tr -d ' ') cargo tools declared; ${_fail} failed validation"

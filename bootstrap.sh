@@ -56,6 +56,7 @@
 #   DF_DO_SCRATCH       — set to 0 to skip scratch space symlink setup
 #   DF_DO_DIRS          — set to 0 to skip home directory creation
 #   DF_DO_PACKAGES      — set to 0 to skip package install (Homebrew on macOS/Linux)
+#   DF_DO_LLDB          — set to 0 to skip LLDB + lldb-dap install
 #   DF_DO_MACOS_SERVICES — set to 0 to skip macOS service registration
 #   DF_START_LOCAL_SERVICES — set to 1 to auto-start colima/ollama/mlxserve at
 #                         login (default 0: installed but not auto-started; at 0
@@ -85,7 +86,7 @@
 #   DF_DO_LOCAL_LLM     — set to 0 to skip local LLM tooling setup
 #   DF_DO_MEMORY        — set to 0 to skip the agent memory stack (qmd/cass/~kb)
 #   DF_DO_SKILLS        — set to 0 to skip agent-skills sync (agent-skills.txt)
-#   DF_DO_BLENDER_MCP   — set to 0 to skip blender-mcp addon install
+#   DF_DO_BLENDER_MCP   — set to 0 to skip blender-mcp addon (default: macOS 1, Linux 0)
 #   DF_DO_OVERLAYS      — set to 0 to skip all overlay bootstraps
 
 set -euo pipefail
@@ -289,12 +290,9 @@ else
     # In update/upgrade mode, pull latest changes
     if [[ "$DF_MODE" != "install" ]]; then
         log_info "Pulling latest changes..."
-        if ! run_logged git -C "$DF_PATH" pull --ff-only; then
-            log_warn "git pull --ff-only failed — continuing with current HEAD"
-            log_warn "You may need to manually rebase or merge"
-        else
-            log_okay "Repo updated"
-        fi
+        run_logged git -C "$DF_PATH" pull --ff-only \
+            || die "git pull --ff-only failed; refusing to bootstrap a stale checkout"
+        log_okay "Repo updated"
     fi
 fi
 
@@ -334,6 +332,13 @@ log_section "0.6 — platform paths"
 
 log_okay "PLAT=${PLAT:-<none>} (DF_USE_PLAT=$DF_USE_PLAT)"
 log_okay "LOCAL_PLAT=$LOCAL_PLAT"
+
+# Child installers must see tools installed by earlier bootstrap stages even
+# when the invoking shell has never loaded the dotfile-managed profiles.
+case ":$PATH:" in
+    *":$ARCH_BIN:"*) ;;
+    *) export PATH="$ARCH_BIN:$PATH" ;;
+esac
 
 ### 1. chezmoi ###
 
@@ -406,6 +411,7 @@ fi
 ### 2.5 — Git helpers ###
 
 bash "$DF_INSTALL_DIR/git-tools.sh"
+bash "$DF_INSTALL_DIR/agent-tools.sh"
 
 ### 2.7 — path sanity check ###
 
@@ -454,15 +460,12 @@ if [[ "${DF_DO_PACKAGES:-1}" != "0" ]]; then
         darwin)
             log_info "macOS — Homebrew (native bottles)"
             bash "$DF_INSTALL_DIR/homebrew.sh" || die "homebrew.sh failed"
+            activate_homebrew || die "Homebrew was installed but is unavailable to later bootstrap stages"
             ;;
         linux)
             log_info "Linux — Homebrew (native, no container)"
             bash "$DF_INSTALL_DIR/linux-packages.sh" || die "linux-packages.sh failed"
-            # Activate brew for the rest of this bootstrap session
-            BREW_BIN="$LOCAL_PLAT/brew/bin/brew"
-            if [[ -x "$BREW_BIN" ]]; then
-                eval "$("$BREW_BIN" shellenv)"
-            fi
+            activate_homebrew || die "Homebrew was installed but is unavailable to later bootstrap stages"
             ;;
         *)
             log_warn "Unknown OS '$OS' — skipping package install"
@@ -470,6 +473,14 @@ if [[ "${DF_DO_PACKAGES:-1}" != "0" ]]; then
     esac
 else
     log_info "Skipping packages (DF_DO_PACKAGES=0)"
+fi
+
+DF_DO_LLDB="${DF_DO_LLDB:-1}"
+export DF_DO_LLDB
+if [[ "$DF_DO_LLDB" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/lldb.sh" || die "lldb.sh failed"
+else
+    log_info "Skipping LLDB (DF_DO_LLDB=0)"
 fi
 
 if [[ "${DF_DO_QUARTO:-1}" != "0" ]]; then
@@ -600,17 +611,21 @@ else
     log_info "Skipping LinearMouse settings (DF_DO_LINEARMOUSE=0)"
 fi
 
-if [[ "${DF_DO_CURSOR:-1}" != "0" ]]; then
+_desktop_cli_default=0
+[[ "$OS" == "darwin" ]] && _desktop_cli_default=1
+
+if [[ "${DF_DO_CURSOR:-$_desktop_cli_default}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/cursor.sh" || die "cursor.sh failed"
 else
-    log_info "Skipping Cursor settings (DF_DO_CURSOR=0)"
+    log_info "Skipping Cursor settings (DF_DO_CURSOR=0 or no desktop CLI on this platform)"
 fi
 
-if [[ "${DF_DO_VSCODE:-1}" != "0" ]]; then
+if [[ "${DF_DO_VSCODE:-$_desktop_cli_default}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/vscode.sh" || die "vscode.sh failed"
 else
-    log_info "Skipping VS Code extensions (DF_DO_VSCODE=0)"
+    log_info "Skipping VS Code extensions (DF_DO_VSCODE=0 or no desktop CLI on this platform)"
 fi
+unset _desktop_cli_default
 
 if [[ "${DF_DO_CMAKE:-1}" != "0" ]]; then
     bash "$DF_INSTALL_DIR/cmake.sh" || die "cmake.sh failed"
@@ -659,11 +674,17 @@ fi
 
 log_section "6.7 — blender-mcp addon"
 
-if [[ "${DF_DO_BLENDER_MCP:-1}" != "0" ]]; then
+_blender_mcp_default=0
+[[ "$OS" == "darwin" ]] && _blender_mcp_default=1
+DF_DO_BLENDER_MCP="${DF_DO_BLENDER_MCP:-$_blender_mcp_default}"
+export DF_DO_BLENDER_MCP
+
+if [[ "$DF_DO_BLENDER_MCP" != "0" ]]; then
     bash "$DF_INSTALL_DIR/blender-mcp.sh" || die "blender-mcp.sh failed"
 else
     log_info "Skipping blender-mcp addon (DF_DO_BLENDER_MCP=0)"
 fi
+unset _blender_mcp_default
 
 ### 7. auth ###
 
@@ -706,6 +727,11 @@ done
 unset _overlay_bs _overlay_name _ran_any
 
 ### done ###
+
+log_section "final verification"
+
+bash "$DF_INSTALL_DIR/verify-tools.sh" \
+    || die "Selected tool runtime verification failed"
 
 log_section "bootstrap complete"
 

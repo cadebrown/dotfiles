@@ -1,6 +1,6 @@
 # Bootstrap flow
 
-Step-by-step diagram of what `bootstrap.sh` actually does, with the `DF_DO_*` skip flag for each phase. Steps run in order — failures in any phase abort the rest (except VS Code/Cursor extension installs and a few other clearly-flagged log-warn-but-continue cases).
+Step-by-step diagram of what `bootstrap.sh` actually does, with the `DF_DO_*` skip flag for each phase. Steps run in order, and any selected phase that misses its postconditions aborts the rest.
 
 ```mermaid
 flowchart TD
@@ -13,7 +13,8 @@ flowchart TD
     S2 --> S27["2.7  PATH sanity check<br/>(verifies ARCH_BIN writable, no broken symlinks)"]
     S27 --> S3["3  oh-my-zsh + plugins<br/>DF_DO_ZSH"]
     S3 --> S4["4  Homebrew + Brewfile<br/>DF_DO_PACKAGES"]
-    S4 --> Q["Quarto<br/>DF_DO_QUARTO"]
+    S4 --> L["LLDB + lldb-dap<br/>DF_DO_LLDB"]
+    L --> Q["Quarto<br/>DF_DO_QUARTO"]
     Q -.macOS.-> S5["5  Colima service<br/>DF_DO_MACOS_SERVICES"]
     S5 -.macOS.-> S55["5.5  defaults write<br/>DF_DO_MACOS_SETTINGS"]
     S55 -.macOS.-> S56["5.6  Quick Actions<br/>DF_DO_MACOS_QUICK_ACTIONS"]
@@ -35,6 +36,7 @@ flowchart TD
     S66 --> S67["6.7  blender-mcp addon<br/>DF_DO_BLENDER_MCP"]
     S66 --> S7["7  auth.sh walk<br/>DF_DO_AUTH (default 0)"]
     S7 --> S8["8  overlay bootstraps<br/>DF_DO_OVERLAYS"]
+    S8 --> VF["final runtime verification<br/>install/verify-tools.sh"]
 ```
 
 ## Step details
@@ -47,6 +49,7 @@ flowchart TD
 | 0.6 | inline | Re-source the cloned repo's `_lib.sh`, rebinding repo, overlay, PLAT, and platform-local paths authoritatively. | Yes |
 | 1 | `install/chezmoi.sh` | Download chezmoi to `$ARCH_BIN/chezmoi`. Skipped if file already executable. | Yes |
 | 2 | (inline) | `chezmoi init --apply --force --exclude=scripts`. Renders `home/*.tmpl` into `~/`. `--exclude=scripts` skips `run_onchange_*.sh.tmpl` (bootstrap calls install scripts directly). | Yes |
+| 2.5 | `install/git-tools.sh`, `install/agent-tools.sh` | Deploy architecture-independent helper commands into `$ARCH_BIN`, including `git-wt` and `df-agent-doctor`. | Yes |
 | 2.7 | inline | Sanity-check that `$ARCH_BIN`, `$CARGO_HOME`, `$RUSTUP_HOME`, `$NVM_DIR` parents exist and aren't broken symlinks. Aborts if anything's wrong. | Yes |
 | 3 | `install/zsh.sh` | Clone or update oh-my-zsh + plugins. | Yes |
 | 4 | `install/homebrew.sh` (macOS) or `install/linux-packages.sh` | Install Homebrew, run `brew bundle install --file=Brewfile`, optionally `brew upgrade` and `brew upgrade --cask --greedy`. | Yes |
@@ -58,15 +61,16 @@ flowchart TD
 | 6.5 | `install/local-llm.sh` + `install/opencode.sh` | Create `$LOCAL_PLAT/.cache/huggingface`; verify ollama/mlx-lm/mlx-openai-server/opencode binaries. | Yes |
 | 6.6 | `install/memory.sh` | Agent memory stack: cass binary/archive setup (indexing is manual), ~/kb knowledge repo, qmd collections/embeddings, qmd daemon. | Yes |
 | 6.65 | `install/skills-sync.sh` | Install agent skills from `agent-skills.txt` into the shared `~/.claude/skills` tree. | Yes |
-| 6.7 | `install/blender-mcp.sh` | Download `addon.py` into Blender's user addons; enable headlessly. Skipped if Blender not installed. | Yes |
+| 6.7 | `install/blender-mcp.sh` | Download `addon.py` into Blender's user addons, enable it headlessly, and verify the enabled state. Default-on on macOS where the Brewfile installs Blender; default-off on Linux. | Yes |
 | 7 | `install/auth.sh` | Walk every service, prompt `[k] keep / [u] update / [d] delete` per service. **Default off** — set `DF_DO_AUTH=1` to enable. | Yes |
 | 8 | overlay scripts | Run `bash $DF_ROOT/dotfiles-*/bootstrap.sh "$DF_MODE"` for each overlay. | Per overlay |
+| final | `install/verify-tools.sh` | Verify selected commands resolve from PATH and pass their runtime postconditions. | Yes |
 
 ## Step 6 in detail
 
 | Sub-step | Script | What | Notes |
 |---|---|---|---|
-| 6a | `install/python.sh` | Install uv to `$ARCH_BIN`; install `pip.txt` plus `pip-full.txt` when `DF_PROFILE=full` (each tool gets an isolated venv). | Runs before Node so node-gyp can use uv's Python. |
+| 6a | `install/python.sh` | Install uv to `$ARCH_BIN`; create `$PYTHON_ENV` with `python.txt`; install `pip.txt` plus `pip-full.txt` when `DF_PROFILE=full` (each CLI gets an isolated venv). | Plain `python` includes SymPy. Runs before Node so node-gyp can use uv's Python. |
 | 6b | `install/node.sh` | Install pinned nvm; install/upgrade Node 24 LTS; install `npm.txt` packages globally. | The parent bootstrap activates nvm before later agent/skill steps. |
 | 6c | `install/rust.sh` | Install rustup and rust-analyzer; in the full profile, install the rust-docs MCP nightly and every entry in `cargo.txt`. | Prebuilt first, host-target source fallback; self-update only in upgrade mode. |
 | 6d | `install/go.sh` | Install CLI tools from `go.txt` into `$ARCH_BIN`. | Go itself is owned by the Brewfile. |
@@ -76,7 +80,7 @@ flowchart TD
 | 6h | `install/claude.sh` | Download Claude Code; install plugins; register MCP servers; deploy overlay skills. | Atomic binary replacement. |
 | 6i | `install/codex.sh` | Sync private config, hooks, guards, risk-scoped MCP servers, and run the healthcheck. | The healthcheck parses every profile and hook trust entry. |
 | 6j | desktop scripts | Merge tracked Claude/Codex Desktop and LinearMouse settings on macOS. | Preserve app-owned state. |
-| 6k | `install/cursor.sh` / `install/vscode.sh` | Sync Cursor MCP/settings and editor extensions. | Extension failures are warnings. |
+| 6k | `install/cursor.sh` / `install/vscode.sh` | Sync Cursor MCP/settings and editor extensions. | Defaults on for macOS and off for Linux. When selected, the CLI and every declared extension must pass the final check. |
 | 6l | `install/cmake.sh` | Copy CMake toolchain files into `$LOCAL_PLAT/cmake/toolchains/`. | Always overwrites deployed copies. |
 
 ## Modes

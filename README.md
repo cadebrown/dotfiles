@@ -53,15 +53,15 @@ A single `packages/Brewfile` drives both platforms. On macOS, Homebrew installs 
 | --- | --- | --- | --- |
 | **Rust** | rustup + cargo-binstall | `$LOCAL_PLAT/rustup/`, `$LOCAL_PLAT/cargo/` | `packages/cargo.txt` |
 | **Node.js** | nvm (lazy-loaded in zsh) | `$LOCAL_PLAT/nvm/` | `packages/npm.txt` |
-| **Python** | uv tool environments | `$LOCAL_PLAT/uv/tools/` | `packages/pip.txt` |
+| **Python** | uv-managed plain Python + isolated CLI tools | `$PYTHON_ENV`, `$LOCAL_PLAT/uv/tools/` | `packages/python.txt`, `packages/pip*.txt` |
 
-Rust tools are installed via `cargo-binstall` -- pre-built binaries from GitHub releases when available, source compilation as fallback. On macOS, rustup comes from Homebrew (code-signed, required on Sequoia+).
+Rust tools are installed via `cargo-binstall` -- pre-built binaries from GitHub releases when available, source compilation as fallback. Plain `python` uses the small `$PYTHON_ENV` environment and includes SymPy; Python CLI tools each get an isolated uv environment. On macOS, rustup comes from Homebrew (code-signed, required on Sequoia+).
 
 ### AI tools
 
 - **Claude Code** -- native binary + plugins (`packages/claude-plugins.txt`) + MCP servers (`packages/mcp-servers.txt`)
 - **Codex CLI** -- npm-installed binary + managed config, skills, themes, and MCP servers (`packages/mcp-servers.txt` is shared with Claude)
-- **Blender MCP** -- `install/blender-mcp.sh` installs the [blender-mcp](https://github.com/ahujasid/blender-mcp) addon into Blender's scripts/addons dir and enables it headlessly (skips if Blender isn't installed). Server side: `blender stdio cmd: uvx blender-mcp` in `packages/mcp-servers.txt`.
+- **Blender MCP** -- `install/blender-mcp.sh` installs the [blender-mcp](https://github.com/ahujasid/blender-mcp) addon into Blender's scripts/addons dir and enables it headlessly. It is default-on on macOS and fails if selected without Blender. Server side: `blender stdio cmd: uvx blender-mcp` in `packages/mcp-servers.txt`.
 
 ### macOS-specific
 
@@ -82,7 +82,7 @@ Rust tools are installed via `cargo-binstall` -- pre-built binaries from GitHub 
 
 **macOS** uses Homebrew at `/opt/homebrew` with native bottles. Rust gets Homebrew's code-signed `rustup` (required on Sequoia+). System preferences are set via `defaults write`.
 
-**Linux** uses Homebrew at `$LOCAL_PLAT/brew/` -- a rootless prefix with its own glibc. No sudo, no Docker, no container.
+**Linux** uses Homebrew at `$LOCAL_PLAT/brew/` -- a rootless prefix with its own glibc. The public package-manager bootstrap needs no sudo, Docker, or container; the NVIDIA overlay's default-on nv-pptx runner requires Docker (`DF_DO_NV_PPTX=0` skips it).
 
 ### PLAT isolation
 
@@ -116,7 +116,8 @@ dotfiles/
 ├── packages/
 │   ├── Brewfile               # Homebrew (macOS + Linux, single file)
 │   ├── cargo.txt              # Rust tools (cargo-binstall)
-│   ├── pip.txt                # Python packages (uv)
+│   ├── python.txt             # Libraries available from plain Python
+│   ├── pip.txt                # Python CLI tools (uv)
 │   ├── pip-full.txt           # Full-profile Python tools
 │   ├── npm.txt                # Global npm packages
 │   ├── npm-allow-scripts.txt  # Reviewed global npm lifecycle hooks
@@ -172,7 +173,8 @@ bash install/rust.sh
 # Homebrew → packages/Brewfile, then:
 brew bundle --file=packages/Brewfile
 
-# Python core → packages/pip.txt; optional full tools → packages/pip-full.txt
+# Plain Python libraries → packages/python.txt
+# Python CLI tools → packages/pip.txt; optional full tools → packages/pip-full.txt
 bash install/python.sh
 ```
 

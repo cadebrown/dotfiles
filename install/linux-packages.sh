@@ -175,7 +175,10 @@ _run_brew_bundle() {
     shift
 
     brew bundle install "$@" --file="$_brewfile" 2>&1 || _exit=$?
-    [[ "$_exit" -eq 0 ]] && return 0
+    if [[ "$_exit" -eq 0 ]]; then
+        brew bundle check "$@" --file="$_brewfile"
+        return
+    fi
     [[ "$_exit" -lt 128 ]] || return "$_exit"
 
     brew bundle check "$@" --file="$_brewfile" || return "$_exit"
@@ -184,6 +187,7 @@ _run_brew_bundle() {
     _exit=0
     brew bundle install "$@" --file="$_brewfile" 2>&1 || _exit=$?
     [[ "$_exit" -eq 0 ]] || return "$_exit"
+    brew bundle check "$@" --file="$_brewfile" || return
     log_okay "brew bundle retry completed cleanly"
 }
 
@@ -230,7 +234,7 @@ fi
 
 # Capture git path before brew shellenv modifies PATH.
 _GIT_PATH="$(command -v git 2>/dev/null || true)"
-eval "$($_REAL_BREW_PREFIX/bin/brew shellenv)"
+eval "$("$_REAL_BREW_PREFIX/bin/brew" shellenv)"
 export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_ENV_HINTS=1
 [[ -n "$_GIT_PATH" ]] && export HOMEBREW_GIT_PATH="$_GIT_PATH"
 unset _GIT_PATH
@@ -286,7 +290,7 @@ brew_glibc_build() {
         *)       _baseline="" ;;
     esac
     (
-        bash "$DF_INSTALL_DIR/patch-homebrew-optflags.sh" || true
+        bash "$DF_INSTALL_DIR/patch-homebrew-optflags.sh"
         export HOMEBREW_OPTFLAGS_PLAT="$_baseline"
         export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
         brew "$@" 2>&1
@@ -350,16 +354,16 @@ else
         # combination it can't dig itself out of: the keg stays behind the
         # bottles. Upgrading the host, or dropping the keg and reinstalling every
         # formula against the host loader, are the only ways out.
-        log_warn "brew glibc $_glibc_have is behind formula $_glibc_want, but host glibc is only $_sys_glibc"
-        log_warn "  Homebrew refuses to build a glibc newer than the host — newly poured bottles will fail to load."
-        log_warn "  See docs/usage/troubleshooting.md (\"GLIBC_x.y not found\")."
+        log_fail "brew glibc $_glibc_have is behind formula $_glibc_want, but host glibc is only $_sys_glibc"
+        log_fail "  Homebrew refuses to build a glibc newer than the host — newly poured bottles will fail to load."
+        die "See docs/usage/troubleshooting.md (\"GLIBC_x.y not found\")"
     else
         log_info "Upgrading brew glibc $_glibc_have → $_glibc_want (builds from source, ~2 min)..."
         if brew_glibc_build upgrade glibc; then
             _glibc_changed=1
             log_okay "brew glibc upgraded to $_glibc_want"
         else
-            log_warn "brew glibc upgrade failed — bottles newer than $_glibc_have will not load"
+            die "brew glibc upgrade failed — bottles newer than $_glibc_have will not load"
         fi
     fi
     unset _glibc_outdated _glibc_have _glibc_want
@@ -386,6 +390,7 @@ else
     log_info "Pre-installing gcc@13 (source-build compiler before brew bundle)..."
     brew install gcc@13 2>&1
 fi
+
 export HOMEBREW_CC=gcc-13
 export HOMEBREW_CXX=g++-13
 log_info "Source-build compiler pinned to gcc-13 (gcc-15 breaks m4/ncurses configure)"
@@ -435,10 +440,22 @@ unset _openssl_cert _brew_ca_cert
 # Patching requires the tap to be cloned locally (HOMEBREW_NO_INSTALL_FROM_API=1).
 # Without this, Homebrew uses a pre-built JSON API and formula files aren't present.
 export HOMEBREW_NO_INSTALL_FROM_API=1
+
+# Casks are macOS-only in this repo. A legacy homebrew/cask tap in a Linux
+# prefix can make `brew update` fail while loading macOS-only DSL constants.
+_linux_taps="$(brew tap 2>&1)" || die "Could not list Homebrew taps"
+if grep -Fxq homebrew/cask <<< "$_linux_taps"; then
+    run_logged brew untap homebrew/cask \
+        || die "Could not remove the macOS-only homebrew/cask tap from Linux"
+    log_okay "Removed macOS-only homebrew/cask tap from Linux prefix"
+fi
+unset _linux_taps
+
 log_info "Tapping homebrew-core for editable formulas..."
-# Note: grep -v exits 1 if it matches nothing (no Warning lines), which would kill
-# the script under set -euo pipefail. The '|| true' absorbs that non-fatal exit.
-brew tap homebrew/core --force 2>&1 | grep -v "^Warning" | head -5 || true
+_tap_output="$(brew tap homebrew/core --force 2>&1)" \
+    || die "Could not tap homebrew/core for editable formulas"
+printf '%s\n' "$_tap_output" | grep -v "^Warning" | head -5 || true
+unset _tap_output
 
 ### Refresh formula definitions ###
 #
@@ -458,7 +475,7 @@ _core_repo="$(brew --repo homebrew/core)"
 _brew_repo="$(brew --repo)"
 [[ -d "$_core_repo/.git" ]] && { git -C "$_core_repo" checkout -- Formula/ 2>/dev/null || true; }
 [[ -d "$_brew_repo/.git" ]] && { git -C "$_brew_repo" checkout -- Library/ 2>/dev/null || true; }
-run_logged brew update || log_warn "brew update failed — formula definitions may be stale"
+run_logged brew update || die "brew update failed — refusing to install from stale formula definitions"
 unset _core_repo _brew_repo
 
 if [[ "${DF_PATCH_BREW_ALL:-1}" == "0" ]]; then
@@ -605,8 +622,7 @@ _bundle_exit=0
 # shellcheck disable=SC2086
 _run_brew_bundle "$_BREWFILE_TMP" $_bundle_flags || _bundle_exit=$?
 if [[ "$_bundle_exit" -ne 0 ]]; then
-    log_warn "brew bundle completed with failures (exit $_bundle_exit) — some packages may not be installed"
-    log_warn "Run 'brew bundle install --file=~/dotfiles/packages/Brewfile' to retry"
+    die "brew bundle failed with exit $_bundle_exit; every Brewfile declaration is required"
 fi
 
 if [[ "${DF_PATCH_BREW_ALL:-1}" != "0" && "${DF_PATCH_BREW_GECODE:-1}" != "0" ]]; then
@@ -792,6 +808,7 @@ if [[ -f "$_GLIBC_LIBC" ]]; then
         log_warn "  Their binaries fail with \"version \`GLIBC_x.y' not found\"."
         log_warn "  See docs/usage/troubleshooting.md (\"GLIBC_x.y not found\")."
         rm -f "$_SCAN_STAMP"
+        die "Homebrew installed kegs that cannot load against its glibc"
     fi
     unset _provided _find_args _offenders _keg _need
 fi

@@ -72,6 +72,8 @@ if [[ "$_CMD" != "install" ]]; then
     die "Usage: vscode.sh [install|sync-extensions]"
 fi
 
+has code || die "code CLI not found — set DF_DO_VSCODE=0 on machines without VS Code"
+
 ### Settings symlinks ###
 
 log_section "VS Code"
@@ -86,7 +88,7 @@ case "$OS" in
 esac
 
 if [[ ! -d "$_SRC_DIR" ]]; then
-    log_warn "Source dir $_SRC_DIR not found — run chezmoi apply first"
+    die "Source dir $_SRC_DIR not found — chezmoi apply must complete before VS Code setup"
 else
     ensure_dir "$_CODE_DIR"
 
@@ -128,16 +130,12 @@ unset _SRC_DIR _CODE_DIR _FILES _f _src _dst _cur _bak
 
 log_section "VS Code extensions"
 
-if ! has code; then
-    log_warn "code CLI not found — skipping extensions (run 'Shell Command: Install code command in PATH' from VS Code)"
-    exit 0
-fi
-
 EXT_TXT="$DF_PACKAGES/vscode-extensions.txt"
-[[ -f "$EXT_TXT" ]] || { log_warn "No vscode-extensions.txt at $EXT_TXT — skipping"; exit 0; }
+[[ -f "$EXT_TXT" ]] || die "No vscode-extensions.txt at $EXT_TXT"
 
 # Get currently installed extensions once
-_installed="$(code --list-extensions 2>/dev/null || true)"
+_installed="$(code --list-extensions)" \
+    || die "Failed to list installed VS Code extensions"
 
 _ok=0 _skip=0 _fail=0
 
@@ -152,11 +150,11 @@ while IFS= read -r line; do
     fi
 
     log_info "  $ext"
-    if code --install-extension "$ext" --force >/dev/null 2>&1; then
+    if _output="$(code --install-extension "$ext" --force 2>&1)"; then
         log_okay "  installed $ext"
         (( _ok++ )) || true
     else
-        log_warn "  fail  $ext"
+        log_warn "  fail  $ext: ${_output//$'\n'/ }"
         (( _fail++ )) || true
     fi
 done < "$EXT_TXT"
@@ -167,8 +165,22 @@ done < "$EXT_TXT"
 # (github.copilot-chat) even though they are current.
 if [[ "${DF_MODE:-}" == "upgrade" ]]; then
     log_info "Updating installed extensions"
-    code --update-extensions >/dev/null 2>&1 || \
-        log_warn "Extension update pass failed — run 'code --update-extensions'"
+    run_logged code --update-extensions \
+        || die "VS Code extension update pass failed"
 fi
 
 log_okay "VS Code extensions: ${_ok} installed, ${_skip} already present, ${_fail} failed"
+(( _fail == 0 )) || die "VS Code failed to install $_fail declared extension(s)"
+
+_installed="$(code --list-extensions)" \
+    || die "Failed to verify installed VS Code extensions"
+_missing=0
+while IFS= read -r line; do
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    ext="${line%% *}"
+    if ! grep -qxF "$ext" <<< "$_installed"; then
+        log_warn "  missing  $ext"
+        (( _missing++ )) || true
+    fi
+done < "$EXT_TXT"
+(( _missing == 0 )) || die "VS Code is missing $_missing declared extension(s) after installation"

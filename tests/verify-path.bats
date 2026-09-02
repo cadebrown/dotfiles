@@ -29,6 +29,17 @@ teardown() {
     [[ "$output" == *"Compiled binary in ~/.local/bin/: native-tool"* ]]
 }
 
+@test "PLAT mode rejects symlinks to native binaries in shared ~/.local/bin" {
+    rm -f "$TEST_HOME/.local/bin/native-tool"
+    ln -s /bin/echo "$TEST_HOME/.local/bin/native-tool"
+
+    run env HOME="$TEST_HOME" DF_USE_PLAT=1 PATH=/usr/bin:/bin \
+        bash "$REPO/install/verify-path.sh" --arch
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Compiled symlink in ~/.local/bin/: native-tool"* ]]
+}
+
 @test "Node installer pins nvm and targets the supported LTS major" {
     grep -q 'DF_NVM_VERSION:-v0.40.7' "$REPO/install/node.sh"
     grep -q 'DF_NODE_MAJOR:-24' "$REPO/install/node.sh"

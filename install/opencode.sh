@@ -68,8 +68,8 @@ _emit_opencode_mcp() {
 
 _sync_config() {
     log_section "OpenCode config"
-    has jq || { log_warn "jq missing — skipping opencode config"; return 0; }
-    has chezmoi || { log_warn "chezmoi missing — skipping opencode config"; return 0; }
+    has jq || die "jq missing — cannot generate opencode config"
+    has chezmoi || die "chezmoi missing — cannot generate opencode config"
 
     local _tmpl="$DF_ROOT/home/dot_config/opencode/create_private_opencode.json.tmpl"
     local _out="$HOME/.config/opencode/opencode.json" _base _mcp _tmp
@@ -80,7 +80,7 @@ _sync_config() {
 
     _tmp="$(mktemp)"
     printf '%s' "$_base" | jq --argjson mcp "$_mcp" '.mcp = $mcp' > "$_tmp" \
-        || { log_warn "opencode config assembly failed"; rm -f "$_tmp"; return 1; }
+        || { log_fail "opencode config assembly failed"; rm -f "$_tmp"; return 1; }
 
     ensure_dir "$HOME/.config/opencode"
     if [[ -f "$_out" ]] && cmp -s "$_tmp" "$_out"; then
@@ -99,10 +99,10 @@ _sync_config() {
 case "$_mode" in
     install)
         log_section "OpenCode (binary check)"
-        if has opencode; then
+        if has opencode && tool_entrypoint_healthy "$(command -v opencode)"; then
             log_okay "opencode: $(opencode --version 2>/dev/null | head -1)"
         else
-            log_warn "opencode not found — skipping binary (run: brew install opencode)"
+            die "opencode is missing or unhealthy — install the Brewfile declaration first"
         fi
         _sync_config
         ;;

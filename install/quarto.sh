@@ -10,9 +10,11 @@ QUARTO_VERSION="${DF_QUARTO_VERSION:-1.10.18}"
 
 if [[ "$OS" == "darwin" ]]; then
     if has quarto; then
-        log_okay "Quarto: $(quarto --version 2>&1 | head -1)"
+        _quarto_version="$(quarto --version 2>&1)" \
+            || die "Quarto is installed but does not start: $_quarto_version"
+        log_okay "Quarto: $(tail -1 <<< "$_quarto_version")"
     else
-        log_warn "Quarto is managed by the macOS Homebrew cask; re-run package installation"
+        die "Quarto is managed by the selected macOS Homebrew cask but is not on PATH"
     fi
     exit 0
 fi
@@ -20,10 +22,7 @@ fi
 case "$ARCH" in
     x86_64) _quarto_arch="amd64" ;;
     aarch64) _quarto_arch="arm64" ;;
-    *)
-        log_warn "No rootless Quarto archive configured for Linux $ARCH"
-        exit 0
-        ;;
+    *) die "No rootless Quarto archive configured for Linux $ARCH" ;;
 esac
 
 _quarto_name="quarto-${QUARTO_VERSION}-linux-${_quarto_arch}.tar.gz"
@@ -68,11 +67,12 @@ fi
 
 ensure_dir "$ARCH_BIN"
 if [[ -e "$ARCH_BIN/quarto" && ! -L "$ARCH_BIN/quarto" ]]; then
-    log_warn "Not replacing non-symlink $ARCH_BIN/quarto"
+    die "Cannot install Quarto over non-symlink: $ARCH_BIN/quarto"
 else
     ln -sfn "$_quarto_bin" "$ARCH_BIN/quarto"
 fi
 
-if [[ -x "$ARCH_BIN/quarto" ]]; then
-    log_okay "Quarto: $($_quarto_bin --version 2>&1 | head -1)"
-fi
+[[ -x "$ARCH_BIN/quarto" ]] || die "Quarto link is not executable: $ARCH_BIN/quarto"
+_quarto_version="$("$ARCH_BIN/quarto" --version 2>&1)" \
+    || die "Quarto is installed but does not start: $_quarto_version"
+log_okay "Quarto: $(tail -1 <<< "$_quarto_version")"

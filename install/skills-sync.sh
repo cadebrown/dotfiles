@@ -36,6 +36,14 @@ _lockfile() {
     fi
 }
 
+_installed_receipt_hash() {
+    local _dir="$1" _lock
+    _lock="$(_lockfile)"
+    [[ -f "$_lock" ]] || return 1
+    jq -er --arg name "$_dir" '.skills[$name].skillFolderHash // empty' \
+        "$_lock" 2>/dev/null
+}
+
 _skill_tree_hash() {
     local _skill_dir="$1" _hash_tmp _hash
     _hash_tmp="$(mktemp -d)"
@@ -53,6 +61,13 @@ _declared_dirs() {
     local _file
     while IFS= read -r _file; do
         awk '!/^[[:space:]]*(#|$)/ { print $1 }' "$_file"
+    done < <(overlay_package_files "agent-skills.txt")
+}
+
+_npx_dirs() {
+    local _file
+    while IFS= read -r _file; do
+        awk '!/^[[:space:]]*(#|$)/ && ($2 == "npx" || $2 == "npx-all") { print $1 }' "$_file"
     done < <(overlay_package_files "agent-skills.txt")
 }
 
@@ -84,7 +99,9 @@ _write_digest_lock() {
 }
 
 _check_registry() {
-    local _lock _tmp _dir _expected _actual _missing=0 _extra=0 _unlocked=0 _modified=0
+    local _permit_modified="${1:-0}"
+    local _lock _tmp _dir _expected _actual
+    local _missing=0 _extra=0 _unlocked=0 _modified=0 _hashfail=0
     _lock="$(_lockfile)"
     _tmp="$(mktemp -d)"
     _declared_dirs | sort -u > "$_tmp/declared"
@@ -130,7 +147,10 @@ _check_registry() {
                 continue
             fi
             _actual="$(_skill_tree_hash "$_SKILLS_DIR/$_dir")"
-            if [[ -z "$_actual" || "$_actual" != "$_expected" ]]; then
+            if [[ -z "$_actual" ]]; then
+                log_warn "could not hash installed skill: $_dir"
+                (( _hashfail++ )) || true
+            elif [[ "$_actual" != "$_expected" ]]; then
                 log_warn "modified installed skill: $_dir (content differs from committed digest)"
                 (( _modified++ )) || true
             fi
@@ -140,13 +160,18 @@ _check_registry() {
         _unlocked=1
     fi
 
-    if (( _missing == 0 && _extra == 0 && _unlocked == 0 && _modified == 0 )); then
+    if (( _missing == 0 && _extra == 0 && _unlocked == 0 && _modified == 0 && _hashfail == 0 )); then
         rm -rf "$_tmp"
         log_okay "Agent skill registry matches the installed tree"
         return 0
     fi
     rm -rf "$_tmp"
-    log_warn "Agent skill drift: $_missing missing, $_extra unmanaged, $_unlocked unlocked, $_modified modified"
+    log_warn "Agent skill drift: $_missing missing, $_extra unmanaged, $_unlocked unlocked, $_modified modified, $_hashfail unreadable"
+    if [[ "$_permit_modified" == "1" ]] \
+       && (( _missing == 0 && _extra == 0 && _unlocked == 0 && _hashfail == 0 )); then
+        log_warn "Preserving $_modified locally modified skill(s); read-only check mode still reports this drift"
+        return 0
+    fi
     return 1
 }
 
@@ -155,7 +180,7 @@ case "$_mode" in
     lock) _write_digest_lock; exit 0 ;;
 esac
 
-has npx || { log_warn "npx not found — run install/node.sh first; skipping"; exit 0; }
+has npx || die "npx not found — install/node.sh must complete before agent skill sync"
 
 _sync_from() {
     local file="$1" line _dir _type _rest
@@ -207,8 +232,8 @@ _sync_from() {
                 # Tool installs its own skill; only when the binary exists.
                 local _bin="${_rest%% *}"
                 if ! has "$_bin"; then
-                    log_info "  skip  $_dir ($_bin not installed)"
-                    (( _skip++ )) || true
+                    log_warn "  fail  $_dir ($_bin not installed)"
+                    (( _fail++ )) || true
                     continue
                 fi
                 log_info "  $_dir ← $_rest"
@@ -229,17 +254,47 @@ _sync_from() {
     done < "$file"
 }
 
-# In upgrade mode, refresh npx-installed skills in bulk first (lockfile-aware:
-# ~/.agents/.skill-lock.json — moves to $XDG_STATE_HOME/skills/ if that var is
-# ever set; our profiles don't set it). Without this, installed skills are
-# frozen at first-install version and `bootstrap upgrade` would silently skip
-# them. Note: skills CLI ≥ 1.5 also PRUNES skills deleted upstream here.
+# The committed digest is an audit baseline, not an update receipt: after a
+# legitimate upstream update it intentionally remains stale until reviewed and
+# re-locked. The skills CLI's mutable lock records the last content it installed,
+# so use that receipt to distinguish another safe update from a local edit.
 if [[ "${DF_MODE:-}" == "upgrade" ]]; then
-    log_info "Updating npx-installed skills (lockfile-aware)"
+    log_info "Updating npx skills unchanged since their last install"
     # NOTE: no `-a claude-code` here — skills CLI ≥ 1.5 matches update targets
     # against the generic ~/.agents tree and an agent filter matches nothing
     # (verified July 2026: `-a claude-code` silently updates 0 skills).
-    run_logged npx -y skills update -g < /dev/null || log_warn "npx skills update failed"
+    has git || die "git is required to preserve modified skills during upgrade"
+    has jq || die "jq is required to preserve modified skills during upgrade"
+    _upgrade_skills=()
+    while IFS= read -r _dir; do
+        _expected="$(_installed_receipt_hash "$_dir" || true)"
+        if [[ -z "$_expected" ]]; then
+            # Migration path for installs predating the mutable receipt. This
+            # only authorizes the first update when the tree still matches the
+            # reviewed digest; npx writes its receipt during that update.
+            _expected="$(jq -r --arg name "$_dir" '.skills[$name] // ""' "$_DIGEST_LOCK")"
+            if [[ -z "$_expected" ]]; then
+                log_warn "  preserve  $_dir (no installed receipt or committed digest)"
+                continue
+            fi
+        fi
+        _actual="$(_skill_tree_hash "$_SKILLS_DIR/$_dir")"
+        if [[ -z "$_actual" ]]; then
+            log_info "  defer  $_dir (missing or unreadable; sync below will repair it)"
+            continue
+        fi
+        if [[ "$_actual" != "$_expected" ]]; then
+            log_warn "  preserve  $_dir (locally modified since last install)"
+            continue
+        fi
+        _upgrade_skills+=("$_dir")
+    done < <(_npx_dirs | sort -u)
+
+    if (( ${#_upgrade_skills[@]} > 0 )) \
+       && ! run_logged npx -y skills update "${_upgrade_skills[@]}" -g < /dev/null; then
+        log_warn "npx skills update failed"
+        (( _fail++ )) || true
+    fi
 fi
 
 while IFS= read -r _file; do
@@ -247,4 +302,5 @@ while IFS= read -r _file; do
 done < <(overlay_package_files "agent-skills.txt")
 
 log_okay "Agent skills: ${_ok} installed, ${_skip} already present, ${_fail} failed"
-_check_registry || log_warn "Run 'bash install/skills-sync.sh check' after reconciling the reported drift"
+(( _fail == 0 )) || die "Agent skill sync failed for $_fail declared skill operation(s)"
+_check_registry 1 || die "Agent skill registry is incomplete; run 'bash install/skills-sync.sh check' for details"

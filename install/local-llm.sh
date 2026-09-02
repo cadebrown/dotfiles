@@ -36,8 +36,6 @@ ensure_dir "$LOCAL_PLAT/.cache/huggingface"
 log_okay "HF_HOME → $LOCAL_PLAT/.cache/huggingface"
 
 ### Binary checks ###
-# Warn (not fail) — targeted runs may have skipped step 4 or 6.
-
 _missing=0
 
 # The whole local-inference stack is macOS-only: MLX needs Apple Metal
@@ -45,29 +43,31 @@ _missing=0
 # sits inside the Brewfile's `if OS.mac?` block. On Linux none of it is ever
 # installed, so checking is noise and pulling MLX models is impossible.
 if [[ "$OS" == "darwin" ]]; then
-    if has ollama; then
+    if has ollama && tool_entrypoint_healthy "$(command -v ollama)"; then
         log_okay "ollama: $(ollama --version 2>/dev/null | head -1)"
     else
-        log_warn "ollama not found — run: brew install ollama  (or re-run install/homebrew.sh)"
+        log_warn "ollama is missing or unhealthy — re-run install/homebrew.sh"
         (( _missing++ )) || true
     fi
 
-    if has mlx_lm.generate; then
-        log_okay "mlx-lm: present"
+    if has mlx_lm.generate && tool_entrypoint_healthy "$(command -v mlx_lm.generate)"; then
+        log_okay "mlx-lm runtime check passed"
     else
-        log_warn "mlx_lm.generate not found — run: uv tool install mlx-lm"
+        log_warn "mlx_lm.generate is missing or unhealthy — re-run install/python.sh"
         (( _missing++ )) || true
     fi
 
-    if has mlx-openai-server; then
-        log_okay "mlx-openai-server: present (tool-calling MLX server)"
+    if has mlx-openai-server && tool_entrypoint_healthy "$(command -v mlx-openai-server)"; then
+        log_okay "mlx-openai-server runtime check passed"
     else
-        log_warn "mlx-openai-server not found — run: uv tool install mlx-openai-server"
+        log_warn "mlx-openai-server is missing or unhealthy — re-run install/python.sh"
         (( _missing++ )) || true
     fi
 fi
 
-[[ "$_missing" -gt 0 ]] && log_warn "$_missing tool(s) missing — re-run after step 4/6 completes"
+if [[ "$_missing" -gt 0 ]]; then
+    die "$_missing required local LLM tool(s) are missing"
+fi
 
 ### MLX model pre-pull (opt-in via `pull-models` arg) ###
 if [[ "$_mode" == "pull-models" ]]; then
@@ -83,6 +83,7 @@ if [[ "$_mode" == "pull-models" ]]; then
     _models_file="$DF_PACKAGES/mlx-models.txt"
     [[ -r "$_models_file" ]] || die "missing $_models_file"
 
+    _pull_failed=0
     while IFS= read -r _model; do
         # skip comments + blanks
         _model="${_model%%#*}"
@@ -102,9 +103,11 @@ if [[ "$_mode" == "pull-models" ]]; then
         if mlx_lm.generate --model "$_model" --prompt "x" --max-tokens 1 >/dev/null 2>&1; then
             log_okay "pulled $_model"
         else
-            log_warn "pull failed for $_model — check name / network"
+            log_fail "pull failed for $_model — check name / network"
+            ((_pull_failed++)) || true
         fi
     done < "$_models_file"
+    [[ "$_pull_failed" -eq 0 ]] || die "$_pull_failed declared MLX model pull(s) failed"
 fi
 
 log_okay "Local LLM tooling ready"

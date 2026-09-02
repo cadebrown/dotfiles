@@ -21,12 +21,8 @@ else
     run_logged bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
 
-# Ensure brew is on PATH for this session (needed right after install)
-if [[ -x "/opt/homebrew/bin/brew" ]]; then
-    eval "$(/opt/homebrew/bin/brew shellenv)"
-elif [[ -x "/usr/local/bin/brew" ]]; then
-    eval "$(/usr/local/bin/brew shellenv)"
-fi
+# Ensure brew is on PATH for this session (needed right after install).
+activate_homebrew || die "Homebrew was installed but could not be activated"
 
 ### Apply Brewfile ###
 
@@ -65,9 +61,13 @@ if brew list --formula docker-completion &>/dev/null; then
         log_warn "Could not remove docker-completion — run 'brew link --overwrite docker' if bundle fails"
 fi
 
-# Reconcile declarations without allowing a cask prompt to block formula work.
+# Reconcile declarations without allowing a cask prompt to block formula work,
+# then ask Bundle to verify the declared state instead of trusting install's
+# exit alone.
 run_logged brew bundle install --no-upgrade --file="$BREWFILE" \
-    || log_warn "Some Brewfile packages failed — re-run homebrew.sh to retry"
+    || die "Homebrew could not install every Brewfile declaration"
+run_logged brew bundle check --no-upgrade --file="$BREWFILE" \
+    || die "Homebrew reports unsatisfied Brewfile declarations after install"
 
 # brew bundle skips casks marked `auto_updates: true` (Cursor, VS Code, iTerm2,
 # etc.) even with upgrades enabled — those casks self-update in place, leaving
@@ -75,7 +75,8 @@ run_logged brew bundle install --no-upgrade --file="$BREWFILE" \
 # the cask record matches the running app version.
 if [[ "$_brew_upgrade" != "0" ]]; then
     log_info "Upgrading Homebrew formulae"
-    run_logged brew upgrade --formula --yes || log_warn "Some formula upgrades failed"
+    run_logged brew upgrade --formula --yes \
+        || die "Homebrew formula upgrade failed"
 
     # Some auto-updating casks ask Homebrew to inspect privileged launchd state.
     # Only enter that path when sudo is already cached; otherwise the prompt is
@@ -84,7 +85,8 @@ if [[ "$_brew_upgrade" != "0" ]]; then
     if [[ "$_upgrade_casks" == "1" ]] \
         || { [[ "$_upgrade_casks" == "auto" ]] && sudo -n true 2>/dev/null; }; then
         log_info "Upgrading auto-updating casks (--greedy)"
-        run_logged brew upgrade --cask --greedy --yes || log_warn "Some greedy cask upgrades failed"
+        run_logged brew upgrade --cask --greedy --yes \
+            || die "Homebrew cask upgrade failed"
     elif [[ "$_upgrade_casks" != "0" ]]; then
         log_info "Cask upgrades deferred: cache sudo first with 'sudo -v', or set DF_BREW_UPGRADE_CASKS=1"
     fi
@@ -95,7 +97,8 @@ if [[ "$_brew_upgrade" != "0" ]]; then
     # or not signed in to the App Store.
     if [[ "$OS" == "darwin" ]] && has mas; then
         log_info "Upgrading Mac App Store apps (mas)"
-        run_logged mas upgrade || log_warn "mas upgrade failed (signed in to the App Store?)"
+        run_logged mas upgrade \
+            || die "Mac App Store upgrade failed (signed in to the App Store?)"
     fi
 fi
 

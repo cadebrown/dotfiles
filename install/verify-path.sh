@@ -62,7 +62,6 @@ _append_unique_dir() {
 _append_unique_dir "$LOCAL_PLAT/bin"
 _append_unique_dir "$LOCAL_PLAT/cargo/bin"
 _append_unique_dir "$HOME/.local/bin"
-[[ -d "$LOCAL_PLAT/venv/bin" ]] && _append_unique_dir "$LOCAL_PLAT/venv/bin"
 
 # If nvm has a default node, include it
 if [[ -d "$NVM_DIR/versions/node" ]]; then
@@ -132,6 +131,23 @@ if [[ "$CHECK_ARCH" == "1" ]]; then
             ((ERRORS += _compiled))
         else
             log_okay "$HOME/.local/bin/ has no compiled binaries (arch-neutral only)"
+        fi
+
+        _compiled_links=0
+        for bin in "$_local_bin"/*; do
+            [[ -L "$bin" && -e "$bin" ]] || continue
+            file_out="$(file -bL "$bin" 2>/dev/null || true)"
+            case "$file_out" in
+                ELF*|Mach-O*)
+                    log_fail "Compiled symlink in ~/.local/bin/: $(basename "$bin") → $(readlink "$bin")"
+                    ((_compiled_links++)) || true
+                    ;;
+            esac
+        done
+        if (( _compiled_links > 0 )); then
+            ((ERRORS += _compiled_links))
+        else
+            log_okay "$HOME/.local/bin/ has no compiled symlink targets"
         fi
     fi
 fi

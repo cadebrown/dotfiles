@@ -52,7 +52,7 @@ opening its files first? Read the rule directly:
 | `homebrew.md` | Brewfile, homebrew/linux-packages/patch-homebrew scripts | Homebrew-on-Linux build lore: formula patch catalog, glibc/GCC 15 traps, tap trust |
 | `chezmoi-home.md` | `home/**` | template rules, shared partials, shell-profile invariants, locale/LC_ALL handling |
 | `agent-tooling.md` | claude/codex/skills/memory scripts + package lists | MCP auth patterns, rtk hooks, chezmoi-guard, harness full-auto config, plugin three-places rule |
-| `toolchains.md` | `install/cmake/**`, `install/plat/**` | CMake toolchains, CUDA convention, ccache/sccache, `tc` switching |
+| `toolchains.md` | `install/cmake/**`, `install/plat/**` | CMake toolchains, CUDA convention, ccache/sccache |
 
 ## PATH priority
 

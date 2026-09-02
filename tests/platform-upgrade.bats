@@ -21,6 +21,25 @@ setup() {
     bash -n "$REPO/install/patch-homebrew-gecode.sh"
 }
 
+@test "Homebrew activation works when brew was absent from the original PATH" {
+    fake_bin="$BATS_TEST_TMPDIR/fresh-brew/bin"
+    mkdir -p "$fake_bin"
+    printf '%s\n' '#!/bin/sh' \
+        'if [ "$1" = shellenv ]; then' \
+        "  printf 'export PATH=%s:\\$PATH\\n' '$fake_bin'" \
+        'fi' > "$fake_bin/brew"
+    chmod +x "$fake_bin/brew"
+
+    run env PATH="/usr/bin:/bin" DF_HOMEBREW_BIN="$fake_bin/brew" REPO="$REPO" bash -c '
+        source "$REPO/install/_lib.sh"
+        activate_homebrew
+        command -v brew
+    '
+
+    [ "$status" -eq 0 ]
+    [ "$output" = "$fake_bin/brew" ]
+}
+
 @test "macOS rustup comes from the declared Homebrew prefix" {
     grep -Eq '^[[:space:]]*brew "rustup"' "$REPO/packages/Brewfile"
     grep -q 'brew --prefix rustup' "$REPO/install/rust.sh"
@@ -58,6 +77,12 @@ setup() {
     grep -q '^export DF_BREW_UPGRADE$' "$REPO/bootstrap.sh"
     grep -q 'brew bundle install --no-upgrade' "$REPO/install/homebrew.sh"
     grep -q 'brew upgrade --formula --yes' "$REPO/install/homebrew.sh"
+}
+
+@test "macOS Homebrew requires the Brewfile to be fully satisfied" {
+    grep -q 'brew bundle check --no-upgrade --file="\$BREWFILE"' \
+        "$REPO/install/homebrew.sh"
+    ! grep -q 'Some Brewfile packages failed' "$REPO/install/homebrew.sh"
 }
 
 @test "Homebrew download concurrency is bounded and configurable" {
@@ -602,11 +627,42 @@ RUBY
     ' _ "$REPO" "$brewfile"
 
     [ "$status" -eq 0 ]
-    [ "$(wc -l <"$calls")" -eq 3 ]
+    [ "$(wc -l <"$calls")" -eq 4 ]
     [ "$(sed -n '1p' "$calls")" = "bundle install --no-upgrade --file=$brewfile" ]
     [ "$(sed -n '2p' "$calls")" = "bundle check --no-upgrade --file=$brewfile" ]
     [ "$(sed -n '3p' "$calls")" = "bundle install --no-upgrade --file=$brewfile" ]
+    [ "$(sed -n '4p' "$calls")" = "bundle check --no-upgrade --file=$brewfile" ]
     [[ "$output" == *"brew bundle retry completed cleanly"* ]]
+}
+
+@test "Linux Bundle verifies a successful install against the Brewfile" {
+    local brewfile="$BATS_TEST_TMPDIR/Brewfile"
+    local calls="$BATS_TEST_TMPDIR/bundle-success-calls"
+    printf '%s\n' 'brew "graphviz"' >"$brewfile"
+
+    run env CALLS="$calls" DF_USE_PLAT=0 LC_ALL=C LANG=C bash -c '
+        source "$1/install/linux-packages.sh"
+        brew() {
+            printf "%s\n" "$*" >>"$CALLS"
+            [[ "$1 $2" == "bundle install" ]] && return 0
+            [[ "$1 $2" == "bundle check" ]] && return 11
+            return 98
+        }
+        _run_brew_bundle "$2" --no-upgrade
+    ' _ "$REPO" "$brewfile"
+
+    [ "$status" -eq 11 ]
+    [ "$(wc -l <"$calls")" -eq 2 ]
+    [ "$(sed -n '1p' "$calls")" = "bundle install --no-upgrade --file=$brewfile" ]
+    [ "$(sed -n '2p' "$calls")" = "bundle check --no-upgrade --file=$brewfile" ]
+}
+
+@test "Linux package reconciliation fails when Bundle remains incomplete" {
+    grep -q 'die "brew bundle failed' "$REPO/install/linux-packages.sh"
+    ! grep -q 'some packages may not be installed' "$REPO/install/linux-packages.sh"
+    ! grep -q 'brew update failed.*definitions may be stale' "$REPO/install/linux-packages.sh"
+    grep -q 'brew tap homebrew/core --force' "$REPO/install/linux-packages.sh"
+    grep -q 'die "Could not tap homebrew/core' "$REPO/install/linux-packages.sh"
 }
 
 @test "Linux Bundle preserves the first failure when dependency check fails" {
@@ -836,8 +892,17 @@ RUBY
 }
 
 @test "Python optional arguments are safe under macOS system Bash nounset" {
-    grep -q '_uv_cmd=(uv tool install "$_pkg")' "$REPO/install/python.sh"
+    grep -q '_uv_cmd=("$_uv" tool install "$_pkg")' "$REPO/install/python.sh"
     ! grep -q '"${_uv_args\[@\]}"' "$REPO/install/python.sh"
+}
+
+@test "Python installer uses the PLAT-owned uv without relying on PATH" {
+    grep -q '_uv="\$ARCH_BIN/uv"' "$REPO/install/python.sh"
+    ! grep -Eq '^[[:space:]]*(run_logged )?uv (venv|pip|tool)' "$REPO/install/python.sh"
+}
+
+@test "Git SSH capability probe cannot inherit an open bootstrap stdin" {
+    grep -q -- '-T "git@\$host" </dev/null >/dev/null 2>&1' "$REPO/install/_lib.sh"
 }
 
 @test "Rust optional flags are safe under macOS system Bash nounset" {

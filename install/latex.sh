@@ -12,12 +12,16 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 log_section "TeX distribution"
 
 if [[ "$OS" == "darwin" ]]; then
-    _texbin=/Library/TeX/texbin
+    _texbin="${DF_MACTEX_BIN:-/Library/TeX/texbin}"
     if [[ ! -x "$_texbin/pdflatex" ]]; then
-        log_warn "MacTeX not found — installed via Brewfile (cask \"mactex\"); run homebrew.sh"
-        exit 0
+        die "MacTeX not found — the selected Brewfile cask did not install successfully"
     fi
     log_okay "MacTeX present: $("$_texbin/pdflatex" --version 2>/dev/null | head -1)"
+    for _tex_cmd in pdflatex latexmk chktex texcount latexdiff; do
+        [[ -x "$_texbin/$_tex_cmd" ]] || die "MacTeX is missing required command: $_tex_cmd"
+        _tex_health="$("$_texbin/$_tex_cmd" --version 2>&1)" \
+            || die "MacTeX command does not start: $_tex_cmd: $_tex_health"
+    done
 
     if [[ "${DF_MODE:-}" == "upgrade" ]]; then
         # The cask only moves on yearly MacTeX releases, so package-level updates
@@ -25,7 +29,8 @@ if [[ "$OS" == "darwin" ]]; then
         # Skip rather than block bootstrap on a password prompt.
         if sudo -n true 2>/dev/null; then
             log_info "Updating TeX Live packages (tlmgr)"
-            run_logged sudo -n "$_texbin/tlmgr" update --self --all || log_warn "tlmgr update failed"
+            run_logged sudo -n "$_texbin/tlmgr" update --self --all \
+                || die "tlmgr update failed"
         else
             log_warn "No sudo ticket — skipping tlmgr. Run: sudo tlmgr update --self --all"
         fi
@@ -59,13 +64,39 @@ _tlmgr="${_tlmgr_glob[0]}"
 run_logged "$_tlmgr" option sys_bin "$ARCH_BIN"
 run_logged "$_tlmgr" path add
 
+# TinyTeX's older default left architecture-specific symlinks in the shared
+# flat bin. The PLAT-local links above supersede only this known legacy layout.
+if [[ "$DF_USE_PLAT" == "1" && -d "$HOME/.local/bin" ]]; then
+    _legacy_tex_links=0
+    for _legacy_tex_link in "$HOME/.local/bin"/*; do
+        [[ -L "$_legacy_tex_link" ]] || continue
+        _legacy_tex_target="$(readlink "$_legacy_tex_link")"
+        case "$_legacy_tex_target" in
+            *"/.TinyTeX/bin/"*)
+                rm -f -- "$_legacy_tex_link"
+                ((_legacy_tex_links++)) || true
+                ;;
+        esac
+    done
+    if (( _legacy_tex_links > 0 )); then
+        log_okay "Removed $_legacy_tex_links legacy flat TinyTeX symlinks"
+    fi
+    unset _legacy_tex_link _legacy_tex_links _legacy_tex_target
+fi
+
 # Paper-writing baseline beyond scheme-infraonly; everything else on demand.
 log_info "Installing base packages (latexmk chktex texcount latexdiff)"
-run_logged "$_tlmgr" install latexmk chktex texcount latexdiff || log_warn "tlmgr install failed for some packages — retry manually"
+run_logged "$_tlmgr" install latexmk chktex texcount latexdiff \
+    || die "tlmgr failed to install the required baseline packages"
 
 if [[ "${DF_MODE:-}" == "upgrade" ]]; then
     log_info "Updating TeX Live packages (tlmgr)"
-    run_logged "$_tlmgr" update --self --all || log_warn "tlmgr update failed"
+    run_logged "$_tlmgr" update --self --all || die "tlmgr update failed"
 fi
 
-log_okay "TeX ready: $("$ARCH_BIN/pdflatex" --version 2>/dev/null | head -1 || echo 'pdflatex pending shell restart')"
+for _tex_cmd in pdflatex latexmk chktex texcount latexdiff; do
+    [[ -x "$ARCH_BIN/$_tex_cmd" ]] || die "TinyTeX is missing required command: $ARCH_BIN/$_tex_cmd"
+    _tex_health="$("$ARCH_BIN/$_tex_cmd" --version 2>&1)" \
+        || die "TinyTeX command does not start: $_tex_cmd: $_tex_health"
+done
+log_okay "TeX ready: $("$ARCH_BIN/pdflatex" --version 2>/dev/null | head -1)"

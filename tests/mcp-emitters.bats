@@ -117,6 +117,28 @@ setup() {
     [[ "$output" == *"unchanged"* ]]
 }
 
+@test "cursor stdio entries resolve through a login shell from a minimal Dock PATH" {
+    source "$REPO_ROOT/install/cursor.sh"
+    mcp_fixture_env
+    fake_bin="$BATS_TEST_TMPDIR/cursor-login-bin"
+    result_file="$BATS_TEST_TMPDIR/cursor-login-result"
+    mkdir -p "$fake_bin"
+    printf '#!/bin/sh\nprintf "%%s\\n" "$*" > "$CURSOR_TEST_RESULT"\n' \
+        > "$fake_bin/solobinary"
+    chmod +x "$fake_bin/solobinary"
+    printf 'export PATH="%s:$PATH"\n' "$fake_bin" > "$HOME/.bash_profile"
+    _sync_cursor_mcp >/dev/null 2>&1
+
+    command="$(jq -r '.mcpServers.bare.command' "$HOME/.cursor/mcp.json")"
+    arg0="$(jq -r '.mcpServers.bare.args[0]' "$HOME/.cursor/mcp.json")"
+    arg1="$(jq -r '.mcpServers.bare.args[1]' "$HOME/.cursor/mcp.json")"
+    run env PATH="/usr/bin:/bin" HOME="$HOME" CURSOR_TEST_RESULT="$result_file" \
+        "$command" "$arg0" "$arg1"
+
+    [ "$status" -eq 0 ]
+    [ -f "$result_file" ]
+}
+
 @test "codex emitter matches golden" {
     source "$REPO_ROOT/install/codex.sh"
     mcp_fixture_env

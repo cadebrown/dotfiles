@@ -2,7 +2,7 @@
 # Usage: install/python.sh reads this after pip.txt when DF_PROFILE=full
 
 # Notebook environment
-jupyterlab
+jupyterlab  # with=jupyterhub
 
 # Local LLM inference
 mlx-lm  # macos-only (Apple MLX framework requires Metal GPU)

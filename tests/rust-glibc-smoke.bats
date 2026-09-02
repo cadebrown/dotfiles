@@ -21,7 +21,9 @@ setup() {
     "badcrate 18.17.0 (registry+https://github.com/rust-lang/crates.io-index)": { "bins": ["badbin"] },
     "yazi-fm 26.5.6 (registry+https://github.com/rust-lang/crates.io-index)": { "bins": ["yazi"] },
     "mixed 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)": { "bins": ["goodbin", "badbin"] },
-    "missinglib 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)": { "bins": ["missinglib"] }
+    "missinglib 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)": { "bins": ["missinglib"] },
+    "exitsbad 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)": { "bins": ["exitsbad"] },
+    "hangs 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)": { "bins": ["hangs"] }
   }
 }
 EOF
@@ -42,8 +44,18 @@ EOF
 echo "missinglib: error while loading shared libraries: libgit2.so.1.9: cannot open shared object file: No such file or directory" >&2
 exit 127
 EOF
+    cat > "$FAKE_CARGO/bin/exitsbad" <<'EOF'
+#!/bin/sh
+exit 1
+EOF
+    cat > "$FAKE_CARGO/bin/hangs" <<'EOF'
+#!/bin/sh
+trap '' TERM
+while :; do :; done
+EOF
     chmod +x "$FAKE_CARGO/bin/goodbin" "$FAKE_CARGO/bin/badbin" \
-        "$FAKE_CARGO/bin/yazi" "$FAKE_CARGO/bin/missinglib"
+        "$FAKE_CARGO/bin/yazi" "$FAKE_CARGO/bin/missinglib" \
+        "$FAKE_CARGO/bin/exitsbad" "$FAKE_CARGO/bin/hangs"
 }
 
 # Run _loader_broken_bins for one crate against the fake CARGO_HOME.
@@ -59,6 +71,27 @@ _probe() {
     run _probe missinglib
     [ "$status" -eq 0 ]
     [ "$output" = "missinglib" ]
+}
+
+@test "flags a declared binary whose version command exits nonzero" {
+    run _probe exitsbad
+    [ "$status" -eq 0 ]
+    [ "$output" = "exitsbad" ]
+}
+
+@test "kills and flags a declared binary whose version command hangs" {
+    DF_TOOL_SMOKE_TIMEOUT=0.1 run _probe hangs
+    [ "$status" -eq 0 ]
+    [ "$output" = "hangs" ]
+}
+
+@test "accepts ripgrep-all helper binaries only on their exact usage errors" {
+    run bash -c '
+        source "'"$REPO_ROOT"'/install/rust.sh"
+        _cargo_usage_error_is_healthy ripgrep_all rga-fzf-open "Error: no filename"
+        ! _cargo_usage_error_is_healthy exitsbad exitsbad "Error: no filename"
+    '
+    [ "$status" -eq 0 ]
 }
 
 @test "flags a bin the loader rejects" {
@@ -98,6 +131,27 @@ _probe() {
     [ -z "$output" ]
 }
 
+@test "cargo entrypoint validation rejects a missing executable" {
+    rm "$FAKE_CARGO/bin/goodbin"
+    run bash -c '
+        source "'"$REPO_ROOT"'/install/rust.sh"
+        CARGO_HOME="'"$FAKE_CARGO"'"
+        _missing_cargo_bins goodcrate
+    '
+    [ "$status" -eq 0 ]
+    [ "$output" = "goodbin" ]
+}
+
+@test "cargo entrypoint validation rejects a missing receipt" {
+    run bash -c '
+        source "'"$REPO_ROOT"'/install/rust.sh"
+        CARGO_HOME="'"$FAKE_CARGO"'"
+        _missing_cargo_bins unknowncrate
+    '
+    [ "$status" -eq 0 ]
+    [ "$output" = "<receipt>" ]
+}
+
 @test "binstall never compiles a musl target internally" {
     grep -q -- '--disable-strategies compile' "$REPO_ROOT/install/rust.sh"
     grep -q 'DF_CARGO_STRATEGIES:-.*== "compile"' "$REPO_ROOT/install/rust.sh"
@@ -111,4 +165,24 @@ _probe() {
     '
     [ "$status" -eq 0 ]
     [[ "$output" == *"env LIBGIT2_NO_PKG_CONFIG=1 cargo install --locked --force rust-docs-mcp"* ]]
+}
+
+@test "rust-docs-mcp accepts only its isolated false GitHub 403 after live probes" {
+    run bash -c '
+        source "'"$REPO_ROOT"'/install/rust.sh"
+        download_stdout() { printf "github"; }
+        git() { printf "deadbeef\\tHEAD\\n"; }
+        _rust_docs_doctor_passed "$1"
+    ' _ $'✅ Rust toolchain: ok\n✅ Nightly toolchain: ok\n✅ Rustdoc JSON: ok\n✅ Git: ok\n❌ Network: crates.io reachable (200 OK) but GitHub unreachable (403 Forbidden)\n✅ Cache directory: ok\n[ERROR] Doctor found 1 issue.'
+    [ "$status" -eq 0 ]
+}
+
+@test "rust-docs-mcp does not hide another doctor failure" {
+    run bash -c '
+        source "'"$REPO_ROOT"'/install/rust.sh"
+        download_stdout() { printf "github"; }
+        git() { printf "deadbeef\\tHEAD\\n"; }
+        _rust_docs_doctor_passed "$1"
+    ' _ $'✅ Rust toolchain: ok\n✅ Nightly toolchain: ok\n✅ Rustdoc JSON: ok\n✅ Git: ok\n❌ Network: crates.io reachable (200 OK) but GitHub unreachable (403 Forbidden)\n❌ Cache directory: broken\n[ERROR] Doctor found 2 issues.'
+    [ "$status" -ne 0 ]
 }

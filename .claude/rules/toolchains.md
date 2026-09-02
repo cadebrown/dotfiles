@@ -21,21 +21,15 @@ CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/gcc.cmake" cmake -B build
 Source files live in `install/cmake/toolchains/` — edit them there, not in the
 deployed copies.
 
-Per-session switching: the `tc` function in `.zshrc` — `tc gcc-13`, `tc gcc-15`,
-`tc llvm-22`, `tc llvm-21`, `tc list`, `tc` (show current). GCC variants set
-CC/CXX/AR/RANLIB/NM; LLVM variants only set CMAKE_TOOLCHAIN_FILE.
+For a per-command switch, set `CMAKE_TOOLCHAIN_FILE` explicitly as above. The
+shell intentionally leaves `tc` to Linux iproute2 traffic control.
 
 ## CUDA convention
 
-CUDA is **not** managed by bootstrap. It must be installed separately (system package,
-NVIDIA runfile, or sysadmin-provided module). To integrate it with the PLAT layout:
-
-```sh
-# Point the per-PLAT symlink at whichever toolkit this machine uses
-ln -sfn /usr/local/cuda              "$_LOCAL_PLAT/.cuda"   # system default
-ln -sfn /opt/nvidia/cuda/12.6        "$_LOCAL_PLAT/.cuda"   # versioned
-ln -sfn "$(which nvcc | xargs dirname)/../" "$_LOCAL_PLAT/.cuda"  # from PATH
-```
+The NVIDIA overlay installs every version declared in
+`dotfiles-nvidia/packages/cuda-versions.txt` under `$LOCAL_PLAT/.cudas/` and
+sets `$LOCAL_PLAT/.cuda` to the first declared version. `DF_CUDA_DEFAULT`
+selects another declared version; `DF_DO_CUDA=0` is the explicit opt-out.
 
 `~/.profile` resolves `$_LOCAL_PLAT/.cuda` via `realpath` and exports:
 - `CUDA_PATH` — used by many build systems and NVCC itself
@@ -46,8 +40,7 @@ Both CMake toolchain files (`llvm.cmake`, `gcc.cmake`) check for
 `$_LOCAL_PLAT/.cuda/bin/nvcc` and set `CMAKE_CUDA_COMPILER` when found.
 `CMAKE_CUDA_HOST_COMPILER` is always set to the toolchain's C++ compiler.
 
-Different machines on a shared NFS home can point `$LOCAL_PLAT/.cuda` at
-different toolkit versions — no conflicts.
+The PLAT-scoped path keeps different machines on a shared NFS home isolated.
 
 ## Compiler caching
 

@@ -30,6 +30,11 @@ _mcp_registry_healthy() (
     source "$_repo/install/_lib.sh"
     mcp_registry_validate
 )
+_managed_python_healthy() (
+    source "$_repo/install/_lib.sh"
+    [[ -x "$PYTHON_ENV/bin/python" ]] || return 1
+    "$PYTHON_ENV/bin/python" -c 'import sympy'
+)
 _node_path_healthy() (
     source "$_repo/install/_lib.sh"
     local _want _actual
@@ -67,6 +72,7 @@ fi
 if _has node; then
     _check "Node default PATH" _node_path_healthy
 fi
+_check "managed Python with SymPy" _managed_python_healthy
 if [[ -f "$_repo/install/skills-sync.sh" ]]; then
     _check "skill registry" bash "$_repo/install/skills-sync.sh" check
 fi
@@ -78,8 +84,10 @@ if [[ -x "$_repo/install/opencode.sh" ]] && _has opencode; then
 fi
 if [[ "$(uname -s)" == "Darwin" ]]; then
     _check "qmd LaunchAgent" launchctl print "gui/$(id -u)/dev.cade.qmd"
-    _check "cass lexical LaunchAgent" launchctl print "gui/$(id -u)/dev.cade.cass-watch"
-    _check "cass semantic LaunchAgent" launchctl print "gui/$(id -u)/dev.cade.cass-semantic"
+fi
+if [[ -f "$_repo/dotfiles-nvidia/install/verify-tools.sh" ]]; then
+    _check "NVIDIA overlay tools" bash \
+        "$_repo/dotfiles-nvidia/install/verify-tools.sh"
 fi
 
 exit "$_fail"

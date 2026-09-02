@@ -44,7 +44,7 @@ _elan="$ELAN_HOME/bin/elan"
 # no-op or pull a surprise 1.5 GB for anyone tracking a channel.
 if [[ "${DF_MODE:-}" == "upgrade" ]]; then
     log_info "Updating elan"
-    run_logged "$_elan" self update || log_warn "elan self update failed"
+    run_logged "$_elan" self update || die "elan self update failed"
 fi
 
 if "$_elan" toolchain list 2>/dev/null | grep -q "${DF_LEAN_TOOLCHAIN##*:}"; then
@@ -56,11 +56,11 @@ fi
 run_logged "$_elan" default "$DF_LEAN_TOOLCHAIN"
 
 # Healthcheck — lake ships inside the toolchain.
-if "$ELAN_HOME/bin/lean" --version >/dev/null 2>&1; then
-    log_okay "lean: $("$ELAN_HOME/bin/lean" --version 2>&1 | head -1)"
-    log_okay "lake: $("$ELAN_HOME/bin/lake" --version 2>&1 | head -1)"
-else
-    log_warn "lean not responding via elan shim — check $ELAN_HOME"
-fi
+_lean_version="$("$ELAN_HOME/bin/lean" --version 2>&1)" \
+    || die "lean does not start through the elan shim in $ELAN_HOME/bin: $_lean_version"
+_lake_version="$("$ELAN_HOME/bin/lake" --version 2>&1)" \
+    || die "lake does not start through the elan shim in $ELAN_HOME/bin: $_lake_version"
+log_okay "lean: $(head -1 <<< "$_lean_version")"
+log_okay "lake: $(head -1 <<< "$_lake_version")"
 
 log_okay "Lean toolchain ready (new Mathlib project: lake +leanprover-community/mathlib4:lean-toolchain new <name> math && cd <name> && lake exe cache get)"

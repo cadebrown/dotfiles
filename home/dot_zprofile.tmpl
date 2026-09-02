@@ -195,12 +195,13 @@ export GOCACHE="$_LOCAL_PLAT/go-build"
 ### PYTHON (uv) ###
 
 # Keep all arch-specific uv state under _LOCAL_PLAT so shared homes stay clean.
-# CLI tools (ipython, jupyter) are installed via `uv tool install` into isolated
-# venvs under uv/tools/, with entrypoints in $_LOCAL_PLAT/bin/ (already on PATH).
+# Plain `python` uses PYTHON_ENV and includes packages/python.txt. CLI tools use
+# isolated uv/tool environments with entrypoints in $_LOCAL_PLAT/bin/.
 # Homebrew python@3.14 provides dev headers; per-project venvs via `uv init`.
 export UV_TOOL_BIN_DIR="$_LOCAL_PLAT/bin"
 export UV_TOOL_DIR="$_LOCAL_PLAT/uv/tools"
 export UV_PYTHON_INSTALL_DIR="$_LOCAL_PLAT/uv/python"
+export PYTHON_ENV="$_LOCAL_PLAT/python"
 
 ### CONAN (C/C++ packages) ###
 # Per-PLAT: cache has compiled binaries, default profile is machine-specific,

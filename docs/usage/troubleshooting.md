@@ -129,7 +129,8 @@ editor's marketplace. Two categories can never satisfy that:
   the CLI can't reproduce. `nvidia.nsight-vscode-edition` is refused explicitly:
   `not available in Cursor for the Mac Silicon`.
 
-Confirm — run the install by hand to see the real error the scripts swallow:
+Confirm — run the install by hand to reproduce the marketplace error reported
+by the now-failing bootstrap step:
 
 ```sh
 code --install-extension <id> --force      # or: cursor --install-extension …
@@ -1125,6 +1126,28 @@ Note the tempting client-side fix does NOT work: `SendEnv -LC_*` in
 default adds the patterns after your removal runs.
 
 ---
+
+## `python` is Python 2 or cannot import SymPy
+
+**Symptom:** `python --version` reports 2.7, or `python -c 'import sympy'`
+fails after bootstrap.
+
+**Cause:** The interactive Python environment or its entrypoint symlink is
+missing for the active PLAT. This commonly appears after moving between hosts
+with different CPU capability levels: another PLAT may have Python packages,
+but its binaries are intentionally not on this host's PATH.
+
+**Fix:** Re-run the Python installer for the active platform:
+
+```sh
+bash ~/dotfiles/install/python.sh
+hash -r
+python -c 'import sys, sympy; print(sys.version, sympy.__version__)'
+```
+
+The installer owns `$LOCAL_PLAT/python` and exposes its interpreter as
+`$LOCAL_PLAT/bin/python`; project-specific dependencies still belong in each
+project's uv environment.
 
 ## Python@3.14 build fails on Linux (uuid or test_datetime errors)
 

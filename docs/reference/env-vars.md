@@ -45,13 +45,15 @@ See [Scratch space](../setup/scratch.md).
 
 ## Skip flags
 
-Each `DF_DO_*` flag defaults to `1` (run). Set to `0` to skip.
+Each `DF_DO_*` flag defaults to `1` (run) except where the table says otherwise.
+Set a flag to `0` to skip it.
 
 | Var | Step | Skips |
 |---|---|---|
 | `DF_DO_SCRATCH` | 0 | Scratch space symlink setup (auto-`0` in update/upgrade modes) |
 | `DF_DO_DIRS` | 0.1 | `~/dev`, `~/bones`, `~/misc` creation |
 | `DF_DO_PACKAGES` | 4 | Homebrew + `brew bundle` |
+| `DF_DO_LLDB` | 4 | LLDB debugger and `lldb-dap` adapter |
 | `DF_DO_MACOS_SERVICES` | 5 | Colima service registration (macOS) |
 | `DF_DO_MACOS_SETTINGS` | 5.5 | Dock/Finder/keyboard/etc. defaults (macOS) |
 | `DF_DO_MACOS_QUICK_ACTIONS` | 5.6 | Finder Quick Actions install (macOS) |
@@ -69,13 +71,13 @@ Each `DF_DO_*` flag defaults to `1` (run). Set to `0` to skip.
 | `DF_DO_CLAUDE_DESKTOP` | 6 | Claude Desktop tracked preferences (macOS) |
 | `DF_DO_CODEX_DESKTOP` | 6 | Codex desktop app tracked preferences (macOS) |
 | `DF_DO_LINEARMOUSE` | 6 | LinearMouse tracked settings (macOS) |
-| `DF_DO_CURSOR` | 6 | Cursor settings symlinks + extensions |
-| `DF_DO_VSCODE` | 6 | VS Code extensions |
+| `DF_DO_CURSOR` | 6 | Cursor settings symlinks + extensions. Defaults to `1` on macOS and `0` on Linux; set `1` explicitly when a Linux Cursor CLI is installed. |
+| `DF_DO_VSCODE` | 6 | VS Code settings + extensions. Defaults to `1` on macOS and `0` on Linux; set `1` explicitly when a Linux `code` CLI is installed. |
 | `DF_DO_CMAKE` | 6 | CMake toolchain file deployment |
 | `DF_DO_LOCAL_LLM` | 6.5 | Local LLM tooling (HuggingFace cache + binary checks) |
 | `DF_DO_MEMORY` | 6.6 | Agent memory stack (cass + qmd + ~/kb + daemons) |
 | `DF_DO_SKILLS` | 6.65 | Agent skills from `agent-skills.txt` |
-| `DF_DO_BLENDER_MCP` | 6.7 | Blender MCP addon install |
+| `DF_DO_BLENDER_MCP` | 6.7 | **Default `1` on macOS, `0` on Linux**. Set to `0` to skip the Blender MCP addon. |
 | `DF_DO_AUTH` | 7 | **Default `0`**. Set to `1` to run interactive token setup. |
 | `DF_DO_OVERLAYS` | 8 | Skip all overlay bootstrap scripts |
 
@@ -100,6 +102,7 @@ These are exported by `_lib.sh` for install scripts to consume — don't overrid
 | `UV_TOOL_BIN_DIR` | `_lib.sh` | `$ARCH_BIN` (where uv tool entrypoints land) |
 | `UV_TOOL_DIR` | `_lib.sh` | `$LOCAL_PLAT/uv/tools` (per-tool venvs) |
 | `UV_PYTHON_INSTALL_DIR` | `_lib.sh` | `$LOCAL_PLAT/uv/python` (uv-managed Python) |
+| `PYTHON_ENV` | `_lib.sh` | `$LOCAL_PLAT/python` (small environment behind plain `python`, including `packages/python.txt`) |
 | `CONAN_HOME` | `_lib.sh` | `$LOCAL_PLAT/conan2` |
 | `DF_ROOT` | `_lib.sh` | The dotfiles repo root (parent of `install/`) |
 | `DF_PACKAGES` | `_lib.sh` | `$DF_ROOT/packages` |

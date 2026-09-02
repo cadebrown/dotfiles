@@ -1,0 +1,7 @@
+# python.txt - libraries for the small interactive Python environment
+# Usage: install/python.sh installs this into $PYTHON_ENV.
+#
+# Project dependencies still belong in each project's pyproject.toml. This
+# manifest is only for libraries expected to work from a plain `python` shell.
+
+sympy

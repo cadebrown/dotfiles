@@ -99,6 +99,16 @@ BASH_SOURCE_CMD='export SSH_AUTH_SOCK=already_running; source ~/.bash_profile'
     [[ "$output" == "$LOCAL_PLAT/uv/python" ]]
 }
 
+@test "PYTHON_ENV set to the PLAT-local plain Python environment" {
+    run zsh --no-rcs -c "$ZSH_SOURCE; echo \$PYTHON_ENV"
+    [ "$status" -eq 0 ]
+    [[ "$output" == "$LOCAL_PLAT/python" ]]
+
+    run bash --norc --noprofile -c "$BASH_SOURCE_CMD; echo \$PYTHON_ENV"
+    [ "$status" -eq 0 ]
+    [[ "$output" == "$LOCAL_PLAT/python" ]]
+}
+
 # --- Rust env vars ---
 
 @test "RUSTUP_HOME set to PLAT rustup" {
@@ -133,12 +143,10 @@ BASH_SOURCE_CMD='export SSH_AUTH_SOCK=already_running; source ~/.bash_profile'
     [[ "$output" =~ ^v[0-9] ]]
 }
 
-@test "uv is callable after sourcing zprofile and tools resolve" {
-    # `python` is no longer a global command — each pip.txt tool has its own
-    # venv. The right invariant is: uv on PATH + at least one tool resolved.
-    run zsh --no-rcs -c "$ZSH_SOURCE; uv tool list"
+@test "plain python is Python 3 and imports SymPy after sourcing zprofile" {
+    run zsh --no-rcs -c "$ZSH_SOURCE; python -c 'import sys, sympy; print(sys.version_info.major, sympy.__version__)'"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"ipython"* ]] || [[ "$output" == *"conan"* ]]
+    [[ "$output" =~ ^3\  ]]
 }
 
 # --- Homebrew stability env vars ---

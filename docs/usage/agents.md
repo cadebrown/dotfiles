@@ -103,14 +103,22 @@ Installer-managed skills are declared in `packages/agent-skills.txt`; Codex
 plugins are declared separately in `packages/codex-plugins.txt`. Run
 `bash install/skills-sync.sh check` for a read-only drift check. Do not use
 `npx skills check` as an audit: current versions update installed skills.
+Normal sync installs missing declarations and fails if any remain missing.
+Upgrade compares each tree with the mutable receipt from its last install, so
+consecutive upgrades keep tracking upstream while real local edits are preserved.
+The committed digest remains the review/audit baseline. Read-only `check`
+continues to exit nonzero for drift from that baseline.
 
 Codex and Claude each have `researcher` and `reviewer` specialists under their
 managed `agents/` directories. Global instructions authorize bounded parallel
 research, log analysis, tests, and final review while keeping overlapping edits
 in one agent. Codex is capped at six direct children and one level of nesting.
 
-`df-agent-doctor` checks the declared tool surface, skill registry, Codex
-plugins/config, qmd, cass, and LaunchAgents.
+`install/agent-tools.sh` deploys `df-agent-doctor` into `$ARCH_BIN` on every
+platform. The command checks the declared tool surface, skill registry, Codex
+plugins/config, qmd, cass, the managed Python/SymPy environment, and the live qmd
+LaunchAgent on macOS. When `dotfiles-nvidia` is present, it also runs the
+overlay's final runtime verifier, including ComputeLab and internal MCP tools.
 
 ## Model and safety defaults
 

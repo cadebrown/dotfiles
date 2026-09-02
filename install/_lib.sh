@@ -54,7 +54,7 @@ log_section() {
     local _prev_elapsed=$(( SECONDS - _SECTION_START ))
     # Print elapsed time of previous section (skip if first section or < 1s)
     if [[ "$DF_DEBUG" == "1" && "$_prev_elapsed" -gt 0 ]]; then
-        printf "${_DIM}      (${_prev_elapsed}s)${_RESET}\n"
+        printf '%s      (%ss)%s\n' "$_DIM" "$_prev_elapsed" "$_RESET"
     fi
     printf "\n${_WHITE}=== %s ===${_RESET}\n\n" "$*"
     _SECTION_START=$SECONDS
@@ -180,6 +180,7 @@ CARGO_TARGET_DIR="$LOCAL_PLAT/cargo-build"
 UV_TOOL_BIN_DIR="$ARCH_BIN"
 UV_TOOL_DIR="$LOCAL_PLAT/uv/tools"
 UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
+PYTHON_ENV="$LOCAL_PLAT/python"
 
 # nvm: per-PLAT so arch-specific node binaries don't collide on shared homes
 NVM_DIR="$LOCAL_PLAT/nvm"
@@ -245,7 +246,7 @@ export DF_SCRATCH DF_SCRATCH_LINK SCRATCH PATHS
 
 export OS ARCH DF_ROOT DF_PACKAGES DF_PROFILE DF_USE_PLAT \
        PLAT LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR \
-       UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR \
+       UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR PYTHON_ENV \
        NVM_DIR CONAN_HOME \
        GOPATH GOBIN GOCACHE \
        ELAN_HOME JULIAUP_DEPOT_PATH JULIA_DEPOT_PATH
@@ -306,7 +307,7 @@ git_clone_url() {
         proto=https
         if has ssh; then
             ssh -o BatchMode=yes -o ConnectTimeout=6 -o StrictHostKeyChecking=accept-new \
-                -p "$ssh_port" -T "git@$host" >/dev/null 2>&1 || rc=$?
+                -p "$ssh_port" -T "git@$host" </dev/null >/dev/null 2>&1 || rc=$?
             # rc 255 = connect/auth failure → HTTPS; 0 (GitLab welcome) or other
             # non-255 (e.g. hosts that deny shell with rc 1) = authenticated → SSH.
             [[ $rc -ne 255 ]] && proto=ssh || true
@@ -598,6 +599,87 @@ run_logged() {
     return "$_rc"
 }
 
+_collect_process_tree() {
+    local _pid="$1" _child _children=""
+    if command -v pgrep >/dev/null 2>&1; then
+        _children="$(pgrep -P "$_pid" 2>/dev/null || true)"
+        for _child in $_children; do
+            _collect_process_tree "$_child"
+        done
+    fi
+    printf '%s\n' "$_pid"
+}
+
+_kill_process_tree() {
+    local _pid="$1" _signal="$2" _process _processes
+    if [[ "$_signal" == "KILL" && "${_DF_PROCESS_TREE_ROOT:-}" == "$_pid" ]]; then
+        _processes="${_DF_PROCESS_TREE_PIDS:-$_pid}"
+    else
+        _processes="$(_collect_process_tree "$_pid")"
+    fi
+    if [[ "$_signal" == "TERM" ]]; then
+        _DF_PROCESS_TREE_ROOT="$_pid"
+        _DF_PROCESS_TREE_PIDS="$_processes"
+    fi
+    for _process in $_processes; do
+        kill "-$_signal" "$_process" 2>/dev/null || true
+    done
+    if [[ "$_signal" == "KILL" ]]; then
+        unset _DF_PROCESS_TREE_ROOT _DF_PROCESS_TREE_PIDS
+    fi
+}
+
+run_bounded() {
+    local _seconds="$1" _pid _watchdog _rc _marker
+    shift
+    _marker="$(mktemp "${TMPDIR:-/tmp}/dotfiles-bounded.XXXXXX")" || return 1
+    rm -f "$_marker"
+    "$@" &
+    _pid=$!
+    (
+        sleep "$_seconds"
+        kill -0 "$_pid" 2>/dev/null || exit 0
+        : > "$_marker"
+        _kill_process_tree "$_pid" TERM
+        sleep 0.1
+        _kill_process_tree "$_pid" KILL
+    ) </dev/null >/dev/null 2>&1 &
+    _watchdog=$!
+    wait "$_pid" 2>/dev/null && _rc=0 || _rc=$?
+    kill "$_watchdog" 2>/dev/null || true
+    wait "$_watchdog" 2>/dev/null || true
+    if [[ -e "$_marker" ]]; then
+        rm -f "$_marker"
+        return 124
+    fi
+    rm -f "$_marker"
+    return "$_rc"
+}
+
+tool_entrypoint_healthy() {
+    local _path="$1" _timeout="${DF_TOOL_SMOKE_TIMEOUT:-10}"
+    [[ -x "$_path" ]] || return 1
+    run_bounded "$_timeout" "$_path" --version </dev/null >/dev/null 2>&1 \
+        || run_bounded "$_timeout" "$_path" --help </dev/null >/dev/null 2>&1
+}
+
+activate_homebrew() {
+    local _brew="${DF_HOMEBREW_BIN:-}"
+    [[ -n "$_brew" ]] || _brew="$(command -v brew 2>/dev/null || true)"
+    if [[ -z "$_brew" && "$OS" == "darwin" ]]; then
+        if [[ -x /opt/homebrew/bin/brew ]]; then
+            _brew=/opt/homebrew/bin/brew
+        elif [[ -x /usr/local/bin/brew ]]; then
+            _brew=/usr/local/bin/brew
+        fi
+    elif [[ -z "$_brew" && "$OS" == "linux" && -x "$LOCAL_PLAT/brew/bin/brew" ]]; then
+        _brew="$LOCAL_PLAT/brew/bin/brew"
+    fi
+    [[ -x "$_brew" ]] || return 1
+    eval "$("$_brew" shellenv)" || return 1
+    has brew
+}
+
 # qmd MCP daemon lifecycle (Linux / no-launchd path; macOS uses the launchd
 # agent instead). The daemon mmaps native addons (sqlite-vec, node-llama-cpp,
 # better-sqlite3). On an NFS home a global `npm install -g @tobilu/qmd` fails
@@ -616,15 +698,19 @@ qmd_daemon_stop() {
     qmd_daemon_running || return 0
     pkill -TERM -f "qmd[^ ]* mcp --http" 2>/dev/null || true
     local _i
-    for _i in $(seq 1 50); do
+    _i=0
+    while (( _i < 50 )); do
         qmd_daemon_running || return 0
         sleep 0.1
+        (( _i++ )) || true
     done
     # Still holding fds after 5s — force it so NFS can reap the .nfs* files.
     pkill -KILL -f "qmd[^ ]* mcp --http" 2>/dev/null || true
-    for _i in $(seq 1 20); do
+    _i=0
+    while (( _i < 20 )); do
         qmd_daemon_running || break
         sleep 0.1
+        (( _i++ )) || true
     done
 }
 
@@ -632,6 +718,21 @@ qmd_daemon_start() {
     has qmd || return 1
     qmd_daemon_running && return 0
     (qmd mcp --http --daemon >/dev/null 2>&1 &)
+}
+
+_qmd_daemon_healthy() {
+    curl -fsS --max-time 2 http://127.0.0.1:8181/health 2>/dev/null \
+        | grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"'
+}
+
+_qmd_wait_healthy() {
+    local _i=0
+    while (( _i < 150 )); do
+        _qmd_daemon_healthy && return 0
+        sleep 0.1
+        (( _i++ )) || true
+    done
+    return 1
 }
 
 # Resolve LOCAL_PLAT from current $HOME/.local (handling symlinks) and the
@@ -658,6 +759,7 @@ _re_derive_plat_vars() {
     UV_TOOL_BIN_DIR="$ARCH_BIN"
     UV_TOOL_DIR="$LOCAL_PLAT/uv/tools"
     UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
+    PYTHON_ENV="$LOCAL_PLAT/python"
     NVM_DIR="$LOCAL_PLAT/nvm"
     CONAN_HOME="$LOCAL_PLAT/conan2"
     # Go: GOBIN=ARCH_BIN lands `go install` binaries alongside cargo/uv ones
@@ -670,7 +772,7 @@ _re_derive_plat_vars() {
     JULIAUP_DEPOT_PATH="$LOCAL_PLAT/julia/juliaup"
     JULIA_DEPOT_PATH="$LOCAL_PLAT/julia/depot"
     export PLAT LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR \
-           UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR NVM_DIR CONAN_HOME \
+           UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR PYTHON_ENV NVM_DIR CONAN_HOME \
            GOPATH GOBIN GOCACHE ELAN_HOME JULIAUP_DEPOT_PATH JULIA_DEPOT_PATH
 }
 

@@ -122,7 +122,7 @@ MESA_RB="$LOCAL_PLAT/brew/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/m
 
 log_section "Patching mesa formula for Linux (pyyaml wheel + bindgen toolchain)"
 
-_ORIG='    venv.pip_install resources.reject { |r| OS.mac? && r.name == "ply" }'
+_ORIG='    venv.pip_install resources.reject { |r| r.name == "mesa-libclc" || (OS.mac? && r.name == "ply") }'
 
 _FIX='    if OS.linux?
       # pyyaml source builds fail with SIGILL on a custom Homebrew prefix — the
@@ -130,12 +130,12 @@ _FIX='    if OS.linux?
       # superenv context. Install pyyaml from its binary wheel instead.
       # macOS builds are unaffected (no OS.linux? guard needed there).
       # ply is excluded here as it is on macOS.
-      venv.pip_install resources.reject { |r| r.name == "pyyaml" || r.name == "ply" }
+      venv.pip_install resources.reject { |r| r.name == "mesa-libclc" || r.name == "pyyaml" || r.name == "ply" }
       system python3, "-m", "pip", "--python=#{venv.root}/bin/python",
              "install", "--verbose", "--no-deps", "--ignore-installed", "--no-compile",
              "--prefer-binary", "pyyaml==6.0.3"
     else
-      venv.pip_install resources.reject { |r| OS.mac? && r.name == "ply" }
+      venv.pip_install resources.reject { |r| r.name == "mesa-libclc" || (OS.mac? && r.name == "ply") }
     end'
 
 _result=$(python3 -c "
@@ -149,7 +149,7 @@ else:             print('notfound')
 case "$_result" in
     already)  log_okay "mesa pyyaml binary-wheel patch already applied" ;;
     patched)  log_okay "Patched: mesa pyyaml installs from binary wheel on Linux" ;;
-    notfound) log_warn "mesa patch target not found — formula may have changed; check mesa.rb" ;;
+    notfound) die "mesa pyyaml patch target not found — formula changed" ;;
 esac
 
 ### Patch 2: bindgen toolchain ###
@@ -183,7 +183,7 @@ else:             print('notfound')
 case "$_result" in
     already)  log_okay "mesa bindgen toolchain patch already applied" ;;
     patched)  log_okay "Patched: mesa bindgen uses newest system GCC with C++ headers" ;;
-    notfound) log_warn "mesa bindgen patch target not found — formula may have changed; check mesa.rb" ;;
+    notfound) die "mesa bindgen patch target not found — formula changed" ;;
 esac
 unset _ORIG _FIX _result
 

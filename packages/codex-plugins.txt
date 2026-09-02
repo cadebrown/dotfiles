@@ -2,10 +2,8 @@
 # One PLUGIN@MARKETPLACE selector per line; install/codex.sh reconciles these.
 #
 # Only plugins present in the codex-cli bundled marketplace snapshot install.
-# The snapshot ships WITH codex-cli (unpinned), so curated plugins come and go
-# across versions — an entry the snapshot no longer offers is warned, not fatal
-# (see install/codex.sh _check_plugins). Prune dropped entries when you see the
-# warning.
+# Every declaration is required: if a curated plugin disappears, remove or
+# replace it here before bootstrap can pass.
 
 # Core coding lifecycle
 github@openai-curated
@@ -15,5 +13,3 @@ plugin-eval@openai-curated
 # User project mix: full-stack web, games
 build-web-apps@openai-curated
 game-studio@openai-curated
-openai-developers@openai-curated
-build-web-data-visualization@openai-curated

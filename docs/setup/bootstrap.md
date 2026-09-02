@@ -64,7 +64,7 @@ Paths below use `$LOCAL_PLAT`, which is `$HOME/.local` by default and `$HOME/.lo
    - Includes `rustup` (Homebrew's code-signed build — required for macOS Sequoia+)
 5. **Services**: colima/ollama/mlxserve auto-start is opt-in (`DF_START_LOCAL_SERVICES=1`); off by default. At the default, colima/ollama are simply left alone, but mlxserve is stopped and `launchctl disable`d — launchd re-loads its plist at every login otherwise, so a hand-started mlxserve will not survive a bootstrap run. Docker CLI plugins are always linked.
 6. **macOS defaults**: Dock, Finder, keyboard, trackpad, screenshots, Safari, iTerm2 preferences
-7. **Python** via uv → `$LOCAL_PLAT/uv/tools/<tool>/` (one isolated venv per CLI tool), entrypoints in `$ARCH_BIN`; `DF_PROFILE=core` skips `pip-full.txt`
+7. **Python** via uv → plain `python` from `$PYTHON_ENV` with `packages/python.txt` (including SymPy), plus one isolated venv per CLI tool under `$LOCAL_PLAT/uv/tools/`; entrypoints land in `$ARCH_BIN`, and `DF_PROFILE=core` skips `pip-full.txt`
 8. **Node.js 24 LTS** via pinned nvm → `$LOCAL_PLAT/nvm/`
    - Uses uv's Python for `node-gyp` fallbacks when an npm package has no prebuilt binary
 9. **Rust** toolchain → `$LOCAL_PLAT/rustup/` + `$LOCAL_PLAT/cargo/`
@@ -83,7 +83,6 @@ Paths below use `$LOCAL_PLAT`, which is `$HOME/.local` by default and `$HOME/.lo
 16. **CMake toolchain files** → `$LOCAL_PLAT/cmake/toolchains/`
     - Versioned files: `llvm-21.cmake`, `llvm-22.cmake`, `gcc-13.cmake`, `gcc-15.cmake`, plus shared `_brew.cmake`
     - `~/.profile` sets `CMAKE_TOOLCHAIN_FILE` to the highest installed LLVM toolchain automatically
-    - Switch at runtime with the `tc` shell function (e.g. `tc gcc-15`, `tc llvm-22`)
 17. **Local LLM tooling** — HuggingFace cache + binary checks
     - Creates `$LOCAL_PLAT/.cache/huggingface` for mlx-lm weights
     - Verifies ollama / mlx-lm / mlx-openai-server / opencode binaries
@@ -107,7 +106,7 @@ Total time: ~2 minutes on subsequent runs (idempotent, mostly bottle pours); ~5�
 | `git`, `curl`, and `python3` | Pre-installed on most systems; Python runs the Homebrew formula patch layer before uv is installed |
 | Internet access | — |
 
-No sudo required. No Docker or Podman needed.
+No sudo is required. The public package-manager bootstrap needs no Docker or Podman; the NVIDIA overlay's default-on nv-pptx runner requires Docker (`DF_DO_NV_PPTX=0` skips it).
 
 ### What gets installed
 
@@ -121,7 +120,7 @@ Paths use `$LOCAL_PLAT`, which is `$HOME/.local` by default (or `$HOME/.local/$P
    - Installs Homebrew's own glibc 2.35 first — binaries are fully self-contained
    - Most packages pour as precompiled bottles; glibc builds from source (~2 min) on first run
    - Custom Python@3.14 patches applied automatically for Linux compatibility
-5. **Python** via uv → `$LOCAL_PLAT/uv/tools/<tool>/` (per-CLI-tool venvs), entrypoints in `$ARCH_BIN`
+5. **Python** via uv → plain `python` from `$PYTHON_ENV` with `packages/python.txt` (including SymPy), plus per-CLI-tool venvs under `$LOCAL_PLAT/uv/tools/`; entrypoints land in `$ARCH_BIN`
 6. **Node.js** via nvm → `$LOCAL_PLAT/nvm/`
    - Uses uv's Python for `node-gyp` fallbacks when an npm package has no prebuilt binary
 7. **Rust** via `sh.rustup.rs` → `$LOCAL_PLAT/rustup/` + `$LOCAL_PLAT/cargo/`
@@ -137,7 +136,6 @@ Paths use `$LOCAL_PLAT`, which is `$HOME/.local` by default (or `$HOME/.local/$P
 15. **Cursor / VS Code** — extensions from `packages/{cursor,vscode}-extensions.txt`
 16. **CMake toolchain files** → `$LOCAL_PLAT/cmake/toolchains/` (`llvm-21/22.cmake`, `gcc-13/15.cmake`, `_brew.cmake`)
     - `~/.profile` auto-sets `CMAKE_TOOLCHAIN_FILE` to the highest installed LLVM toolchain
-    - Switch with the `tc` shell function (e.g. `tc gcc-15`, `tc llvm-22`)
 17. **Local LLM tooling** — HuggingFace cache + ollama/mlx-lm/mlx-openai-server/opencode binary checks
 18. **Agent memory stack** — cass session-history archive, ~/kb + qmd knowledge index; cass indexing stays manual
 19. **Agent skills** — installs `packages/agent-skills.txt` into the shared `~/.claude/skills` tree
@@ -156,6 +154,7 @@ Any step can be disabled with an environment variable:
 DF_DO_SCRATCH=0              # skip scratch space symlink setup
 DF_DO_DIRS=0                 # skip home directory creation (~/dev, ~/bones, ~/misc)
 DF_DO_PACKAGES=0             # skip Homebrew + brew bundle
+DF_DO_LLDB=0                 # skip LLDB and lldb-dap
 DF_DO_MACOS_SERVICES=0       # skip colima service setup (macOS)
 DF_DO_MACOS_SETTINGS=0       # skip macOS settings (Dock, Finder, keyboard, etc.)
 DF_DO_MACOS_QUICK_ACTIONS=0  # skip Finder Quick Actions install (macOS)
@@ -173,8 +172,8 @@ DF_DO_CODEX=0                # skip Codex CLI install
 DF_DO_CLAUDE_DESKTOP=0       # skip Claude Desktop tracked preferences (macOS)
 DF_DO_CODEX_DESKTOP=0        # skip Codex desktop app tracked preferences (macOS)
 DF_DO_LINEARMOUSE=0          # skip LinearMouse tracked settings (macOS)
-DF_DO_CURSOR=0               # skip Cursor settings symlinks + extension install
-DF_DO_VSCODE=0               # skip VS Code extension install
+DF_DO_CURSOR=0               # skip Cursor (default 1 on macOS, 0 on Linux)
+DF_DO_VSCODE=0               # skip VS Code (default 1 on macOS, 0 on Linux)
 DF_DO_CMAKE=0                # skip CMake toolchain file deployment
 DF_DO_LOCAL_LLM=0            # skip local LLM setup (HuggingFace cache + binary checks)
 DF_DO_MEMORY=0               # skip the agent memory stack (cass + qmd + ~/kb)
@@ -186,6 +185,11 @@ DF_USE_PLAT=1                # opt in to per-PLAT directory isolation (default 0
 DF_BREW_UPGRADE=0            # skip Homebrew upgrades (default except in upgrade mode)
 DF_STRICT_UPGRADE=0          # report stale tools without failing upgrade
 ```
+
+On Linux, Cursor and VS Code default off because a headless machine has no
+desktop CLI to configure. Set `DF_DO_CURSOR=1` or `DF_DO_VSCODE=1` explicitly
+on a Linux workstation or Remote-SSH host where that CLI is installed. Once
+selected, a missing CLI or extension is a bootstrap failure.
 
 The complete reference lives at [Env vars](../reference/env-vars.md).
 

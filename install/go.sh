@@ -13,13 +13,26 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
+_go_bin_for_package() {
+    local _pkg_path="${1%@*}"
+    printf '%s\n' "${_pkg_path##*/}"
+}
+
+_go_missing_bin() {
+    local _bin
+    _bin="$(_go_bin_for_package "$1")"
+    tool_entrypoint_healthy "$GOBIN/$_bin" || printf '%s\n' "$_bin"
+}
+
+# Source-guard: focused tests source the entrypoint helpers above.
+[[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
+
 log_section "Go CLI tools"
 
 GO_MIN_VERSION="${DF_GO_MIN_VERSION:-1.27}"
 
 if ! has go; then
-    log_warn "go not on PATH — install via Brewfile (\`brew install go\`) then re-run"
-    exit 0
+    die "go not on PATH — packages/Brewfile must install it before go.sh"
 fi
 
 _go_version="$(go version 2>&1 | awk '{print $3}' | sed 's/^go//')"
@@ -30,7 +43,7 @@ _go_minor="${_go_rest%%.*}"
 _go_min_major="${GO_MIN_VERSION%%.*}"
 _go_min_minor="${GO_MIN_VERSION#*.}"
 if (( _go_major < _go_min_major || (_go_major == _go_min_major && _go_minor < _go_min_minor) )); then
-    log_warn "Go $_go_version is below the managed minimum $GO_MIN_VERSION; upgrade Homebrew's go formula"
+    die "Go $_go_version is below the managed minimum $GO_MIN_VERSION; upgrade Homebrew's go formula"
 fi
 unset _go_version _go_major _go_rest _go_minor _go_min_major _go_min_minor
 ensure_dir "$GOBIN"
@@ -38,7 +51,7 @@ ensure_dir "$GOPATH"
 ensure_dir "$GOCACHE"
 
 _install_from() {
-    local file="$1" _line _pkg _pkg_path _bin _is_linux _is_macos
+    local file="$1" _line _pkg _bin _is_linux _is_macos _missing _repair_failed
     log_info "Reading $file"
     while IFS= read -r _line; do
         # Skip blank lines and pure comments.
@@ -61,9 +74,9 @@ _install_from() {
             continue
         fi
 
-        _pkg_path="${_pkg%@*}"
-        _bin="${_pkg_path##*/}"
-        if [[ "${DF_MODE:-install}" != "upgrade" && -x "$GOBIN/$_bin" ]]; then
+        _bin="$(_go_bin_for_package "$_pkg")"
+        if [[ "${DF_MODE:-install}" != "upgrade" \
+              && -z "$(_go_missing_bin "$_pkg")" ]]; then
             log_okay "  held  $_pkg (upgrade mode refreshes @latest)"
             (( _skip++ )) || true
             continue
@@ -71,8 +84,21 @@ _install_from() {
 
         log_info "  go install $_pkg"
         if run_logged go install "$_pkg"; then
-            log_okay "  ok    $_pkg"
-            (( _ok++ )) || true
+            _repair_failed=0
+            _missing="$(_go_missing_bin "$_pkg")"
+            if [[ -n "$_missing" ]]; then
+                log_warn "  $_pkg did not create $GOBIN/$_missing — reinstalling"
+                run_logged go install "$_pkg" || _repair_failed=1
+                _missing="$(_go_missing_bin "$_pkg")"
+            fi
+            if [[ "$_repair_failed" == "1" || -n "$_missing" ]]; then
+                [[ "$_repair_failed" == "1" ]] && log_warn "  fail  $_pkg (repair installation failed)"
+                [[ -n "$_missing" ]] && log_warn "  fail  $_pkg (missing executable: $GOBIN/$_missing)"
+                (( _fail++ )) || true
+            else
+                log_okay "  ok    $_pkg"
+                (( _ok++ )) || true
+            fi
         else
             log_warn "  fail  $_pkg"
             (( _fail++ )) || true
@@ -80,10 +106,13 @@ _install_from() {
     done < "$file"
 }
 
-_ok=0 _skip=0 _fail=0
+_ok=0 _skip=0 _fail=0 _manifest_count=0
 
 while IFS= read -r _file; do
+    (( _manifest_count++ )) || true
     _install_from "$_file"
 done < <(overlay_package_files "go.txt")
 
+(( _manifest_count > 0 )) || die "Required Go manifest missing: $DF_PACKAGES/go.txt"
 log_okay "Go tools: ${_ok} installed, ${_skip} held/skipped, ${_fail} failed"
+(( _fail == 0 )) || die "${_fail} declared Go tools failed installation or executable validation"

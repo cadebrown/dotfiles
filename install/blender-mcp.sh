@@ -3,7 +3,7 @@
 #
 # Downloads addon.py from github.com/ahujasid/blender-mcp, places it in the
 # user's Blender scripts/addons directory, and enables it via a headless
-# Blender invocation. Skips gracefully if Blender is not installed.
+# Blender invocation. This script is only called when the addon is selected.
 #
 # The MCP *server* side is wired up separately via packages/mcp-servers.txt
 # (`blender stdio cmd: uvx blender-mcp`). This script handles only the
@@ -26,8 +26,7 @@ elif [[ -x /Applications/Blender.app/Contents/MacOS/Blender ]]; then
 fi
 
 if [[ -z "$_BLENDER" ]]; then
-    log_okay "Blender not installed — skipping blender-mcp addon"
-    exit 0
+    die "Blender is not installed; set DF_DO_BLENDER_MCP=0 or install Blender"
 fi
 log_info "Blender: $_BLENDER"
 
@@ -35,8 +34,7 @@ log_info "Blender: $_BLENDER"
 _VERSION="$("$_BLENDER" --version 2>/dev/null \
     | awk '/^Blender/ && !seen++ {split($2, v, "."); printf "%s.%s", v[1], v[2]}')"
 if [[ -z "$_VERSION" ]]; then
-    log_warn "Could not detect Blender version — skipping"
-    exit 0
+    die "Could not detect Blender version"
 fi
 log_info "Blender version: $_VERSION"
 
@@ -44,7 +42,7 @@ log_info "Blender version: $_VERSION"
 case "$OS" in
     darwin) _ADDON_DIR="$HOME/Library/Application Support/Blender/$_VERSION/scripts/addons" ;;
     linux)  _ADDON_DIR="$HOME/.config/blender/$_VERSION/scripts/addons" ;;
-    *)      log_warn "Unsupported OS for Blender addon install: $OS"; exit 0 ;;
+    *)      die "Unsupported OS for Blender addon install: $OS" ;;
 esac
 ensure_dir "$_ADDON_DIR"
 
@@ -56,9 +54,8 @@ _ADDON_FILE="$_ADDON_DIR/blender_mcp.py"
 log_info "Downloading addon.py → $_ADDON_FILE"
 _TMP="$(mktemp)"
 if ! download "$_ADDON_URL" "$_TMP"; then
-    log_warn "Failed to download $_ADDON_URL — skipping"
     rm -f "$_TMP"
-    exit 0
+    die "Failed to download $_ADDON_URL"
 fi
 mv "$_TMP" "$_ADDON_FILE"
 log_okay "Addon file installed"
@@ -71,7 +68,16 @@ import bpy
 bpy.ops.preferences.addon_enable(module='blender_mcp')
 bpy.ops.wm.save_userpref()
 " >/dev/null 2>&1; then
+    :
+else
+    die "Could not enable Blender MCP addon in headless Blender"
+fi
+
+if "$_BLENDER" --background --python-expr "
+import bpy
+raise SystemExit(0 if 'blender_mcp' in bpy.context.preferences.addons else 1)
+" >/dev/null 2>&1; then
     log_okay "Addon enabled — look for 'BlenderMCP' tab in the 3D view sidebar (N)"
 else
-    log_warn "Could not auto-enable — toggle manually in Blender: Edit > Preferences > Add-ons > 'Interface: Blender MCP'"
+    die "Blender MCP addon is not enabled after installation"
 fi

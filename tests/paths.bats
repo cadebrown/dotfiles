@@ -113,9 +113,9 @@ setup() {
 
 # --- Python (uv tool install) ---
 #
-# pip.txt CLI tools each get their own venv under $UV_TOOL_DIR — no monolithic
-# user-level Python environment. Per-project library work uses `uv init` /
-# `uv sync` against pyproject.toml, not these.
+# pip.txt CLI tools each get their own venv under $UV_TOOL_DIR. A separate small
+# environment owns plain `python`; project dependencies still use `uv init` /
+# `uv sync` against pyproject.toml.
 
 @test "uv tool dir has at least one installed tool" {
     [[ -d "$UV_TOOL_DIR" ]]
@@ -123,8 +123,14 @@ setup() {
     [[ -d "$UV_TOOL_DIR/ipython" ]]
 }
 
-@test "no monolithic Python venv (legacy paths absent)" {
-    # Anti-regression: confirms the old design is gone and not creeping back.
+@test "interactive Python is PLAT-local and imports SymPy" {
+    [[ "$PYTHON_ENV" == "$LOCAL_PLAT/python" ]]
+    [[ -x "$PYTHON_ENV/bin/python" ]]
+    [[ -x "$ARCH_BIN/python" ]]
+    "$ARCH_BIN/python" -c 'import sys, sympy; assert sys.version_info.major == 3'
+}
+
+@test "legacy Python venv paths remain absent" {
     [[ ! -d "$LOCAL_PLAT/venv" ]]
     [[ ! -d "$HOME/.venv" ]]
 }

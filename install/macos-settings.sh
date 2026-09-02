@@ -192,8 +192,8 @@ if command -v wolframscript >/dev/null 2>&1 && [[ -x "$_wolfram_kernel" ]]; then
         log_okay "wolframscript kernel path already configured"
     else
         wolframscript -configure "WOLFRAMSCRIPT_KERNELPATH=$_wolfram_kernel" >/dev/null 2>&1 \
-            && log_okay "wolframscript kernel path configured" \
-            || log_warn "wolframscript -configure failed"
+            || die "wolframscript -configure failed"
+        log_okay "wolframscript kernel path configured"
     fi
 else
     log_info "Wolfram Engine not installed — skipping wolframscript config"

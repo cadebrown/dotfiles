@@ -96,13 +96,32 @@ else
     log_okay "Installed claude $_version → $_dest"
 fi
 
-unset _plat_arch _platform _BUCKET _version _dest _tmp _checksum _actual _manifest
+_claude_health="$("$_dest" --version 2>&1)" \
+    || die "claude binary is installed but does not start: $_dest: $_claude_health"
+
+_legacy_claude="$HOME/.local/bin/claude"
+if [[ "$DF_USE_PLAT" == "1" && "$_legacy_claude" != "$_dest" \
+      && -L "$_legacy_claude" ]]; then
+    _legacy_claude_target="$(readlink "$_legacy_claude")"
+    case "$_legacy_claude_target" in
+        *"/.local/share/claude/versions/"*)
+            _claude_quarantine="$LOCAL_PLAT/quarantine/flat-bin/claude.symlink"
+            ensure_dir "$(dirname "$_claude_quarantine")"
+            printf '%s\n' "$_legacy_claude_target" > "$_claude_quarantine"
+            rm -f -- "$_legacy_claude"
+            log_okay "Removed legacy flat Claude launcher; target recorded at $_claude_quarantine"
+            ;;
+    esac
+fi
+
+unset _plat_arch _platform _BUCKET _version _dest _tmp _checksum _actual _manifest _claude_health
+unset _legacy_claude _legacy_claude_target _claude_quarantine
 
 ### PLUGINS (all platforms) ###
 
 log_section "Claude Code plugins"
 
-has claude || { log_warn "claude not found — skipping plugins"; exit 0; }
+has claude || die "claude is not on PATH after installation: $ARCH_BIN/claude"
 
 # Third-party marketplaces required by claude-plugins.txt entries
 # (<name>@<marketplace> form). Format: "owner/repo|marketplace-name".
@@ -112,14 +131,21 @@ _MARKETPLACES=(
     "AlmogBaku/debug-skill|debug-skill-marketplace"  # dap stateful DAP debugging
     "cameronfreer/lean4-skills|lean4-skills"         # Lean 4 proving workflows (lean4 plugin)
 )
+_marketplace_fail=0
 for _mp_entry in "${_MARKETPLACES[@]}"; do
     IFS='|' read -r _mp_repo _mp_name <<< "$_mp_entry"
-    if claude plugin marketplace list 2>/dev/null | grep -q "$_mp_name"; then
+    if ! _mp_list="$(claude plugin marketplace list 2>&1)"; then
+        log_warn "  failed listing marketplaces: ${_mp_list//$'\n'/ }"
+        (( _marketplace_fail++ )) || true
+        _mp_list=""
+    fi
+    if grep -q "$_mp_name" <<< "$_mp_list"; then
         log_info "  marketplace $_mp_name (already known)"
-    elif claude plugin marketplace add "$_mp_repo" >/dev/null 2>&1; then
+    elif run_logged claude plugin marketplace add "$_mp_repo"; then
         log_okay "  added marketplace $_mp_name ($_mp_repo)"
     else
         log_warn "  failed adding marketplace $_mp_repo — its plugins will fail below"
+        (( _marketplace_fail++ )) || true
     fi
 done
 unset _mp_entry _mp_repo _mp_name
@@ -132,8 +158,10 @@ unset _mp_entry _mp_repo _mp_name
 # all; there is no --all flag (the old upgrade path passed one and errored
 # silently for months behind >/dev/null, which is how the staleness happened).
 log_info "Refreshing marketplace catalogs"
-claude plugin marketplace update >/dev/null 2>&1 || \
-    log_warn "marketplace refresh failed — newly added plugins may not resolve below"
+if ! run_logged claude plugin marketplace update; then
+    log_warn "marketplace refresh failed — plugin declarations could not be reconciled"
+    (( _marketplace_fail++ )) || true
+fi
 
 _install_plugins_from() {
     local file="$1"
@@ -143,11 +171,12 @@ _install_plugins_from() {
         plugin="${line%% *}"
 
         log_info "  $plugin"
-        output=$(claude plugin install "$plugin" 2>&1) && status=0 || status=$?
+        output=$(claude plugin install -y "$plugin" 2>&1) && status=0 || status=$?
 
         # "already installed" exits 0 too — test the output before the status,
         # or the skip branch is unreachable and every run reports installs.
-        if echo "$output" | grep -qi "already installed\|already enabled"; then
+        if [[ $status -eq 0 ]] \
+           && grep -qi "already installed\|already enabled" <<< "$output"; then
             log_info "  skip  $plugin (already installed)"
             (( _skip++ )) || true
         elif [[ $status -eq 0 ]]; then
@@ -167,24 +196,52 @@ while IFS= read -r _file; do
 done < <(overlay_package_files "claude-plugins.txt")
 
 log_okay "Claude plugins: ${_ok} installed, ${_skip} already present, ${_fail} failed"
+(( _marketplace_fail == 0 )) || die "Claude marketplace reconciliation failed $_marketplace_fail time(s)"
+(( _fail == 0 )) || die "Claude plugin installation failed for $_fail declared plugin(s)"
+
+has jq || die "jq not found — Claude plugin declarations cannot be verified"
+_plugin_state="$(claude plugin list --json)" \
+    || die "Claude plugin inventory could not be read"
+_missing=0
+while IFS= read -r _file; do
+    while IFS= read -r line; do
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        _plugin="${line%% *}"
+        if ! jq -e --arg id "$_plugin" \
+            'any(.[];
+                .enabled == true
+                and (if ($id | contains("@"))
+                     then .id == $id
+                     else (.id | startswith($id + "@"))
+                     end))' \
+            <<< "$_plugin_state" >/dev/null; then
+            log_warn "  missing or disabled  $_plugin"
+            (( _missing++ )) || true
+        fi
+    done < "$_file"
+done < <(overlay_package_files "claude-plugins.txt")
+(( _missing == 0 )) || die "Claude is missing $_missing enabled declared plugin(s) after installation"
 
 # Plugins don't auto-update (we set DISABLE_AUTOUPDATER=1), so `bootstrap
 # upgrade` must pull them explicitly: update each enabled plugin to the
 # marketplace's latest (catalogs were already refreshed above).
 if [[ "${DF_MODE:-}" == "upgrade" ]]; then
     log_info "Upgrading Claude plugins"
+    _update_fail=0
     while IFS= read -r _file; do
         while IFS= read -r line; do
             [[ -z "$line" || "$line" == \#* ]] && continue
             _plugin="${line%% *}"
-            if claude plugin update "$_plugin" >/dev/null 2>&1; then
+            if output="$(claude plugin update -y "$_plugin" 2>&1)"; then
                 log_okay "  updated $_plugin"
             else
-                log_debug "  $_plugin up to date or no update path"
+                log_warn "  failed updating $_plugin: ${output//$'\n'/ }"
+                (( _update_fail++ )) || true
             fi
         done < "$_file"
     done < <(overlay_package_files "claude-plugins.txt")
     unset _plugin
+    (( _update_fail == 0 )) || die "Claude plugin update failed for $_update_fail declared plugin(s)"
 fi
 
 ### MCP SERVERS (all platforms) ###
@@ -259,7 +316,7 @@ _server_matches() {
     jq -e --arg n "$name" --argjson d "$desired" '
         .mcpServers[$n] as $s
         | $s != null
-          and (["type","url","command","args","headers","headersHelper"]
+          and (["type","url","command","args","headers","headersHelper","oauth"]
                | map($d[.] == $s[.]) | all)
     ' "$HOME/.claude.json" >/dev/null 2>&1
 }
@@ -267,7 +324,7 @@ _server_matches() {
 # Replace (or create) server $1 with desired JSON $2.
 _register_server() {
     claude mcp remove "$1" -s user >/dev/null 2>&1 || true
-    claude mcp add-json -s user "$1" "$2" >/dev/null 2>&1
+    run_logged claude mcp add-json -s user "$1" "$2"
 }
 
 _register_mcps() {
@@ -275,7 +332,7 @@ _register_mcps() {
     # this function only builds Claude's desired shape + reconciles it.
     log_info "Reading MCP servers (packages/mcp-servers.txt + overlays)"
     local _name _kind _transport _cmd _url _auth_source _codex_client_id
-    local _profile _risk _extra
+    local _profile _risk _extra _client_id
     mcp_registry_validate || die "invalid MCP registry"
     while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
        && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth_source \
@@ -286,8 +343,7 @@ _register_mcps() {
         if [[ "$_kind" == "stdio" ]]; then
             _json="$(jq -nc --arg cmd "$_cmd" '
                 ($cmd | split(" ")) as $w
-                | {type: "stdio", command: $w[0]}
-                + (if ($w | length) > 1 then {args: $w[1:]} else {} end)')"
+                | {type: "stdio", command: $w[0], args: $w[1:]}')"
             _label="stdio → $_cmd"
         else
             # URL placeholders: {VAR} → $VAR (env files sourced by _lib.sh), for
@@ -306,6 +362,19 @@ _register_mcps() {
                 _extra=""
             fi
 
+            # --client-id has a stable stored representation, so model it and
+            # reconcile drift instead of falling back to a name-only check.
+            if [[ "$_extra" == --client-id\ * ]]; then
+                _client_id="${_extra#--client-id }"
+                [[ -n "$_client_id" && "$_client_id" != *' '* ]] \
+                    || die "invalid --client-id extras for $_name: $_extra"
+                _json="$(jq -nc --arg t "$_transport" --arg url "$_url" \
+                    --arg id "$_client_id" \
+                    '{type: $t, url: $url, oauth: {clientId: $id}}')"
+                _label="$_transport → $_url [client-id=$_client_id]"
+                _extra=""
+            fi
+
             # Entries with pass-through extras land in fields we don't model,
             # so they can't be shape-compared — keep the name-only skip.
             if [[ -n "$_extra" ]]; then
@@ -315,7 +384,7 @@ _register_mcps() {
                 else
                     log_info "  $_name ($_transport) → $_url [$_extra]"
                     # shellcheck disable=SC2086
-                    if claude mcp add --transport "$_transport" --scope user $_extra "$_name" "$_url" 2>/dev/null; then
+                    if run_logged claude mcp add --transport "$_transport" --scope user $_extra "$_name" "$_url"; then
                         log_okay "  registered $_name"
                         (( _ok++ )) || true
                     else
@@ -326,7 +395,8 @@ _register_mcps() {
                 continue
             fi
 
-            case "$_auth_source" in
+            if [[ -z "$_json" ]]; then
+                case "$_auth_source" in
                 "")
                     _json="$(jq -nc --arg t "$_transport" --arg url "$_url" '{type: $t, url: $url}')"
                     _label="$_transport → $_url"
@@ -361,7 +431,8 @@ _register_mcps() {
                         _label="$_transport → $_url [auth=$_auth_source unavailable]"
                     fi
                     ;;
-            esac
+                esac
+            fi
         fi
 
         # Reconcile desired vs stored.
@@ -371,7 +442,7 @@ _register_mcps() {
             continue
         fi
         log_info "  $_name ($_label, risk=$_risk)"
-        if _register_server "$_name" "$_json"; then
+        if _register_server "$_name" "$_json" && _server_matches "$_name" "$_json"; then
             log_okay "  registered $_name"
             (( _ok++ )) || true
         else
@@ -386,8 +457,9 @@ _ok=0 _skip=0 _fail=0
 if has jq; then
     _register_mcps
     log_okay "MCP servers: ${_ok} registered, ${_skip} already present, ${_fail} failed"
+    (( _fail == 0 )) || die "Claude MCP registration failed for $_fail declared server(s)"
 else
-    log_warn "jq not found — skipping MCP server sync (installed via Brewfile step 4; re-run after)"
+    die "jq not found — MCP server declarations cannot be reconciled"
 fi
 
 ### OVERLAY SKILLS ###

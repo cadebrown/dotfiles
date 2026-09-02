@@ -96,9 +96,19 @@ _cass_build_from_source() {
         coding-agent-search --bin cass --locked --root "${ARCH_BIN%/bin}"
 }
 
+_cass_works() {
+    [[ -x "$1" ]] && "$1" --version >/dev/null 2>&1
+}
+
 _install_cass() {
     local _plat _ver _dest _tmp _url _want _got _meta
-    _plat="$(_cass_platform)" || { log_warn "cass: unsupported platform $OS-$ARCH — skipping"; return 0; }
+    _dest="$ARCH_BIN/cass"
+    if ! _plat="$(_cass_platform)"; then
+        log_info "cass: no release asset for $OS-$ARCH; building from source"
+        _cass_build_from_source || return 1
+        _cass_works "$_dest"
+        return
+    fi
 
     # Resolve the latest release tag via the GitHub API. Route through download()
     # (not raw curl) so it sends Authorization when GITHUB_TOKEN is set: the
@@ -114,17 +124,17 @@ _install_cass() {
     if [[ -z "${_ver:-}" ]]; then
         log_warn "cass: GitHub API release lookup failed — rate-limited or offline."
         log_warn "cass: set GITHUB_TOKEN (run 'bash install/auth.sh github') to raise the 60/hr limit."
-        if has cargo; then
-            log_warn "cass: building from source instead (one-time, ~minutes)"
-            _cass_build_from_source || log_warn "cass: source build failed — skipping"
-        else
-            log_warn "cass: no cargo to fall back to — skipping"
+        if _cass_works "$_dest"; then
+            log_warn "cass: using the installed version because the release service is unavailable"
+            return 0
         fi
-        return 0
+        log_info "cass: no working cached binary; building from source"
+        _cass_build_from_source || return 1
+        _cass_works "$_dest"
+        return
     fi
 
-    _dest="$ARCH_BIN/cass"
-    if [[ -x "$_dest" ]] && "$_dest" --version 2>/dev/null | grep -qF "${_ver#v}"; then
+    if _cass_works "$_dest" && "$_dest" --version 2>/dev/null | grep -qF "${_ver#v}"; then
         log_okay "cass ${_ver} already installed at $_dest"
         return 0
     fi
@@ -134,13 +144,10 @@ _install_cass() {
         local _glibc
         _glibc="$(ldd --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+$' || echo 0)"
         if ! awk -v v="$_glibc" 'BEGIN { exit !(v >= 2.38) }'; then
-            if has cargo; then
-                log_warn "cass: host glibc $_glibc < 2.38 — building from source (one-time, ~minutes)"
-                _cass_build_from_source || log_warn "cass: source build failed — skipping"
-                return 0
-            fi
-            log_warn "cass: host glibc $_glibc < 2.38 and no cargo — skipping"
-            return 0
+            log_info "cass: host glibc $_glibc < 2.38; building from source"
+            _cass_build_from_source || return 1
+            _cass_works "$_dest"
+            return
         fi
     fi
 
@@ -149,8 +156,14 @@ _install_cass() {
     trap "rm -rf '$_tmp'" RETURN
     _url="https://github.com/$_CASS_REPO/releases/download/$_ver"
     log_info "Downloading cass $_ver ($_plat)..."
-    download "$_url/cass-$_plat.tar.gz" "$_tmp/cass.tar.gz"
-    download "$_url/cass-$_plat.tar.gz.sha256" "$_tmp/cass.tar.gz.sha256"
+    if ! download "$_url/cass-$_plat.tar.gz" "$_tmp/cass.tar.gz" \
+        || ! download "$_url/cass-$_plat.tar.gz.sha256" "$_tmp/cass.tar.gz.sha256"; then
+        if _cass_works "$_dest"; then
+            log_warn "cass: release asset unavailable; keeping the working installed version"
+            return 0
+        fi
+        return 1
+    fi
     _want="$(awk '{print $1}' "$_tmp/cass.tar.gz.sha256")"
     if [[ "$OS" == "darwin" ]]; then
         _got="$(shasum -a 256 "$_tmp/cass.tar.gz" | awk '{print $1}')"
@@ -161,56 +174,59 @@ _install_cass() {
     tar -xzf "$_tmp/cass.tar.gz" -C "$_tmp"
     ensure_dir "$ARCH_BIN"
     install -m 755 "$(fd -t f '^cass$' "$_tmp" | head -1 || find "$_tmp" -type f -name cass | head -1)" "$_dest"
+    _cass_works "$_dest" || return 1
     log_okay "Installed cass $_ver → $_dest"
 }
 
-_install_cass
+_install_cass || die "cass: installation did not produce a working command"
 
-if has cass || [[ -x "$ARCH_BIN/cass" ]]; then
-    _cass="$ARCH_BIN/cass"; has cass && _cass="$(command -v cass)"
+_cass="$ARCH_BIN/cass"
+_cass_works "$_cass" || die "cass: installation did not produce a working command"
 
-    # MiniLM is cass's architecture-verified native embedder. Nomic's removed
-    # ONNX path is still downloadable in cass 0.6.22 but cannot build an index.
-    # `models status` prints a per-model block; an installed model's Status
-    # line does NOT contain "not acquired". -y is required: without it the
-    # installer prompts and silently cancels on non-tty stdin (exit 0!).
-    if "$_cass" models status 2>/dev/null | grep -A6 -i 'minilm' | grep -i 'status:' | grep -qiv 'not acquired'; then
-        log_okay "cass: all-MiniLM-L6-v2 model already installed"
-    else
-        log_info "cass: installing all-MiniLM-L6-v2 model (~87MB, one-time)"
-        run_logged "$_cass" models install --model all-minilm-l6-v2 -y \
-            || log_warn "cass: model install failed — lexical-only until retried"
+# MiniLM is cass's architecture-verified native embedder. Nomic's removed
+# ONNX path is still downloadable in cass 0.6.22 but cannot build an index.
+# `models status` prints a per-model block; an installed model's Status
+# line does NOT contain "not acquired". -y is required: without it the
+# installer prompts and silently cancels on non-tty stdin (exit 0!).
+if "$_cass" models status 2>/dev/null | grep -A6 -i 'minilm' | grep -i 'status:' | grep -qiv 'not acquired'; then
+    log_okay "cass: all-MiniLM-L6-v2 model already installed"
+else
+    log_info "cass: installing all-MiniLM-L6-v2 model (~87MB, one-time)"
+    run_logged "$_cass" models install --model all-minilm-l6-v2 -y \
+        || die "cass: model installation failed"
+    if ! "$_cass" models status 2>/dev/null | grep -A6 -i 'minilm' | grep -i 'status:' | grep -qiv 'not acquired'; then
+        die "cass: all-MiniLM-L6-v2 model is still unavailable after installation"
     fi
+fi
 
-    # cass indexing is deliberately manual. Raw session archives can be large,
-    # so install/upgrade must not wait for derived lexical or semantic assets.
-    if [[ "$_mode" == "reindex" ]]; then
-        if pgrep -f "cass index" >/dev/null 2>&1; then
-            log_warn "cass: index already running — not starting a concurrent rebuild"
-        else
-            log_info "cass: full lexical index rebuild"
-            run_logged "$_cass" index --full \
-                || log_warn "cass index failed — run 'cass doctor'"
-        fi
-    elif [[ "$_mode" == "index" ]]; then
-        if pgrep -f "cass index" >/dev/null 2>&1; then
-            log_warn "cass: index already running — not starting a concurrent refresh"
-        else
-            log_info "cass: refreshing lexical session index"
-            run_logged "$_cass" index \
-                || log_warn "cass index failed — run 'cass doctor'"
-        fi
-    elif [[ "$_mode" == "semantic" ]]; then
-        if pgrep -f "cass index" >/dev/null 2>&1; then
-            log_warn "cass: lexical index is running — retry the semantic batch after it finishes"
-        else
-            log_info "cass: processing one bounded semantic batch"
-            run_logged "$_cass" models backfill --tier quality --embedder fastembed --batch-conversations 64 \
-                || log_warn "cass semantic batch failed — run 'cass doctor'"
-        fi
+# cass indexing is deliberately manual. Raw session archives can be large,
+# so install/upgrade must not wait for derived lexical or semantic assets.
+if [[ "$_mode" == "reindex" ]]; then
+    if pgrep -f "cass index" >/dev/null 2>&1; then
+        die "cass: index already running; refusing a concurrent rebuild"
     else
-        log_info "cass: indexing is manual (memory.sh index / memory.sh semantic)"
+        log_info "cass: full lexical index rebuild"
+        run_logged "$_cass" index --full \
+            || die "cass full index failed — run 'cass doctor'"
     fi
+elif [[ "$_mode" == "index" ]]; then
+    if pgrep -f "cass index" >/dev/null 2>&1; then
+        die "cass: index already running; refusing a concurrent refresh"
+    else
+        log_info "cass: refreshing lexical session index"
+        run_logged "$_cass" index \
+            || die "cass index failed — run 'cass doctor'"
+    fi
+elif [[ "$_mode" == "semantic" ]]; then
+    if pgrep -f "cass index" >/dev/null 2>&1; then
+        die "cass: lexical index is running; retry the semantic batch after it finishes"
+    else
+        log_info "cass: processing one bounded semantic batch"
+        run_logged "$_cass" models backfill --tier quality --embedder fastembed --batch-conversations 64 \
+            || die "cass semantic batch failed — run 'cass doctor'"
+    fi
+else
+    log_info "cass: indexing is manual (memory.sh index / memory.sh semantic)"
 fi
 
 ### ~/kb — markdown knowledge base (L2 source of truth) ###
@@ -238,7 +254,7 @@ EOF
     # comment), which hides ~/.gitconfig identity; commit with it restored.
     env -u GIT_CONFIG_GLOBAL git -C "$HOME/kb" add -A
     env -u GIT_CONFIG_GLOBAL git -C "$HOME/kb" commit -qm "kb: initial layout" \
-        || log_warn "kb: initial commit failed — set git identity and commit ~/kb manually"
+        || die "kb: initial commit failed — set git identity and retry"
     log_okay "$HOME/kb initialized (add a private remote to sync across machines)"
 else
     log_okay "$HOME/kb already a git repo"
@@ -247,8 +263,10 @@ fi
 ### qmd — knowledge search daemon (L2 search) ###
 
 if ! has qmd; then
-    log_warn "qmd not found — run install/node.sh (npm.txt has @tobilu/qmd); skipping qmd setup"
+    die "qmd not found — run install/node.sh (npm.txt has @tobilu/qmd)"
 else
+    _qmd="$(command -v qmd)"
+    run_logged "$_qmd" --version || die "qmd command is installed but does not run"
     # Collections: kb + Claude auto-memory + dotfiles docs.
     #
     # `collection show` answers by exit code (0 present, 1 absent). The guard
@@ -258,28 +276,32 @@ else
     # existing collection and killed the whole script under set -e.
     _qmd_add() {
         local _name="$1"; shift
-        if qmd collection show "$_name" >/dev/null 2>&1; then
+        if "$_qmd" collection show "$_name" >/dev/null 2>&1; then
             log_okay "  qmd collection $_name already indexed"
-        elif run_logged qmd collection add "$@" --name "$_name"; then
+        elif run_logged "$_qmd" collection add "$@" --name "$_name"; then
             log_okay "  qmd collection $_name added"
         else
-            log_warn "  qmd collection $_name could not be added — search will miss it until retried"
+            return 1
         fi
+        "$_qmd" collection show "$_name" >/dev/null 2>&1
     }
-    _qmd_add kb "$HOME/kb"
-    _qmd_add agent-memory "$HOME/.claude/projects" --mask '**/memory/*.md'
-    _qmd_add dotfiles-docs "$DF_ROOT/docs" --mask '**/*.md'
+    _qmd_add kb "$HOME/kb" || die "qmd collection kb could not be configured"
+    _qmd_add agent-memory "$HOME/.claude/projects" --mask '**/memory/*.md' \
+        || die "qmd collection agent-memory could not be configured"
+    _qmd_add dotfiles-docs "$DF_ROOT/docs" --mask '**/*.md' \
+        || die "qmd collection dotfiles-docs could not be configured"
 
     if [[ "$_mode" == "reindex" ]]; then
-        run_logged qmd update
-        run_logged qmd embed -f
+        run_logged "$_qmd" update || die "qmd update failed"
+        run_logged "$_qmd" embed -f || die "qmd forced embedding failed"
     elif [[ "$_mode" == "setup" ]]; then
         # Incremental: cheap when nothing changed. Models download on first use.
-        run_logged qmd update
-        run_logged qmd embed || log_warn "qmd embed failed — vector search degraded to BM25 until retried"
+        run_logged "$_qmd" update || die "qmd update failed"
+        run_logged "$_qmd" embed || die "qmd embedding failed"
     else
         log_info "qmd: unchanged for cass $_mode"
     fi
+    run_logged "$_qmd" status || die "qmd status check failed"
 fi
 
 ### Daemons ###
@@ -301,9 +323,15 @@ if [[ "$OS" == "darwin" ]]; then
     _agent=dev.cade.qmd
     _plist="$HOME/Library/LaunchAgents/$_agent.plist"
     if [[ ! -f "$_plist" ]]; then
-        log_warn "$_agent.plist missing — run chezmoi apply"
+        die "$_agent.plist missing — run chezmoi apply"
     elif launchctl print "gui/$(id -u)/$_agent" >/dev/null 2>&1; then
-        log_okay "$_agent already loaded"
+        if _qmd_daemon_healthy; then
+            log_okay "$_agent already loaded"
+        else
+            launchctl kickstart -k "gui/$(id -u)/$_agent" \
+                || die "could not restart unhealthy $_agent"
+            log_okay "restarted $_agent"
+        fi
     else
         # Clear any disabled override first: bootstrap on a disabled label
         # returns success but launchd never runs the job.
@@ -311,14 +339,23 @@ if [[ "$OS" == "darwin" ]]; then
         if launchctl bootstrap "gui/$(id -u)" "$_plist" 2>/dev/null; then
             log_okay "loaded $_agent"
         else
-            log_warn "could not load $_agent (launchctl bootstrap failed)"
+            die "could not load $_agent (launchctl bootstrap failed)"
         fi
     fi
 else
     # No launchd: lazy-start (also done by shell profiles on login).
-    if has qmd && ! qmd_daemon_running; then
-        qmd_daemon_start && log_okay "started qmd mcp daemon"
+    if qmd_daemon_running && ! _qmd_daemon_healthy; then
+        log_info "restarting unhealthy qmd MCP daemon"
+        qmd_daemon_stop
+        qmd_daemon_running && die "could not stop unhealthy qmd MCP daemon"
+        qmd_daemon_start || die "could not restart qmd MCP daemon"
+        log_okay "restarted qmd mcp daemon"
+    elif ! qmd_daemon_running; then
+        qmd_daemon_start || die "could not start qmd MCP daemon"
+        log_okay "started qmd mcp daemon"
     fi
 fi
+
+_qmd_wait_healthy || die "qmd MCP daemon failed its health check on 127.0.0.1:8181"
 
 log_okay "Memory stack ready (qmd MCP on localhost:8181; cass archive at $CASS_DATA_DIR)"

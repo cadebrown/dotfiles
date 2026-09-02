@@ -100,10 +100,6 @@ _declared_plugins() {
     done < <(overlay_package_files "codex-plugins.txt")
 }
 
-_codex_authenticated() {
-    codex login status >/dev/null 2>&1
-}
-
 _marketplace_names() {
     codex plugin marketplace list --json 2>/dev/null \
         | jq -r '.marketplaces[].name'
@@ -112,22 +108,25 @@ _marketplace_names() {
 _sync_plugins() {
     local _tmp _markets _plugin _market
     log_section "Codex Plugins"
-    has jq || { log_warn "jq not found — skipping Codex plugin sync"; return 0; }
+    has jq || die "jq is required to sync Codex plugins"
     _tmp="$(mktemp)"
     _markets="$(mktemp)"
     if ! codex plugin list --json | jq -r '.installed[].pluginId' > "$_tmp"; then
-        log_warn "Could not read Codex plugin inventory"
+        log_fail "Could not read Codex plugin inventory"
         rm -f "$_tmp" "$_markets"
-        return 0
+        return 1
     fi
-    _marketplace_names > "$_markets" || true
+    _marketplace_names > "$_markets" || {
+        rm -f "$_tmp" "$_markets"
+        die "Could not read Codex marketplace inventory"
+    }
 
     while IFS= read -r _plugin; do
         [[ -n "$_plugin" ]] || continue
         _market="${_plugin##*@}"
         if ! grep -qxF "$_market" "$_markets"; then
-            log_warn "  skip  $_plugin (marketplace unavailable; Codex login/runtime may be required)"
-            continue
+            rm -f "$_tmp" "$_markets"
+            die "Codex marketplace unavailable for declared plugin: $_plugin"
         fi
         if grep -qxF "$_plugin" "$_tmp"; then
             log_info "  skip  $_plugin (already installed)"
@@ -138,7 +137,8 @@ _sync_plugins() {
             log_okay "  installed $_plugin"
             printf '%s\n' "$_plugin" >> "$_tmp"
         else
-            log_warn "  failed $_plugin"
+            rm -f "$_tmp" "$_markets"
+            die "Failed to install declared Codex plugin: $_plugin"
         fi
     done < <(_declared_plugins)
     rm -f "$_tmp" "$_markets"
@@ -152,29 +152,26 @@ _check_plugins() {
     _tmp="$(mktemp)"; _markets="$(mktemp)"; _avail="$(mktemp)"
     jq -r '.installed[] | select(.enabled) | .pluginId' <<<"$_json" > "$_tmp"
     jq -r '.available[].pluginId'                        <<<"$_json" > "$_avail"
-    _marketplace_names > "$_markets" || true
+    _marketplace_names > "$_markets" || {
+        rm -f "$_tmp" "$_markets" "$_avail"
+        die "Could not read Codex marketplace inventory"
+    }
     while IFS= read -r _plugin; do
         [[ -n "$_plugin" ]] || continue
         _market="${_plugin##*@}"
         if ! grep -qxF "$_market" "$_markets"; then
-            if _codex_authenticated; then
-                rm -f "$_tmp" "$_markets" "$_avail"
-                die "Codex marketplace unavailable while authenticated: $_market"
-            fi
-            log_warn "Skipping plugin check without Codex login/runtime: $_plugin"
-            continue
+            rm -f "$_tmp" "$_markets" "$_avail"
+            die "Codex marketplace unavailable for declared plugin: $_plugin"
         fi
         grep -qxF "$_plugin" "$_tmp" && continue
-        # Declared but not installed+enabled. If the marketplace snapshot no
-        # longer offers it, upstream dropped it (the curated snapshot ships with
-        # codex-cli and drifts across versions) — warn and keep going so a stale
-        # list can't break bootstrap. A plugin still offered but missing is a
-        # real local failure and stays fatal.
+        # A declaration is a hard contract: unavailable, missing, or disabled
+        # plugins all fail until the registry is corrected or install succeeds.
         if grep -qxF "$_plugin" "$_avail"; then
             rm -f "$_tmp" "$_markets" "$_avail"
             die "Missing or disabled Codex plugin: $_plugin"
         fi
-        log_warn "  dropped upstream: $_plugin — prune packages/codex-plugins.txt"
+        rm -f "$_tmp" "$_markets" "$_avail"
+        die "Declared Codex plugin was dropped upstream: $_plugin"
     done < <(_declared_plugins)
     rm -f "$_tmp" "$_markets" "$_avail"
 }

@@ -31,7 +31,8 @@ bash ~/dotfiles/install/rust.sh
 # Homebrew formula/cask → packages/Brewfile, then:
 brew bundle --file=~/dotfiles/packages/Brewfile
 
-# Python core → packages/pip.txt; optional full tools → packages/pip-full.txt
+# Plain Python libraries → packages/python.txt
+# Python CLI tools → packages/pip.txt; optional full tools → packages/pip-full.txt
 bash ~/dotfiles/install/python.sh
 ```
 

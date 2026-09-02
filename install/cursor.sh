@@ -35,12 +35,12 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 # environment. Tokens at rest in ~/.cursor/mcp.json is the accepted tradeoff;
 # rotation heals on the next sync.
 _sync_cursor_mcp() {
-    has jq || { log_warn "jq not found — skipping Cursor MCP sync"; return 0; }
+    has jq || { log_warn "jq not found — Cursor MCP declarations cannot be reconciled"; return 1; }
     log_section "Cursor MCP servers"
 
     local _out="$HOME/.cursor/mcp.json" _stream _count=0
     local _name _kind _transport _cmd _url _auth _ccid _profile _risk _extras
-    local _missing _hname _hval _def
+    local _missing _hname _hval _def _login_cmd
     # NB: no `trap ... RETURN` for cleanup — bash fires RETURN traps when any
     # sourced script finishes, so a `.`/`source` anywhere in this function
     # would silently delete the accumulator mid-loop (this happened: only
@@ -55,9 +55,11 @@ _sync_cursor_mcp() {
        && IFS= read -r _ccid && IFS= read -r _profile && IFS= read -r _risk \
        && IFS= read -r _extras; do
             if [[ "$_kind" == "stdio" ]]; then
-                _def="$(jq -nc --arg cmd "$_cmd" \
-                    '($cmd|split(" ")) as $w | {command:$w[0]}
-                     + (if ($w|length)>1 then {args:$w[1:]} else {} end)')"
+                _login_cmd="$_cmd"
+                [[ "$_login_cmd" == "bash -lc "* ]] \
+                    && _login_cmd="${_login_cmd#bash -lc }"
+                _def="$(jq -nc --arg cmd "$_login_cmd" \
+                    '{command:"bash", args:["-lc", $cmd]}')"
             else
                 # {VAR} URL placeholders → $VAR (env files sourced by _lib.sh).
                 if [[ "$_url" == *'{'*'}'* ]]; then
@@ -179,6 +181,8 @@ if [[ "$_CMD" != "install" ]]; then
     die "Usage: cursor.sh [install|sync-extensions|sync-mcp]"
 fi
 
+has cursor || die "cursor CLI not found — set DF_DO_CURSOR=0 on machines without Cursor"
+
 log_section "Cursor"
 
 ### MCP servers (independent of the cursor binary) ###
@@ -197,8 +201,7 @@ case "$OS" in
 esac
 
 if [[ ! -d "$_SRC_DIR" ]]; then
-    log_warn "Source dir $_SRC_DIR not found — run chezmoi apply first"
-    exit 0
+    die "Source dir $_SRC_DIR not found — chezmoi apply must complete before Cursor setup"
 fi
 
 ensure_dir "$_CURSOR_DIR"
@@ -241,16 +244,12 @@ unset _SRC_DIR _CURSOR_DIR _FILES _f _src _dst _cur _bak
 
 log_section "Cursor extensions"
 
-if ! has cursor; then
-    log_warn "cursor CLI not found — skipping extensions"
-    exit 0
-fi
-
 EXT_TXT="$DF_PACKAGES/cursor-extensions.txt"
-[[ -f "$EXT_TXT" ]] || { log_warn "No cursor-extensions.txt at $EXT_TXT — skipping"; exit 0; }
+[[ -f "$EXT_TXT" ]] || die "No cursor-extensions.txt at $EXT_TXT"
 
 # Get currently installed extensions once
-_installed="$(cursor --list-extensions 2>/dev/null || true)"
+_installed="$(cursor --list-extensions)" \
+    || die "Failed to list installed Cursor extensions"
 
 _ok=0 _skip=0 _fail=0
 
@@ -265,11 +264,11 @@ while IFS= read -r line; do
     fi
 
     log_info "  $ext"
-    if cursor --install-extension "$ext" --force >/dev/null 2>&1; then
+    if _output="$(cursor --install-extension "$ext" --force 2>&1)"; then
         log_okay "  installed $ext"
         (( _ok++ )) || true
     else
-        log_warn "  fail  $ext"
+        log_warn "  fail  $ext: ${_output//$'\n'/ }"
         (( _fail++ )) || true
     fi
 done < "$EXT_TXT"
@@ -280,8 +279,22 @@ done < "$EXT_TXT"
 # can't serve by ID even though they are installed and working.
 if [[ "${DF_MODE:-}" == "upgrade" ]]; then
     log_info "Updating installed extensions"
-    cursor --update-extensions >/dev/null 2>&1 || \
-        log_warn "Extension update pass failed — run 'cursor --update-extensions'"
+    run_logged cursor --update-extensions \
+        || die "Cursor extension update pass failed"
 fi
 
 log_okay "Cursor extensions: ${_ok} installed, ${_skip} already present, ${_fail} failed"
+(( _fail == 0 )) || die "Cursor failed to install $_fail declared extension(s)"
+
+_installed="$(cursor --list-extensions)" \
+    || die "Failed to verify installed Cursor extensions"
+_missing=0
+while IFS= read -r line; do
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    ext="${line%% *}"
+    if ! grep -qxF "$ext" <<< "$_installed"; then
+        log_warn "  missing  $ext"
+        (( _missing++ )) || true
+    fi
+done < "$EXT_TXT"
+(( _missing == 0 )) || die "Cursor is missing $_missing declared extension(s) after installation"

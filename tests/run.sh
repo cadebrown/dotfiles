@@ -19,6 +19,12 @@ if [[ "${DOCKER_BUILD:-1}" != "0" ]]; then
     docker buildx build --load -t dotfiles-test "$TESTS_DIR"
 fi
 
+echo "==> Running clean rootless LLDB install"
+docker run --rm --user root \
+    -v "$REPO_ROOT:/home/user/dotfiles" \
+    dotfiles-test \
+    bash -c 'apt-get update -qq && runuser -u user -- env HOME=/home/user bash /home/user/dotfiles/tests/lldb-clean-container.sh'
+
 echo "==> Running tests"
 docker run --rm \
     -v "$REPO_ROOT:/home/user/dotfiles" \

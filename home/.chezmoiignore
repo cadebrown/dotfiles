@@ -7,5 +7,6 @@ Library/**
 {{ end }}
 
 .local/bin/git-wt
+.local/bin/df-agent-doctor
 
 AGENTS.md

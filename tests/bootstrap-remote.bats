@@ -61,7 +61,7 @@ run_remote_bootstrap() {
             HOME="$2" PATH="$3:/usr/bin:/bin" REPO_SOURCE="$4" \
             DF_USE_PLAT="$5" DF_NAME=Test DF_EMAIL=test@example.com \
             DF_DO_SCRATCH=0 DF_DO_DIRS=0 DF_DO_ZSH=0 DF_DO_PACKAGES=0 \
-            DF_DO_QUARTO=0 DF_DO_MACOS_SERVICES=0 DF_DO_MACOS_SETTINGS=0 \
+            DF_DO_LLDB=0 DF_DO_QUARTO=0 DF_DO_MACOS_SERVICES=0 DF_DO_MACOS_SETTINGS=0 \
             DF_DO_MACOS_QUICK_ACTIONS=0 DF_DO_PYTHON=0 DF_DO_NODE=0 \
             DF_DO_RUST=0 DF_DO_GO=0 DF_DO_JULIA=0 DF_DO_LEAN=0 \
             DF_DO_LATEX=0 DF_DO_CLAUDE=0 DF_DO_CODEX=0 \

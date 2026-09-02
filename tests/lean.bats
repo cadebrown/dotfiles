@@ -62,6 +62,15 @@ setup() {
     grep -q 'tlmgr" update --self --all\|update --self --all' "$REPO/install/latex.sh"
 }
 
+@test "math runtime installers enforce bounded health checks" {
+    grep -Fq '|| die "lean does not start' "$REPO/install/lean.sh"
+    grep -Fq '|| die "lake does not start' "$REPO/install/lean.sh"
+    grep -Fq '|| die "TinyTeX command does not start' "$REPO/install/latex.sh"
+    grep -Fq '|| die "Quarto is installed but does not start' "$REPO/install/quarto.sh"
+    grep -Fq 'Julia channel $JULIA_CHANNEL is installed but the runtime does not start' \
+        "$REPO/install/julia.sh"
+}
+
 # A Lean toolchain is ~1.5 GB and these tests never invoke lean or tlmgr.
 @test "docker entrypoint skips the lean and latex steps" {
     grep -q 'DF_DO_LEAN=0' "$REPO/tests/entrypoint.sh"

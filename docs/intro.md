@@ -47,9 +47,9 @@ A single `packages/Brewfile` drives both platforms. On macOS, Homebrew installs 
 | --- | --- | --- | --- |
 | **Rust** | rustup + cargo-binstall | `$LOCAL_PLAT/rustup/`, `$LOCAL_PLAT/cargo/` | `packages/cargo.txt` |
 | **Node.js** | nvm (lazy-loaded in zsh) | `$LOCAL_PLAT/nvm/` | `packages/npm.txt` |
-| **Python** | uv tool install (per CLI tool) | `$LOCAL_PLAT/uv/tools/`, entrypoints in `$LOCAL_PLAT/bin/` | `packages/pip.txt` + full profile |
+| **Python** | uv-managed plain Python + isolated CLI tools | `$PYTHON_ENV`, `$LOCAL_PLAT/uv/tools/`, entrypoints in `$LOCAL_PLAT/bin/` | `packages/python.txt`, `packages/pip.txt` + full profile |
 
-Rust tools install via `cargo-binstall` (downloads pre-built binaries from GitHub releases when available, falls back to source). Python CLI tools each get their own isolated venv via `uv tool install` — no monolithic user-level environment. On macOS, rustup comes from Homebrew (code-signed, required on Sequoia+ where the linker enforces provenance).
+Rust tools install via `cargo-binstall` (downloads pre-built binaries from GitHub releases when available, falls back to source). Plain `python` uses the small `$PYTHON_ENV` environment and includes SymPy. Python CLI tools each get their own isolated venv via `uv tool install`. On macOS, rustup comes from Homebrew (code-signed, required on Sequoia+ where the linker enforces provenance).
 
 ### AI tools
 

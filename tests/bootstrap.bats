@@ -7,6 +7,27 @@ setup() {
     ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh-custom}"
 }
 
+teardown() {
+    if [[ -f "$ARCH_BIN/uv.test-real" ]]; then
+        rm -f "$ARCH_BIN/uv"
+        mv "$ARCH_BIN/uv.test-real" "$ARCH_BIN/uv"
+    fi
+    if [[ -f "$ARCH_BIN/ruff.test-missing" ]]; then
+        if [[ -x "$ARCH_BIN/ruff" ]]; then
+            rm -f "$ARCH_BIN/ruff.test-missing"
+        else
+            mv "$ARCH_BIN/ruff.test-missing" "$ARCH_BIN/ruff"
+        fi
+    fi
+    if [[ -f "$ARCH_BIN/ruff.test-broken" ]]; then
+        if "$ARCH_BIN/ruff" --version </dev/null >/dev/null 2>&1; then
+            rm -f "$ARCH_BIN/ruff.test-broken"
+        else
+            mv -f "$ARCH_BIN/ruff.test-broken" "$ARCH_BIN/ruff"
+        fi
+    fi
+}
+
 # --- Dotfiles ---
 
 @test "~/.zshrc exists" {
@@ -94,6 +115,12 @@ setup() {
     [[ -f "$HOME/.pythonrc" ]]
 }
 
+@test "plain Python is managed and includes SymPy" {
+    run python -c 'import sys, sympy; print(sys.version_info.major, sympy.__version__)'
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ ^3\  ]]
+}
+
 @test "pip.txt tools are installed via uv tool" {
     # The monolithic ~/venv was removed; each pip.txt entry now lives in its
     # own venv under $UV_TOOL_DIR (per `uv tool install`).
@@ -110,6 +137,82 @@ setup() {
     [ "$status" -eq 0 ]
     [[ "$output" != *"manim "* ]]
     [[ "$output" != *"whisperx "* ]]
+}
+
+@test "Python installer repairs a missing declared tool entrypoint" {
+    mv "$ARCH_BIN/ruff" "$ARCH_BIN/ruff.test-missing"
+
+    run bash "$HOME/dotfiles/install/python.sh"
+
+    [ "$status" -eq 0 ]
+    [[ -x "$ARCH_BIN/ruff" ]]
+}
+
+@test "Python installer repairs a declared entrypoint that cannot start" {
+    local broken
+    cp "$ARCH_BIN/ruff" "$ARCH_BIN/ruff.test-broken"
+    broken="$(mktemp "$ARCH_BIN/.ruff-broken.XXXXXX")"
+    cat > "$broken" <<'EOF'
+#!/usr/bin/env bash
+exit 127
+EOF
+    chmod +x "$broken"
+    mv -f "$broken" "$ARCH_BIN/ruff"
+
+    run env DF_PROFILE=core bash "$HOME/dotfiles/install/python.sh"
+
+    [ "$status" -eq 0 ]
+    run "$ARCH_BIN/ruff" --version
+    [ "$status" -eq 0 ]
+}
+
+@test "Python installer fails when a declared CLI cannot be installed" {
+    mv "$ARCH_BIN/uv" "$ARCH_BIN/uv.test-real"
+    cat > "$ARCH_BIN/uv" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "--version" ]]; then
+    printf 'uv 0.test\n'
+elif [[ "$1 ${2:-}" == "pip install" ]]; then
+    exit 0
+elif [[ "$1 ${2:-}" == "tool list" ]]; then
+    exit 0
+elif [[ "$1 ${2:-}" == "tool install" ]]; then
+    exit 42
+fi
+EOF
+    chmod +x "$ARCH_BIN/uv"
+
+    run bash "$HOME/dotfiles/install/python.sh"
+
+    rm -f "$ARCH_BIN/uv"
+    mv "$ARCH_BIN/uv.test-real" "$ARCH_BIN/uv"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"declared Python CLI tool(s) failed to install"* ]]
+}
+
+@test "Python upgrade fails if uv drops a declared entrypoint" {
+    cp "$ARCH_BIN/ruff" "$ARCH_BIN/ruff.test-present"
+    mv "$ARCH_BIN/uv" "$ARCH_BIN/uv.test-real"
+    cat > "$ARCH_BIN/uv" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1 ${2:-}" == "self update" ]]; then
+    exit 0
+elif [[ "$1 ${2:-} ${3:-}" == "tool upgrade --all" ]]; then
+    rm -f "$UV_DROP_BIN"
+    exit 0
+fi
+exec "$UV_REAL_BIN" "$@"
+EOF
+    chmod +x "$ARCH_BIN/uv"
+
+    run env DF_MODE=upgrade UV_REAL_BIN="$ARCH_BIN/uv.test-real" \
+        UV_DROP_BIN="$ARCH_BIN/ruff" bash "$HOME/dotfiles/install/python.sh"
+
+    rm -f "$ARCH_BIN/uv"
+    mv "$ARCH_BIN/uv.test-real" "$ARCH_BIN/uv"
+    mv "$ARCH_BIN/ruff.test-present" "$ARCH_BIN/ruff"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"validation failed after uv tool upgrade"* ]]
 }
 
 # --- Local LLM config files ---

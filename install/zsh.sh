@@ -19,9 +19,11 @@ if [[ -f "$ZSH_DIR/oh-my-zsh.sh" ]]; then
         [[ -L "$_omz_git" ]] && _omz_git="$(readlink -f "$_omz_git")"
         if [[ -d "$_omz_git/.git" ]]; then
             log_info "Updating oh-my-zsh core..."
-            git -C "$_omz_git" pull --ff-only --quiet \
-                && log_okay "oh-my-zsh core updated" \
-                || log_warn "oh-my-zsh core git pull failed"
+            if git -C "$_omz_git" pull --ff-only --quiet; then
+                log_okay "oh-my-zsh core updated"
+            else
+                die "oh-my-zsh core git pull failed"
+            fi
         fi
         unset _omz_git
     fi

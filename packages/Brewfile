@@ -113,13 +113,15 @@ brew "cmake"
 brew "ninja"
 brew "meson"
 brew "shfmt"     # shell formatter; keeps Bash/Zsh install scripts mechanically checkable
+brew "shellcheck" # shell linter used by the repository's validation suite
 brew "gcc"
 brew "gcc@13"
 brew "gcc@15"
-brew "llvm"   # clang, clang++, lldb, llvm-ar, opt, etc.
+brew "llvm"   # clang, clang++, llvm-ar, opt, etc. (LLDB is installed separately)
 brew "llvm@21"
 brew "llvm@22"  # pinned major selected by the checked-in CMake toolchain files
 brew "lld"    # LLVM linker (now a separate formula)
+brew "lldb" if OS.mac? # Linux uses the rootless distro package installer
 brew "mold"   # fast modern linker
 brew "osv-scanner" # dependency vulnerability scanner; network use is opt-in at scan time
 if OS.linux?

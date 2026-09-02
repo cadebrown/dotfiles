@@ -37,6 +37,65 @@ _reconcile_nvm_npmrc() {
     log_info "Removed npm prefix from $_npmrc; nvm owns the global prefix"
 }
 
+_npm_package_bins() {
+    local _name="$1" _root="${2:-}"
+    [[ -n "$_root" ]] || _root="$(npm root -g)"
+    node - "$_root/$_name/package.json" <<'NODE'
+const fs = require("fs");
+const manifest = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+if (typeof manifest.bin === "string") {
+  process.stdout.write(`${manifest.name.split("/").pop()}\n`);
+} else if (manifest.bin && typeof manifest.bin === "object") {
+  for (const name of Object.keys(manifest.bin)) process.stdout.write(`${name}\n`);
+}
+NODE
+}
+
+_npm_missing_bins() {
+    local _name="$1" _root="${2:-}" _bin_dir="${3:-}" _bins _bin
+    [[ -n "$_root" ]] || _root="$(npm root -g)"
+    [[ -n "$_bin_dir" ]] || _bin_dir="$(npm prefix -g)/bin"
+    _bins="$(_npm_package_bins "$_name" "$_root" 2>/dev/null || true)"
+    if [[ -z "$_bins" ]]; then
+        printf '%s\n' '<package-bin-metadata>'
+        return 0
+    fi
+    while IFS= read -r _bin; do
+        _npm_entrypoint_healthy "$_name" "$_bin" "$_bin_dir/$_bin" \
+            || printf '%s\n' "$_bin"
+    done <<< "$_bins"
+}
+
+_npm_entrypoint_healthy() {
+    local _name="$1" _bin="$2" _path="$3" _error _rc
+    if [[ "$_name:$_bin" != "pyright:pyright-langserver" ]]; then
+        tool_entrypoint_healthy "$_path"
+        return
+    fi
+    if _error="$(run_bounded "${DF_TOOL_SMOKE_TIMEOUT:-10}" \
+        "$_path" --help </dev/null 2>&1 >/dev/null)"; then
+        _rc=0
+    else
+        _rc=$?
+    fi
+    [[ "$_rc" == "1" && "$_error" == *"Connection input stream is not set"* \
+        && "$_error" == *"--stdio"* ]]
+}
+
+_restart_qmd_after_node_exit() {
+    local _rc=$?
+    trap - EXIT
+    if [[ "${_qmd_stopped:-0}" == "1" ]]; then
+        if qmd_daemon_start && _qmd_wait_healthy; then
+            log_okay "  restarted qmd mcp daemon"
+        else
+            log_fail "  failed to restart qmd mcp daemon after npm reconciliation"
+            [[ "$_rc" -ne 0 ]] || _rc=1
+        fi
+    fi
+    exit "$_rc"
+}
+
 # Source-guard: tests source this file for the helper above.
 [[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
 
@@ -148,8 +207,7 @@ fi
 
 NPM_TXT="$DF_PACKAGES/npm.txt"
 if [[ ! -f "$NPM_TXT" ]]; then
-    log_warn "No npm.txt at $NPM_TXT — skipping npm packages"
-    exit 0
+    die "Required npm manifest missing: $NPM_TXT"
 fi
 
 _npm_allow_scripts=""
@@ -168,6 +226,8 @@ _npm_install_cmd=(npm install -g)
 _pkg_count=0
 _upgrade_count=0
 _qmd_stopped=0
+_npm_fail=0
+trap _restart_qmd_after_node_exit EXIT
 while IFS= read -r pkg; do
     # Entries may pin a version ("<name>@1.2.3", scoped names keep their
     # leading @). Split at the LAST @ — a tail with "/" in it is the package
@@ -227,15 +287,25 @@ while IFS= read -r pkg; do
         log_okay "  $_name"
         (( _pkg_count++ )) || true
     fi
-done < <(_read_package_list "$NPM_TXT")
 
-# Bring the qmd MCP daemon back if we stopped it for its upgrade. In a full
-# bootstrap memory.sh (step 6.6) would also restart it, but node.sh can run
-# standalone, so don't leave the memory daemon dead.
-if [[ "$_qmd_stopped" == "1" ]]; then
-    qmd_daemon_start && log_okay "  restarted qmd mcp daemon"
-fi
+    _missing="$(_npm_missing_bins "$_name")"
+    if [[ -n "$_missing" ]]; then
+        log_warn "  $_name is missing declared entrypoints (${_missing//$'\n'/, }) — reinstalling"
+        _repair_failed=0
+        run_logged "${_npm_install_cmd[@]}" "$pkg" || _repair_failed=1
+        _missing="$(_npm_missing_bins "$_name")"
+    else
+        _repair_failed=0
+    fi
+    if [[ "$_repair_failed" == "1" || -n "$_missing" ]]; then
+        [[ "$_repair_failed" == "1" ]] && log_warn "  fail  $_name (repair installation failed)"
+        [[ -n "$_missing" ]] && log_warn "  fail  $_name (missing entrypoints: ${_missing//$'\n'/, })"
+        (( _npm_fail++ )) || true
+    fi
+done < <(_read_package_list "$NPM_TXT")
 
 if [[ $_pkg_count -eq 0 && $_upgrade_count -eq 0 ]]; then
     log_info "All npm packages already installed"
 fi
+
+(( _npm_fail == 0 )) || die "${_npm_fail} declared npm packages failed executable validation"

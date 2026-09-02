@@ -8,7 +8,8 @@ Every package layer has a declarative text file and an idempotent install script
 |---|---|---|---|
 | System packages | `packages/Brewfile` | `install/homebrew.sh` / `install/linux-packages.sh` | macOS (bottles) / Linux (native, no container) |
 | Rust tools | `packages/cargo.txt` | `install/rust.sh` | All |
-| Python packages | `packages/pip.txt`, `packages/pip-full.txt` | `install/python.sh` | All |
+| Plain Python libraries | `packages/python.txt` | `install/python.sh` | All |
+| Python CLI tools | `packages/pip.txt`, `packages/pip-full.txt` | `install/python.sh` | All |
 | Global npm | `packages/npm.txt`, `packages/npm-allow-scripts.txt` | `install/node.sh` | All |
 | Go CLI tools | `packages/go.txt` | `install/go.sh` | All (respects `# linux-only` / `# macos-only`) |
 | Claude plugins | `packages/claude-plugins.txt` | `install/claude.sh` | All |
@@ -84,19 +85,22 @@ Codex CLI config, rules, themes, and MCP servers are managed from `home/dot_code
 `install/codex.sh sync-config` preserves runtime trust/plugin sections while refreshing the
 managed config. Chezmoi also runs this sync when `home/dot_codex/create_private_config.toml` changes.
 
-### 3. pip — Python packages
+### 3. uv — Python libraries and CLI tools
 
 ```sh
-# packages/pip.txt (core) or packages/pip-full.txt (full profile)
-requests
-black
-numpy
+# packages/python.txt: libraries available from plain `python`
+sympy
+
+# packages/pip.txt (core) or packages/pip-full.txt (full profile): CLI tools
+ruff
 some-macos-tool  # macos-only (requires Metal / only available on macOS)
 ```
 
 Re-run: `bash ~/dotfiles/install/python.sh`
 
-Each tool gets its own isolated venv via `uv tool install`, with entrypoints in `$LOCAL_PLAT/bin/`.
+`packages/python.txt` is installed into `$PYTHON_ENV`; the `$LOCAL_PLAT/bin/python`
+wrapper runs that environment. Each package in `pip.txt` and `pip-full.txt` gets
+its own isolated venv via `uv tool install`, with entrypoints in `$LOCAL_PLAT/bin/`.
 
 `DF_PROFILE=full` is the default and installs both manifests. Use
 `DF_PROFILE=core` for a small bootstrap or CI environment; the core profile
@@ -140,6 +144,12 @@ myriad-dreamin.tinymist     # Typst LSP — works in both
 
 Re-run: `bash ~/dotfiles/install/vscode.sh` and/or `bash ~/dotfiles/install/cursor.sh`
 
+Bootstrap selects both editors by default on macOS and neither on Linux. On a
+Linux workstation or Remote-SSH host with an editor CLI installed, opt in with
+`DF_DO_VSCODE=1` or `DF_DO_CURSOR=1`. A selected installer fails if the CLI is
+missing, an extension install exits nonzero, or the final extension inventory
+does not contain every declared ID.
+
 To capture newly installed extensions back into the file (union — never removes):
 
 ```sh
@@ -147,7 +157,9 @@ bash ~/dotfiles/install/vscode.sh sync-extensions
 bash ~/dotfiles/install/cursor.sh sync-extensions
 ```
 
-> **Note:** VS Code `settings.json` is **not tracked** (contains embedded credentials in some setups). Cursor's settings ARE tracked via symlinks under `home/dot_cursor/`.
+> **Note:** Both editors' settings are tracked under
+> `home/dot_config/{vscode,cursor}/`. Credential fields contain environment
+> references; secret values stay in the corresponding `~/.<service>.env` files.
 
 ### 6. Custom install script
 
@@ -283,7 +295,7 @@ The toolchain configures:
 | `CMAKE_CXX_COMPILER` | `$_LOCAL_PLAT/brew/opt/llvm@22/bin/clang++` |
 | `CMAKE_AR` / `CMAKE_RANLIB` | `llvm-ar`, `llvm-ranlib` (LTO needs the matching tool) |
 | `CMAKE_LINKER_TYPE` | `MOLD` > `LLD` (Linux only; macOS uses Apple's ld) |
-| `CMAKE_CUDA_COMPILER` | `$_LOCAL_PLAT/.cuda/bin/nvcc` (only if symlink set up) |
+| `CMAKE_CUDA_COMPILER` | `$_LOCAL_PLAT/.cuda/bin/nvcc` (when the NVIDIA overlay is enabled) |
 | `CMAKE_CUDA_HOST_COMPILER` | `clang++` (when CUDA available) |
 
 CMake auto-detects `nm`/`objcopy`/`objdump`/`strip` from `CC`, so the toolchain files only override what actually matters.
@@ -296,16 +308,8 @@ Per-invocation:
 CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/gcc-15.cmake" cmake -B build
 ```
 
-Per-session via the `tc` shell function:
-
-```sh
-tc            # show active
-tc list       # list available
-tc gcc-15     # GCC 15
-tc gcc-13     # GCC 13
-tc llvm-22    # LLVM 22
-tc llvm-21    # LLVM 21
-```
+The shell does not define `tc`: Linux reserves that command for iproute2 traffic
+control. Set `CMAKE_TOOLCHAIN_FILE` explicitly or use a CMake preset.
 
 Per-project (`CMakePresets.json`):
 
@@ -323,13 +327,16 @@ unset CMAKE_TOOLCHAIN_FILE   # let CMake auto-detect compilers
 
 ### CUDA
 
-CUDA is not managed by bootstrap — install the toolkit separately (system package, NVIDIA
-runfile, or a module system on HPC). Then point the per-PLAT symlink at it:
+The NVIDIA overlay installs the versions in
+`dotfiles-nvidia/packages/cuda-versions.txt` under `$LOCAL_PLAT/.cudas/` and
+sets the per-PLAT default symlink automatically. The first declaration is the
+default; select a different declared install explicitly with:
 
 ```sh
-ln -sfn /usr/local/cuda "$_LOCAL_PLAT/.cuda"        # system default
-ln -sfn /opt/nvidia/cuda/12.6 "$_LOCAL_PLAT/.cuda"  # versioned install
+DF_CUDA_DEFAULT=public_cuda_12.8.0 ~/dotfiles/bootstrap.sh
 ```
+
+Set `DF_DO_CUDA=0` to skip the overlay CUDA stage.
 
 `~/.profile` resolves the symlink at login and exports:
 
@@ -340,21 +347,7 @@ ln -sfn /opt/nvidia/cuda/12.6 "$_LOCAL_PLAT/.cuda"  # versioned install
 Both toolchain files also set `CMAKE_CUDA_COMPILER` to `$LOCAL_PLAT/.cuda/bin/nvcc` when the
 symlink exists, so `enable_language(CUDA)` works without any project-level configuration.
 
-Different machines on a shared NFS home can point their `$LOCAL_PLAT/.cuda` symlinks at
-different toolkit versions — no conflicts.
-
-### Switching toolchains at runtime
-
-The `tc` shell function (defined in `.zshrc`) switches the active toolchain for the current session:
-
-```sh
-tc              # show active toolchain
-tc list         # list available toolchain files
-tc gcc-15       # switch to GCC 15 (sets CC/CXX/AR/RANLIB/NM + CMAKE_TOOLCHAIN_FILE)
-tc gcc-13       # switch to GCC 13
-tc llvm-22      # switch to LLVM 22 (clears CC/CXX; CMake file owns compiler selection)
-tc llvm-21      # switch to LLVM 21
-```
+The PLAT-scoped path keeps different machines on a shared NFS home isolated.
 
 ### Compiler caching (ccache / sccache)
 
