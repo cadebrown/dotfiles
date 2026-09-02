@@ -21,7 +21,7 @@ _install_brew_lldb() {
     }
     _brew_lldb_healthy() {
         _brew_lldb_link \
-            && "$ARCH_BIN/lldb" --batch -o 'target create /bin/true' -o quit \
+            && "$ARCH_BIN/lldb" --batch -o 'target create /bin/sh' -o quit \
                 </dev/null >/dev/null 2>&1 \
             && "$ARCH_BIN/lldb-dap" --help </dev/null >/dev/null 2>&1
     }
@@ -145,7 +145,7 @@ EOF
 }
 
 _lldb_runtime_healthy() {
-    "$ARCH_BIN/lldb" --batch -o 'target create /bin/true' -o quit \
+    "$ARCH_BIN/lldb" --batch -o 'target create /bin/sh' -o quit \
         </dev/null >/dev/null 2>&1 \
         && "$ARCH_BIN/lldb-dap" --help </dev/null >/dev/null 2>&1
 }

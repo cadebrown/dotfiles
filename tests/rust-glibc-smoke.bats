@@ -73,23 +73,23 @@ _probe() {
     [ "$output" = "missinglib" ]
 }
 
-@test "flags a declared binary whose version command exits nonzero" {
+@test "does not confuse a generic nonzero exit with a loader failure" {
     run _probe exitsbad
     [ "$status" -eq 0 ]
-    [ "$output" = "exitsbad" ]
+    [ -z "$output" ]
 }
 
-@test "kills and flags a declared binary whose version command hangs" {
+@test "kills a hanging probe without calling the installed tool broken" {
     DF_TOOL_SMOKE_TIMEOUT=0.1 run _probe hangs
     [ "$status" -eq 0 ]
-    [ "$output" = "hangs" ]
+    [ -z "$output" ]
 }
 
-@test "accepts ripgrep-all helper binaries only on their exact usage errors" {
+@test "does not confuse ripgrep-all usage errors with loader failures" {
     run bash -c '
         source "'"$REPO_ROOT"'/install/rust.sh"
-        _cargo_usage_error_is_healthy ripgrep_all rga-fzf-open "Error: no filename"
-        ! _cargo_usage_error_is_healthy exitsbad exitsbad "Error: no filename"
+        ! _cargo_loader_error "Error: no filename"
+        ! _cargo_loader_error "inappropriate ioctl for device"
     '
     [ "$status" -eq 0 ]
 }
@@ -170,7 +170,7 @@ _probe() {
 @test "rust-docs-mcp accepts only its isolated false GitHub 403 after live probes" {
     run bash -c '
         source "'"$REPO_ROOT"'/install/rust.sh"
-        download_stdout() { printf "github"; }
+        download() { printf "github" > "$2"; }
         git() { printf "deadbeef\\tHEAD\\n"; }
         _rust_docs_doctor_passed "$1"
     ' _ $'✅ Rust toolchain: ok\n✅ Nightly toolchain: ok\n✅ Rustdoc JSON: ok\n✅ Git: ok\n❌ Network: crates.io reachable (200 OK) but GitHub unreachable (403 Forbidden)\n✅ Cache directory: ok\n[ERROR] Doctor found 1 issue.'
@@ -180,7 +180,7 @@ _probe() {
 @test "rust-docs-mcp does not hide another doctor failure" {
     run bash -c '
         source "'"$REPO_ROOT"'/install/rust.sh"
-        download_stdout() { printf "github"; }
+        download() { printf "github" > "$2"; }
         git() { printf "deadbeef\\tHEAD\\n"; }
         _rust_docs_doctor_passed "$1"
     ' _ $'✅ Rust toolchain: ok\n✅ Nightly toolchain: ok\n✅ Rustdoc JSON: ok\n✅ Git: ok\n❌ Network: crates.io reachable (200 OK) but GitHub unreachable (403 Forbidden)\n❌ Cache directory: broken\n[ERROR] Doctor found 2 issues.'

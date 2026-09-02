@@ -71,10 +71,18 @@ if [ "\${1:-}" = --prefix ] && [ "\${2:-}" = lldb ]; then
 fi
 exit 1
 EOF
-    for command in lldb lldb-dap; do
-        printf '#!/bin/sh\nexit 0\n' > "$lldb_prefix/bin/$command"
-        chmod +x "$lldb_prefix/bin/$command"
-    done
+    cat > "$lldb_prefix/bin/lldb" <<'EOF'
+#!/bin/sh
+case "$*" in
+    *"target create /bin/sh"*) exit 0 ;;
+esac
+exit 1
+EOF
+    cat > "$lldb_prefix/bin/lldb-dap" <<'EOF'
+#!/bin/sh
+test "${1:-}" = --help
+EOF
+    chmod +x "$lldb_prefix/bin/lldb" "$lldb_prefix/bin/lldb-dap"
     chmod +x "$fake_bin/uname" "$fake_bin/brew"
 
     run env HOME="$fake_home" DF_USE_PLAT=0 PATH="$fake_bin:/usr/bin:/bin" \

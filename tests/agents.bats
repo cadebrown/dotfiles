@@ -148,6 +148,18 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
+@test "qmd health check follows the localhost MCP endpoint" {
+    run env REPO="$REPO" bash -c '
+        source "$REPO/install/_lib.sh"
+        curl() {
+            [[ "${*: -1}" == "http://localhost:8181/health" ]] || return 1
+            printf "{\"status\":\"ok\"}\n"
+        }
+        _qmd_daemon_healthy
+    '
+    [ "$status" -eq 0 ]
+}
+
 @test "qmd persists the intended embedding model" {
     config="$REPO/home/dot_config/qmd/index.yml.tmpl"
     grep -q 'Qwen3-Embedding-0.6B-Q8_0.gguf' "$config"

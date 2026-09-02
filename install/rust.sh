@@ -7,45 +7,29 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
-_cargo_usage_error_is_healthy() {
-    local _crate="$1" _bin="$2" _error="$3"
-    [[ "$_crate" == "ripgrep_all" ]] || return 1
-    case "$_bin" in
-        rga-preproc)  [[ "$_error" == *"Specified input file not found"* ]] ;;
-        rga-fzf)      [[ "$_error" == *"inappropriate ioctl for device"* \
-                            && "$_error" == *"fzf output not two line"* ]] ;;
-        rga-fzf-open) [[ "$_error" == *"Error: no filename"* ]] ;;
+_cargo_loader_error() {
+    local _error="$1"
+    case "$_error" in
+        *GLIBC_*|*libc.so*|*"error while loading shared libraries"*|\
+        *"cannot open shared object file"*|*"Library not loaded:"*|\
+        *"Symbol not found:"*|*"Bad CPU type in executable"*|\
+        *"Exec format error"*) return 0 ;;
         *) return 1 ;;
     esac
 }
 
-# Print the crate's binaries that fail their bounded startup check.
+# Print the crate's binaries that fail to start with a dynamic-loader error.
 # Bin names come from cargo's install registry because they often differ from
 # crate names (yazi-fm → yazi).
 _loader_broken_bins() {
-    local _crate="$1" _bin _err _rc
+    local _crate="$1" _bin _err
     has jq || return 0
     [[ -f "$CARGO_HOME/.crates2.json" ]] || return 0
     while IFS= read -r _bin; do
         [[ -x "$CARGO_HOME/bin/$_bin" ]] || continue
-        if _err="$(run_bounded "${DF_TOOL_SMOKE_TIMEOUT:-10}" \
-            "$CARGO_HOME/bin/$_bin" --version </dev/null 2>&1 >/dev/null)"; then
-            _rc=0
-        else
-            _rc=$?
-        fi
-        if (( _rc != 0 )); then
-            if _err="$(run_bounded "${DF_TOOL_SMOKE_TIMEOUT:-10}" \
-                "$CARGO_HOME/bin/$_bin" --help </dev/null 2>&1 >/dev/null)"; then
-                _rc=0
-            else
-                _rc=$?
-            fi
-        fi
-        if (( _rc != 0 )) && _cargo_usage_error_is_healthy "$_crate" "$_bin" "$_err"; then
-            _rc=0
-        fi
-        if (( _rc != 0 )); then
+        _err="$(run_bounded "${DF_TOOL_SMOKE_TIMEOUT:-10}" \
+            "$CARGO_HOME/bin/$_bin" --version </dev/null 2>&1 >/dev/null)" || true
+        if _cargo_loader_error "$_err"; then
             printf '%s\n' "$_bin"
         fi
     done < <(jq -r --arg c "$_crate " \
@@ -91,7 +75,7 @@ _source_install_crate() {
 # on NVIDIA's network even when HTTPS and Git access both work. Accept only
 # that exact isolated diagnostic after independent HTTPS and Git probes pass.
 _rust_docs_doctor_passed() {
-    local _output="$1"
+    local _output="$1" _probe_file
     [[ "$_output" == *"❌ Network: crates.io reachable (200 OK) but GitHub unreachable (403 Forbidden)"* ]] \
         || return 1
     [[ "$_output" == *"[ERROR] Doctor found 1 issue."* ]] || return 1
@@ -100,9 +84,15 @@ _rust_docs_doctor_passed() {
         && "$_output" == *"✅ Rustdoc JSON:"* \
         && "$_output" == *"✅ Git:"* \
         && "$_output" == *"✅ Cache directory:"* ]] || return 1
-    download_stdout https://github.com/ >/dev/null \
-        && git ls-remote https://github.com/rust-lang/rust.git HEAD 2>/dev/null \
-            | grep -q $'\tHEAD$'
+    _probe_file="$(mktemp "${TMPDIR:-/tmp}/dotfiles-github-probe.XXXXXX")" \
+        || return 1
+    if ! download https://github.com/ "$_probe_file" >/dev/null 2>&1; then
+        rm -f "$_probe_file"
+        return 1
+    fi
+    rm -f "$_probe_file"
+    git ls-remote https://github.com/rust-lang/rust.git HEAD 2>/dev/null \
+        | grep -q $'\tHEAD$'
 }
 
 _link_homebrew_rustup_proxies() {

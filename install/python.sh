@@ -131,11 +131,22 @@ _installed=0
 _skipped=0
 _failed=0
 
+_uv_entrypoints_from_line() {
+    local _line="$1" _value
+    _value="$(printf '%s\n' "$_line" | grep -oE 'entry=[^[:space:]]+' | head -1 | cut -d= -f2)" \
+        || return 1
+    [[ -n "$_value" ]] || return 1
+    printf '%s\n' "$_value" | tr ',' '\n'
+}
+
 _uv_tool_ready() {
-    local _pkg="$1" _listing _entrypoints _entrypoint
+    local _pkg="$1" _expected_entrypoints="$2" _listing _entrypoints _entrypoint
     _uv_tool_present=0
-    _listing="$("$_uv" tool list --color never 2>/dev/null)" || return 1
+    _uv_tool_problem=""
+    _listing="$("$_uv" tool list --color never 2>/dev/null)" \
+        || { _uv_tool_problem="uv tool list failed"; return 1; }
     if [[ "$(printf '%s\n' "$_listing" | awk -v pkg="$_pkg" '$1 != "-" && $1 == pkg { print 1; exit }')" != "1" ]]; then
+        _uv_tool_problem="package is not installed"
         return 1
     fi
 
@@ -144,15 +155,30 @@ _uv_tool_ready() {
         $1 != "-" { active = ($1 == pkg); next }
         active && $1 == "-" { print $2 }
     ')"
-    [[ -n "$_entrypoints" ]] || return 1
+    if [[ -z "$_entrypoints" || -z "$_expected_entrypoints" ]]; then
+        _uv_tool_problem="required entrypoint contract is empty"
+        return 1
+    fi
 
     while IFS= read -r _entrypoint; do
-        _uv_entrypoint_healthy "$_pkg" "$_entrypoint" || return 1
-    done <<< "$_entrypoints"
+        if ! grep -Fxq "$_entrypoint" <<< "$_entrypoints"; then
+            _uv_tool_problem="required entrypoint is not advertised: $_entrypoint"
+            return 1
+        fi
+        if ! _uv_entrypoint_healthy "$_pkg" "$_entrypoint"; then
+            _uv_tool_problem="required entrypoint does not start: $_entrypoint"
+            if [[ -n "${_uv_entrypoint_problem:-}" ]]; then
+                _uv_tool_problem="$_uv_tool_problem ($_uv_entrypoint_problem)"
+            fi
+            return 1
+        fi
+    done <<< "$_expected_entrypoints"
 }
 
 _uv_entrypoint_healthy() {
-    local _pkg="$1" _entrypoint="$2" _path="$ARCH_BIN/$2" _python _error _rc
+    local _pkg="$1" _entrypoint="$2" _path="$ARCH_BIN/$2" _python _project _rc
+    local _timeout="${DF_PYTHON_TOOL_SMOKE_TIMEOUT:-30}"
+    _uv_entrypoint_problem=""
     case "$_pkg:$_entrypoint" in
         paper-qa:pqa)
             [[ -x "$_path" ]] || return 1
@@ -169,30 +195,41 @@ entrypoints[0].load()
 ' </dev/null >/dev/null 2>&1
             ;;
         leanblueprint:leanblueprint)
-            if _error="$(run_bounded "${DF_TOOL_SMOKE_TIMEOUT:-10}" \
-                "$_path" --version </dev/null 2>&1)"; then
+            [[ -x "$_path" ]] || return 1
+            _project="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-leanblueprint.XXXXXX")" \
+                || return 1
+            if git -C "$_project" init -q && : > "$_project/lakefile.toml" \
+                && (cd "$_project" && run_bounded "$_timeout" \
+                    "$_path" --version </dev/null >/dev/null 2>&1); then
                 _rc=0
             else
                 _rc=$?
             fi
-            [[ "$_rc" == "1" && "$_error" == *"Could not find lakefile.lean or lakefile.toml"* ]]
+            rm -rf -- "$_project"
+            return "$_rc"
             ;;
         *)
-            tool_entrypoint_healthy "$_path"
+            [[ -x "$_path" ]] \
+                && { run_bounded "$_timeout" "$_path" --version </dev/null >/dev/null 2>&1 \
+                    || run_bounded "$_timeout" "$_path" --help </dev/null >/dev/null 2>&1; }
             ;;
     esac
 }
 
 _validate_uv_tool_manifest() {
-    local _pip_file _line _pkg _macos_only _bad=0
+    local _pip_file _line _pkg _entrypoints _macos_only _bad=0
     while IFS= read -r _pip_file; do
         while IFS= read -r _line; do
             _macos_only="$(printf '%s\n' "$_line" | grep -c 'macos-only' || true)"
             _pkg="$(printf '%s\n' "$_line" | sed 's/#.*//;s/^[[:space:]]*//;s/[[:space:]]*$//')"
             [[ -z "$_pkg" ]] && continue
             [[ "$_macos_only" -gt 0 && "$OS" != "darwin" ]] && continue
-            if ! _uv_tool_ready "$_pkg"; then
-                log_warn "Declared Python CLI is missing or has broken entrypoints: $_pkg"
+            _entrypoints="$(_uv_entrypoints_from_line "$_line" || true)"
+            if [[ -z "$_entrypoints" ]]; then
+                log_warn "Declared Python CLI has no entry= contract: $_pkg"
+                (( _bad++ )) || true
+            elif ! _uv_tool_ready "$_pkg" "$_entrypoints"; then
+                log_warn "Declared Python CLI failed validation: $_pkg ($_uv_tool_problem)"
                 (( _bad++ )) || true
             fi
         done < "$_pip_file"
@@ -216,16 +253,28 @@ while IFS= read -r _pip_file; do
             continue
         fi
 
+        _entrypoints="$(_uv_entrypoints_from_line "$_line" || true)"
+        if [[ -z "$_entrypoints" ]]; then
+            log_warn "Declared Python CLI has no entry= contract: $_pkg"
+            (( _failed++ )) || true
+            continue
+        fi
+
         # Keep the command array non-empty: macOS system Bash treats an empty
         # array expansion as unbound under `set -u`.
         _uv_cmd=("$_uv" tool install "$_pkg")
         [[ -n "$_py_ver" ]] && _uv_cmd+=(--python "$_py_ver")
         [[ -n "$_with" ]] && _uv_cmd+=(--with "$_with")
 
-        if _uv_tool_ready "$_pkg"; then
+        if _uv_tool_ready "$_pkg" "$_entrypoints"; then
             log_debug "Already installed: $_pkg"
             (( _skipped++ )) || true
         else
+            if [[ "$_uv_tool_present" == "1" ]]; then
+                log_info "Repairing Python CLI $_pkg: $_uv_tool_problem"
+            else
+                log_info "Installing Python CLI $_pkg"
+            fi
             _uv_cmd+=(--reinstall)
             _install_ok=0
             if "${_uv_cmd[@]}" 2>&1; then
@@ -247,10 +296,10 @@ while IFS= read -r _pip_file; do
                 fi
             fi
             if [[ "$_install_ok" == "1" ]]; then
-                if _uv_tool_ready "$_pkg"; then
+                if _uv_tool_ready "$_pkg" "$_entrypoints"; then
                     (( _installed++ )) || true
                 else
-                    log_warn "Installed tool has missing entrypoints: $_pkg"
+                    log_warn "Installed Python CLI failed validation: $_pkg ($_uv_tool_problem)"
                     (( _failed++ )) || true
                 fi
             else

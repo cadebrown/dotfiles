@@ -356,6 +356,6 @@ else
     fi
 fi
 
-_qmd_wait_healthy || die "qmd MCP daemon failed its health check on 127.0.0.1:8181"
+_qmd_wait_healthy || die "qmd MCP daemon failed its health check on localhost:8181"
 
 log_okay "Memory stack ready (qmd MCP on localhost:8181; cass archive at $CASS_DATA_DIR)"

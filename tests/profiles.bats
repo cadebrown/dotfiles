@@ -21,6 +21,23 @@ setup() {
     [[ "$output" == *"$REPO/packages/pip-full.txt"* ]]
 }
 
+@test "every Python tool declares its required entrypoint contract" {
+    local manifest
+    for manifest in "$REPO/packages/pip.txt" "$REPO/packages/pip-full.txt"; do
+        run awk '
+            /^[[:space:]]*($|#)/ { next }
+            !/#[[:space:]].*entry=[^[:space:]]+/ { print NR ":" $0; bad = 1 }
+            END { exit bad }
+        ' "$manifest"
+        [ "$status" -eq 0 ]
+    done
+}
+
+@test "leanblueprint validation supplies the minimal project its import requires" {
+    grep -Fq 'git -C "$_project" init -q' "$REPO/install/python.sh"
+    grep -Fq 'lakefile.toml' "$REPO/install/python.sh"
+}
+
 @test "unknown profile fails before installation" {
     run env DF_PROFILE=unknown bash -c 'source "$1/install/_lib.sh"' _ "$REPO"
 

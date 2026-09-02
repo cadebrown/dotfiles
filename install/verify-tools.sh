@@ -53,7 +53,7 @@ if [[ "${DF_DO_PACKAGES:-1}" != "0" ]]; then
 fi
 
 if [[ "${DF_DO_LLDB:-1}" != "0" ]]; then
-    _require_smoke lldb "$ARCH_BIN/lldb" --batch -o "target create /bin/true" -o quit
+    _require_smoke lldb "$ARCH_BIN/lldb" --batch -o "target create /bin/sh" -o quit
     _require_smoke lldb-dap "$ARCH_BIN/lldb-dap" --help
 fi
 

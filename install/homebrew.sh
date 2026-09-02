@@ -92,13 +92,17 @@ if [[ "$_brew_upgrade" != "0" ]]; then
     fi
 
     # Mac App Store apps (Xcode, GarageBand, iMovie, …) are installed outside
-    # Homebrew and never upgraded by brew. `mas` (Brewfile) bridges that gap so
-    # `bootstrap upgrade` leaves nothing stale. macOS-only; skips if mas absent
-    # or not signed in to the App Store.
-    if [[ "$OS" == "darwin" ]] && has mas; then
+    # Homebrew and never upgraded by brew. `mas` bridges that gap, but its
+    # private App Store download path can refuse an update without reporting why.
+    # Keep that visible without misreporting a successful Homebrew run as failed.
+    _upgrade_mas="${DF_BREW_UPGRADE_MAS:-auto}"
+    if [[ "$OS" == "darwin" && "$_upgrade_mas" != "0" ]] && has mas \
+        && sudo -n true 2>/dev/null; then
         log_info "Upgrading Mac App Store apps (mas)"
         run_logged mas upgrade \
-            || die "Mac App Store upgrade failed (signed in to the App Store?)"
+            || log_warn "Mac App Store upgrade failed — update pending apps in App Store, then retry"
+    elif [[ "$OS" == "darwin" && "$_upgrade_mas" != "0" ]] && has mas; then
+        log_info "Mac App Store upgrades deferred: cache sudo first with 'sudo -v', or update apps in App Store"
     fi
 fi
 

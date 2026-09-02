@@ -1496,6 +1496,14 @@ A failed swap can also leave a **broken husk** — a `qmd/` dir with only an emp
 than the one `which qmd` resolves to (nvm's). Delete the husk; the live copy is
 the one on PATH.
 
+## qmd is running but its health check cannot connect to `127.0.0.1:8181`
+
+Recent qmd releases may bind `localhost:8181` only on IPv6 (`::1`). A check
+hard-coded to IPv4 then fails even though the daemon and the configured MCP URL
+are healthy. Confirm with `curl http://localhost:8181/health`; it should return
+`{"status":"ok",...}`. The shared health check now uses `localhost`, matching
+the MCP server URL in `packages/mcp-servers.txt`.
+
 [allowlist]: https://github.com/gitleaks/gitleaks#configuration
 
 ## `import sage.all` / cysignals dies with `TypeError: signal handler must be signal.SIG_IGN, signal.SIG_DFL, or a callable object`
@@ -1658,3 +1666,76 @@ bearers directly, verified with the handshake above. Caveat: the token's
 scopes bound what the tools can do — OAuth carried your full user grant, so
 mint a broader token if a tool call 403s. Remove the annotation once the
 upstream fix ships.
+
+---
+
+## Mac App Store reports `No downloads initiated`
+
+Symptom: `bootstrap.sh upgrade` reaches `Upgrading Mac App Store apps (mas)`,
+then prints one or more messages such as:
+
+```text
+Error: No downloads initiated for ADAM ID 682658836
+```
+
+Root cause: `mas` found a newer catalog version, but macOS's private CommerceKit
+API returned no download object and no underlying error. The message alone does
+not distinguish App Store sign-in or account ownership problems from an App
+Store service or cache failure. Homebrew has already finished by this point, so
+this refusal must not turn the whole Homebrew reconciliation into a failure.
+
+Confirm the pending apps and the local App Store configuration:
+
+```sh
+mas outdated
+mas config
+```
+
+`mas 7` also requires root privileges for updates. The bootstrap only runs it
+when `sudo` is already cached because its password prompt is hidden inside the
+logged command. Run `sudo -v` before bootstrap to enable the automatic attempt.
+
+**Fix:** open App Store, sign in or accept any pending account terms, and update
+the named apps there. Then rerun `mas outdated`; once it is empty, rerun
+`~/dotfiles/bootstrap.sh upgrade`. The bootstrap preserves `mas` warnings but
+continues after Homebrew itself has reconciled successfully.
+
+---
+
+## Homebrew LLDB installs but fails its runtime checks
+
+Symptom: Homebrew successfully pours the `lldb` bottle, then `lldb.sh` reports
+`Homebrew LLDB failed its runtime checks after installation`.
+
+Root cause: the runtime probe asked LLDB to load `/bin/true`. Linux provides
+that path, but macOS provides `true` at `/usr/bin/true`, so a healthy macOS LLDB
+failed the probe before `lldb-dap` was checked.
+
+**Fix:** update the dotfiles checkout and rerun:
+
+```sh
+~/dotfiles/bootstrap.sh upgrade
+```
+
+The probe now loads `/bin/sh`, which exists on both supported platforms.
+
+---
+
+## Python tools repeatedly report missing entrypoints
+
+Symptom: `python.sh` successfully installs a package and lists its executables,
+then immediately reports `Installed tool has missing entrypoints`; several
+large tools may be reinstalled on every bootstrap run.
+
+Root cause: the validator treated every console script advertised by a Python
+package as part of the dotfiles contract and gave each script a 10-second cold
+start. Those scripts are not equivalent to selected tools. For example,
+`mlx-lm` advertises `mlx_lm.evaluate`, but that optional command imports
+`lm-eval`, which the base `mlx-lm` install intentionally does not include.
+Heavy ML commands could also exceed the cold-start bound and pass on the next
+run after their caches were warm.
+
+**Fix:** update the dotfiles checkout and rerun the upgrade. Each `pip*.txt`
+declaration now names the command the dotfiles actually require with `entry=`.
+The installer validates only those commands, uses a 30-second Python CLI bound,
+and reports the exact package and command when validation fails.

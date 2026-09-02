@@ -12,6 +12,10 @@ teardown() {
         rm -f "$ARCH_BIN/uv"
         mv "$ARCH_BIN/uv.test-real" "$ARCH_BIN/uv"
     fi
+    if [[ -f "$ARCH_BIN/ipython3.test-real" ]]; then
+        rm -f "$ARCH_BIN/ipython3"
+        mv "$ARCH_BIN/ipython3.test-real" "$ARCH_BIN/ipython3"
+    fi
     if [[ -f "$ARCH_BIN/ruff.test-missing" ]]; then
         if [[ -x "$ARCH_BIN/ruff" ]]; then
             rm -f "$ARCH_BIN/ruff.test-missing"
@@ -163,6 +167,18 @@ EOF
 
     [ "$status" -eq 0 ]
     run "$ARCH_BIN/ruff" --version
+    [ "$status" -eq 0 ]
+}
+
+@test "Python installer ignores undeclared auxiliary package entrypoints" {
+    mv "$ARCH_BIN/ipython3" "$ARCH_BIN/ipython3.test-real"
+    printf '#!/bin/sh\nexit 127\n' > "$ARCH_BIN/ipython3"
+    chmod +x "$ARCH_BIN/ipython3"
+
+    run env DF_PROFILE=core bash "$HOME/dotfiles/install/python.sh"
+
+    [ "$status" -eq 0 ]
+    run "$ARCH_BIN/ipython" --version
     [ "$status" -eq 0 ]
 }
 

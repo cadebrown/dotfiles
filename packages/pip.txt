@@ -5,21 +5,21 @@
 # Libraries (numpy, scipy, etc.) belong in per-project pyproject.toml, not here.
 
 # Interactive Python
-ipython
+ipython  # entry=ipython
 
 # Monitoring
-glances
+glances  # entry=glances
 
 # CLI/output helpers
-rich-cli
+rich-cli  # entry=rich
 
 # C/C++ package manager
-conan
+conan  # entry=conan
 
 # MkDocs — static documentation-site generator from Markdown + a YAML config.
 # `mkdocs build --strict` surfaces broken links/config as CI failures.
-mkdocs
+mkdocs  # entry=mkdocs
 
 # Fast Python formatter and linter.  It belongs in uv, not Homebrew, so Python
 # projects and editor integrations resolve the same executable.
-ruff
+ruff  # entry=ruff

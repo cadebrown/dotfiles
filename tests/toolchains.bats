@@ -41,7 +41,7 @@ setup() {
 @test "new cross-platform tools have one declared owner" {
     [ "$(grep -l '^zizmor$' "$REPO/packages"/*.txt | wc -l | tr -d ' ')" -eq 1 ]
     [ "$(grep -l '^wasm-tools$' "$REPO/packages"/*.txt | wc -l | tr -d ' ')" -eq 1 ]
-    [ "$(grep -l '^ruff$' "$REPO/packages"/*.txt | wc -l | tr -d ' ')" -eq 1 ]
+    [ "$(grep -lE '^ruff([[:space:]]|$)' "$REPO/packages"/*.txt | wc -l | tr -d ' ')" -eq 1 ]
     [ "$(grep -l 'brew "osv-scanner"' "$REPO/packages/Brewfile" | wc -l | tr -d ' ')" -eq 1 ]
 }
 

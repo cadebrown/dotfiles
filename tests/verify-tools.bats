@@ -48,6 +48,11 @@ setup() {
     [[ "$output" == *"lldb runtime check failed"* ]]
 }
 
+@test "public verifier loads a target present on macOS and Linux" {
+    grep -Fq 'target create /bin/sh' "$REPO/install/verify-tools.sh"
+    ! grep -Fq 'target create /bin/true' "$REPO/install/verify-tools.sh"
+}
+
 @test "public verifier uses the MacTeX path on macOS" {
     local mactex_bin="$BATS_TEST_TMPDIR/mactex/bin"
     mkdir -p "$mactex_bin"

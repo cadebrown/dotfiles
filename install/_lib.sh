@@ -721,7 +721,7 @@ qmd_daemon_start() {
 }
 
 _qmd_daemon_healthy() {
-    curl -fsS --max-time 2 http://127.0.0.1:8181/health 2>/dev/null \
+    curl -fsS --max-time 2 http://localhost:8181/health 2>/dev/null \
         | grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"'
 }
 

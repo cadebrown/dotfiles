@@ -85,6 +85,17 @@ setup() {
     ! grep -q 'Some Brewfile packages failed' "$REPO/install/homebrew.sh"
 }
 
+@test "Mac App Store refusal does not invalidate Homebrew reconciliation" {
+    grep -q 'run_logged mas upgrade' "$REPO/install/homebrew.sh"
+    grep -q 'log_warn "Mac App Store upgrade failed' "$REPO/install/homebrew.sh"
+    ! grep -q 'die "Mac App Store upgrade failed' "$REPO/install/homebrew.sh"
+}
+
+@test "unattended Mac App Store upgrades require cached sudo" {
+    grep -q 'DF_BREW_UPGRADE_MAS:-auto' "$REPO/install/homebrew.sh"
+    grep -q "Mac App Store upgrades deferred: cache sudo first" "$REPO/install/homebrew.sh"
+}
+
 @test "Homebrew download concurrency is bounded and configurable" {
     grep -q 'HOMEBREW_DOWNLOAD_CONCURRENCY="${DF_BREW_DOWNLOAD_CONCURRENCY:-4}"' \
         "$REPO/install/homebrew.sh"
