@@ -217,13 +217,15 @@ entrypoints[0].load()
 }
 
 _validate_uv_tool_manifest() {
-    local _pip_file _line _pkg _entrypoints _macos_only _bad=0
+    local _pip_file _line _pkg _entrypoints _macos_only _linux_only _bad=0
     while IFS= read -r _pip_file; do
         while IFS= read -r _line; do
             _macos_only="$(printf '%s\n' "$_line" | grep -c 'macos-only' || true)"
+            _linux_only="$(printf '%s\n' "$_line" | grep -c 'linux-only' || true)"
             _pkg="$(printf '%s\n' "$_line" | sed 's/#.*//;s/^[[:space:]]*//;s/[[:space:]]*$//')"
             [[ -z "$_pkg" ]] && continue
             [[ "$_macos_only" -gt 0 && "$OS" != "darwin" ]] && continue
+            [[ "$_linux_only" -gt 0 && "$OS" != "linux" ]] && continue
             _entrypoints="$(_uv_entrypoints_from_line "$_line" || true)"
             if [[ -z "$_entrypoints" ]]; then
                 log_warn "Declared Python CLI has no entry= contract: $_pkg"
@@ -242,13 +244,19 @@ while IFS= read -r _pip_file; do
         # Extract optional # python=X.Y constraint before stripping comments
         _py_ver="$(echo "$_line" | grep -oE 'python=[0-9]+\.[0-9]+' | cut -d= -f2 || true)"
         _with="$(echo "$_line" | grep -oE 'with=[^[:space:]]+' | cut -d= -f2 || true)"
-        # Extract optional # macos-only marker
+        # Extract optional platform markers
         _macos_only="$(echo "$_line" | grep -c 'macos-only' || true)"
+        _linux_only="$(echo "$_line" | grep -c 'linux-only' || true)"
         _pkg="$(echo "$_line" | sed 's/#.*//;s/^[[:space:]]*//;s/[[:space:]]*$//')"
         [[ -z "$_pkg" ]] && continue
 
         if [[ "$_macos_only" -gt 0 && "$OS" != "darwin" ]]; then
             log_debug "Skipping macOS-only package on $OS: $_pkg"
+            (( _skipped++ )) || true
+            continue
+        fi
+        if [[ "$_linux_only" -gt 0 && "$OS" != "linux" ]]; then
+            log_debug "Skipping Linux-only package on $OS: $_pkg"
             (( _skipped++ )) || true
             continue
         fi

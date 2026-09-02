@@ -99,6 +99,8 @@ brew "pkg-config"
 ### Monitoring ###
 brew "htop"
 brew "btop"
+brew "nvtop" # multi-vendor GPU process monitor
+brew "macmon" if OS.mac? && Hardware::CPU.arm? # Apple Silicon CPU/GPU/ANE monitor
 # glances: Python CLI tool — installed via uv (pip.txt) instead of brew.
 # Brew's glances pulls python@3.13 which has the same PGO failures as 3.14
 # on custom prefix, and we only patch 3.14.

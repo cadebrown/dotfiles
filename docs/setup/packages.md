@@ -94,6 +94,7 @@ sympy
 # packages/pip.txt (core) or packages/pip-full.txt (full profile): CLI tools
 ruff
 some-macos-tool  # macos-only (requires Metal / only available on macOS)
+some-linux-tool  # linux-only (requires a Linux driver/runtime)
 ```
 
 Re-run: `bash ~/dotfiles/install/python.sh`
@@ -108,6 +109,7 @@ also keeps the Rust toolchain while skipping optional `cargo.txt` tools.
 
 **Comment conventions** parsed by `install/python.sh`:
 - `# macos-only` — skipped on Linux (e.g. `mlx-lm` requires Apple Metal/MLX framework)
+- `# linux-only` — skipped on macOS (e.g. `nvitop` requires NVIDIA's Linux NVML runtime)
 - `# python=X.Y` — pins to a specific Python version for that tool (e.g. `mlx-openai-server` needs 3.12 because `outlines-core` has no cp313/cp314 wheels)
 
 ### 4. Homebrew — non-language-specific tools and C libraries

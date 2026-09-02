@@ -9,6 +9,7 @@ ipython  # entry=ipython
 
 # Monitoring
 glances  # entry=glances
+nvitop  # entry=nvitop,nvisel linux-only
 
 # CLI/output helpers
 rich-cli  # entry=rich
