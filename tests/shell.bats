@@ -37,6 +37,38 @@ BASH_SOURCE_CMD='export SSH_AUTH_SOCK=already_running; source ~/.bash_profile'
     [ "$status" -eq 0 ]
 }
 
+@test "gwt new enters the created worktree in Bash and zsh" {
+    local test_root repo main_path expected
+
+    for shell_name in bash zsh; do
+        test_root="$(mktemp -d)"
+        repo="$test_root/repo"
+        git init -q -b main "$repo"
+        git -C "$repo" config user.name "Test User"
+        git -C "$repo" config user.email test@example.com
+        git -C "$repo" config gwt.github.com.user cadebrown
+        printf 'base\n' > "$repo/tracked.txt"
+        git -C "$repo" add tracked.txt
+        git -C "$repo" commit -qm initial
+        git -C "$repo" remote add origin git@github.com:some-org/project.git
+        main_path="$(cd "$repo" && git wt init --print-path)"
+        expected="$repo/cadebrown/shell-$shell_name"
+
+        if [[ "$shell_name" == bash ]]; then
+            run env GWT_START="$main_path" bash --norc --noprofile -c \
+                "$BASH_SOURCE_CMD; source ~/.bashrc; cd \"\$GWT_START\"; gwt new shell-bash >/dev/null 2>&1; pwd -P"
+        else
+            run env GWT_START="$main_path" zsh --no-rcs -c \
+                "$ZSH_SOURCE; source ~/.zshrc; cd \"\$GWT_START\"; gwt new shell-zsh >/dev/null 2>&1; pwd -P"
+        fi
+
+        [ "$status" -eq 0 ]
+        [ "$output" = "$expected" ]
+        [ "$(git -C "$expected" branch --show-current)" = "cadebrown/shell-$shell_name" ]
+        rm -rf "$test_root"
+    done
+}
+
 # --- PLAT variables (zsh) ---
 
 @test "_PLAT is set after sourcing zprofile" {

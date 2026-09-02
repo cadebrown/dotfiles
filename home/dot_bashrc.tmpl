@@ -134,8 +134,17 @@ PROMPT_COMMAND='_bash_prompt'
 ### ALIASES ###
 
 alias g='git'
-alias gwt='git-wt'
-alias gwtn='git wt new'
+unalias gwt gwtn 2>/dev/null || true
+gwt() {
+    local destination
+    if [[ "${1:-}" == "new" && "${2:-}" != "-h" && "${2:-}" != "--help" ]]; then
+        destination="$(git-wt "$@")" || return
+        cd "$destination" || return
+    else
+        git-wt "$@"
+    fi
+}
+alias gwtn='gwt new'
 alias gwta='git wt add'
 alias gwtls='git wt list'
 alias gwtmv='git wt move'

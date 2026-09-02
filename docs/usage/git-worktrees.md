@@ -19,7 +19,8 @@ tree.
 
 The implementation is a Bash script installed as `git-wt` in the active
 `~/.local` or PLAT-specific `bin` directory. Git discovers it as the external
-subcommand `git wt`. The shell alias `gwt` invokes the same command.
+subcommand `git wt`. The shell function `gwt` invokes the same command and
+enters worktrees created by `gwt new`.
 
 After installing or updating the dotfiles, open a new shell so `gwt` and the
 interactive `gwtize` wrapper are loaded. `git wt` itself works as soon as the
@@ -66,8 +67,8 @@ gwt new perf/fft develop
 ```
 
 `new` selects the configured username from the push remote's host, creates the
-branch from the optional start point, and uses the complete branch name as the
-path. The same logical command produces:
+branch from the optional start point, uses the complete branch name as the
+path, and enters the new worktree. The same logical command produces:
 
 ```text
 remote       branch                    path
@@ -81,6 +82,9 @@ The start point defaults to `HEAD`:
 ```sh
 gwt new docs/worktrees
 ```
+
+Use `git wt new` instead when a script should stay in its current directory;
+it prints the new worktree path on standard output.
 
 Passing an already qualified name does not duplicate the prefix:
 

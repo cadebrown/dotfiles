@@ -27,7 +27,8 @@ Commands:
   list      List worktrees using Git's native command.
   help      Show this help.
 
-Shell command:
+Shell commands:
+  gwt new   Create a personal worktree and enter it.
   gwtize    Run 'git wt init' and enter the primary worktree.
 
 Native worktree commands are passed through unchanged:
