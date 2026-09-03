@@ -38,7 +38,7 @@ BASH_SOURCE_CMD='export SSH_AUTH_SOCK=already_running; source ~/.bash_profile'
 }
 
 @test "gwt new enters the created worktree in Bash and zsh" {
-    local test_root repo main_path expected
+    local test_root repo main_path expected actual
 
     for shell_name in bash zsh; do
         test_root="$(mktemp -d)"
@@ -56,14 +56,16 @@ BASH_SOURCE_CMD='export SSH_AUTH_SOCK=already_running; source ~/.bash_profile'
 
         if [[ "$shell_name" == bash ]]; then
             run env GWT_START="$main_path" bash --norc --noprofile -c \
-                "$BASH_SOURCE_CMD; source ~/.bashrc; cd \"\$GWT_START\"; gwt new shell-bash >/dev/null 2>&1; pwd -P"
+                "$BASH_SOURCE_CMD; source ~/.bashrc; cd \"\$GWT_START\" && gwt new shell-bash && printf 'GWT_PWD=%s\\n' \"\$(pwd -P)\""
         else
             run env GWT_START="$main_path" zsh --no-rcs -c \
-                "$ZSH_SOURCE; source ~/.zshrc; cd \"\$GWT_START\"; gwt new shell-zsh >/dev/null 2>&1; pwd -P"
+                "$ZSH_SOURCE; source ~/.zshrc; cd \"\$GWT_START\" && gwt new shell-zsh && printf 'GWT_PWD=%s\\n' \"\$(pwd -P)\""
         fi
 
         [ "$status" -eq 0 ]
-        [ "$output" = "$expected" ]
+        actual="$(printf '%s\n' "$output" | sed -n 's/^GWT_PWD=//p')"
+        expected="$(cd "$expected" && pwd -P)"
+        [ "$actual" = "$expected" ]
         [ "$(git -C "$expected" branch --show-current)" = "cadebrown/shell-$shell_name" ]
         rm -rf "$test_root"
     done
