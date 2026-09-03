@@ -188,7 +188,7 @@ brew "AlmogBaku/tap/dap"
 brew "sqlite"
 
 ### Security ###
-brew "gitleaks"  # secret scanning — also used as a global pre-push hook
+brew "gitleaks"  # secret scanning
 brew "bats-core" # bash test runner — tests/*.bats run locally, not just in docker
 
 ### DevOps ###

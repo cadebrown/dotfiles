@@ -121,13 +121,6 @@ flags (`DF_DO_*`, `0` skips / `1` enables), behavior (`DF_USE_PLAT`), debug
 Tool-standard vars (`PLAT`, `LOCAL_PLAT`, `RUSTUP_HOME`, `CARGO_HOME`, `NVM_DIR`, …)
 keep their conventional names.
 
-## Git hooks
-
-A global pre-push hook scans pushed commits for secrets with gitleaks —
-`core.hooksPath = ~/.config/git/hooks` applies to **every repo**, not just dotfiles.
-If a push is blocked, run `gitleaks git --no-banner` to review; emergency bypass
-`git push --no-verify` (only when certain there's no secret). Don't disable the hook.
-
 ## Cross-cutting gotchas
 
 Area-specific gotchas live in the scoped rules; only repo-wide traps here:

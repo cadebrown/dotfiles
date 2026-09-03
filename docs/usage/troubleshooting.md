@@ -1414,52 +1414,6 @@ self-updating ad-hoc-signed binary read access to Mail, Messages, and Safari his
 
 ---
 
-## `git push` blocked by gitleaks ("secrets detected")
-
-A global **pre-push** hook scans the commits being pushed for secrets with
-[gitleaks](https://github.com/gitleaks/gitleaks) and refuses the push if it finds
-any. This is the safety net that keeps tokens and private keys out of remote
-history — see [Authentication → File security](../setup/auth.md#file-security).
-
-How it's wired:
-
-- `brew "gitleaks"` (in `packages/Brewfile`) installs the scanner.
-- The hook lives at `home/dot_config/git/hooks/executable_pre-push`, deployed by
-  chezmoi to `~/.config/git/hooks/pre-push`.
-- `~/.gitconfig` sets `core.hooksPath = ~/.config/git/hooks`, so it applies to
-  **every repo on the machine**, not just dotfiles.
-- It scans only the commits being pushed (a new branch is scanned against
-  `--remotes`), not the full history, so it stays fast.
-- If gitleaks isn't installed yet, the hook prints a warning and exits cleanly
-  rather than blocking you.
-
-When a push is blocked, the hook prints the exact `--log-opts` range it flagged.
-Review the finding:
-
-```sh
-# Re-run the scan the hook ran (range is printed in the failure message)
-gitleaks git --log-opts="<remote_sha>..<local_sha>"
-
-# Or scan the entire repo history
-gitleaks git --no-banner
-```
-
-If it's a real secret: rotate it, then rewrite the offending commit(s) to remove
-it before pushing (a `--no-verify` push would leak it to the remote). If it's a
-confirmed false positive, add a [gitleaks allowlist][allowlist] entry rather than
-disabling the hook.
-
-**Emergency bypass** (use only when you're certain there's no secret):
-
-```sh
-git push --no-verify
-```
-
-Don't disable the hook permanently — `core.hooksPath` is global precisely so the
-protection can't be forgotten on a per-repo basis.
-
----
-
 ## `npm install -g` fails with `EBUSY … unlink '.nfsXXXX'` (qmd upgrade)
 
 `bootstrap.sh upgrade` (or `install/node.sh`) dies upgrading a global npm
@@ -1503,8 +1457,6 @@ hard-coded to IPv4 then fails even though the daemon and the configured MCP URL
 are healthy. Confirm with `curl http://localhost:8181/health`; it should return
 `{"status":"ok",...}`. The shared health check now uses `localhost`, matching
 the MCP server URL in `packages/mcp-servers.txt`.
-
-[allowlist]: https://github.com/gitleaks/gitleaks#configuration
 
 ## `import sage.all` / cysignals dies with `TypeError: signal handler must be signal.SIG_IGN, signal.SIG_DFL, or a callable object`
 

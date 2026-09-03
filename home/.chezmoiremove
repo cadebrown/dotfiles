@@ -30,15 +30,13 @@
 .aider.model.settings.yml
 .config/aider
 
-# Entire was dropped (July 2026). `entire hooks install` writes into the global
-# core.hooksPath dir, so it clobbered the managed pre-push and chained the
-# original as pre-push.pre-entire. chezmoi restores pre-push from
-# dot_config/git/hooks/executable_pre-push on its own; these are the hooks it
-# does not manage and would otherwise leave behind.
+# Entire and the global hooks path were dropped. Remove hooks previously
+# installed into that directory from machines that deployed them.
 .config/git/hooks/commit-msg
 .config/git/hooks/post-commit
 .config/git/hooks/post-rewrite
 .config/git/hooks/prepare-commit-msg
+.config/git/hooks/pre-push
 .config/git/hooks/pre-push.pre-entire
 .config/entire
 
