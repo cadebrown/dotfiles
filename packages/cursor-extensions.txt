@@ -10,15 +10,13 @@
 # Known-unavailable in Cursor (present in vscode-extensions.txt only). Some are
 # installed locally because Cursor imported them from VS Code on first run; that
 # path is not reproducible, so they are not declared here:
-#   analytic-signal.preview-mp4
-#   ms-vscode.cpptools                  (use anysphere.cpptools — Cursor's fork)
-#   ms-vscode.cpptools-extension-pack
-#   ms-vscode-remote.remote-ssh-edit    (use anysphere.remote-ssh)
-#   platformio.platformio-ide
-#   nvidia.nsight-vscode-edition        ("not available in Cursor for the Mac
-#                                        Silicon" — refused by ID, not missing)
-#   ltex-plus.vscode-ltex-plus          (not on Open VSX — verified 2026-08;
-#                                        grammar via harper-ls instead)
+# sync-ignore analytic-signal.preview-mp4
+# sync-ignore ms-vscode.cpptools                  (use anysphere.cpptools — Cursor's fork)
+# sync-ignore ms-vscode.cpptools-extension-pack
+# sync-ignore ms-vscode-remote.remote-ssh-edit    (use anysphere.remote-ssh)
+# sync-ignore platformio.platformio-ide
+# sync-ignore nvidia.nsight-vscode-edition        (refused on Mac Silicon)
+# sync-ignore ltex-plus.vscode-ltex-plus          (use harper-ls for grammar)
 anthropic.claude-code
 anysphere.cpptools
 anysphere.cursorpyright

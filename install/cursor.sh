@@ -142,6 +142,13 @@ if [[ "$_CMD" == "sync-extensions" || "$_CMD" == "sync" ]]; then
     _cursor_exts="$(cursor --list-extensions 2>/dev/null | grep -E '^[A-Za-z0-9][A-Za-z0-9_-]*\.[A-Za-z0-9][A-Za-z0-9_-]*$' || true)"
     [[ -n "$_cursor_exts" ]] || die "Failed to list Cursor extensions"
 
+    _sync_ignored="$(awk '$1 == "#" && $2 == "sync-ignore" { print $3 }' "$EXT_TXT" | sort -u)"
+    if [[ -n "$_sync_ignored" ]]; then
+        _cursor_exts="$(comm -23 \
+            <(printf '%s\n' "$_cursor_exts" | sort -u) \
+            <(printf '%s\n' "$_sync_ignored"))"
+    fi
+
     # Read existing entries (skip comments and blanks)
     _file_exts="$(grep -v '^\s*#' "$EXT_TXT" | grep -v '^\s*$' || true)"
 
