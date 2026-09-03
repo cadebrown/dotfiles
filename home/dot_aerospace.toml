@@ -1,6 +1,10 @@
 # .aerospace.toml - AeroSpace v2 (direct hotkeys, no hardcoded routing)
 
+config-version = 2
+
 start-at-login = true
+
+persistent-workspaces = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
 
 enable-normalization-flatten-containers = true
 enable-normalization-opposite-orientation-for-nested-containers = true
@@ -42,6 +46,9 @@ on-focused-monitor-changed = []
     outer.right = 0
 
 [mode.main.binding]
+    # System
+    cmd-l = 'exec-and-forget /bin/sleep 0.5; /usr/bin/pmset displaysleepnow'
+
     # Layout and sizing
     alt-slash = 'layout tiles horizontal vertical'
     alt-comma = 'layout accordion horizontal vertical'

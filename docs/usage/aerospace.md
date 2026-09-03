@@ -25,6 +25,7 @@ aerospace reload-config
 
 ## Main keymap
 
+- `cmd + l`: sleep displays and require authentication on wake
 - `alt + ←/↓/↑/→`: focus window
 - `alt + shift + ←/↓/↑/→`: move window
 - `cmd + alt + ←/↓/↑/→`: join-with direction
