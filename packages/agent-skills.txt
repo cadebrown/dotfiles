@@ -54,7 +54,7 @@ docx npx anthropics/skills docx
 # the binary exists, so on an older glab this row fails at install time.
 # A `fail glab` here usually means a stale Homebrew tap, not a missing package —
 # see the Linux tap-refresh gotcha in .claude/rules/homebrew.md.
-glab self glab skills install --global
+glab self glab skills install --global --force
 
 # ffmpeg: command cheatsheet skill (rendi-api — ffmpeg API vendor)
 ffmpeg npx rendi-api/ffmpeg-cheatsheet ffmpeg

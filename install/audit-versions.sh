@@ -76,7 +76,7 @@ command_version() {
     printf '%s\n' "$output" | sed -nE "$pattern"
 }
 
-record rustup 1.29.0 exact rustup repo-baseline "$(command_version rustup 's/^rustup ([0-9.]+).*/\1/p')"
+record rustup 1.29.1 minimum rustup repo-baseline "$(command_version rustup 's/^rustup ([0-9.]+).*/\1/p')"
 record rustc 1.98.0 minimum rustup stable "$(command_version rustc 's/^rustc ([0-9.]+).*/\1/p')"
 record node 24 major nvm lts "$(command_version node 's/^v?([0-9.]+).*/\1/p')"
 record nvm 0.40.7 exact nvm repo-pin "$(bash -c 'NVM_DIR="$1"; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" >/dev/null 2>&1 && nvm --version' _ "$NVM_DIR" 2>/dev/null || true)"
@@ -85,7 +85,7 @@ record python 3.14 major homebrew python@3.14 "$(command_version python3 's/^Pyt
 record uv 0.12 major uv self-update "$(command_version uv 's/^uv ([0-9.]+).*/\1/p')"
 record go 1.27 minimum homebrew go "$(go version 2>/dev/null | sed -nE 's/^go version go([0-9.]+).*/\1/p' || true)"
 record zig 0.16.0 exact homebrew zig "$(zig version 2>/dev/null | sed -nE 's/^([0-9.]+).*/\1/p' || true)"
-record juliaup 1.22.2 exact homebrew juliaup "$(command_version juliaup 's/^Juliaup ([0-9.]+).*/\1/p')"
+record juliaup 1.22.3 minimum homebrew juliaup "$(command_version juliaup 's/^Juliaup ([0-9.]+).*/\1/p')"
 record julia 1.12.7 minimum juliaup release "$(command_version julia 's/^julia version ([0-9.]+).*/\1/p')"
 record lean 4.33.1 exact elan mathlib-paired-pin "$(command_version lean 's/^Lean \(version ([0-9.]+).*/\1/p')"
 record llvm@22 22.1.8 exact homebrew llvm@22 "$(brew list --versions llvm@22 2>/dev/null | awk '{print $2}' || true)"

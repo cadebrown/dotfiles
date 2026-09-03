@@ -79,3 +79,29 @@ run_upgrade() {
     [ "$(wc -l < "$CALLS" | tr -d ' ')" -eq 1 ]
     [[ "$output" == *"preserve  example (locally modified since last install)"* ]]
 }
+
+@test "upgrade forces self-installed skills to overwrite existing content" {
+    mv "$FAKE_HOME/.claude/skills/example" "$FAKE_HOME/.claude/skills/glab"
+    grep '^glab self ' "$REPO/packages/agent-skills.txt" \
+        > "$FIXTURE/packages/agent-skills.txt"
+    jq -n --arg hash "$(tree_hash "$FAKE_HOME/.claude/skills/glab")" \
+        '{version: 1, skills: {glab: $hash}}' \
+        > "$FIXTURE/packages/agent-skills.lock.json"
+    jq -n '{version: 3, skills: {}}' > "$FAKE_HOME/.agents/.skill-lock.json"
+
+    cat > "$STUB_BIN/glab" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "$*" == "skills install --global --force" ]]
+printf '%s\n' '---' 'name: glab' '---' 'version 2' \
+    > "$HOME/.claude/skills/glab/SKILL.md"
+EOF
+    chmod 755 "$STUB_BIN/glab"
+
+    run env HOME="$FAKE_HOME" DF_USE_PLAT=0 DF_MODE=upgrade \
+        CALLS="$CALLS" PATH="$STUB_BIN:$PATH" \
+        bash "$FIXTURE/install/skills-sync.sh"
+
+    [ "$status" -eq 0 ]
+    grep -Fxq 'version 2' "$FAKE_HOME/.claude/skills/glab/SKILL.md"
+}

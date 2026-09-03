@@ -104,8 +104,9 @@ plugins are declared separately in `packages/codex-plugins.txt`. Run
 `bash install/skills-sync.sh check` for a read-only drift check. Do not use
 `npx skills check` as an audit: current versions update installed skills.
 Normal sync installs missing declarations and fails if any remain missing.
-Upgrade compares each tree with the mutable receipt from its last install, so
-consecutive upgrades keep tracking upstream while real local edits are preserved.
+Upgrade compares each npx-managed tree with the mutable receipt from its last
+install, so consecutive upgrades keep tracking upstream while real local edits
+are preserved. Self-installed skills rerun their declared force installer.
 The committed digest remains the review/audit baseline. Read-only `check`
 continues to exit nonzero for drift from that baseline.
 

@@ -617,6 +617,53 @@ in `.claude/rules/homebrew.md`.
 
 ---
 
+## Upgrade finishes installing, then the version audit calls newer tools outdated
+
+Symptom: `bootstrap.sh upgrade` installs current Homebrew packages, passes runtime
+verification, then fails its strict version audit because an installed patch
+version is newer than the reported exact baseline.
+
+Root cause: an unpinned package-manager tool was audited as an exact pin. A
+Homebrew upgrade could therefore make the machine newer than the repo baseline,
+and the audit categorized every exact mismatch as `outdated`.
+
+Confirm:
+
+```sh
+bash install/audit-versions.sh | jq '.[] | select(.status != "current")'
+brew info --json=v2 rustup juliaup | jq '.formulae[] | {name, stable: .versions.stable, installed: .installed[0].version}'
+```
+
+**Fix:** update the repo, then rerun `bootstrap.sh upgrade`. Unpinned `rustup` and
+`juliaup` releases now use minimum-version floors; genuinely pinned toolchains
+remain exact.
+
+---
+
+## Skill upgrade reports both “up to date” and committed-digest drift
+
+Symptom: the skills updater says global skills are current, then
+`install/skills-sync.sh` reports `content differs from committed digest`.
+
+Root cause: the mutable installer receipt and committed review digest serve
+different purposes. A legitimate upstream update advances the receipt, while
+the committed digest stays unchanged until the new content is reviewed. Local
+trees that differ from their installer receipt are preserved instead.
+
+Confirm with the read-only audit:
+
+```sh
+bash install/skills-sync.sh check
+```
+
+After reviewing the changed skill trees, refresh the review baseline with
+`bash install/skills-sync.sh lock`. Do not use `npx skills check` for this; it
+updates installed content. Self-installed skills must declare their own force
+flag. The `glab` row uses `--force`, because `glab skills install` otherwise
+refuses an existing file but exits successfully.
+
+---
+
 ## `GLIBC_x.y not found` from a Homebrew binary (Linux)
 
 Symptom: a brew-installed binary refuses to start, blaming Homebrew's own libc:
