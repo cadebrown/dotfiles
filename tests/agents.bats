@@ -28,6 +28,27 @@ setup() {
         "$REPO/install/claude.sh"
 }
 
+@test "Codex plugin reconciliation uses the declared marketplace inventory" {
+    run env REPO="$REPO" bash -c '
+        source "$REPO/install/codex.sh"
+        _declared_plugins() { printf "%s\n" "github@openai-curated"; }
+        _marketplace_names() { printf "%s\n" "openai-curated"; }
+        codex() {
+            if [[ "$*" == "plugin list --marketplace openai-curated --available --json" ]]; then
+                printf "%s\n" '\''{"installed":[{"pluginId":"github@openai-curated","enabled":true}],"available":[]}'\''
+            elif [[ "$*" == "plugin list --json" ]]; then
+                printf "%s\n" '\''{"installed":[{"pluginId":"github@openai-curated-remote","enabled":true}],"available":[]}'\''
+            else
+                return 1
+            fi
+        }
+        _sync_plugins
+        _check_plugins
+    '
+
+    [ "$status" -eq 0 ]
+}
+
 @test "agent doctor installer deploys and repairs the command in ARCH_BIN" {
     local fake_home="$BATS_TEST_TMPDIR/agent-tools-home"
     local destination

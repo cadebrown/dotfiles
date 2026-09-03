@@ -155,11 +155,11 @@ and chezmoi-managed guidance files built from shared partials.
 - **Codex curated plugins drift with the codex-cli version** — `openai-curated` is a
   snapshot bundled with the (unpinned) codex-cli, so its plugin set changes across
   releases. `packages/codex-plugins.txt` selectors a newer codex-cli drops fail to
-  install; `codex.sh` `_check_plugins` compares declared entries against `codex plugin
-  list --json | jq '.available'` and now *warns* (`dropped upstream: … — prune …`)
-  when one is gone from the snapshot instead of dying — but a plugin still offered yet
-  not installed/enabled stays a hard failure. Prune dropped entries when you see the
-  warning (`openai-developers`, `build-web-data-visualization` went away at 0.144.6).
+  install. Since 0.153.0, inventory checks must use both `--marketplace <name>` and
+  `--available`: the default JSON omits uninstalled plugins, while an unscoped listing
+  can hide an installed local plugin behind a same-named remote plugin. `codex.sh`
+  scopes each inventory snapshot accordingly. A genuinely absent, missing, or disabled
+  declaration remains a hard failure; prune or replace it in the registry.
 - **Codex full-auto is explicit at every layer** — `default_permissions =
   ":danger-full-access"` removes the local sandbox, `approval_policy = "never"`
   suppresses interactive execpolicy prompts, and generated MCP/app policy uses

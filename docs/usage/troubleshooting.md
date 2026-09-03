@@ -45,32 +45,30 @@ manually because that can conflict with the app's marketplace reconciliation.
 
 ---
 
-## Codex plugin fails: `plugin X was not found in marketplace openai-curated`
+## Codex plugin healthcheck reports a plugin was dropped upstream
 
-Symptom: `install/codex.sh` (Codex Plugins step) logs a `[warn]` like
-`Error: plugin openai-developers was not found in marketplace openai-curated`,
-and on an older checkout the healthcheck then died with
-`Missing or disabled Codex plugin: <plugin>@openai-curated`.
+Symptom: `install/codex.sh` dies with
+`Declared Codex plugin was dropped upstream: <plugin>@openai-curated`, even
+though the plugin still appears in the curated marketplace.
 
-Root cause: `openai-curated` is a snapshot **bundled with codex-cli**, and codex
-is unpinned (`packages/npm.txt`), so its curated plugin set changes across
-versions. A selector in `packages/codex-plugins.txt` that a newer codex-cli no
-longer ships can't install — the entry is stale. (`openai-developers` and
-`build-web-data-visualization` were temporarily absent in codex-cli 0.144.6 and
-returned in 0.147.0.)
+Root cause: codex-cli 0.153.0 changed `plugin list --json`: uninstalled plugins
+are omitted unless `--available` is passed, and an unscoped listing can prefer
+a same-named remote plugin over an installed local-marketplace plugin. Older
+`install/codex.sh` code read that incomplete global inventory and mistook the
+missing row for an upstream removal.
 
-Confirm — list what the installed codex actually offers:
+Confirm using the marketplace-scoped complete inventory:
 
 ```sh
-codex plugin list --json | jq -r '.available[].pluginId'
+codex plugin list --marketplace openai-curated --available --json \
+  | jq -r '.installed[].pluginId, .available[].pluginId'
 ```
 
-**Fix:** prune (or re-point) the missing selectors in
-`packages/codex-plugins.txt` to match that list, then rerun `bootstrap.sh`. The
-healthcheck now **warns** (`dropped upstream: … — prune packages/codex-plugins.txt`)
-instead of failing when a declared plugin is gone from the snapshot, so this no
-longer blocks bootstrap — the warning is your cue to prune. A plugin still
-offered by the snapshot but not installed/enabled stays a hard failure.
+**Fix:** update the dotfiles checkout and rerun `bootstrap.sh`. The installer
+now queries each declared marketplace with `--available`, so collisions with
+remote plugins do not hide installed curated plugins. If the scoped inventory
+really does omit a declared selector, prune or replace that selector in
+`packages/codex-plugins.txt`; declarations remain a hard contract.
 
 The `WARNING: failed to clean up stale arg0 temp dirs: Directory not empty` line
 from codex-cli is unrelated NFS noise (`.nfs*` files in its temp dir) — harmless.

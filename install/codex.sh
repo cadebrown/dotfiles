@@ -105,27 +105,45 @@ _marketplace_names() {
         | jq -r '.marketplaces[].name'
 }
 
+_snapshot_declared_plugin_inventory() {
+    local _installed="$1" _available="$2" _markets="$3"
+    local _market _json
+
+    : > "$_installed"
+    : > "$_available"
+    while IFS= read -r _market; do
+        [[ -n "$_market" ]] || continue
+        grep -qxF "$_market" "$_markets" || continue
+        _json="$(codex plugin list --marketplace "$_market" --available --json)" \
+            || return 1
+        jq -r '.installed[] | select(.enabled) | .pluginId' <<<"$_json" \
+            >> "$_installed" || return 1
+        jq -r '.available[].pluginId' <<<"$_json" >> "$_available" || return 1
+    done < <(_declared_plugins | awk -F@ '{ print $NF }' | sort -u)
+}
+
 _sync_plugins() {
-    local _tmp _markets _plugin _market
+    local _tmp _markets _avail _plugin _market
     log_section "Codex Plugins"
     has jq || die "jq is required to sync Codex plugins"
     _tmp="$(mktemp)"
     _markets="$(mktemp)"
-    if ! codex plugin list --json | jq -r '.installed[].pluginId' > "$_tmp"; then
-        log_fail "Could not read Codex plugin inventory"
-        rm -f "$_tmp" "$_markets"
-        return 1
-    fi
+    _avail="$(mktemp)"
     _marketplace_names > "$_markets" || {
-        rm -f "$_tmp" "$_markets"
+        rm -f "$_tmp" "$_markets" "$_avail"
         die "Could not read Codex marketplace inventory"
     }
+    if ! _snapshot_declared_plugin_inventory "$_tmp" "$_avail" "$_markets"; then
+        log_fail "Could not read Codex plugin inventory"
+        rm -f "$_tmp" "$_markets" "$_avail"
+        return 1
+    fi
 
     while IFS= read -r _plugin; do
         [[ -n "$_plugin" ]] || continue
         _market="${_plugin##*@}"
         if ! grep -qxF "$_market" "$_markets"; then
-            rm -f "$_tmp" "$_markets"
+            rm -f "$_tmp" "$_markets" "$_avail"
             die "Codex marketplace unavailable for declared plugin: $_plugin"
         fi
         if grep -qxF "$_plugin" "$_tmp"; then
@@ -137,24 +155,24 @@ _sync_plugins() {
             log_okay "  installed $_plugin"
             printf '%s\n' "$_plugin" >> "$_tmp"
         else
-            rm -f "$_tmp" "$_markets"
+            rm -f "$_tmp" "$_markets" "$_avail"
             die "Failed to install declared Codex plugin: $_plugin"
         fi
     done < <(_declared_plugins)
-    rm -f "$_tmp" "$_markets"
+    rm -f "$_tmp" "$_markets" "$_avail"
 }
 
 _check_plugins() {
-    local _tmp _markets _avail _plugin _market _json
+    local _tmp _markets _avail _plugin _market
     has jq || die "jq is required to check Codex plugins"
-    # One snapshot read: .installed (+enabled) and .available must be consistent.
-    _json="$(codex plugin list --json)" || die "Could not read Codex plugin inventory"
     _tmp="$(mktemp)"; _markets="$(mktemp)"; _avail="$(mktemp)"
-    jq -r '.installed[] | select(.enabled) | .pluginId' <<<"$_json" > "$_tmp"
-    jq -r '.available[].pluginId'                        <<<"$_json" > "$_avail"
     _marketplace_names > "$_markets" || {
         rm -f "$_tmp" "$_markets" "$_avail"
         die "Could not read Codex marketplace inventory"
+    }
+    _snapshot_declared_plugin_inventory "$_tmp" "$_avail" "$_markets" || {
+        rm -f "$_tmp" "$_markets" "$_avail"
+        die "Could not read Codex plugin inventory"
     }
     while IFS= read -r _plugin; do
         [[ -n "$_plugin" ]] || continue
@@ -164,8 +182,6 @@ _check_plugins() {
             die "Codex marketplace unavailable for declared plugin: $_plugin"
         fi
         grep -qxF "$_plugin" "$_tmp" && continue
-        # A declaration is a hard contract: unavailable, missing, or disabled
-        # plugins all fail until the registry is corrected or install succeeds.
         if grep -qxF "$_plugin" "$_avail"; then
             rm -f "$_tmp" "$_markets" "$_avail"
             die "Missing or disabled Codex plugin: $_plugin"
