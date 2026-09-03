@@ -100,15 +100,19 @@ function gsm { if [[ $# -eq 0 ]]; then git submodule update --init --recursive; 
 unalias gwt gwta gwtls gwtmv gwtrm 2>/dev/null
 gwt() {
     local destination
-    if [[ "${1:-}" == "new" && "${2:-}" != "-h" && "${2:-}" != "--help" ]]; then
-        destination="$(git-wt "$@")" || return
-        cd "$destination" || return
-    else
-        git-wt "$@"
-    fi
+    case "${1:-}" in
+        new|add)
+            if [[ "${2:-}" != "-h" && "${2:-}" != "--help" ]]; then
+                destination="$(git-wt "$@")" || return
+                cd "$destination" || return
+                return
+            fi
+            ;;
+    esac
+    git-wt "$@"
 }
 alias gwtn='gwt new'
-alias gwta='git wt add'
+alias gwta='gwt add'
 alias gwtls='git wt list'
 alias gwtmv='git wt move'
 alias gwtrm='git wt remove'

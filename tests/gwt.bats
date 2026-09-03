@@ -36,6 +36,11 @@ make_repo() {
     run bash "$SCRIPT" help init
     [ "$status" -eq 0 ]
     [[ "$output" == *"preserves staged, unstaged, and untracked files"* ]]
+
+    run bash "$SCRIPT" help add
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"fetched remote-tracking branch"* ]]
+    [[ "$output" == *"does not fetch"* ]]
 }
 
 @test "git discovers the helper as an external subcommand" {
@@ -106,6 +111,111 @@ make_repo() {
     [ "$status" -eq 0 ]
     [ -f "$REPO_DIR/team/review/.git" ]
     [ "$(git -C "$REPO_DIR/team/review" branch --show-current)" = "team/review" ]
+}
+
+@test "add creates a tracking branch from a fetched remote branch" {
+    make_repo
+    remote_dir="$TEST_ROOT/remote.git"
+    git init -q --bare "$remote_dir"
+    git -C "$REPO_DIR" remote add origin "$remote_dir"
+    git -C "$REPO_DIR" branch team/review
+    git -C "$REPO_DIR" push -q origin main team/review
+    git -C "$REPO_DIR" branch -D team/review
+    git -C "$REPO_DIR" tag team/review
+    ! git -C "$REPO_DIR" show-ref --verify --quiet refs/heads/team/review
+    git -C "$REPO_DIR" show-ref --verify --quiet refs/remotes/origin/team/review
+    cd "$REPO_DIR"
+    bash "$SCRIPT" init --print-path >/dev/null
+    cd "$REPO_DIR/main"
+
+    run bash "$SCRIPT" add team/review
+    [ "$status" -eq 0 ]
+    [ -f "$REPO_DIR/team/review/.git" ]
+    [ "$(git -C "$REPO_DIR/team/review" branch --show-current)" = "team/review" ]
+    [ "$(git -C "$REPO_DIR/team/review" rev-parse --abbrev-ref '@{upstream}')" = "origin/team/review" ]
+}
+
+@test "add follows a nonstandard remote fetch mapping" {
+    make_repo
+    remote_dir="$TEST_ROOT/remote.git"
+    git init -q --bare "$remote_dir"
+    git -C "$REPO_DIR" remote add origin "$remote_dir"
+    git -C "$REPO_DIR" branch team/mapped
+    git -C "$REPO_DIR" push -q origin main team/mapped
+    git -C "$REPO_DIR" branch -D team/mapped
+    git -C "$REPO_DIR" config --unset-all remote.origin.fetch
+    git -C "$REPO_DIR" config --add remote.origin.fetch \
+        '+refs/heads/*:refs/remotes/mirror/*'
+    while IFS= read -r ref; do
+        git -C "$REPO_DIR" update-ref -d "$ref"
+    done < <(git -C "$REPO_DIR" for-each-ref --format='%(refname)' refs/remotes/origin)
+    git -C "$REPO_DIR" fetch -q origin
+    git -C "$REPO_DIR" show-ref --verify --quiet refs/remotes/mirror/team/mapped
+    cd "$REPO_DIR"
+    bash "$SCRIPT" init --print-path >/dev/null
+    cd "$REPO_DIR/main"
+
+    run bash "$SCRIPT" add team/mapped
+    [ "$status" -eq 0 ]
+    [ "$(git -C "$REPO_DIR/team/mapped" branch --show-current)" = "team/mapped" ]
+    [ "$(git -C "$REPO_DIR/team/mapped" rev-parse --abbrev-ref '@{upstream}')" = "mirror/team/mapped" ]
+}
+
+@test "add uses checkout.defaultRemote when remotes share a branch" {
+    make_repo
+    origin_dir="$TEST_ROOT/origin.git"
+    upstream_dir="$TEST_ROOT/upstream.git"
+    git init -q --bare "$origin_dir"
+    git init -q --bare "$upstream_dir"
+    git -C "$REPO_DIR" remote add origin "$origin_dir"
+    git -C "$REPO_DIR" remote add upstream "$upstream_dir"
+    git -C "$REPO_DIR" branch team/review
+    git -C "$REPO_DIR" push -q origin main team/review
+    git -C "$REPO_DIR" push -q upstream main team/review
+    git -C "$REPO_DIR" branch -D team/review
+    git -C "$REPO_DIR" config checkout.defaultRemote upstream
+    cd "$REPO_DIR"
+    bash "$SCRIPT" init --print-path >/dev/null
+    cd "$REPO_DIR/main"
+
+    run bash "$SCRIPT" add team/review
+    [ "$status" -eq 0 ]
+    [ "$(git -C "$REPO_DIR/team/review" branch --show-current)" = "team/review" ]
+    [ "$(git -C "$REPO_DIR/team/review" rev-parse --abbrev-ref '@{upstream}')" = "upstream/team/review" ]
+}
+
+@test "add distinguishes a missing branch from new" {
+    make_repo
+    cd "$REPO_DIR"
+    bash "$SCRIPT" init --print-path >/dev/null
+    cd "$REPO_DIR/main"
+
+    run bash "$SCRIPT" add missing/topic
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"branch not found locally or in fetched remotes: missing/topic"* ]]
+    [[ "$output" == *"git fetch <remote>"* ]]
+    [[ "$output" == *"git wt new"* ]]
+    [ ! -e "$REPO_DIR/missing/topic" ]
+    run git show-ref --verify --quiet refs/heads/missing/topic
+    [ "$status" -ne 0 ]
+}
+
+@test "add rejects tags and object IDs instead of detaching HEAD" {
+    make_repo
+    git -C "$REPO_DIR" tag release/candidate
+    object_id="$(git -C "$REPO_DIR" rev-parse --short=12 HEAD)"
+    cd "$REPO_DIR"
+    bash "$SCRIPT" init --print-path >/dev/null
+    cd "$REPO_DIR/main"
+
+    for branch in release/candidate "$object_id"; do
+        run bash "$SCRIPT" add "$branch"
+        [ "$status" -eq 1 ]
+        [[ "$output" == *"branch not found locally or in fetched remotes: $branch"* ]]
+        [ ! -e "$REPO_DIR/$branch" ]
+        run git show-ref --verify --quiet "refs/heads/$branch"
+        [ "$status" -ne 0 ]
+    done
 }
 
 @test "new reports a missing host identity without guessing" {

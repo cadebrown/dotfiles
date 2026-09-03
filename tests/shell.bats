@@ -37,8 +37,8 @@ BASH_SOURCE_CMD='export SSH_AUTH_SOCK=already_running; source ~/.bash_profile'
     [ "$status" -eq 0 ]
 }
 
-@test "gwt new enters the created worktree in Bash and zsh" {
-    local test_root repo main_path expected actual
+@test "gwt new and add enter their worktrees in Bash and zsh" {
+    local test_root repo main_path expected_new expected_add actual_new actual_add
 
     for shell_name in bash zsh; do
         test_root="$(mktemp -d)"
@@ -50,23 +50,29 @@ BASH_SOURCE_CMD='export SSH_AUTH_SOCK=already_running; source ~/.bash_profile'
         printf 'base\n' > "$repo/tracked.txt"
         git -C "$repo" add tracked.txt
         git -C "$repo" commit -qm initial
+        git -C "$repo" branch "team/shell-$shell_name"
         git -C "$repo" remote add origin git@github.com:some-org/project.git
         main_path="$(cd "$repo" && git wt init --print-path)"
-        expected="$repo/cadebrown/shell-$shell_name"
+        expected_new="$repo/cadebrown/shell-$shell_name"
+        expected_add="$repo/team/shell-$shell_name"
 
         if [[ "$shell_name" == bash ]]; then
             run env GWT_START="$main_path" bash --norc --noprofile -c \
-                "$BASH_SOURCE_CMD; source ~/.bashrc; cd \"\$GWT_START\" && gwt new shell-bash && printf 'GWT_PWD=%s\\n' \"\$(pwd -P)\""
+                "$BASH_SOURCE_CMD; source ~/.bashrc; cd \"\$GWT_START\" && gwt new shell-bash && printf 'GWT_NEW_PWD=%s\\n' \"\$(pwd -P)\" && gwt add team/shell-bash && printf 'GWT_ADD_PWD=%s\\n' \"\$(pwd -P)\""
         else
             run env GWT_START="$main_path" zsh --no-rcs -c \
-                "$ZSH_SOURCE; source ~/.zshrc; cd \"\$GWT_START\" && gwt new shell-zsh && printf 'GWT_PWD=%s\\n' \"\$(pwd -P)\""
+                "$ZSH_SOURCE; source ~/.zshrc; cd \"\$GWT_START\" && gwt new shell-zsh && printf 'GWT_NEW_PWD=%s\\n' \"\$(pwd -P)\" && gwt add team/shell-zsh && printf 'GWT_ADD_PWD=%s\\n' \"\$(pwd -P)\""
         fi
 
         [ "$status" -eq 0 ]
-        actual="$(printf '%s\n' "$output" | sed -n 's/^GWT_PWD=//p')"
-        expected="$(cd "$expected" && pwd -P)"
-        [ "$actual" = "$expected" ]
-        [ "$(git -C "$expected" branch --show-current)" = "cadebrown/shell-$shell_name" ]
+        actual_new="$(printf '%s\n' "$output" | sed -n 's/^GWT_NEW_PWD=//p')"
+        actual_add="$(printf '%s\n' "$output" | sed -n 's/^GWT_ADD_PWD=//p')"
+        expected_new="$(cd "$expected_new" && pwd -P)"
+        expected_add="$(cd "$expected_add" && pwd -P)"
+        [ "$actual_new" = "$expected_new" ]
+        [ "$actual_add" = "$expected_add" ]
+        [ "$(git -C "$expected_new" branch --show-current)" = "cadebrown/shell-$shell_name" ]
+        [ "$(git -C "$expected_add" branch --show-current)" = "team/shell-$shell_name" ]
         rm -rf "$test_root"
     done
 }

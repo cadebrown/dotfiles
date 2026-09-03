@@ -20,7 +20,7 @@ tree.
 The implementation is a Bash script installed as `git-wt` in the active
 `~/.local` or PLAT-specific `bin` directory. Git discovers it as the external
 subcommand `git wt`. The shell function `gwt` invokes the same command and
-enters worktrees created by `gwt new`.
+enters worktrees created by `gwt new` or attached by `gwt add`.
 
 After installing or updating the dotfiles, open a new shell so `gwt` and the
 interactive `gwtize` wrapper are loaded. `git wt` itself works as soon as the
@@ -94,17 +94,34 @@ gwt new cadeb/perf/fft
 
 ## Add an existing branch
 
-`add` never changes a branch name. Use it for shared branches, base branches,
-or a branch that already has the correct namespace:
+Use `new` when the branch does not exist yet: it adds your forge username and
+creates a personal branch from `HEAD` or an explicit start point. Use `add`
+when the branch already exists locally or in the fetched remote refs: it keeps
+the exact branch name and enters the matching worktree.
+
+`add` uses a local branch directly. If a matching remote-tracking branch exists,
+Git creates the same-named local branch and configures its upstream.
+The complete branch name remains mirrored in the worktree path:
 
 ```sh
 gwt add main
 gwt add release/13.5
-gwt add cadeb/perf/fft
+gwt add bancelin/rubin-sm107-tuned-pow2-fp32
 ```
 
-The branch must already exist locally. Use `gwt new` when creating a personal
-branch.
+`add` does not fetch or silently create an unrelated branch. If the branch is
+not present in the fetched remote refs, run `git fetch origin` and retry. If it
+does not exist anywhere, use `gwt new` instead.
+
+When multiple remotes contain the branch, Git uses `checkout.defaultRemote` to
+select one. Set it explicitly if needed:
+
+```sh
+git config --global checkout.defaultRemote origin
+```
+
+Use `git wt add` instead when a script should stay in its current directory;
+it prints the new worktree path on standard output.
 
 ## Forge usernames
 

@@ -22,13 +22,14 @@ Usage:
 
 Commands:
   new       Create a personal branch and matching nested worktree.
-  add       Add an existing local branch at its matching nested path.
+  add       Attach an existing local or fetched branch at its nested path.
   init      Convert a normal clone into a .bare + worktrees layout.
   list      List worktrees using Git's native command.
   help      Show this help.
 
 Shell commands:
   gwt new   Create a personal worktree and enter it.
+  gwt add   Attach an existing branch and enter its worktree.
   gwtize    Run 'git wt init' and enter the primary worktree.
 
 Native worktree commands are passed through unchanged:
@@ -68,9 +69,14 @@ usage_add() {
     cat <<'EOF'
 Usage: git wt add <branch>
 
-Add an existing local branch without changing its name. The worktree path
-mirrors the complete branch name. Git refuses a branch that is already checked
-out in another worktree.
+Attach an existing branch without changing its name. A local branch is used
+directly. If a fetched remote-tracking branch matches, Git creates a local branch
+with the same name and configures its upstream. The worktree path mirrors the
+complete branch name.
+
+This command does not fetch. Run 'git fetch <remote>' first when the branch is
+not present locally or in the fetched remote refs. Use 'git wt new' to create a
+new personal branch instead.
 
 Examples:
   git wt add main
@@ -214,6 +220,63 @@ validate_branch() {
         || die "invalid branch name '$branch'"
 }
 
+ref_matches_pattern() {
+    local ref="$1" pattern="$2" prefix suffix remainder
+    if [[ "$pattern" == *"*"* ]]; then
+        prefix="${pattern%%\**}"
+        suffix="${pattern#*\*}"
+        [[ "$ref" == "$prefix"*"$suffix" ]] || return 1
+        remainder="${ref#"$prefix"}"
+        [[ "$remainder" == *"$suffix" ]]
+    else
+        [[ "$ref" == "$pattern" ]]
+    fi
+}
+
+fetch_destination() {
+    local source="$1" refspec="$2" src dst prefix suffix wildcard
+    refspec="${refspec#+}"
+    [[ "$refspec" != ^* && "$refspec" == *:* ]] || return 1
+    src="${refspec%%:*}"
+    dst="${refspec#*:}"
+    ref_matches_pattern "$source" "$src" || return 1
+
+    if [[ "$src" == *"*"* ]]; then
+        [[ "$dst" == *"*"* ]] || return 1
+        prefix="${src%%\**}"
+        suffix="${src#*\*}"
+        wildcard="${source#"$prefix"}"
+        wildcard="${wildcard%"$suffix"}"
+        printf '%s%s%s\n' "${dst%%\**}" "$wildcard" "${dst#*\*}"
+    else
+        printf '%s\n' "$dst"
+    fi
+}
+
+remote_excludes_branch() {
+    local remote="$1" source="$2" refspec
+    while IFS= read -r refspec; do
+        [[ "$refspec" == ^* ]] || continue
+        ref_matches_pattern "$source" "${refspec#^}" && return 0
+    done < <(git config --get-all "remote.$remote.fetch" 2>/dev/null || true)
+    return 1
+}
+
+remote_tracking_ref() {
+    local remote="$1" branch="$2" source refspec destination
+    source="refs/heads/$branch"
+    remote_excludes_branch "$remote" "$source" && return 1
+    while IFS= read -r refspec; do
+        destination="$(fetch_destination "$source" "$refspec" || true)"
+        [[ -n "$destination" ]] || continue
+        if git show-ref --verify --quiet "$destination"; then
+            printf '%s\n' "$destination"
+            return 0
+        fi
+    done < <(git config --get-all "remote.$remote.fetch" 2>/dev/null || true)
+    return 1
+}
+
 validate_relative_path() {
     local path="$1"
     [[ -n "$path" ]] || die "worktree path cannot be empty"
@@ -284,17 +347,40 @@ cmd_new() {
 }
 
 cmd_add() {
-    local branch="${1:-}" root destination
+    local branch="${1:-}" root destination remote tracking_ref
+    local default_remote selected_ref="" default_ref="" match_count=0
     [[ "$branch" != "-h" && "$branch" != "--help" ]] || { usage_add; return; }
     [[ -n "$branch" && $# -eq 1 ]] || { usage_add >&2; exit 2; }
     validate_branch "$branch"
-    git show-ref --verify --quiet "refs/heads/$branch" \
-        || die "local branch does not exist: $branch; use 'git wt new' to create a personal branch"
 
     root="$(layout_root)"
     destination="$root/$branch"
     ensure_layout_destination "$root" "$branch"
-    git worktree add "$destination" "$branch" >&2
+    if git show-ref --verify --quiet "refs/heads/$branch"; then
+        git worktree add "$destination" "$branch" >&2
+    else
+        default_remote="$(git config --get checkout.defaultRemote 2>/dev/null || true)"
+        while IFS= read -r remote; do
+            [[ -n "$remote" ]] || continue
+            tracking_ref="$(remote_tracking_ref "$remote" "$branch" || true)"
+            [[ -n "$tracking_ref" ]] || continue
+            match_count=$((match_count + 1))
+            [[ -n "$selected_ref" ]] || selected_ref="$tracking_ref"
+            if [[ "$remote" == "$default_remote" ]]; then
+                default_ref="$tracking_ref"
+            fi
+        done < <(git remote)
+
+        if [[ "$match_count" -eq 0 ]]; then
+            die "branch not found locally or in fetched remotes: $branch; run 'git fetch <remote>' and retry, or use 'git wt new' to create a personal branch"
+        fi
+        if [[ "$match_count" -gt 1 ]]; then
+            [[ -n "$default_ref" ]] \
+                || die "branch exists on multiple remotes: $branch; configure checkout.defaultRemote and retry"
+            selected_ref="$default_ref"
+        fi
+        git worktree add --track -b "$branch" "$destination" "$selected_ref" >&2
+    fi
     printf '%s\n' "$destination"
 }
 
