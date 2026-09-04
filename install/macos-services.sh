@@ -27,6 +27,68 @@ log_section "Services (auto-start)"
 # Container runtime — provides a Docker-compatible socket for the `docker` CLI.
 # After this, `docker` works without Docker Desktop.
 
+_set_colima_ssh_config_false() {
+    local _file="$1" _tmp _mode
+    [[ ! -L "$_file" ]] || return 1
+    _tmp="$(mktemp "${_file}.tmp.XXXXXX")" || return 1
+
+    if ! awk '
+        BEGIN { found = 0 }
+        /^sshConfig:[[:space:]]*/ {
+            if (!found) print "sshConfig: false"
+            found = 1
+            next
+        }
+        { print }
+        END { if (!found) print "sshConfig: false" }
+    ' "$_file" > "$_tmp"; then
+        rm -f "$_tmp"
+        return 1
+    fi
+
+    if stat --version >/dev/null 2>&1; then
+        _mode="$(stat -c '%a' "$_file")"
+    else
+        _mode="$(stat -f '%Lp' "$_file")"
+    fi
+    chmod "$_mode" "$_tmp"
+    if cmp -s "$_file" "$_tmp"; then
+        rm -f "$_tmp"
+    else
+        mv -f "$_tmp" "$_file"
+    fi
+}
+
+_configure_colima_ssh() {
+    local _template _root _config
+    _template="$(colima template --print)" \
+        || die "Unable to locate the Colima configuration template"
+    case "$_template" in
+        /*/_templates/*.yaml) ;;
+        *) die "Unexpected Colima template path: $_template" ;;
+    esac
+
+    if [[ ! -f "$_template" ]]; then
+        # Sparse templates replace Colima's CLI defaults with zero values.
+        colima template --editor /usr/bin/true >/dev/null \
+            || die "Unable to initialize the Colima configuration template"
+    fi
+    _set_colima_ssh_config_false "$_template" \
+        || die "Unable to disable Colima SSH config injection in $_template"
+
+    _root="$(dirname "$(dirname "$_template")")"
+    for _config in "$_root"/*/colima.yaml; do
+        [[ -f "$_config" ]] || continue
+        _set_colima_ssh_config_false "$_config" \
+            || die "Unable to disable Colima SSH config injection in $_config"
+    done
+    log_okay "colima SSH config injection disabled"
+}
+
+if has colima; then
+    _configure_colima_ssh
+fi
+
 if [[ "$DF_START_LOCAL_SERVICES" != "1" ]]; then
     log_okay "colima auto-start disabled (DF_START_LOCAL_SERVICES=0) — 'colima start' to run manually"
 elif has colima; then
@@ -43,6 +105,7 @@ elif has colima; then
 else
     log_warn "colima not found — skipping (run install/homebrew.sh first)"
 fi
+unset -f _set_colima_ssh_config_false _configure_colima_ssh
 
 ### ollama ###
 # Local LLM inference server — OpenAI-compatible API on localhost:11434.

@@ -4,6 +4,37 @@ Quick reference for when things go wrong. Check here before digging into scripts
 
 ---
 
+## Colima intermittently rewrites or breaks `~/.ssh/config`
+
+Symptom: tools that parse `~/.ssh/config` fail intermittently, or
+`chezmoi diff` alternates between a clean file and a leading Colima `Include`.
+
+Root cause: with `sshConfig: true`, every Colima start may prepend its exact
+`~/.colima/ssh_config` include. A globbed include in the managed template does
+not satisfy Colima's exact-path check, so Colima and chezmoi repeatedly rewrite
+the same file. Colima writes the file in place, which can also expose a partial
+config to concurrent readers.
+
+Confirm:
+
+```sh
+grep '^sshConfig:' ~/.colima/*/colima.yaml
+grep -n '\.colima/.*ssh_config' ~/.ssh/config
+chezmoi diff ~/.ssh/config
+```
+
+**Fix:** update the dotfiles checkout and rerun `bootstrap.sh`. The macOS
+services installer sets `sshConfig: false` in Colima's default template and all
+existing profiles, while chezmoi removes the Colima include from the managed
+SSH config. Docker is unaffected. Use `colima ssh` to enter the VM, or use the
+separately generated config without loading it globally:
+
+```sh
+ssh -F ~/.colima/ssh_config colima
+```
+
+---
+
 ## Tool not found after bootstrap
 
 ```sh

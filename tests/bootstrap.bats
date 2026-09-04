@@ -113,6 +113,16 @@ teardown() {
 
 # --- SSH config ---
 
+@test "SSH config stays parser-friendly and outside Colima ownership" {
+    run grep -q '\.colima/.*ssh_config' "$HOME/.ssh/config"
+    [ "$status" -ne 0 ]
+    grep -q '^Include ~/.ssh/config.d/\*$' "$HOME/.ssh/config"
+    grep -q '^    # Reliability$' "$HOME/.ssh/config"
+
+    run ssh -G github.com
+    [ "$status" -eq 0 ]
+}
+
 # --- Python ---
 
 @test "~/.pythonrc exists" {
