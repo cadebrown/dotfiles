@@ -1433,9 +1433,11 @@ kill it if started; it only touches lock files before hanging.
 
 ---
 
-## macOS keeps asking: "cass would like to access data from other apps"
+## macOS still asks: "cass would like to access data from other apps"
 
-The prompt returns every few minutes, and "Allow" doesn't make it stop.
+After an upgrade, an old launchd job may still be scanning the session archive.
+The current setup never schedules cass indexing: qmd stays warm for Markdown
+search, while cass runs only when you invoke `memory.sh index` or `semantic`.
 
 Older dotfiles deployed a `dev.cade.cass-watch` LaunchAgent that ran `cass index`
 every 300 s, and **the `aider`
@@ -1467,15 +1469,17 @@ cass logs only record paths it opens deliberately, not what a directory walk tou
 
 (`/usr/bin/log` explicitly — `log` is a shell function in this repo's profiles.)
 
-**Fix — bound the crawl. That's the whole fix; leave every connector enabled:**
+**Fix — remove the old scheduler and bound any manual crawl.** First rerun the
+current memory setup, which unloads the legacy cass jobs. Then keep the aider
+discovery root bounded for manual indexing:
 
 ```bash
 export CASS_AIDER_DATA_ROOT="$HOME/dev"   # aider discovery root, not $HOME
 ```
 
-Applied on macOS by the manual `install/memory.sh` index modes. Current dotfiles
-remove the old scheduled LaunchAgents. Aider still indexes normally — just only
-under the given root, so aider projects elsewhere go unindexed.
+Applied on macOS by the manual `install/memory.sh` index modes. Aider still
+indexes normally — just only under the given root, so aider projects elsewhere
+go unindexed.
 `CASS_AIDER_DATA_ROOT` takes a single path, so `$HOME` is the only "covers everything"
 value and it is what causes the problem.
 
@@ -1652,6 +1656,34 @@ bash install/linearmouse.sh         # push repo settings → app (default: apply
 Adding a new app to this pattern means deleting its `home/` chezmoi source
 (chezmoi then leaves the live file alone), adding the script, and wiring a
 `DF_DO_*` flag in `bootstrap.sh`.
+
+---
+
+## `codex -p <domain>` cannot see its expected MCP tools
+
+**Symptom.** A new Codex session using `-p browser`, `creative`, or another
+domain profile starts, but the expected tools are absent or Codex rejects the
+profile.
+
+**Root cause.** Domain overlays are generated files in `~/.codex`, while the
+base configuration intentionally contains only the core MCP set. An older
+checkout, an incomplete bootstrap, or a registry change can leave those
+overlays stale. Codex accepts one profile overlay per invocation.
+
+**Confirm and fix.** Regenerate the configuration, then run the same parser
+check used by bootstrap:
+
+```bash
+bash ~/dotfiles/install/codex.sh sync-config
+bash ~/dotfiles/install/codex.sh check
+codex -p browser debug prompt-input "healthcheck"
+```
+
+For several domains in a persistent host baseline, set the exact
+`DF_MCP_PROFILES` value during `sync-config`; do not use `tools-all` merely to
+work around a missing overlay. Start a new Codex task after the check, because
+an existing task keeps its initial tool inventory and may retain an old MCP
+subprocess environment.
 
 ---
 

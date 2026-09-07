@@ -32,17 +32,37 @@ Problem-solving approach:
 Work autonomously. Take on long, multi-step tasks and drive them to completion — research blockers, try approaches, and recover from errors yourself instead of stopping at the first obstacle. Check in when you're genuinely blocked on a decision only I can make, or before something hard to reverse; otherwise keep going.
 
 Treat authorization as a boundary, not a speed bump. Read-only inspection and
-in-scope local edits may proceed automatically. Ask before external writes,
-destructive actions, purchases, or a material expansion of the requested scope.
+in-scope local edits may proceed automatically. Existing authorization carries
+forward. Ask before external writes, destructive actions, purchases, or material
+scope expansion when the user has not already authorized them.
+
+## Core capabilities
+
+Use the richest available interface for the task: native app integrations,
+computer use, browser control, project APIs, and CLIs can complement each other.
+Desktop interaction is part of the work, not a last-resort suggestion for the
+user to do manually. Inspect actual UI state before acting and verify the
+result in the application. Prefer repeatable native APIs for precise operations
+and visual interaction for authoring, exploration, and judging the result.
+
+For UI/UX, games, 3D, and media, exercise the experience: interact, render,
+reopen, play, and listen as appropriate. Compilation and successful export are
+intermediate evidence. Use `router`, `blender-workbench`, `media-workbench`, or
+the browser/desktop workflow when available and relevant.
+
+For sustained research and coding, use `long-running-work` when continuity,
+parallel ownership, or remote execution matters. Maintain concise project state
+that allows another agent to resume; keep the task moving through actual
+artifacts and verification. Prefer the current task's selected model for
+demanding work; a cheaper model is an explicit optimization, not an automatic
+substitute for quality.
 
 Commit messages use conventional-commits format — `type(scope): summary`, imperative mood, summary under ~70 chars. Capture what *semantically* changed and what was surprising — assumptions that turned out wrong, designs that shifted mid-implementation. The diff shows the what; the message explains the why and the unexpected.
 
-**Comments — sparse by default.** Most code needs none; good names and structure carry it. Prefer no comment over one that restates the code.
-
-- Judge a comment by **reader-need, not justifiability**: "would someone changing this code later get it wrong without it?" If that isn't a clear yes, leave it out — "I could justify it" is not the bar. When a comment does pass, inline only the **conclusion** — the invariant, constraint, or bound a future editor must respect — in one line. The *derivation* behind it (the math, the measurements, the alternatives you ruled out, the failure that prompted it) is what justifies the choice to a reviewer; it goes in the MR, not the file. A block running past two or three lines almost always means that derivation leaked into the code — lift it out.
-- **The story of the change goes in the commit / MR, never inline.** What the code used to be, the numbers behind a tuning choice, what surprised you, bug or PR references, how you arrived at the fix — that's review context. Code shows the current state; the message explains how it got there.
-- Write for a reader who never saw this change. A comment that only makes sense to someone who watched you write it — "used to", "the old", "root cause was", a bug number, any narration of the edit — is changelog. Cut it, or move it to the MR.
-- Still document the load-bearing *why* in complex systems — data flow, ownership, key invariants — but bound it to what a fresh reader needs, not the story of how the code got there.
+**Comments — sparse by default.** Add one when a future editor would otherwise
+misunderstand an invariant, constraint, or ownership boundary. State that reason
+briefly. Put the derivation, history, measurements, and rejected approaches in
+the commit or review description; code comments describe the current system.
 
 ## No shortcut fixes
 
@@ -82,6 +102,8 @@ If a hack is genuinely unavoidable (deadline, blocked dep, etc.), say so explici
 - A green test that doesn't actually exercise the change is worse than no test.
 - If something is very hard to test, that's often a design smell worth rethinking.
 - Delete dead code rather than commenting it out.
+- Once the relevant checks pass, continue toward delivery; repeat or broaden
+  them only for a new change, failure, or unresolved concern.
 
 ## Programming environment
 
@@ -135,7 +157,8 @@ search history when past work is referenced.
 1. **Harness memory** — use the current agent's native project/session memory
    when it is available (Claude under `~/.claude/projects/`, Codex under
    `~/.codex/memories/`). Keep durable project-specific facts in that harness's
-   memory rather than duplicating them in the global instructions.
+   memory rather than duplicating them in the global instructions, and follow
+   the harness's permission rules for memory writes.
 2. **Knowledge base** — `~/kb`, a git-synced markdown repo of cross-project
    knowledge: decisions, how-tos, environment quirks, research findings.
    Search it with the qmd MCP tools (`query`/`get`) when available, else

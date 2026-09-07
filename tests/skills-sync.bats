@@ -105,3 +105,92 @@ EOF
     [ "$status" -eq 0 ]
     grep -Fxq 'version 2' "$FAKE_HOME/.claude/skills/glab/SKILL.md"
 }
+
+@test "sync archives obsolete generated Pi links and preserves other links" {
+    mkdir -p "$FAKE_HOME/.pi/agent/skills"
+    ln -s ../../../.agents/skills/retired "$FAKE_HOME/.pi/agent/skills/retired"
+    ln -s ../../../.agents/skills/example "$FAKE_HOME/.pi/agent/skills/example"
+    ln -s /missing/personal-skill "$FAKE_HOME/.pi/agent/skills/personal"
+
+    run env HOME="$FAKE_HOME" DF_USE_PLAT=0 PATH="$STUB_BIN:$PATH" \
+        bash "$FIXTURE/install/skills-sync.sh"
+    [ "$status" -eq 0 ]
+    [ ! -L "$FAKE_HOME/.pi/agent/skills/retired" ]
+    [ -L "$FAKE_HOME/.pi/agent/skills/example" ]
+    [ -L "$FAKE_HOME/.pi/agent/skills/personal" ]
+    run bash -c 'compgen -G "$1/.local/state/dotfiles/skill-backups/*/pi-links/retired"' _ "$FAKE_HOME"
+    [ "$status" -eq 0 ]
+}
+
+@test "sync adopts vendored skills without overwriting their installed contents" {
+    mkdir -p "$FIXTURE/home/dot_claude/skills/adopted" "$FAKE_HOME/.claude/skills/adopted"
+    printf 'managed source\n' > "$FIXTURE/home/dot_claude/skills/adopted/SKILL.md"
+    printf 'prior install\n' > "$FAKE_HOME/.claude/skills/adopted/SKILL.md"
+    jq '.skills.adopted = {skillFolderHash: "prior"}' "$FAKE_HOME/.agents/.skill-lock.json" > "$BATS_TEST_TMPDIR/receipt"
+    mv "$BATS_TEST_TMPDIR/receipt" "$FAKE_HOME/.agents/.skill-lock.json"
+
+    run env HOME="$FAKE_HOME" DF_USE_PLAT=0 PATH="$STUB_BIN:$PATH" \
+        bash "$FIXTURE/install/skills-sync.sh"
+    [ "$status" -eq 0 ]
+    jq -e '.skills.adopted == null and .skills.example != null' "$FAKE_HOME/.agents/.skill-lock.json"
+    grep -Fxq 'prior install' "$FAKE_HOME/.claude/skills/adopted/SKILL.md"
+    run bash -c 'compgen -G "$1/.local/state/dotfiles/skill-backups/*/adopted/SKILL.md"' _ "$FAKE_HOME"
+    [ "$status" -eq 0 ]
+}
+
+@test "chezmoi archives prior skill edits before replacing them on apply" {
+    mkdir -p "$FIXTURE/home/dot_claude/skills/adopted" "$FAKE_HOME/.claude/skills/adopted"
+    printf 'managed source\n' > "$FIXTURE/home/dot_claude/skills/adopted/SKILL.md"
+    printf 'original local edits\n' > "$FAKE_HOME/.claude/skills/adopted/SKILL.md"
+    cp "$REPO/home/run_onchange_before_skill-ownership.sh.tmpl" "$FIXTURE/home/"
+    jq '.skills.adopted = {skillFolderHash: "prior"}' "$FAKE_HOME/.agents/.skill-lock.json" > "$BATS_TEST_TMPDIR/receipt"
+    mv "$BATS_TEST_TMPDIR/receipt" "$FAKE_HOME/.agents/.skill-lock.json"
+    printf '[data]\n' > "$BATS_TEST_TMPDIR/chezmoi.toml"
+
+    run env HOME="$FAKE_HOME" DF_USE_PLAT=0 PATH="$STUB_BIN:$PATH" \
+        chezmoi --source "$FIXTURE/home" --destination "$FAKE_HOME" \
+        --config "$BATS_TEST_TMPDIR/chezmoi.toml" \
+        --persistent-state "$BATS_TEST_TMPDIR/chezmoi-state.boltdb" apply --force
+    [ "$status" -eq 0 ]
+    grep -Fxq 'managed source' "$FAKE_HOME/.claude/skills/adopted/SKILL.md"
+    local archived
+    archived="$(printf '%s\n' "$FAKE_HOME"/.local/state/dotfiles/skill-backups/*/adopted/SKILL.md)"
+    grep -Fxq 'original local edits' "$archived"
+    jq -e '.skills.adopted == null and .skills.example != null' "$FAKE_HOME/.agents/.skill-lock.json"
+    [ ! -f "$CALLS" ]
+    run env HOME="$FAKE_HOME" DF_USE_PLAT=0 \
+        chezmoi --source "$FIXTURE/home" --destination "$FAKE_HOME" \
+        --config "$BATS_TEST_TMPDIR/chezmoi.toml" \
+        --persistent-state "$BATS_TEST_TMPDIR/chezmoi-state.boltdb" diff --exclude=scripts
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "bootstrap archives skill edits before its scripts-excluded chezmoi apply" {
+    mkdir -p "$FIXTURE/home/dot_claude/skills/adopted" "$FAKE_HOME/.claude/skills/adopted"
+    printf 'managed source\n' > "$FIXTURE/home/dot_claude/skills/adopted/SKILL.md"
+    printf 'original local edits\n' > "$FAKE_HOME/.claude/skills/adopted/SKILL.md"
+    printf '#!/bin/sh\nexit 91\n' > "$FIXTURE/home/run_before_should-not-run.sh"
+    jq '.skills.adopted = {skillFolderHash: "prior"}' "$FAKE_HOME/.agents/.skill-lock.json" > "$BATS_TEST_TMPDIR/receipt"
+    mv "$BATS_TEST_TMPDIR/receipt" "$FAKE_HOME/.agents/.skill-lock.json"
+    awk '/^log_section "2 — dotfiles/ {capture=1} capture {print} /^log_okay "Dotfiles applied"/ {exit}' \
+        "$REPO/bootstrap.sh" > "$BATS_TEST_TMPDIR/dotfiles-phase.sh"
+
+    run env HOME="$FAKE_HOME" DF_USE_PLAT=0 PATH="$STUB_BIN:$PATH" \
+        DF_PATH="$FIXTURE" DF_INSTALL_DIR="$FIXTURE/install" \
+        DF_NAME="Test User" DF_EMAIL="test@example.com" CHEZMOI_BIN="$(command -v chezmoi)" \
+        bash -eu -c '
+            log_section() { :; }; log_info() { :; }; log_okay() { :; }
+            ensure_dir() { mkdir -p "$1"; }
+            source "$1"
+        ' _ "$BATS_TEST_TMPDIR/dotfiles-phase.sh"
+    [ "$status" -eq 0 ]
+    grep -Fxq 'managed source' "$FAKE_HOME/.claude/skills/adopted/SKILL.md"
+    local archived
+    archived="$(printf '%s\n' "$FAKE_HOME"/.local/state/dotfiles/skill-backups/*/adopted/SKILL.md)"
+    grep -Fxq 'original local edits' "$archived"
+    [ ! -f "$CALLS" ]
+    run env HOME="$FAKE_HOME" DF_USE_PLAT=0 chezmoi diff --exclude=scripts
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}

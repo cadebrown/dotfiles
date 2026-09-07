@@ -13,3 +13,6 @@ plugin-eval@openai-curated
 # User project mix: full-stack web, games
 build-web-apps@openai-curated
 game-studio@openai-curated
+
+# Structured design context and canvas operations; account connection is separate.
+figma@openai-curated-remote

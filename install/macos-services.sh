@@ -16,6 +16,25 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
+_start_ollama_formula() {
+    if ! has brew || ! brew list ollama >/dev/null 2>&1; then
+        log_fail "Ollama's Homebrew formula is missing — run install/homebrew.sh"
+        return 1
+    fi
+    if pgrep -u "$(id -u)" -f '^/Applications/Ollama.app/Contents/Resources/ollama( |$)' >/dev/null; then
+        log_fail "Ollama.app owns the running server; quit it before starting the Homebrew service"
+        return 1
+    fi
+    if brew services list 2>/dev/null | grep -q '^ollama.*started'; then
+        log_okay "ollama already running as a brew service"
+    else
+        run_logged brew services start ollama || return 1
+        log_okay "ollama Homebrew service registered"
+    fi
+}
+
+[[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
+
 log_section "Services (auto-start)"
 
 [[ "$OS" == "darwin" ]] || { log_info "Not macOS — no services to configure"; exit 0; }
@@ -109,32 +128,12 @@ unset -f _set_colima_ssh_config_false _configure_colima_ssh
 
 ### ollama ###
 # Local LLM inference server — OpenAI-compatible API on localhost:11434.
-# Two install paths:
-#   - Homebrew formula (`brew install ollama`): managed via `brew services`
-#   - macOS app (/Applications/Ollama.app): manages its own LaunchAgent
+# The Brewfile formula owns the server and its service lifecycle.
 
 if [[ "$DF_START_LOCAL_SERVICES" != "1" ]]; then
     log_okay "ollama auto-start disabled (DF_START_LOCAL_SERVICES=0) — 'ollama serve' to run manually"
-elif has ollama; then
-    if [[ -d "/Applications/Ollama.app" ]]; then
-        # App install handles its own LaunchAgent — brew services is irrelevant here.
-        # Checking brew first was wrong: the app's agent can appear in brew services
-        # output as "started", giving a misleading "brew service" log message.
-        log_okay "ollama installed as macOS app (manages its own LaunchAgent)"
-    elif brew services list 2>/dev/null | grep -q '^ollama.*started'; then
-        log_okay "ollama already running as a brew service"
-    elif brew list ollama &>/dev/null 2>&1; then
-        log_info "Starting ollama service (auto-start at login)"
-        if run_logged brew services start ollama; then
-            log_okay "ollama service registered"
-        else
-            log_warn "ollama service start failed — run 'brew services start ollama' manually"
-        fi
-    else
-        log_warn "ollama found but source unknown — start manually: ollama serve"
-    fi
 else
-    log_warn "ollama not found — skipping (run install/homebrew.sh first)"
+    _start_ollama_formula || die "could not start the declared Ollama service"
 fi
 
 ### mlxserve (mlx-openai-server) ###

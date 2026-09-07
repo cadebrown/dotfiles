@@ -15,6 +15,15 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
+_mode="${1:-install}"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    case "$_mode" in
+        install|sync-mcp) ;;
+        *) die "Usage: claude.sh [install|sync-mcp]" ;;
+    esac
+fi
+
+if [[ "${BASH_SOURCE[0]}" == "$0" && "$_mode" == install ]]; then
 log_section "Claude Code"
 
 ### Binary install ###
@@ -244,9 +253,9 @@ if [[ "${DF_MODE:-}" == "upgrade" ]]; then
     (( _update_fail == 0 )) || die "Claude plugin update failed for $_update_fail declared plugin(s)"
 fi
 
-### MCP SERVERS (all platforms) ###
+fi
 
-log_section "Claude Code MCP servers"
+### MCP SERVERS (all platforms) ###
 
 # Servers are reconciled declaratively: build the desired JSON shape for each
 # list entry, compare it field-by-field against what's stored in ~/.claude.json,
@@ -323,8 +332,15 @@ _server_matches() {
 
 # Replace (or create) server $1 with desired JSON $2.
 _register_server() {
-    claude mcp remove "$1" -s user >/dev/null 2>&1 || true
-    run_logged claude mcp add-json -s user "$1" "$2"
+    local _name="$1" _desired="$2"
+    if [[ -f "$HOME/.claude.json" ]]; then
+        _desired="$(jq -c --arg name "$_name" --argjson desired "$_desired" '
+            (.mcpServers[$name] // {}
+             | del(.type,.url,.command,.args,.headers,.headersHelper,.oauth)) + $desired
+        ' "$HOME/.claude.json")" || return 1
+    fi
+    claude mcp remove "$_name" -s user >/dev/null 2>&1 || true
+    run_logged claude mcp add-json -s user "$_name" "$_desired"
 }
 
 _register_mcps() {
@@ -332,8 +348,9 @@ _register_mcps() {
     # this function only builds Claude's desired shape + reconciles it.
     log_info "Reading MCP servers (packages/mcp-servers.txt + overlays)"
     local _name _kind _transport _cmd _url _auth_source _codex_client_id
-    local _profile _risk _extra _client_id
+    local _profile _risk _extra _client_id _entries
     mcp_registry_validate || die "invalid MCP registry"
+    _entries="$(mcp_servers_for_config "$HOME/.claude.json" mcpServers)" || return 1
     while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
        && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth_source \
        && IFS= read -r _codex_client_id && IFS= read -r _profile \
@@ -351,6 +368,16 @@ _register_mcps() {
             if [[ "$_url" == *'{'*'}'* ]]; then
                 if ! _missing="$(mcp_url_substitute "$_url")"; then
                     log_warn "  $_name: \$$_missing unset — run 'bash install/auth.sh $_name'; skipping"
+                    if [[ -f "$HOME/.claude.json" ]] && jq -e --arg name "$_name" \
+                        '.mcpServers | has($name)' "$HOME/.claude.json" >/dev/null; then
+                        if ! claude mcp remove "$_name" -s user >/dev/null 2>&1 \
+                            || jq -e --arg name "$_name" '.mcpServers | has($name)' \
+                                "$HOME/.claude.json" >/dev/null; then
+                            log_warn "  fail  $_name (could not remove unavailable URL credential)"
+                            (( _fail++ )) || true
+                            continue
+                        fi
+                    fi
                     (( _skip++ )) || true
                     continue
                 fi
@@ -449,9 +476,12 @@ _register_mcps() {
             log_warn "  fail  $_name"
             (( _fail++ )) || true
         fi
-    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .profile, .risk, .extras')
+    done < <(printf '%s\n' "$_entries" | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .profile, .risk, .extras')
 }
 
+[[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
+
+log_section "Claude Code MCP servers"
 _ok=0 _skip=0 _fail=0
 
 if has jq; then
@@ -461,6 +491,8 @@ if has jq; then
 else
     die "jq not found — MCP server declarations cannot be reconciled"
 fi
+
+[[ "$_mode" == sync-mcp ]] && exit 0
 
 ### OVERLAY SKILLS ###
 

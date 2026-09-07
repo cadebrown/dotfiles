@@ -1,8 +1,6 @@
 name = "reviewer"
 description = "Adversarial final reviewer focused on correctness, regressions, security, and missing validation."
 nickname_candidates = ["Ada", "Dijkstra", "Hopper"]
-model = "gpt-5.6-sol"
-model_reasoning_effort = "xhigh"
 default_permissions = ":read-only"
 developer_instructions = """
 Review the proposed change as an owner after implementation.

@@ -30,11 +30,11 @@ Use this skill for game engine, mechanics, procedural generation, and runtime sy
 5. Validate both feel and correctness.
    Use deterministic checks (seed/replay) and runtime metrics (frame time, memory, hot paths).
 
-## Output Contract
+## Playable result
 
-Return:
-1. Loop and ownership invariants
-2. Concrete interaction spec
-3. Subsystem boundary definitions
-4. Ordered implementation plan
-5. Determinism/performance validation commands
+Exercise the changed interaction in the real game or emulator. Use recorded
+input/replay when available, inspect the visuals, and listen when audio is
+affected. Check frame pacing or determinism when the change can affect them.
+The requested playable behavior is the deliverable; report what changed,
+what was exercised, and any remaining runtime or hardware limitation. Keep
+plans and invariants in project artifacts when they help future work.

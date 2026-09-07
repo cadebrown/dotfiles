@@ -27,14 +27,15 @@ Use this skill for website/full-stack tasks that must move quickly without losin
 4. Generalize only after the slice passes checks.
    Extend patterns to adjacent routes/components without changing core invariants.
 
-5. Validate with commands, not claims.
-   Use targeted test/build/lint/run commands and include expected pass criteria.
+5. Exercise the actual user flow.
+   Run the appropriate project checks, then interact with the page in a browser.
+   Inspect relevant viewport sizes, loading/error states, and the visual result.
 
-## Output Contract
+## Working result
 
-Return:
-1. First-principles summary (3-5 lines)
-2. Concrete slice spec (inputs, outputs, failure modes)
-3. Interface/invariant list
-4. Ordered implementation steps
-5. Validation commands with expected outcomes
+Deliver the implemented flow and a usable preview when available. Use the
+available browser skill/tool for shared visual inspection and project browser
+automation for repeatable checks. Report what changed, the behavior exercised,
+and any material deployment or integration gap. Keep implementation plans and
+interface detail in project files when useful, without prescribing a report
+template for every request.

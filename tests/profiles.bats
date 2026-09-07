@@ -49,3 +49,39 @@ setup() {
     grep -q 'DF_PROFILE.*== "core"' "$REPO/install/rust.sh"
     grep -q 'skipping optional cargo.txt tools' "$REPO/install/rust.sh"
 }
+
+@test "rendered Linux login profiles start qmd without indexing the CASS archive" {
+    local test_home shell_name source_file rendered
+    test_home="$BATS_TEST_TMPDIR/home"
+    mkdir -p "$test_home/.local/bin"
+    cat > "$test_home/.local/bin/qmd" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >> "$HOME/qmd-calls"
+EOF
+    cat > "$test_home/.local/bin/cass" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >> "$HOME/cass-calls"
+EOF
+    cat > "$test_home/.local/bin/pgrep" <<'EOF'
+#!/bin/sh
+exit 1
+EOF
+    chmod +x "$test_home/.local/bin/"*
+    for shell_name in bash zsh; do
+        if [[ "$shell_name" == bash ]]; then
+            source_file=dot_bash_profile.tmpl
+        else
+            source_file=dot_zprofile.tmpl
+        fi
+        rendered="$BATS_TEST_TMPDIR/$shell_name-profile"
+        chezmoi --source "$REPO/home" \
+            --override-data '{"chezmoi":{"os":"linux"},"use_plat":false}' \
+            execute-template --file "$REPO/home/$source_file" > "$rendered"
+        run env HOME="$test_home" SSH_AUTH_SOCK=already_running \
+            "$shell_name" -f -c 'source "$1"; wait' _ "$rendered"
+        [ "$status" -eq 0 ]
+        [ ! -e "$test_home/cass-calls" ]
+    done
+    [ "$(wc -l < "$test_home/qmd-calls" | tr -d " ")" -eq 2 ]
+    [ "$(sort -u "$test_home/qmd-calls")" = 'mcp --http --daemon' ]
+}

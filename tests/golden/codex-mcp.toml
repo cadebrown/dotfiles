@@ -116,3 +116,27 @@ startup_timeout_sec = 20
 tool_timeout_sec = 60
 required = false
 default_tools_approval_mode = "approve"
+
+[mcp_servers.scitesrv]
+enabled = false
+url = "https://scite.example/mcp"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"
+
+[mcp_servers.biomedsrv]
+enabled = false
+url = "https://biomed.example/mcp"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "approve"
+
+[mcp_servers.publishsrv]
+enabled = false
+url = "https://publish.example/mcp"
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+required = false
+default_tools_approval_mode = "writes"

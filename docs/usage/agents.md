@@ -121,22 +121,62 @@ plugins/config, qmd, cass, the managed Python/SymPy environment, and the live qm
 LaunchAgent on macOS. When `dotfiles-nvidia` is present, it also runs the
 overlay's final runtime verifier, including ComputeLab and internal MCP tools.
 
-## Model and safety defaults
+## Codex workbench
 
-- Codex defaults to GPT-5.6 Sol at high reasoning. `deep` raises reasoning to
-  extra-high, `fast` uses GPT-5.6 Luna at low reasoning, and `review` is read-only.
-- Codex defaults to the built-in `:danger-full-access` profile with approval policy
-  `never`. All MCP and connector tools, including destructive and open-world tools,
-  run without prompts.
+Codex defaults to GPT-6 Astra at extra-high reasoning. Use the base task for
+normal work, then select one profile when its narrow purpose matches the job:
+
+| Command | Intended use |
+|---|---|
+| `codex -p deep` | Astra with medium verbosity for a demanding implementation or research task. |
+| `codex -p review` | Astra with read-only filesystem permissions for review and exploration. |
+| `codex -p fast` | GPT-5.6 Luna at low reasoning for quick, low-risk iteration. |
+| `codex -p context` | Astra with experimental context management. It requires a supported client and a ChatGPT Plus or Pro sign-in; it is not an API, Business, or Enterprise feature. |
+
+The base configuration enables only the small, general MCP set: GitHub, OpenAI
+developer docs, Context7, qmd, Rust docs, and crates.io. Domain profiles inherit
+that base and add one task surface:
+
+| Command | Adds |
+|---|---|
+| `codex -p browser` | Chrome DevTools MCP for browser debugging. |
+| `codex -p creative` | The pinned Blender bridge. |
+| `codex -p desktop` | Scriptable macOS-app automation. |
+| `codex -p research` | Web and scholarly research sources. |
+| `codex -p math` | Lean, theorem-search, and Wolfram tools. |
+| `codex -p cloud` | Cloudflare and Google Cloud tools. |
+| `codex -p workspace` | Google Workspace tools. |
+| `codex -p tools-all` | Every declared MCP; use only when its added context and authority are intentional. |
+
+Codex accepts one `-p` overlay per invocation. Treat it as a session choice:
+browser work uses `browser`, Blender work uses `creative`, and so on. When a
+project actually needs several domains at baseline, select the precise set with
+`DF_MCP_PROFILES=browser:creative` while running
+`bash ~/dotfiles/install/codex.sh sync-config`; rerun without that variable to
+return Codex's base activation to the core set. Claude Code, OpenCode, and
+Cursor preserve optional registry MCPs already activated there; profile
+selection determines which new ones a sync adds. Start a new task after a
+change to an MCP pin, environment, or activation, since an existing task keeps
+its original tool inventory and may retain an old subprocess. The registry and
+generated profiles live in
+[`packages/mcp-servers.txt`](../../packages/mcp-servers.txt) and
+[`install/codex-config.py`](../../install/codex-config.py).
+
+Codex uses unrestricted local shell permissions with approval policy `never`,
+but MCP servers carry their own risk policy. Read-only servers run automatically;
+local-write servers use `approve`, and external-write servers use Codex's
+`writes` approval mode. Connector and account authorization remain separate
+from shell permissions.
+
+## Other harnesses
+
 - Claude Code defaults to Claude Fable 5 with extra-high effort,
   `bypassPermissions`, and its OS sandbox disabled.
 - OpenCode uses Fable for planning, local Qwen3.6 for builds on macOS, and a
-  read-only Sonnet 5 review subagent. Plan/build agents and all MCP tools use the
-  global `allow` policy; its shell wrapper also passes `--auto`. Review rejects
-  unmatched shell commands without asking.
+  read-only Sonnet 5 review subagent. Its generated MCP configuration follows the
+  selected registry profiles; permissions are scoped per agent.
 - Cursor CLI permits every shell command, Cursor's Claude extension starts in
-  bypass mode, Claude Desktop permits all browser actions, and Codex Desktop skips
-  its full-access confirmation.
+  bypass mode, and Codex Desktop has its own app integrations and account gates.
 
 The chezmoi source guard still blocks edits to rendered targets when an authoritative
 source exists under `home/`. That is a correctness invariant, not an approval gate.
@@ -159,7 +199,9 @@ That is why it lives at `~/.cass` rather than under `~/.cache`. qmd keeps a
 persistent MCP daemon, but cass indexing is manual on every platform so a large
 session archive never blocks bootstrap or consumes resources on a schedule.
 
-Run `bash install/memory.sh index` for a lexical refresh. Run
+qmd stays warm as a query service. cass indexing is deliberately **manual**:
+the shell profiles and installer do not schedule an archive scan. Run
+`bash install/memory.sh index` for a lexical refresh. Run
 `bash install/memory.sh semantic` for one resumable 64-conversation semantic
 batch; repeat it when you want more history embedded. After bulk changes,
 `bash install/memory.sh reindex` forces the qmd embedding and cass lexical

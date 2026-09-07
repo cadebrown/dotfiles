@@ -5,8 +5,9 @@
 # Stdio format:  <name> stdio [profile=<name>] [risk=<risk>] cmd: <command...>
 #
 # profile defaults to core. Select opt-in profiles with DF_MCP_PROFILES as a
-# colon/comma/space-separated list; the reserved rollout profiles are
-# research-scite, biomed, and publish. risk defaults to read and accepts read,
+# colon/comma/space-separated list. Codex also generates named domain profiles
+# and a tools-all profile, keeping the full catalog available without a resync.
+# risk defaults to read and accepts read,
 # local-write, or external-write. Codex maps external-write servers to its
 # official `writes` approval mode: reads stay automatic, mutating tools ask.
 #
@@ -71,7 +72,7 @@
 # All four harnesses use OAuth (Cloudflare's AS advertises CIMD + DCR). Codex
 # needs 0.147.0+ — earlier versions dropped the RFC 9207 callback issuer
 # (openai/codex#31573); run `codex mcp login cloudflare` once after upgrading.
-cloudflare http https://mcp.cloudflare.com/mcp risk=external-write
+cloudflare http https://mcp.cloudflare.com/mcp profile=cloud risk=external-write
 
 # GitHub: PRs, issues, repo search, code review.
 # OAuth/DCR is unsupported by GitHub's IdP, so we authenticate via gh CLI.
@@ -85,11 +86,11 @@ openaiDeveloperDocs http https://developers.openai.com/mcp
 context7 http https://mcp.context7.com/mcp auth=context7
 
 # DeepWiki: Devin-generated architecture wikis + Q&A for any public GitHub repo (no auth)
-deepwiki http https://mcp.deepwiki.com/mcp
+deepwiki http https://mcp.deepwiki.com/mcp profile=research
 
 # Chrome DevTools: drive/inspect a live Chrome — network, console, performance
 # traces. Google's official server; gracefully useless on machines without Chrome.
-chrome-devtools stdio risk=external-write cmd: npx -y chrome-devtools-mcp@latest
+chrome-devtools stdio profile=browser risk=external-write cmd: npx -y chrome-devtools-mcp@1.8.0 --no-usage-statistics --no-performance-crux
 
 # qmd: semantic+lexical search over the markdown knowledge layers (~/kb,
 # Claude auto-memory, dotfiles docs). Talks to the warm local daemon
@@ -98,7 +99,7 @@ chrome-devtools stdio risk=external-write cmd: npx -y chrome-devtools-mcp@latest
 qmd http http://localhost:8181/mcp
 
 # Blender: control Blender via MCP (requires addon.py installed in Blender — see github.com/ahujasid/blender-mcp)
-blender stdio risk=local-write cmd: uvx blender-mcp
+blender stdio profile=creative risk=local-write cmd: env DISABLE_TELEMETRY=true uvx blender-mcp==1.9.1
 
 # Unity first-party MCP: NOT registered globally by design. It lives in the
 # com.unity.ai.assistant package (pre-release) — the editor auto-launches an MCP
@@ -107,19 +108,19 @@ blender stdio risk=local-write cmd: uvx blender-mcp
 # docs.unity3d.com/Packages/com.unity.ai.assistant@latest (unity-mcp-get-started).
 # Community fallback with play-mode tests/builds: github.com/CoplayDev/unity-mcp.
 
-# === Web search & data retrieval (always-on) ===
+# === Web search & data retrieval (research profile) ===
 # Tavily: LLM-tuned web search + extract + crawl + map in one server.
 # 1000 credits/mo free (no card). Bearer auth (TAVILY_API_KEY).
-tavily http https://mcp.tavily.com/mcp/ auth=tavily
+tavily http https://mcp.tavily.com/mcp/ auth=tavily profile=research
 
 # Exa: neural/semantic web search + crawling — best recall for research queries.
 # x-api-key header (EXA_API_KEY).
-exa http https://mcp.exa.ai/mcp auth=exa
+exa http https://mcp.exa.ai/mcp auth=exa profile=research
 
 # Hugging Face: official remote MCP (streamable HTTP, stateless) — model/
 # dataset/Space/paper search + HF doc search. Anonymous works (rate-limited,
 # standard toolset); HF_TOKEN unlocks account-scoped tools + quota.
-huggingface http https://huggingface.co/mcp auth=hf risk=external-write
+huggingface http https://huggingface.co/mcp auth=hf profile=research risk=external-write
 
 # === Rust development (local stdio, keyless) ===
 # rust-docs: item-level rustdoc JSON + crate source exploration — deeper than
@@ -133,7 +134,7 @@ crates stdio cmd: cratesio-mcp
 
 # Firecrawl: best-in-class deep crawl + structured extraction (scrape, crawl,
 # map, extract). Key rides in the URL path (FIRECRAWL_API_KEY).
-firecrawl http https://mcp.firecrawl.dev/{FIRECRAWL_API_KEY}/v2/mcp
+firecrawl http https://mcp.firecrawl.dev/{FIRECRAWL_API_KEY}/v2/mcp profile=research
 
 # === Google Cloud: official remote MCP servers (auth=gcloud / ADC) ===
 # Google's own managed MCP endpoints (announced Dec 2025, expanded at Next '26),
@@ -144,10 +145,10 @@ firecrawl http https://mcp.firecrawl.dev/{FIRECRAWL_API_KEY}/v2/mcp
 # cover nollege deploys; Storage + BigQuery for data. Needs: gcloud services
 # enable run.googleapis.com cloudresourcemanager.googleapis.com
 # storage.googleapis.com bigquery.googleapis.com (auth.sh google offers this).
-cloud-run        http https://run.googleapis.com/mcp                   auth=gcloud risk=external-write
-cloud-resmgr     http https://cloudresourcemanager.googleapis.com/mcp  auth=gcloud risk=external-write
-cloud-storage    http https://storage.googleapis.com/storage/mcp       auth=gcloud risk=external-write
-bigquery         http https://bigquery.googleapis.com/mcp              auth=gcloud risk=external-write
+cloud-run        http https://run.googleapis.com/mcp                   auth=gcloud profile=cloud risk=external-write
+cloud-resmgr     http https://cloudresourcemanager.googleapis.com/mcp  auth=gcloud profile=cloud risk=external-write
+cloud-storage    http https://storage.googleapis.com/storage/mcp       auth=gcloud profile=cloud risk=external-write
+bigquery         http https://bigquery.googleapis.com/mcp              auth=gcloud profile=cloud risk=external-write
 
 # === Google Workspace: community server (full read+WRITE) ===
 # taylorwilsdon/google_workspace_mcp — full Gmail (incl. send), Calendar (create/
@@ -166,42 +167,42 @@ bigquery         http https://bigquery.googleapis.com/mcp              auth=gclo
 # lets the localhost callback (http://localhost:8000/oauth2callback) complete.
 # Registers inert until ~/.google.env exists — harmless, like chrome-devtools
 # without Chrome.
-google-workspace stdio risk=external-write cmd: env OAUTHLIB_INSECURE_TRANSPORT=1 uvx workspace-mcp --tools gmail drive calendar
+google-workspace stdio profile=workspace risk=external-write cmd: env OAUTHLIB_INSECURE_TRANSPORT=1 uvx workspace-mcp==1.26.0 --tools gmail drive calendar
 
 # === Desktop automation (macOS) ===
 # macos-automator: run AppleScript/JXA — control any Mac app (Finder, Mail,
 # Safari, Music, System Events…). No auth; broad local power, so review prompts.
 # Needs Automation + Accessibility grants on first use (System Settings → Privacy).
-macos-automator stdio risk=external-write cmd: npx -y @steipete/macos-automator-mcp@latest
+macos-automator stdio profile=desktop risk=external-write cmd: npx -y @steipete/macos-automator-mcp@0.4.7
 
 # === Research mathematics ===
 # lean-lsp: Lean 4 LSP bridge (oOo0oOo/lean-lsp-mcp) — goal states, diagnostics,
 # multi-attempt tactics, axiom audit (lean_verify), LeanSearch/Loogle/LeanFinder/
 # LeanHammer search. The lean4 plugin's subagents expect these tools. Pinned;
 # bump deliberately (uvx re-resolves on version change).
-lean-lsp stdio risk=local-write cmd: uvx lean-lsp-mcp==0.29.0
+lean-lsp stdio profile=math risk=local-write cmd: uvx lean-lsp-mcp==0.30.0
 
 # arxiv: paper search + LaTeX source retrieval BY SECTION (blazickjp/arxiv-mcp-server)
 # — source-level access matters for math papers; generic web-search MCPs can't do it.
-arxiv stdio cmd: uvx arxiv-mcp-server
+arxiv stdio profile=research cmd: uvx arxiv-mcp-server==0.7.2
 
 # mathlas: no-LLM verification tools — theorem search (3.68M docs), verify_formal
 # against a real Lean kernel, PSLQ constant identification, exact OEIS matching.
 # Young solo-maintainer project — drop if it misbehaves.
-mathlas stdio cmd: uvx mathlas-mcp
+mathlas stdio profile=math cmd: uvx mathlas-mcp==1.5.0
 
 # asta: Ai2's official scholarly-corpus MCP (Semantic Scholar successor) — 200M+
 # papers, dense snippet search, citation graph. Free key via the Ai2 form:
 # https://allenai.org/asta/resources/mcp → `bash install/auth.sh asta`.
 # Registers unauthenticated until ~/.asta.env exists.
-asta http https://asta-tools.allen.ai/mcp/v1 auth=asta
+asta http https://asta-tools.allen.ai/mcp/v1 auth=asta profile=research
 
 # lean-explore: semantic search across Lean libraries beyond Mathlib (CLI itself
 # is in pip.txt). The API backend is keyless as of 1.29 (--api-key is accepted
 # and ignored). The local backend needs a 3.7 GB `lean-explore data fetch` whose
 # CDN is blocked on filtered corporate DNS — it writes the block page and exits
 # 0, so the failure only shows up later as "Essential data files are missing".
-lean-explore stdio cmd: uvx lean-explore mcp serve --backend api
+lean-explore stdio profile=math cmd: uvx lean-explore==1.3.0 mcp serve --backend api
 
 # Scite: official Smart Citations MCP. The remote endpoint supports OAuth 2.0
 # discovery and dynamic client registration, so no static secret belongs here.
@@ -214,4 +215,4 @@ scite http https://api.scite.ai/mcp profile=research-scite risk=external-write
 # in-kernel computation. Wrapper script (chezmoi: dot_local/bin/wolfram-mcp)
 # because the kernel path contains spaces. Needs an activated Wolfram Engine
 # + PacletInstall["Wolfram/AgentTools"]; registers inert otherwise.
-wolfram stdio risk=local-write cmd: wolfram-mcp
+wolfram stdio profile=math risk=local-write cmd: wolfram-mcp

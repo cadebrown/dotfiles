@@ -1,0 +1,8 @@
+# `codex -p context` starts a new Astra task with experimental context management.
+# Requires a supported client and ChatGPT Plus/Pro sign-in; not API/Business/Enterprise.
+# https://learn.chatgpt.com/docs/models#experimental-context-management
+model = "gpt-6-astra"
+model_reasoning_effort = "xhigh"
+
+[features.context_management]
+experimental_mode = true

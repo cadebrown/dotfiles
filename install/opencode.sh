@@ -27,12 +27,13 @@ _mode="${1:-install}"
 # Schema: local  {type:"local",  command:[...], enabled}
 #         remote {type:"remote", url, headers?, enabled}
 _emit_opencode_mcp() {
-    local _stream _name _kind _transport _cmd _url _auth _ccid _profile _risk _extras _def
+    local _stream _name _kind _transport _cmd _url _auth _ccid _profile _risk _extras _def _entries
     # No `trap ... RETURN` cleanup: bash fires RETURN traps when any sourced
     # script finishes, which would delete the accumulator mid-loop if a
     # `source` ever lands in this function (bit install/cursor.sh for real).
     _stream="$(mktemp)"
     mcp_registry_validate || die "invalid MCP registry"
+    _entries="$(mcp_servers_for_config "$HOME/.config/opencode/opencode.json" mcp)" || return 1
 
     # Entries come from the shared parser (mcp_servers_each in _lib.sh);
     # this function only renders opencode's schema + auth policy.
@@ -60,7 +61,7 @@ _emit_opencode_mcp() {
             esac
         fi
         jq -nc --arg n "$_name" --argjson def "$_def" '{name:$n, def:$def}' >> "$_stream"
-    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .profile, .risk, .extras')
+    done < <(printf '%s\n' "$_entries" | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .profile, .risk, .extras')
 
     jq -s 'reduce .[] as $e ({}; .[$e.name] = $e.def)' "$_stream"
     rm -f "$_stream"
@@ -72,14 +73,21 @@ _sync_config() {
     has chezmoi || die "chezmoi missing — cannot generate opencode config"
 
     local _tmpl="$DF_ROOT/home/dot_config/opencode/create_private_opencode.json.tmpl"
-    local _out="$HOME/.config/opencode/opencode.json" _base _mcp _tmp
+    local _out="$HOME/.config/opencode/opencode.json" _base _mcp _tmp _existing='{}'
     [[ -f "$_tmpl" ]] || die "missing opencode template: $_tmpl"
 
     _base="$(chezmoi execute-template < "$_tmpl")" || die "chezmoi execute-template failed for opencode"
     _mcp="$(_emit_opencode_mcp)"
+    [[ ! -f "$_out" ]] || _existing="$(jq -ce . "$_out")" || return 1
 
     _tmp="$(mktemp)"
-    printf '%s' "$_base" | jq --argjson mcp "$_mcp" '.mcp = $mcp' > "$_tmp" \
+    printf '%s' "$_base" | jq --argjson mcp "$_mcp" --argjson existing "$_existing" '
+        ($existing.mcp // {}) as $old
+        | .mcp = (reduce ($mcp | to_entries[]) as $e ($old;
+            .[$e.key] = (($old[$e.key] // {} | del(.type,.command,.url,.headers,.enabled)) + $e.value
+                + (if ($old[$e.key].enabled | type) == "boolean"
+                   then {enabled:$old[$e.key].enabled} else {} end))))
+    ' > "$_tmp" \
         || { log_fail "opencode config assembly failed"; rm -f "$_tmp"; return 1; }
 
     ensure_dir "$HOME/.config/opencode"
@@ -102,7 +110,7 @@ case "$_mode" in
         if has opencode && tool_entrypoint_healthy "$(command -v opencode)"; then
             log_okay "opencode: $(opencode --version 2>/dev/null | head -1)"
         else
-            die "opencode is missing or unhealthy — install the Brewfile declaration first"
+            die "opencode is missing or unhealthy — run install/node.sh first"
         fi
         _sync_config
         ;;

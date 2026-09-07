@@ -470,6 +470,17 @@ mcp_registry_validate() {
     mcp_servers_each --all >/dev/null
 }
 
+# Reconcile selected profiles and previously activated registry entries together.
+mcp_servers_for_config() {
+    local _file="$1" _key="$2" _existing='{}' _selected
+    if [[ -f "$_file" ]]; then
+        _existing="$(jq -ce --arg key "$_key" '.[$key] // {} | objects' "$_file")" || return 1
+    fi
+    _selected="$(mcp_servers_each | jq -sc 'map(.name)')" || return 1
+    mcp_servers_each --all | jq -c --argjson old "$_existing" --argjson selected "$_selected" '
+        select(.name as $name | ($selected | index($name)) != null or ($old | has($name)))'
+}
+
 # mcp_url_substitute URL — expand every {VAR} placeholder from the
 # environment (env files are sourced globally by this library). On success
 # prints the substituted URL and returns 0. On the first unset VAR prints
@@ -680,23 +691,36 @@ activate_homebrew() {
     has brew
 }
 
-# qmd MCP daemon lifecycle (Linux / no-launchd path; macOS uses the launchd
-# agent instead). The daemon mmaps native addons (sqlite-vec, node-llama-cpp,
-# better-sqlite3). On an NFS home a global `npm install -g @tobilu/qmd` fails
-# with EBUSY: deleting a file the daemon holds open silly-renames it to
-# .nfsXXXX and keeps it until the fd closes, so npm can't unlink the old tree.
-# node.sh stops the daemon around the upgrade; node.sh + memory.sh + the shell
-# profiles start it. Shared here so the start command has one definition.
+# Stop the service before replacing its runtime or mmap'd native dependencies.
+qmd_daemon_pids() {
+    pgrep -u "$(id -u)" -f "qmd[^ ]* mcp --http"
+}
+
 qmd_daemon_running() {
-    # The daemonized process re-execs as ".../qmd.js mcp --http" (not
-    # ".../qmd mcp ..."), so allow an optional non-space suffix after "qmd".
-    # A bare "qmd mcp --http" pattern only matches the transient launcher.
-    pgrep -f "qmd[^ ]* mcp --http" >/dev/null 2>&1
+    qmd_daemon_pids >/dev/null 2>&1
+}
+
+qmd_daemon_runtime_current() {
+    local _bin _pids _pid _command
+    _bin="$(resolve_nvm_default_bin)" || return 1
+    _pids="$(qmd_daemon_pids)" || return 1
+    while IFS= read -r _pid; do
+        _command="$(ps -p "$_pid" -o command=)" || return 1
+        case "$_command" in
+            *"$_bin/qmd mcp --http"*|"$_bin/node ${_bin%/bin}/lib/node_modules/@tobilu/qmd/"*" mcp --http"*) ;;
+            *) return 1 ;;
+        esac
+    done <<< "$_pids"
 }
 
 qmd_daemon_stop() {
+    if [[ "$OS" == "darwin" ]] \
+        && launchctl print "gui/$(id -u)/dev.cade.qmd" >/dev/null 2>&1; then
+        plutil -lint "$HOME/Library/LaunchAgents/dev.cade.qmd.plist" >/dev/null || return 1
+        launchctl bootout "gui/$(id -u)/dev.cade.qmd" || return 1
+    fi
     qmd_daemon_running || return 0
-    pkill -TERM -f "qmd[^ ]* mcp --http" 2>/dev/null || true
+    pkill -TERM -u "$(id -u)" -f "qmd[^ ]* mcp --http" 2>/dev/null || true
     local _i
     _i=0
     while (( _i < 50 )); do
@@ -705,19 +729,34 @@ qmd_daemon_stop() {
         (( _i++ )) || true
     done
     # Still holding fds after 5s — force it so NFS can reap the .nfs* files.
-    pkill -KILL -f "qmd[^ ]* mcp --http" 2>/dev/null || true
+    pkill -KILL -u "$(id -u)" -f "qmd[^ ]* mcp --http" 2>/dev/null || true
     _i=0
     while (( _i < 20 )); do
         qmd_daemon_running || break
         sleep 0.1
         (( _i++ )) || true
     done
+    ! qmd_daemon_running
 }
 
 qmd_daemon_start() {
     has qmd || return 1
     qmd_daemon_running && return 0
-    (qmd mcp --http --daemon >/dev/null 2>&1 &)
+    if [[ "$OS" == "darwin" ]]; then
+        local _label _plist
+        _label="gui/$(id -u)/dev.cade.qmd"
+        _plist="$HOME/Library/LaunchAgents/dev.cade.qmd.plist"
+        [[ -f "$_plist" ]] || return 1
+        plutil -lint "$_plist" >/dev/null || return 1
+        launchctl enable "$_label" || return 1
+        if launchctl print "$_label" >/dev/null 2>&1; then
+            launchctl kickstart -k "$_label"
+        else
+            launchctl bootstrap "gui/$(id -u)" "$_plist"
+        fi
+    else
+        (qmd mcp --http --daemon >/dev/null 2>&1 &)
+    fi
 }
 
 _qmd_daemon_healthy() {

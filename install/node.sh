@@ -96,6 +96,18 @@ _restart_qmd_after_node_exit() {
     exit "$_rc"
 }
 
+_npm_install() {
+    case "$1" in
+        @tobilu/qmd|@tobilu/qmd@*)
+            if qmd_daemon_running; then
+                qmd_daemon_stop || return 1
+                _qmd_stopped=1
+            fi
+            ;;
+    esac
+    run_logged "${_npm_install_cmd[@]}" "$@"
+}
+
 # Source-guard: tests source this file for the helper above.
 [[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
 
@@ -228,6 +240,11 @@ _upgrade_count=0
 _qmd_stopped=0
 _npm_fail=0
 trap _restart_qmd_after_node_exit EXIT
+if qmd_daemon_running && ! qmd_daemon_runtime_current; then
+    log_info "Stopping qmd to adopt the selected Node runtime"
+    qmd_daemon_stop || die "could not stop qmd using the previous Node runtime"
+    _qmd_stopped=1
+fi
 while IFS= read -r pkg; do
     # Entries may pin a version ("<name>@1.2.3", scoped names keep their
     # leading @). Split at the LAST @ — a tail with "/" in it is the package
@@ -243,7 +260,7 @@ while IFS= read -r pkg; do
         if npm list -g "${_name}@${_pin}" --depth=0 &>/dev/null; then
             log_okay "  $_name@$_pin (pinned, installed)"
             if [[ "$_npm_repair" == "1" ]]; then
-                run_logged "${_npm_install_cmd[@]}" "${_name}@${_pin}"
+                _npm_install "${_name}@${_pin}"
             fi
             # Never SILENTLY stale: in upgrade mode, surface the pin-vs-latest
             # delta loudly so a held package is a visible decision, not a
@@ -257,25 +274,16 @@ while IFS= read -r pkg; do
             fi
         else
             log_info "  installing $_name@$_pin (pinned)"
-            run_logged "${_npm_install_cmd[@]}" "${_name}@${_pin}"
+            _npm_install "${_name}@${_pin}"
             log_okay "  $_name@$_pin"
             (( _pkg_count++ )) || true
         fi
     elif npm list -g "$_name" --depth=0 &>/dev/null; then
         if [[ "$_npm_repair" == "1" ]]; then
-            run_logged "${_npm_install_cmd[@]}" "$_name"
+            _npm_install "$_name"
         elif [[ "${DF_MODE:-}" == "upgrade" ]]; then
             log_info "  upgrading $_name"
-            # qmd runs a persistent MCP daemon that mmaps native addons; on an
-            # NFS home npm can't unlink them mid-upgrade (EBUSY on .nfs*
-            # silly-renames) while it runs. Stop it here, restart after the
-            # loop. Linux only — macOS uses launchd + a local FS (no EBUSY).
-            # See docs/usage/troubleshooting.md.
-            if [[ "$OS" == "linux" && "$_name" == "@tobilu/qmd" ]] && qmd_daemon_running; then
-                log_info "  stopping qmd daemon for safe upgrade (NFS EBUSY guard)"
-                qmd_daemon_stop && _qmd_stopped=1
-            fi
-            run_logged "${_npm_install_cmd[@]}" "$_name@latest"
+            _npm_install "$_name@latest"
             log_okay "  $_name (upgraded)"
             (( _upgrade_count++ )) || true
         else
@@ -283,7 +291,7 @@ while IFS= read -r pkg; do
         fi
     else
         log_info "  installing $_name"
-        run_logged "${_npm_install_cmd[@]}" "$_name"
+        _npm_install "$_name"
         log_okay "  $_name"
         (( _pkg_count++ )) || true
     fi
@@ -292,7 +300,7 @@ while IFS= read -r pkg; do
     if [[ -n "$_missing" ]]; then
         log_warn "  $_name is missing declared entrypoints (${_missing//$'\n'/, }) — reinstalling"
         _repair_failed=0
-        run_logged "${_npm_install_cmd[@]}" "$pkg" || _repair_failed=1
+        _npm_install "$pkg" || _repair_failed=1
         _missing="$(_npm_missing_bins "$_name")"
     else
         _repair_failed=0

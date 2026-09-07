@@ -12,6 +12,7 @@
 - [packages/](/Users/cade/dotfiles/packages): declarative package ownership across Brew, Cargo, npm, pip, and Claude-related lists
 - [tests/](/Users/cade/dotfiles/tests): Docker-based bats suite for bootstrap validation
 - [docs/](/Users/cade/dotfiles/docs): mdBook source for the docs site
+- [docs/usage/ai-workbench.md](/Users/cade/dotfiles/docs/usage/ai-workbench.md): operator guide for Codex profiles and browser, desktop, 3D, media, and long-running workflows
 - [infra/cloudflare/](/Users/cade/dotfiles/infra/cloudflare): OpenTofu for docs hosting
 
 ## Authoritative Files

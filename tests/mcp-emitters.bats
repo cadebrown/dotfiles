@@ -79,6 +79,118 @@ setup() {
     [[ "$output" == *"publishsrv"* ]]
 }
 
+@test "MCP migration selects existing optional entries without activating other profiles" {
+    source "$REPO_ROOT/install/_lib.sh"
+    mcp_fixture_env
+    printf '%s\n' '{"mcp":{"scitesrv":{},"custom":{}}}' > "$HOME/config.json"
+
+    run mcp_servers_for_config "$HOME/config.json" mcp
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"name":"scitesrv"'* ]]
+    [[ "$output" != *'"name":"biomedsrv"'* ]]
+    [[ "$output" != *'"name":"custom"'* ]]
+}
+
+@test "Claude reconciles activated optional servers and preserves custom entries and environment" {
+    source "$REPO_ROOT/install/claude.sh"
+    mcp_fixture_env
+    cat > "$HOME/.claude.json" <<'EOF'
+{"mcpServers":{
+  "scitesrv":{"type":"http","url":"https://old.example/mcp"},
+  "misskey":{"type":"http","url":"https://key.example/obsolete-secret/v2/mcp"},
+  "tool":{"type":"stdio","command":"old","args":[],"env":{"CUSTOM":"retained"}},
+  "custom":{"command":"mine","args":["custom-flag"]}
+}}
+EOF
+    claude() {
+        case "$1 $2" in
+            'mcp remove')
+                jq --arg n "$3" 'del(.mcpServers[$n])' "$HOME/.claude.json" > "$HOME/next.json"
+                ;;
+            'mcp add-json')
+                jq --arg n "$5" --argjson d "$6" '.mcpServers[$n]=$d' "$HOME/.claude.json" > "$HOME/next.json"
+                ;;
+            *) return 1 ;;
+        esac
+        mv "$HOME/next.json" "$HOME/.claude.json"
+    }
+    run_logged() { "$@"; }
+    _ok=0 _skip=0 _fail=0
+    _register_mcps >/dev/null
+    [ "$_fail" -eq 0 ]
+    jq -e '.mcpServers.scitesrv.url == "https://scite.example/mcp"
+        and .mcpServers.tool.command == "uvx"
+        and .mcpServers.tool.env.CUSTOM == "retained"
+        and .mcpServers.custom == {command:"mine",args:["custom-flag"]}
+        and (.mcpServers | has("misskey") | not)
+        and (.mcpServers | has("biomedsrv") | not)' "$HOME/.claude.json"
+    _ok=0 _skip=0 _fail=0
+    _register_mcps >/dev/null
+    [ "$_ok" -eq 0 ]
+    [ "$_fail" -eq 0 ]
+}
+
+@test "OpenCode sync preserves activated optional and custom MCP entries and disabled choices" {
+    source "$REPO_ROOT/install/opencode.sh"
+    mcp_fixture_env
+    mkdir -p "$HOME/.config/opencode"
+    cat > "$HOME/.config/opencode/opencode.json" <<'EOF'
+{"mcp":{
+  "scitesrv":{"type":"remote","url":"https://old.example/mcp","enabled":false,"timeout":9000},
+  "misskey":{"type":"remote","url":"https://key.example/obsolete-secret/v2/mcp","enabled":true},
+  "custom":{"type":"local","command":["mine"],"enabled":true}
+}}
+EOF
+    chezmoi() { printf '{}\n'; }
+    _sync_config >/dev/null
+    jq -e '.mcp.scitesrv.url == "https://scite.example/mcp"
+        and .mcp.scitesrv.enabled == false
+        and .mcp.scitesrv.timeout == 9000
+        and .mcp.custom == {type:"local",command:["mine"],enabled:true}
+        and .mcp.misskey.url == "https://key.example/{env:FIXTURE_MISSING}/v2/mcp"
+        and (.mcp | has("biomedsrv") | not)' "$HOME/.config/opencode/opencode.json"
+}
+
+@test "Claude reports a failure when it cannot remove an unavailable URL credential" {
+    source "$REPO_ROOT/install/claude.sh"
+    mcp_fixture_env
+    DF_PACKAGES="$HOME/packages"
+    mkdir -p "$DF_PACKAGES"
+    printf '%s\n' 'misskey http https://key.example/{FIXTURE_MISSING}/v2/mcp' > "$DF_PACKAGES/mcp-servers.txt"
+    printf '%s\n' '{"mcpServers":{"misskey":{"url":"https://key.example/obsolete-secret/v2/mcp"}}}' > "$HOME/.claude.json"
+    claude() { return 1; }
+    _ok=0 _skip=0 _fail=0
+    _register_mcps >/dev/null
+    [ "$_fail" -eq 1 ]
+    [ "$_skip" -eq 0 ]
+}
+
+@test "Cursor sync preserves optional and custom entries while refreshing managed commands" {
+    source "$REPO_ROOT/install/cursor.sh"
+    mcp_fixture_env
+    mkdir -p "$HOME/.cursor"
+    cat > "$HOME/.cursor/mcp.json" <<'EOF'
+{"userSetting":"retained","mcpServers":{
+  "scitesrv":{"url":"https://old.example/mcp","disabled":true,"headers":{"Stale":"remove"}},
+  "misskey":{"url":"https://key.example/obsolete-secret/v2/mcp"},
+  "gcsrv":{"url":"https://gc.example/mcp","headers":{"Authorization":"Bearer obsolete-secret"}},
+  "tool":{"command":"old","args":[],"env":{"CUSTOM":"retained"}},
+  "custom":{"command":"mine","args":["custom-flag"]}
+}}
+EOF
+    _sync_cursor_mcp >/dev/null
+    jq -e '.userSetting == "retained"
+        and .mcpServers.scitesrv.url == "https://scite.example/mcp"
+        and .mcpServers.scitesrv.disabled == true
+        and (.mcpServers.scitesrv | has("headers") | not)
+        and .mcpServers.tool.args == ["-lc","uvx some-tool --flag val"]
+        and .mcpServers.tool.env.CUSTOM == "retained"
+        and .mcpServers.custom == {command:"mine",args:["custom-flag"]}
+        and (.mcpServers | has("misskey") | not)
+        and (.mcpServers | has("gcsrv") | not)
+        and (.mcpServers | has("biomedsrv") | not)' "$HOME/.cursor/mcp.json"
+}
+
 @test "mcp_url_substitute expands placeholders and reports missing vars" {
     source "$REPO_ROOT/install/_lib.sh"
     export FIXTURE_KEY="fixture-url-key"

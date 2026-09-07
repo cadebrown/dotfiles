@@ -11,8 +11,7 @@
 #   - sync-config: write managed ~/.codex/config.toml from the chezmoi template,
 #                  generate [mcp_servers.*] blocks from packages/mcp-servers.txt
 #                  (shared with install/claude.sh — same format), and preserve
-#                  runtime sections (projects, notice, plugins, hooks.state)
-#                  that codex itself maintains
+#                  user model choices and Desktop/runtime integrations
 #   - sync-hooks:  write ~/.codex/hooks.json + ~/.local/bin/df-chezmoi-guard,
 #                  then update the trusted_hash so codex accepts the hook
 #   - plugins:     reconcile packages/codex-plugins.txt against official markets
@@ -113,12 +112,19 @@ _snapshot_declared_plugin_inventory() {
     : > "$_available"
     while IFS= read -r _market; do
         [[ -n "$_market" ]] || continue
-        grep -qxF "$_market" "$_markets" || continue
-        _json="$(codex plugin list --marketplace "$_market" --available --json)" \
-            || return 1
+        _json="$(
+            codex plugin list --marketplace "$_market" --available --json \
+                | jq -c '{installed: [.installed[] | {pluginId, enabled, marketplaceName}],
+                          available: [.available[] | {pluginId, marketplaceName}]}'
+        )" || return 1
+        # Remote catalogs are discoverable here but absent from local marketplace roots.
+        jq -r --arg market "$_market" \
+            '.installed[], .available[] | select(.marketplaceName == $market) | .marketplaceName' \
+            <<<"$_json" | sort -u >> "$_markets" || return 1
         jq -r '.installed[] | select(.enabled) | .pluginId' <<<"$_json" \
             >> "$_installed" || return 1
-        jq -r '.available[].pluginId' <<<"$_json" >> "$_available" || return 1
+        jq -r '.installed[], .available[] | .pluginId' <<<"$_json" \
+            >> "$_available" || return 1
     done < <(_declared_plugins | awk -F@ '{ print $NF }' | sort -u)
 }
 
@@ -211,6 +217,9 @@ _emit_mcp_blocks_to() {
        && IFS= read -r _profile && IFS= read -r _risk && IFS= read -r _extras; do
 
             printf '\n[mcp_servers.%s]\n' "$_name" >> "$out"
+            if ! mcp_profile_enabled "$_profile"; then
+                printf 'enabled = false\n' >> "$out"
+            fi
 
             if [[ "$_kind" == "stdio" ]]; then
                 _head="${_cmd%% *}"
@@ -362,7 +371,7 @@ _emit_mcp_blocks_to() {
                     printf 'client_id = "%s"\n' "$(_toml_escape "$_codex_client_id")"
                 } >> "$out"
             fi
-    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .codex_bearer, .profile, .risk, .extras')
+    done < <(mcp_servers_each --all | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .codex_bearer, .profile, .risk, .extras')
 }
 
 # One-time eviction of the retired managed rules file. Managed rules moved
@@ -388,13 +397,15 @@ _evict_legacy_rules() {
 }
 
 _sync_config() {
-    local _tmpl _dest _tmp _managed _runtime _merged _mcp
+    local _tmpl _dest _tmp _managed _mcp _registry _skill
+    local -a _merge_args=()
     log_section "Codex Config Sync"
 
     _tmpl="$DF_ROOT/home/dot_codex/create_private_config.toml"
     _dest="$HOME/.codex/config.toml"
 
     [[ -f "$_tmpl" ]] || die "Missing managed config template: $_tmpl"
+    has uv || die "uv is required for safe Codex TOML sync (run install/python.sh)"
     ensure_dir "$HOME/.codex"
 
     _evict_legacy_rules
@@ -402,40 +413,28 @@ _sync_config() {
     _tmp="$(mktemp -d)"
     trap 'rm -rf "$_tmp"' RETURN
     _managed="$_tmp/managed.toml"
-    _runtime="$_tmp/runtime.toml"
-    _merged="$_tmp/merged.toml"
     _mcp="$_tmp/mcp.toml"
+    _registry="$_tmp/registry.jsonl"
 
     cp "$_tmpl" "$_managed"
 
-    # Append generated [mcp_servers.*] blocks from the shared MCP list. Any
-    # [mcp_servers.*] sections in the destination get dropped (the runtime
-    # awk below does not preserve them), so the list is the source of truth.
+    # Registry names are managed; Desktop and manually added MCP names are not.
+    mcp_servers_each --all > "$_registry"
     _emit_mcp_blocks_to "$_mcp"
     if [[ -s "$_mcp" ]]; then
         printf '\n# === Managed MCP servers (generated from packages/mcp-servers.txt) ===\n' >> "$_managed"
         cat "$_mcp" >> "$_managed"
     fi
 
-    : > "$_runtime"
-    if [[ -f "$_dest" ]]; then
-        awk 'BEGIN{keep=0} /^\[(projects|notice|marketplaces|plugins)\./ || /^\[hooks\.state\]/{keep=1} keep{print}' "$_dest" > "$_runtime"
+    _skill="$HOME/.agents/skills/skill-creator/SKILL.md"
+    if [[ -f "$_skill" ]]; then
+        _merge_args+=(--disable-skill "$_skill")
     fi
-
-    cp "$_managed" "$_merged"
-    if [[ -s "$_runtime" ]]; then
-        printf '\n' >> "$_merged"
-        cat "$_runtime" >> "$_merged"
-        log_info "Preserved runtime sections: projects/notice/marketplaces/plugins/hooks.state"
-    fi
-
-    if [[ -f "$_dest" ]] && cmp -s "$_merged" "$_dest"; then
-        log_okay "No config changes needed at $_dest"
-    else
-        cp "$_merged" "$_dest"
-        chmod 600 "$_dest"
-        log_okay "Synced managed codex config → $_dest"
-    fi
+    uv run --quiet "$DF_ROOT/install/codex-config.py" \
+        --managed "$_managed" --current "$_dest" --output "$_dest" \
+        --registry "$_registry" --ownership "$HOME/.codex/.dotfiles-mcp-ownership.json" \
+        --profiles-dir "$HOME/.codex" "${_merge_args[@]}"
+    log_okay "Synced Codex defaults and MCP profiles; preserved model choices and runtime integrations"
 }
 
 _sync_hooks() {
@@ -604,11 +603,11 @@ _check_setup() {
     [[ -f "$_hooks" ]] || die "Missing codex hooks: $_hooks"
     [[ -x "$_guard" ]] || die "Missing executable chezmoi guard: $_guard"
 
-    # Model pin: derived from the source template so the check tracks it.
+    # Live model selection is a user preference, not managed drift.
     _want_model="$(grep '^model = ' "$DF_ROOT/home/dot_codex/create_private_config.toml" | head -1 || true)"
     [[ -n "$_want_model" ]] || die "No 'model =' line in create_private_config.toml template"
-    grep -qF "$_want_model" "$_config" \
-        || die "Deployed model differs from template (${_want_model}) in $_config"
+    grep -q '^model = "[^\"]\+"' "$_config" \
+        || die "No active model configured in $_config"
     grep -q 'project_doc_fallback_filenames = \["AGENTS.md", "CLAUDE.md"\]' "$_config" \
         || die "Missing AGENTS.md fallback in $_config"
     grep -q '^approval_policy = "never"' "$_config" \

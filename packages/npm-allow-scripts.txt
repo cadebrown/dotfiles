@@ -14,3 +14,8 @@ tree-sitter-typescript
 @google/genai
 fsevents
 protobufjs
+
+# Select and verify version-matched native binaries for agent runtimes.
+opencode-ai
+esbuild
+agent-browser

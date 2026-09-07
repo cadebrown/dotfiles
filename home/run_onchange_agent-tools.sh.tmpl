@@ -1,0 +1,6 @@
+#!/bin/bash
+# installer hash: {{ include "../install/agent-tools.sh" | sha256sum }}
+# doctor hash: {{ include "dot_local/bin/executable_df-agent-doctor" | sha256sum }}
+# evaluator hash: {{ include "dot_local/bin/executable_plugin-eval" | sha256sum }}
+set -euo pipefail
+bash "$CHEZMOI_SOURCE_DIR/../install/agent-tools.sh"

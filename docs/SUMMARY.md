@@ -16,6 +16,7 @@
 - [Git worktrees](usage/git-worktrees.md)
 - [AeroSpace window management](usage/aerospace.md)
 - [Local AI coding](usage/local-llm.md)
+- [AI workbench](usage/ai-workbench.md)
 - [Game development](usage/gamedev.md)
 - [Research mathematics](usage/math.md)
 - [Scientific review](usage/scientific-review.md)

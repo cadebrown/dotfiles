@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+_codex_home="${CODEX_HOME:-$HOME/.codex}"
+_installed="$(codex plugin list --marketplace openai-curated --available --json)"
+_plugin="$(jq -cer '[.installed[] | select(.name == "plugin-eval" and .enabled == true)] | if length == 1 then .[0] else error("Enable plugin-eval@openai-curated in Codex first") end' <<< "$_installed")"
+_version="$(jq -r '.version' <<< "$_plugin")"
+[[ "$_version" != */* && "$_version" != .* ]] || { echo "Invalid plugin-eval version" >&2; exit 1; }
+_root="$_codex_home/plugins/cache/openai-curated/plugin-eval/$_version"
+if [[ ! -f "$_root/scripts/plugin-eval.js" ]]; then
+    _root="$(jq -er '.source.path' <<< "$_plugin")"
+fi
+jq -e '.name == "plugin-eval"' "$_root/.codex-plugin/plugin.json" >/dev/null
+if [[ "${1:-}" == "benchmark" || "${1:-}" == "init-benchmark" ]]; then
+    _has_model=0
+    for _arg in "$@"; do
+        [[ "$_arg" != --model && "$_arg" != --model=* ]] || _has_model=1
+    done
+    if (( _has_model == 0 )); then
+        set -- "$@" --model gpt-6-astra
+    fi
+fi
+exec node "$_root/scripts/plugin-eval.js" "$@"

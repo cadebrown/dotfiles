@@ -127,9 +127,8 @@ rust-skills npx leonardomso/rust-skills rust-skills
 # disclosure structure guidance — we ship skills from this repo.
 skill-creator npx anthropics/skills skill-creator
 
-# writing-skills (obra): how to write skills that actually steer agents;
-# cherry-picked — the rest of superpowers duplicates our methodology.
-writing-skills npx obra/superpowers writing-skills
+# writing-skills is repo-owned under home/dot_claude/skills: native Codex
+# behavioral evaluation without dependencies on the superpowers plugin.
 
 # find-skills (vercel-labs): discover/install registry skills from inside a
 # session — the discovery half of this very file's workflow.
@@ -170,10 +169,8 @@ web-design-guidelines npx vercel-labs/agent-skills web-design-guidelines
 
 ### Game development ###
 
-# Engine-detecting router (repo-root skill) — routes to the repo's 66
-# engine/discipline skills. Router-only install: it embeds enough routing
-# context on its own; add specific engine skills if sessions ask for them.
-router npx gamedev-skills/awesome-gamedev-agent-skills router
+# The repo-owned router uses installed skills and project-native tooling;
+# it does not require the upstream repository's uninstalled skill hierarchy.
 
 ### GPU beyond CUDA/Triton ###
 

@@ -34,15 +34,5 @@ subscriptions if I want to swap from API-key billing.
     "enabled": true,
     "maxRetries": 3,
     "baseDelayMs": 2000
-  },
-  "enabledModels": [
-{{- if eq .chezmoi.os "darwin" }}
-    "mlx/*",
-{{- end }}
-    "anthropic/{{ .models.fable }}*",
-    "anthropic/{{ .models.sonnet }}*",
-    "anthropic/{{ .models.opus }}*",
-    "anthropic/{{ .models.haiku }}*",
-    "openai/gpt-5*"
-  ]
+  }
 }

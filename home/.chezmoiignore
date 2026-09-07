@@ -8,5 +8,6 @@ Library/**
 
 .local/bin/git-wt
 .local/bin/df-agent-doctor
+.local/bin/plugin-eval
 
 AGENTS.md

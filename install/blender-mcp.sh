@@ -1,83 +1,91 @@
 #!/usr/bin/env bash
-# install/blender-mcp.sh - install the blender-mcp Blender addon
-#
-# Downloads addon.py from github.com/ahujasid/blender-mcp, places it in the
-# user's Blender scripts/addons directory, and enables it via a headless
-# Blender invocation. This script is only called when the addon is selected.
-#
-# The MCP *server* side is wired up separately via packages/mcp-servers.txt
-# (`blender stdio cmd: uvx blender-mcp`). This script handles only the
-# Blender-side addon, which must live inside Blender's own scripts/addons
-# directory and be toggled on in user preferences.
-
+# Install the addon bundled with the same pinned release as the MCP server.
 set -euo pipefail
-
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 log_section "Blender MCP addon"
+_RELEASE=1.9.1
+_WHEEL_URL=https://files.pythonhosted.org/packages/98/93/3e8656c0436c7df6397775064cc05261910c05be009c598d38dda0eda816/blender_mcp-1.9.1-py3-none-any.whl
+_WHEEL_SHA=ede3aed34926f77142b8f00ee4f8544f68067d2dc747da8295d1c456171355b2
+_ADDON_SHA=f43469c8518c7021e0060e32cfe52e3beb126b0f62fbae7293106642a3ebda89
 
-# Locate blender. The macOS cask installs /Applications/Blender.app but does
-# not put `blender` on PATH, so fall back to the app bundle's executable.
-_BLENDER=""
-if has blender; then
+_BLENDER="${BLENDER_BIN:-}"
+if [[ -z "$_BLENDER" ]] && has blender; then
     _BLENDER="$(command -v blender)"
-elif [[ -x /Applications/Blender.app/Contents/MacOS/Blender ]]; then
-    _BLENDER="/Applications/Blender.app/Contents/MacOS/Blender"
+elif [[ -z "$_BLENDER" && -x /Applications/Blender.app/Contents/MacOS/Blender ]]; then
+    _BLENDER=/Applications/Blender.app/Contents/MacOS/Blender
 fi
-
-if [[ -z "$_BLENDER" ]]; then
-    die "Blender is not installed; set DF_DO_BLENDER_MCP=0 or install Blender"
-fi
-log_info "Blender: $_BLENDER"
-
-# Detect major.minor (e.g. "4.2") — Blender stores per-version config dirs
-_VERSION="$("$_BLENDER" --version 2>/dev/null \
-    | awk '/^Blender/ && !seen++ {split($2, v, "."); printf "%s.%s", v[1], v[2]}')"
-if [[ -z "$_VERSION" ]]; then
-    die "Could not detect Blender version"
-fi
-log_info "Blender version: $_VERSION"
-
-# Per-OS user addons dir
+[[ -x "$_BLENDER" ]] || die "Blender is not installed; set DF_DO_BLENDER_MCP=0 or install Blender"
+_VERSION="$("$_BLENDER" --version | awk '/^Blender/ && !seen++ {split($2, v, "."); printf "%s.%s", v[1], v[2]}')"
+[[ "$_VERSION" =~ ^[0-9]+[.][0-9]+$ ]] || die "Could not detect Blender version"
 case "$OS" in
-    darwin) _ADDON_DIR="$HOME/Library/Application Support/Blender/$_VERSION/scripts/addons" ;;
-    linux)  _ADDON_DIR="$HOME/.config/blender/$_VERSION/scripts/addons" ;;
-    *)      die "Unsupported OS for Blender addon install: $OS" ;;
+    darwin) _USER_DIR="$HOME/Library/Application Support/Blender/$_VERSION" ;;
+    linux)  _USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/blender/$_VERSION" ;;
+    *) die "Unsupported OS: $OS" ;;
 esac
-ensure_dir "$_ADDON_DIR"
-
-# Install as blender_mcp.py so the module name is unique (upstream filename
-# is the generic `addon.py`, which collides with other addons named the same)
-_ADDON_URL="https://raw.githubusercontent.com/ahujasid/blender-mcp/main/addon.py"
+_ADDON_DIR="$_USER_DIR/scripts/addons"
 _ADDON_FILE="$_ADDON_DIR/blender_mcp.py"
+_STATE_DIR="$LOCAL_PLAT/share/blender-mcp/$_VERSION"
+ensure_dir "$_ADDON_DIR"
+ensure_dir "$_STATE_DIR/backups"
 
-log_info "Downloading addon.py → $_ADDON_FILE"
-_TMP="$(mktemp)"
-if ! download "$_ADDON_URL" "$_TMP"; then
-    rm -f "$_TMP"
-    die "Failed to download $_ADDON_URL"
-fi
-mv "$_TMP" "$_ADDON_FILE"
-log_okay "Addon file installed"
+_sha256() {
+    if has sha256sum; then sha256sum "$1" | awk '{print $1}'
+    else shasum -a 256 "$1" | awk '{print $1}'; fi
+}
+_backup() {
+    [[ -f "$1" ]] || return 0
+    local _target
+    _target="$_STATE_DIR/backups/$(basename "$1").$(_sha256 "$1")"
+    [[ -f "$_target" ]] || cp -p "$1" "$_target"
+}
 
-# Enable the addon and persist in user prefs. Running blender in --background
-# mode writes to ~/Library/... (macOS) or ~/.config/... (Linux) userpref.blend.
-log_info "Enabling addon in Blender user preferences"
-if "$_BLENDER" --background --python-expr "
-import bpy
-bpy.ops.preferences.addon_enable(module='blender_mcp')
-bpy.ops.wm.save_userpref()
-" >/dev/null 2>&1; then
-    :
+_TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$_TMP_DIR"' EXIT
+if [[ ! -f "$_ADDON_FILE" ]] || [[ "$(_sha256 "$_ADDON_FILE")" != "$_ADDON_SHA" ]]; then
+    has unzip || die "unzip is required to extract the release addon"
+    download "$_WHEEL_URL" "$_TMP_DIR/release.whl" || die "Could not download Blender MCP $_RELEASE"
+    [[ "$(_sha256 "$_TMP_DIR/release.whl")" == "$_WHEEL_SHA" ]] || die "Blender MCP release checksum mismatch"
+    unzip -p "$_TMP_DIR/release.whl" blender_mcp/bundled/addon.py > "$_TMP_DIR/blender_mcp.py"
+    [[ "$(_sha256 "$_TMP_DIR/blender_mcp.py")" == "$_ADDON_SHA" ]] || die "Blender MCP addon checksum mismatch"
+    _backup "$_ADDON_FILE"
+    mv "$_TMP_DIR/blender_mcp.py" "$_ADDON_FILE"
+    log_okay "Installed Blender MCP $_RELEASE bundled addon"
 else
-    die "Could not enable Blender MCP addon in headless Blender"
+    log_okay "Blender MCP $_RELEASE addon checksum matches"
 fi
 
-if "$_BLENDER" --background --python-expr "
+_backup "$_USER_DIR/config/userpref.blend"
+cat > "$_TMP_DIR/enable.py" <<'PY'
 import bpy
-raise SystemExit(0 if 'blender_mcp' in bpy.context.preferences.addons else 1)
-" >/dev/null 2>&1; then
-    log_okay "Addon enabled — look for 'BlenderMCP' tab in the 3D view sidebar (N)"
-else
-    die "Blender MCP addon is not enabled after installation"
-fi
+
+changed = 'blender_mcp' not in bpy.context.preferences.addons
+if changed:
+    result = bpy.ops.preferences.addon_enable(module='blender_mcp')
+    if result != {'FINISHED'}:
+        raise RuntimeError(f'Addon enable failed: {result}')
+prefs = bpy.context.preferences.addons['blender_mcp'].preferences
+if prefs.telemetry_consent:
+    prefs.telemetry_consent = False
+    changed = True
+if changed:
+    bpy.ops.wm.save_userpref()
+assert not prefs.telemetry_consent
+print('BLENDER_MCP_READY telemetry=false')
+PY
+DISABLE_TELEMETRY=true "$_BLENDER" --background --disable-autoexec --python-exit-code 1 \
+    --python "$_TMP_DIR/enable.py" > "$_TMP_DIR/enable.log" 2>&1 || {
+    tail -30 "$_TMP_DIR/enable.log" >&2
+    die "Could not configure Blender MCP preferences"
+}
+DISABLE_TELEMETRY=true "$_BLENDER" --background --disable-autoexec --python-exit-code 1 \
+    --python-expr "import bpy; assert 'blender_mcp' in bpy.context.preferences.addons; assert not bpy.context.preferences.addons['blender_mcp'].preferences.telemetry_consent" \
+    > "$_TMP_DIR/verify.log" 2>&1 || {
+    tail -30 "$_TMP_DIR/verify.log" >&2
+    die "Blender MCP preference verification failed"
+}
+cat > "$_STATE_DIR/install-receipt.json" <<EOF
+{"schema":1,"release":"$_RELEASE","wheel_sha256":"$_WHEEL_SHA","addon_sha256":"$_ADDON_SHA","telemetry_consent":false,"blender":"$_VERSION","source":"$_WHEEL_URL"}
+EOF
+log_okay "Addon enabled; telemetry disabled; existing preferences preserved"
+log_info "The live MCP bridge needs GUI Blender. Headless bpy rendering works independently."

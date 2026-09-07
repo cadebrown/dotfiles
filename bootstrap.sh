@@ -361,6 +361,9 @@ fi
 
 log_section "2 — dotfiles (chezmoi apply)"
 
+# Bootstrap excludes chezmoi scripts, including the pre-apply ownership hook.
+bash "$DF_INSTALL_DIR/skills-sync.sh" adopt
+
 # Pre-seed name/email from env so chezmoi doesn't prompt — useful for CI and
 # unattended installs. promptStringOnce checks the config file first, so if
 # chezmoi.toml already exists (re-run on same machine), this is a no-op.

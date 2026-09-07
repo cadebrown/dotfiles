@@ -58,17 +58,23 @@ setup() {
     destination="$(printf '%s\n' "$fake_home"/.local/plat_*/bin/df-agent-doctor)"
     [ -x "$destination" ]
     cmp -s "$REPO/home/dot_local/bin/executable_df-agent-doctor" "$destination"
+    local evaluator="$(dirname "$destination")/plugin-eval"
+    [ -x "$evaluator" ]
+    cmp -s "$REPO/home/dot_local/bin/executable_plugin-eval" "$evaluator"
 
     printf '#!/usr/bin/env bash\nexit 0\n' > "$destination"
     chmod 755 "$destination"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$evaluator"
     run env HOME="$fake_home" DF_USE_PLAT=1 bash "$REPO/install/agent-tools.sh"
     [ "$status" -eq 0 ]
     cmp -s "$REPO/home/dot_local/bin/executable_df-agent-doctor" "$destination"
+    cmp -s "$REPO/home/dot_local/bin/executable_plugin-eval" "$evaluator"
 }
 
 @test "bootstrap explicitly deploys agent helper commands" {
     grep -Fq 'bash "$DF_INSTALL_DIR/agent-tools.sh"' "$REPO/bootstrap.sh"
     grep -Fxq '.local/bin/df-agent-doctor' "$REPO/home/.chezmoiignore"
+    grep -Fxq '.local/bin/plugin-eval' "$REPO/home/.chezmoiignore"
 }
 
 @test "Claude handles an empty overlay registry under macOS system Bash" {

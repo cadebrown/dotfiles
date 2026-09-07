@@ -42,6 +42,10 @@ _node_path_healthy() (
     _actual="$(command -v node)" || return 1
     [[ "${_actual%/*}" == "$_want" ]]
 )
+_qmd_runtime_healthy() (
+    source "$_repo/install/_lib.sh"
+    qmd_daemon_runtime_current
+)
 
 for _tool in jq yq chezmoi codex claude opencode pi qmd cass rtk; do
     _check "tool: $_tool" _has "$_tool"
@@ -55,6 +59,7 @@ if _has cass && _has jq; then
 fi
 if _has qmd; then
     _check "qmd index" qmd status
+    _check "qmd daemon runtime" _qmd_runtime_healthy
 fi
 if _has jq; then
     _check "MCP registry" _mcp_registry_healthy

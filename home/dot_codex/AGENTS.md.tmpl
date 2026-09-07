@@ -27,7 +27,12 @@ follow.
   wait for every delegated result before handing work back.
 - `packages/agent-skills.txt` and `packages/codex-plugins.txt` are the registries.
   Use `bash install/skills-sync.sh check` for a read-only skill audit; `npx skills
-  check` is an updater despite its name. Use the plugin-eval workflows before
-  adopting or materially changing a skill or plugin.
+  check` is an updater despite its name. Use `writing-skills` and `plugin-eval`
+  for meaningful workflow changes; benchmark with the actual intended model.
+- Prefer the bundled system `skill-creator` for Codex skill authoring. The
+  shared Anthropic authoring skill is for other harnesses.
+- Use native browser/computer tools for desktop work and `long-running-work`
+  for sustained projects. API-only features are not automatically Codex
+  settings; check current official support before configuring them.
 - Keep repo-specific behavior in project `AGENTS.md` or `CLAUDE.md`, not in
   this global file.

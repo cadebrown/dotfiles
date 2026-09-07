@@ -87,6 +87,43 @@ file_mode() {
     fi
 }
 
+@test "Ollama formula startup rejects an app-owned running server" {
+    run env HOME="$TEST_HOME" DF_USE_PLAT=0 bash -c '
+        source "$1/install/macos-services.sh"
+        has() { return 0; }
+        brew() {
+            [[ "$1" != services ]] || touch "$HOME/services-called"
+        }
+        pgrep() { return 0; }
+        _start_ollama_formula
+    ' _ "$REPO"
+    [ "$status" -ne 0 ]
+    [ ! -e "$TEST_HOME/services-called" ]
+    [[ "$output" == *"Ollama.app owns the running server"* ]]
+}
+
+@test "Ollama formula starts once and accepts an already running managed service" {
+    run env HOME="$TEST_HOME" DF_USE_PLAT=0 bash -c '
+        source "$1/install/macos-services.sh"
+        has() { return 0; }
+        pgrep() { return 1; }
+        brew() {
+            case "$*" in
+                "list ollama") return 0 ;;
+                "services list") [[ ! -e "$HOME/started" ]] || printf "ollama started\n" ;;
+                "services start ollama") printf "start\n" >> "$HOME/started" ;;
+                *) return 1 ;;
+            esac
+        }
+        run_logged() { "$@"; }
+        _start_ollama_formula
+        _start_ollama_formula
+        cat "$HOME/started"
+    ' _ "$REPO"
+    [ "$status" -eq 0 ]
+    [ "$(grep -c '^start$' "$TEST_HOME/started")" -eq 1 ]
+}
+
 @test "macOS services disable Colima SSH injection without starting it" {
     run env HOME="$TEST_HOME" DF_USE_PLAT=0 DF_START_LOCAL_SERVICES=0 \
         PATH="$TEST_BIN:/usr/bin:/bin" /bin/bash "$REPO/install/macos-services.sh"

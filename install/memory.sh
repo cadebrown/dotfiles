@@ -325,12 +325,12 @@ if [[ "$OS" == "darwin" ]]; then
     if [[ ! -f "$_plist" ]]; then
         die "$_agent.plist missing — run chezmoi apply"
     elif launchctl print "gui/$(id -u)/$_agent" >/dev/null 2>&1; then
-        if _qmd_daemon_healthy; then
+        if _qmd_daemon_healthy && qmd_daemon_runtime_current; then
             log_okay "$_agent already loaded"
         else
             launchctl kickstart -k "gui/$(id -u)/$_agent" \
                 || die "could not restart unhealthy $_agent"
-            log_okay "restarted $_agent"
+            log_okay "restarted $_agent with the selected Node runtime"
         fi
     else
         # Clear any disabled override first: bootstrap on a disabled label
@@ -344,8 +344,8 @@ if [[ "$OS" == "darwin" ]]; then
     fi
 else
     # No launchd: lazy-start (also done by shell profiles on login).
-    if qmd_daemon_running && ! _qmd_daemon_healthy; then
-        log_info "restarting unhealthy qmd MCP daemon"
+    if qmd_daemon_running && { ! _qmd_daemon_healthy || ! qmd_daemon_runtime_current; }; then
+        log_info "restarting qmd MCP daemon with the selected Node runtime"
         qmd_daemon_stop
         qmd_daemon_running && die "could not stop unhealthy qmd MCP daemon"
         qmd_daemon_start || die "could not restart qmd MCP daemon"

@@ -149,7 +149,7 @@ brew "zig"
 brew "go"  # Go toolchain; packages/go.txt drives `go install` via install/go.sh
 
 ### AI Coding Agents ###
-brew "opencode"
+# Codex, OpenCode, and pi are owned by packages/npm.txt.
 
 ### Token optimization ###
 # rtk (Rust Token Killer): CLI proxy that compresses command output before it
@@ -242,6 +242,10 @@ if OS.mac?
 
   ### Local AI ###
   brew "ollama"
+
+  ### Desktop automation ###
+  tap "openclaw/tap"
+  brew "openclaw/tap/peekaboo"
 
   ### GPU Profiling ###
   cask "nvidia-nsight-systems"

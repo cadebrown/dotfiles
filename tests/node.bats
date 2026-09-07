@@ -180,3 +180,34 @@ EOF
     [ "$status" -eq 42 ]
     [ -f "$TEST_HOME/qmd-started" ]
 }
+
+@test "npm replaces qmd only after stopping its service on either platform" {
+    local platform
+    for platform in darwin linux; do
+        run env HOME="$TEST_HOME" DF_USE_PLAT=0 LC_ALL=C LANG=C bash -c '
+            source "$1/install/node.sh"
+            OS="$2"
+            _npm_install_cmd=(npm install -g)
+            qmd_daemon_running() { return 0; }
+            qmd_daemon_stop() { printf "stopped\n"; }
+            run_logged() { printf "%s\n" "$*"; }
+            _npm_install @tobilu/qmd@latest
+            printf "restart=%s\n" "$_qmd_stopped"
+        ' _ "$REPO" "$platform"
+        [ "$status" -eq 0 ]
+        [ "$output" = $'stopped\nnpm install -g @tobilu/qmd@latest\nrestart=1' ]
+    done
+}
+
+@test "npm leaves qmd dependencies intact when the service cannot stop" {
+    run env HOME="$TEST_HOME" DF_USE_PLAT=0 LC_ALL=C LANG=C bash -c '
+        source "$1/install/node.sh"
+        _npm_install_cmd=(npm install -g)
+        qmd_daemon_running() { return 0; }
+        qmd_daemon_stop() { return 1; }
+        run_logged() { touch "$HOME/install-called"; }
+        _npm_install @tobilu/qmd
+    ' _ "$REPO"
+    [ "$status" -ne 0 ]
+    [ ! -e "$TEST_HOME/install-called" ]
+}

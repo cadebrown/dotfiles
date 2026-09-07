@@ -12,6 +12,7 @@
 #
 # Idempotent: rows are skipped when the skill's SKILL.md already exists.
 # `check` is read-only and verifies names plus installed content digests.
+# `adopt` backs up prior installations before chezmoi takes skill ownership.
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
@@ -24,8 +25,8 @@ _ok=0 _skip=0 _fail=0
 _mode="${1:-sync}"
 
 case "$_mode" in
-    sync|check|lock) ;;
-    *) die "Usage: skills-sync.sh [sync|check|lock]" ;;
+    sync|check|lock|adopt) ;;
+    *) die "Usage: skills-sync.sh [sync|check|lock|adopt]" ;;
 esac
 
 _lockfile() {
@@ -75,6 +76,59 @@ _locked_dirs() {
     awk '!/^[[:space:]]*(#|$)/ { print $1 }' "$DF_PACKAGES/agent-skills.txt"
 }
 
+_adopt_vendored_skills() {
+    local _entry _dir _lock _backup="" _tmp
+    _lock="$(_lockfile)"
+    [[ -f "$_lock" ]] || return 0
+    has jq || die "jq is required to migrate skill ownership"
+    for _entry in "$DF_ROOT"/home/dot_claude/skills/*/SKILL.md; do
+        [[ -f "$_entry" ]] || continue
+        _dir="$(basename "$(dirname "$_entry")")"
+        jq -e --arg name "$_dir" '.skills[$name] != null' "$_lock" >/dev/null || continue
+        if _declared_dirs | command grep -Fxq "$_dir"; then
+            die "Skill $_dir has both installer and chezmoi ownership"
+        fi
+        if [[ -z "$_backup" ]]; then
+            _backup="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/skill-backups/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+            mkdir -p "$_backup"
+            cp -p "$_lock" "$_backup/skill-lock.json"
+        fi
+        [[ ! -d "$_SKILLS_DIR/$_dir" ]] || cp -Rp "$_SKILLS_DIR/$_dir" "$_backup/$_dir"
+        _tmp="$(mktemp "${_lock}.XXXXXX")"
+        jq --arg name "$_dir" 'del(.skills[$name])' "$_lock" > "$_tmp"
+        mv "$_tmp" "$_lock"
+        log_okay "  $_dir is now chezmoi-owned; prior install saved in $_backup"
+    done
+}
+
+_legacy_skill_links() {
+    local _link _target _name
+    for _link in "$HOME/.pi/agent/skills/"*; do
+        [[ -L "$_link" && ! -e "$_link" ]] || continue
+        _name="$(basename "$_link")"
+        _target="$(readlink "$_link")"
+        [[ "$_target" == "../../../.agents/skills/$_name" ]] || continue
+        [[ ! -f "$DF_ROOT/home/dot_claude/skills/$_name/SKILL.md" ]] || continue
+        if _declared_dirs | command grep -Fxq "$_name"; then
+            continue
+        fi
+        printf '%s\n' "$_link"
+    done
+}
+
+_archive_legacy_skill_links() {
+    local _link _backup=""
+    while IFS= read -r _link; do
+        [[ -n "$_link" ]] || continue
+        if [[ -z "$_backup" ]]; then
+            _backup="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/skill-backups/$(date -u +%Y%m%dT%H%M%SZ)-$$/pi-links"
+            mkdir -p "$_backup"
+        fi
+        mv "$_link" "$_backup/$(basename "$_link")"
+        log_okay "  archived obsolete Pi skill link $(basename "$_link") in $_backup"
+    done < <(_legacy_skill_links)
+}
+
 _write_digest_lock() {
     local _tmp _dir _hash
     has git || die "git is required to hash installed skills"
@@ -101,10 +155,15 @@ _write_digest_lock() {
 _check_registry() {
     local _permit_modified="${1:-0}"
     local _lock _tmp _dir _expected _actual
-    local _missing=0 _extra=0 _unlocked=0 _modified=0 _hashfail=0
+    local _missing=0 _extra=0 _unlocked=0 _modified=0 _hashfail=0 _broken=0
     _lock="$(_lockfile)"
     _tmp="$(mktemp -d)"
     _declared_dirs | sort -u > "$_tmp/declared"
+
+    while IFS= read -r _dir; do
+        log_warn "obsolete Pi skill link: $_dir (sync archives the link)"
+        (( _broken++ )) || true
+    done < <(_legacy_skill_links)
 
     while IFS= read -r _dir; do
         if [[ ! -f "$_SKILLS_DIR/$_dir/SKILL.md" ]]; then
@@ -160,15 +219,15 @@ _check_registry() {
         _unlocked=1
     fi
 
-    if (( _missing == 0 && _extra == 0 && _unlocked == 0 && _modified == 0 && _hashfail == 0 )); then
+    if (( _missing == 0 && _extra == 0 && _unlocked == 0 && _modified == 0 && _hashfail == 0 && _broken == 0 )); then
         rm -rf "$_tmp"
         log_okay "Agent skill registry matches the installed tree"
         return 0
     fi
     rm -rf "$_tmp"
-    log_warn "Agent skill drift: $_missing missing, $_extra unmanaged, $_unlocked unlocked, $_modified modified, $_hashfail unreadable"
+    log_warn "Agent skill drift: $_missing missing, $_extra unmanaged, $_unlocked unlocked, $_modified modified, $_hashfail unreadable, $_broken obsolete links"
     if [[ "$_permit_modified" == "1" ]] \
-       && (( _missing == 0 && _extra == 0 && _unlocked == 0 && _hashfail == 0 )); then
+       && (( _missing == 0 && _extra == 0 && _unlocked == 0 && _hashfail == 0 && _broken == 0 )); then
         log_warn "Preserving $_modified locally modified skill(s); read-only check mode still reports this drift"
         return 0
     fi
@@ -178,9 +237,13 @@ _check_registry() {
 case "$_mode" in
     check) _check_registry; exit $? ;;
     lock) _write_digest_lock; exit 0 ;;
+    adopt) _adopt_vendored_skills; exit 0 ;;
 esac
 
 has npx || die "npx not found — install/node.sh must complete before agent skill sync"
+
+_adopt_vendored_skills
+_archive_legacy_skill_links
 
 _sync_from() {
     local file="$1" line _dir _type _rest

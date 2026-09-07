@@ -18,6 +18,7 @@ ARCH_BIN="$HOME/managed/bin"
 PYTHON_ENV="$HOME/managed/python"
 mcp_registry_validate() { return 0; }
 resolve_nvm_default_bin() { printf '%s\n' "$STUB_BIN"; }
+qmd_daemon_runtime_current() { return "${FAKE_QMD_STALE:-0}"; }
 EOF
     cat > "$FAKE_REPO/dotfiles-nvidia/install/verify-tools.sh" <<'EOF'
 #!/usr/bin/env bash
@@ -72,10 +73,22 @@ EOF
     [[ "$output" == *"[okay] managed Python with SymPy"* ]]
     [[ "$output" == *"[okay] NVIDIA overlay tools"* ]]
     [[ "$output" == *"[okay] qmd LaunchAgent"* ]]
+    [[ "$output" == *"[okay] qmd daemon runtime"* ]]
     grep -Fxq "python:-c import sympy" "$CALLS"
     grep -Fxq "overlay-verifier" "$CALLS"
     grep -Fxq "launchctl:print gui/$(id -u)/dev.cade.qmd" "$CALLS"
     ! grep -q 'cass-watch\|cass-semantic' "$CALLS"
+}
+
+@test "doctor rejects a healthy qmd service using an outdated Node runtime" {
+    run env HOME="$FAKE_HOME" DF_DOTFILES_REPO="$FAKE_REPO" \
+        STUB_BIN="$STUB_BIN" CALLS="$CALLS" PATH="$STUB_BIN:$PATH" \
+        FAKE_QMD_STALE=1 bash "$REPO/home/dot_local/bin/executable_df-agent-doctor"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"[okay] qmd index"* ]]
+    [[ "$output" == *"[okay] qmd LaunchAgent"* ]]
+    [[ "$output" == *"[fail] qmd daemon runtime"* ]]
 }
 
 @test "doctor source has no contract for removed cass indexing LaunchAgents" {

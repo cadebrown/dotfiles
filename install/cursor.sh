@@ -40,13 +40,15 @@ _sync_cursor_mcp() {
 
     local _out="$HOME/.cursor/mcp.json" _stream _count=0
     local _name _kind _transport _cmd _url _auth _ccid _profile _risk _extras
-    local _missing _hname _hval _def _login_cmd
+    local _missing _hname _hval _def _login_cmd _entries _existing='{}' _remove='[]'
     # NB: no `trap ... RETURN` for cleanup — bash fires RETURN traps when any
     # sourced script finishes, so a `.`/`source` anywhere in this function
     # would silently delete the accumulator mid-loop (this happened: only
     # servers after the last in-loop `. ~/.<svc>.env` survived into mcp.json).
     _stream="$(mktemp)"
     mcp_registry_validate || die "invalid MCP registry"
+    _entries="$(mcp_servers_for_config "$_out" mcpServers)" || return 1
+    [[ ! -f "$_out" ]] || _existing="$(jq -ce . "$_out")" || return 1
 
     # Entries come from the shared parser (mcp_servers_each in _lib.sh);
     # this function only renders Cursor's schema + auth policy.
@@ -65,6 +67,7 @@ _sync_cursor_mcp() {
                 if [[ "$_url" == *'{'*'}'* ]]; then
                     if ! _missing="$(mcp_url_substitute "$_url")"; then
                         log_warn "  $_name: \$$_missing unset — run 'bash install/auth.sh $_name'; skipping"
+                        _remove="$(jq -c --arg name "$_name" '. + [$name]' <<< "$_remove")"
                         continue
                     fi
                     _url="$_missing"
@@ -86,6 +89,7 @@ _sync_cursor_mcp() {
                     # and the Cursor GUI has no way to refresh them, so these
                     # servers are Claude/Codex-only by design.
                     gcloud)   log_info "  $_name: skipped (short-lived ADC auth is unavailable to the Cursor GUI)"
+                              _remove="$(jq -c --arg name "$_name" '. + [$name]' <<< "$_remove")"
                               continue ;;
                     *)        log_warn "  $_name: unknown auth source '$_auth' — registering unauthenticated" ;;
                 esac
@@ -102,10 +106,15 @@ _sync_cursor_mcp() {
 
             jq -nc --arg n "$_name" --argjson def "$_def" '{name:$n, def:$def}' >> "$_stream"
             (( ++_count ))
-    done < <(mcp_servers_each | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .profile, .risk, .extras')
+    done < <(printf '%s\n' "$_entries" | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .profile, .risk, .extras')
 
     local _tmp; _tmp="$(mktemp)"
-    jq -s '{mcpServers: (reduce .[] as $e ({}; .[$e.name] = $e.def))}' "$_stream" > "$_tmp" \
+    jq -s --argjson existing "$_existing" --argjson remove "$_remove" '
+        . as $entries | $existing
+        | .mcpServers = (reduce $remove[] as $name (.mcpServers // {}; del(.[$name])))
+        | .mcpServers = (reduce $entries[] as $e (.mcpServers;
+            .[$e.name] = ((.[$e.name] // {} | del(.url,.command,.args,.headers)) + $e.def)))
+    ' "$_stream" > "$_tmp" \
         || { log_warn "Cursor MCP assembly failed"; rm -f "$_tmp" "$_stream"; return 1; }
     rm -f "$_stream"
 

@@ -23,6 +23,9 @@
 # re-pin here (`@openai/codex@X.Y.Z`) until the config catches up.
 @openai/codex
 
+# OpenCode releases reach npm directly; share the managed Node LTS runtime.
+opencode-ai
+
 # JavaScript package manager used by workspace-based web projects. Install it
 # directly rather than letting Corepack and npm compete for the same shim.
 pnpm
@@ -38,6 +41,9 @@ pnpm
 # attributed to the Playwright team's launch materials).
 @playwright/cli
 
+# Alternative compact browser CLI for portable/headless agent sessions.
+agent-browser
+
 # LSP servers backing the Claude Code LSP plugins (pyright-lsp, typescript-lsp).
 # The plugins only wrap these binaries — without them the plugins are inert.
 # (rust-analyzer comes from a rustup component in install/rust.sh; clangd from
@@ -47,5 +53,4 @@ typescript-language-server
 typescript
 
 # claude-code: installed via native binary (install/claude.sh)
-# opencode: installed via brew "opencode" (packages/Brewfile)
 # claude statusline: pure bash + jq, see home/dot_claude/executable_statusline.sh

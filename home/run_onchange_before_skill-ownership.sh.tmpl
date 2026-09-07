@@ -1,0 +1,7 @@
+#!/bin/bash
+# installer hash: {{ include "../install/skills-sync.sh" | sha256sum }}
+{{ range glob (joinPath .chezmoi.sourceDir "dot_claude/skills/*/SKILL.md") -}}
+# owned skill hash: {{ include . | sha256sum }}
+{{ end -}}
+set -euo pipefail
+bash "$CHEZMOI_SOURCE_DIR/../install/skills-sync.sh" adopt
