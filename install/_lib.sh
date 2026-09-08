@@ -134,6 +134,8 @@ _normalize_plat_layout
 # launchers use the same detection only when they need PLAT isolation.
 _detect_plat "$DF_ROOT"
 if [[ -n "$PLAT" && -f "$DF_ROOT/install/plat/$PLAT/.plat_env.sh" ]]; then
+    # Selected at runtime; CI lints every platform environment separately.
+    # shellcheck source=/dev/null
     source "$DF_ROOT/install/plat/$PLAT/.plat_env.sh"
 fi
 

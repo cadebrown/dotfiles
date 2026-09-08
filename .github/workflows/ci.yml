@@ -58,7 +58,7 @@ jobs:
           done
 
       - name: Run ShellCheck
-        run: shellcheck -S warning bootstrap.sh install/*.sh home/dot_local/bin/executable_git-wt
+        run: shellcheck -S warning bootstrap.sh install/*.sh install/plat/*/.plat_env.sh home/dot_local/bin/executable_git-wt
 
       - name: Run fast Bats tests
         env:
@@ -108,7 +108,7 @@ jobs:
           for script in bootstrap.sh install/*.sh home/dot_local/bin/executable_git-wt; do
             bash -n "$script"
           done
-          shellcheck -S warning bootstrap.sh install/*.sh home/dot_local/bin/executable_git-wt
+          shellcheck -S warning bootstrap.sh install/*.sh install/plat/*/.plat_env.sh home/dot_local/bin/executable_git-wt
           env PATH=/usr/bin:/bin:/usr/sbin:/sbin \
             /bin/bash "$(brew --prefix bats-core)/bin/bats" \
               tests/agents.bats \

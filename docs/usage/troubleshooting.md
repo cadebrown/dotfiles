@@ -50,6 +50,22 @@ estimated savings are not a guarantee that every command is compressed. Batch
 independent reads and prefer a completion-aware wait (for example
 `gh run watch RUN_ID --exit-status`) over rapid repeated status polling.
 
+## ShellCheck rejects the runtime-selected platform environment
+
+**Symptom:** Quality and macOS smoke fail with `SC1090` in `install/_lib.sh`,
+while the Docker bootstrap suites pass.
+
+**Root cause:** The platform environment path contains a runtime-selected
+`$PLAT`, so ShellCheck cannot resolve it. The Docker suite does not run the
+separate CI lint gate.
+
+**Confirm:** Run `shellcheck -S warning bootstrap.sh install/*.sh
+install/plat/*/.plat_env.sh home/dot_local/bin/executable_git-wt` from the repo.
+
+**Fix:** Mark only the dynamic import with `source=/dev/null` and lint every
+actual platform environment explicitly in both CI jobs. Keep the global lint
+severity unchanged; a passing bootstrap suite does not replace this check.
+
 ## Quality CI fails with `chezmoi: command not found`
 
 **Symptom:** The fast Bats profile-rendering test exits 127, while the Docker
