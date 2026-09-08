@@ -18,6 +18,23 @@ the test sources both bash and zsh profiles. Keep these dependencies in
 because this chezmoi version's Go module has `exclude` directives and cannot be
 installed with `go install github.com/twpayne/chezmoi/v2@version`.
 
+## Native OpenCode test cannot find an installed binary
+
+**Symptom:** A fresh Linux bootstrap installs OpenCode successfully, but
+`tests/opencode-native-argv.bats` fails with `FileNotFoundError: 'opencode'`.
+
+**Root cause:** The test entrypoint resolved its Node path before bootstrap
+installed nvm. Bootstrap runs in a child shell, so its updated `PATH` cannot
+reach the parent Bats runner. Tests that source installer helpers again can
+pass while tests using the inherited environment fail.
+
+**Confirm:** Read the native argv test's captured exception and check whether
+the runner's `PATH` contains the installed nvm default's `bin` directory.
+
+**Fix:** `tests/entrypoint.sh` resolves the nvm default after bootstrap and
+adds it to the shared test environment. Keep this setup in the entrypoint so
+native commands work without per-test environment repairs.
+
 ## Local agents default to MLX but localhost:8080 is unavailable
 
 **Symptom:** Pi or OpenCode starts with the configured local model but cannot

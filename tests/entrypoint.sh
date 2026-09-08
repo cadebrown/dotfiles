@@ -20,10 +20,6 @@ export DF_PROFILE=core
 # from interfering with chezmoi diff and other git operations in tests.
 source "$DOTFILES/install/_lib.sh"
 
-# Source nvm so node/npm are available for the test suite
-# shellcheck source=/dev/null
-[[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh" && nvm use default --silent 2>/dev/null || true
-
 # Keep ARCH_BIN off PATH during bootstrap. Installers must invoke binaries in
 # their owned PLAT directly; the login environment adds these paths afterward.
 export PATH="$CARGO_HOME/bin:$HOME/.local/bin:$PATH"
@@ -48,7 +44,9 @@ DF_DO_PACKAGES=0 DF_DO_LLDB=0 DF_DO_GO=0 DF_DO_LOCAL_LLM=0 \
     DF_DO_OVERLAYS="${DF_DO_OVERLAYS:-0}" \
     bash "$DOTFILES/bootstrap.sh"
 
-export PATH="$ARCH_BIN:$PATH"
+# Bootstrap installs Node in a child shell, so resolve its new default here.
+_nvm_bin="$(resolve_nvm_default_bin)"
+export PATH="$_nvm_bin:$ARCH_BIN:$PATH"
 
 echo ""
 echo "=== Test suite ==="

@@ -15,7 +15,7 @@ spec.loader.exec_module(module)
 arguments = module.client_arguments("opencode", ["run", "--help"], ["--model", "mlx/local-model"])
 result = subprocess.run(["opencode", *arguments], capture_output=True, text=True, timeout=15)
 output = result.stdout + result.stderr
-assert result.returncode == 0 and output.startswith("opencode run [message..]") and "Commands:" not in output
+assert result.returncode == 0 and output.startswith("opencode run [message..]") and "Commands:" not in output, (arguments, result.returncode, output)
 environment = dict(os.environ, GH_TOKEN="fixture", GOOGLE_MCP_TOKEN="fixture", GOOGLE_CLOUD_PROJECT="fixture")
 for shell in ("bash", "zsh"):
     for command in ("run", "models"):
@@ -23,7 +23,8 @@ for shell in ("bash", "zsh"):
             str(root / "home/.chezmoitemplates/opencode-credentials.sh"), command, "--help"],
             capture_output=True, text=True, env=environment, timeout=15)
         output = result.stdout + result.stderr
-        assert result.returncode == 0 and output.startswith("opencode " + command + " ") and "Commands:" not in output, (shell, command)
+        assert result.returncode == 0 and output.startswith("opencode " + command + " ") and "Commands:" not in output, (shell, command, result.returncode, output)
 PY
+    printf '%s\n' "$output"
     [ "$status" -eq 0 ]
 }
