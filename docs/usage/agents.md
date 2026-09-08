@@ -177,11 +177,12 @@ generated profiles live in
 [`packages/mcp-servers.txt`](../../packages/mcp-servers.txt) and
 [`install/codex-config.py`](../../install/codex-config.py).
 
-Codex uses unrestricted local shell permissions with approval policy `never`,
-but MCP servers carry their own risk policy. Read-only servers run automatically;
-local-write servers use `approve`, and external-write servers use Codex's
-`writes` approval mode. Connector and account authorization remain separate
-from shell permissions.
+Codex uses unrestricted local shell permissions with approval policy `never`.
+Every managed or runtime-added MCP server and app connector uses Codex's
+`approve` mode so read and write tools run without an interactive approval
+prompt. Connector and account authorization remain separate from shell
+permissions, and Codex may still enforce confirmation for tools marked
+destructive by their provider.
 
 ## Other harnesses
 

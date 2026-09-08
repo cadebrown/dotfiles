@@ -2,7 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["tomlkit==0.13.3"]
 # ///
-"""Merge managed Codex defaults without removing user or Desktop integration state."""
+"""Merge Codex defaults while preserving runtime integrations in full-auto mode."""
 
 from __future__ import annotations
 
@@ -34,6 +34,22 @@ RETIRED = {
 }
 RUNTIME = {"projects", "notice", "marketplaces", "plugins"}
 PROFILE_HEADER = "# Managed MCP activation from packages/mcp-servers.txt.\n"
+FULL_AUTO_APPROVAL_MODE = "approve"
+
+
+def preapprove_tools(config):
+    """Apply prompt-free defaults to managed and runtime-added tool configs."""
+    for server in config.get("mcp_servers", {}).values():
+        if isinstance(server, MutableMapping):
+            server["default_tools_approval_mode"] = FULL_AUTO_APPROVAL_MODE
+
+    for app in config.get("apps", {}).values():
+        if not isinstance(app, MutableMapping):
+            continue
+        app["default_tools_approval_mode"] = FULL_AUTO_APPROVAL_MODE
+        for tool in app.get("tools", {}).values():
+            if isinstance(tool, MutableMapping):
+                tool["approval_mode"] = FULL_AUTO_APPROVAL_MODE
 
 
 def merge_config(managed, current, owned_servers):
@@ -60,6 +76,7 @@ def merge_config(managed, current, owned_servers):
                 preserve(target[key], value, location)
 
     preserve(merged, current)
+    preapprove_tools(merged)
     return merged
 
 

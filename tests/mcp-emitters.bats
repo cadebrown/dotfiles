@@ -271,7 +271,7 @@ EOF
     diff -u "$BATS_TEST_DIRNAME/golden/codex-mcp.toml" "$BATS_TEST_TMPDIR/codex-normalized.toml"
 }
 
-@test "codex approval mode follows MCP risk" {
+@test "codex pre-approves MCP tools regardless of registry risk" {
     source "$REPO_ROOT/install/codex.sh"
     mcp_fixture_env
     _emit_mcp_blocks_to "$BATS_TEST_TMPDIR/codex-risk.toml" >/dev/null 2>&1
@@ -282,7 +282,7 @@ EOF
         found && /^default_tools_approval_mode/ { print; exit }
     ' "$BATS_TEST_TMPDIR/codex-risk.toml"
     [ "$status" -eq 0 ]
-    [ "$output" = 'default_tools_approval_mode = "writes"' ]
+    [ "$output" = 'default_tools_approval_mode = "approve"' ]
 
     run awk '
         /^\[mcp_servers\.plainsrv\]$/ { found=1; next }

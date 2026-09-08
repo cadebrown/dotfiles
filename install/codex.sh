@@ -203,7 +203,7 @@ _check_plugins() {
 _emit_mcp_blocks_to() {
     local out="$1" _name _kind _transport _cmd _head _tail _url
     local _auth_source _client_id _codex_client_id _codex_bearer _profile _risk
-    local _extras _arg _first _sub _approval
+    local _extras _arg _first _sub
 
     : > "$out"
     mcp_registry_validate || die "invalid MCP registry"
@@ -355,11 +355,8 @@ _emit_mcp_blocks_to() {
                 printf 'startup_timeout_sec = 20\n'
                 printf 'tool_timeout_sec = 60\n'
                 printf 'required = false\n'
-                # Codex's writes mode keeps read tools automatic and asks only
-                # for tools the server marks as mutating.
-                _approval="approve"
-                [[ "$_risk" == "external-write" ]] && _approval="writes"
-                printf 'default_tools_approval_mode = "%s"\n' "$_approval"
+                # Full-auto mode pre-approves MCP tools at the server level.
+                printf 'default_tools_approval_mode = "approve"\n'
             } >> "$out"
 
             # OAuth sub-table — must trail the parent table's bare keys.
@@ -582,7 +579,7 @@ _toml_section_key_matches() {
 
 _check_setup() {
     local _config _rules _hooks _guard _profile _pfile _guard_rc _hook_hash
-    local _want_model _mcp_name _mcp_risk _mcp_approval
+    local _want_model _mcp_name
     local _g _h _event_name _event_key _hook_key
     log_section "Codex Healthcheck"
 
@@ -614,8 +611,8 @@ _check_setup() {
         || die "Legacy sandbox_mode disables permission profiles in $_config"
     grep -q '^\[apps\._default\]$' "$_config" \
         || die "App defaults missing in $_config"
-    _toml_section_key_matches "$_config" '[apps._default]' default_tools_approval_mode writes \
-        || die "External app writes are not configured to request approval in $_config"
+    _toml_section_key_matches "$_config" '[apps._default]' default_tools_approval_mode approve \
+        || die "App tools are not configured for prompt-free execution in $_config"
     grep -q '^destructive_enabled = true$' "$_config" \
         || die "Destructive app tools are not enabled in $_config"
     grep -q '^open_world_enabled = true$' "$_config" \
@@ -625,18 +622,17 @@ _check_setup() {
     grep -q 'bearer_token_env_var = "GH_TOKEN"' "$_config" \
         || die "GitHub MCP missing bearer_token_env_var in $_config (auth=gh)"
 
-    # Active MCP profiles only: every selected server must exist and its
-    # server-level default must match the registry risk policy.
+    # Every registry server, including disabled optional profiles, must exist
+    # and use the prompt-free server-level default. Risk still informs clients
+    # that retain their own confirmation policy.
     mcp_registry_validate || die "Invalid packages/mcp-servers.txt registry"
-    while IFS= read -r _mcp_name && IFS= read -r _mcp_risk; do
+    while IFS= read -r _mcp_name; do
         grep -q "^\[mcp_servers\.${_mcp_name}\]$" "$_config" \
             || die "Missing [mcp_servers.$_mcp_name] in $_config (generated from packages/mcp-servers.txt)"
-        _mcp_approval="approve"
-        [[ "$_mcp_risk" == "external-write" ]] && _mcp_approval="writes"
         _toml_section_key_matches "$_config" "[mcp_servers.$_mcp_name]" \
-            default_tools_approval_mode "$_mcp_approval" \
-            || die "Wrong approval mode for MCP $_mcp_name (risk=$_mcp_risk)"
-    done < <(mcp_servers_each | jq -r '.name, .risk')
+            default_tools_approval_mode approve \
+            || die "MCP $_mcp_name is not configured for prompt-free execution"
+    done < <(mcp_servers_each --all | jq -r '.name')
 
     grep -q '"command": "~/.local/bin/df-chezmoi-guard"' "$_hooks" \
         || die "Codex hook does not use shared chezmoi guard"

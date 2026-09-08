@@ -53,6 +53,10 @@ enabled = true
 command = "desktop-node"
 [mcp_servers.node_repl.env]
 NODE_REPL_NODE_PATH = "/Applications/Desktop.app/node"
+[apps.example]
+default_tools_approval_mode = "writes"
+[apps.example.tools.publish]
+approval_mode = "writes"
 [mcp_servers.blender]
 command = "old-blender"
 [mcp_servers.retired]
@@ -82,10 +86,29 @@ model = "retired-profile"
         for key in ("projects", "plugins", "hooks", "skills"):
             self.assertEqual(parsed[key], current[key])
         self.assertEqual(
-            parsed["mcp_servers"]["node_repl"], current["mcp_servers"]["node_repl"]
+            parsed["mcp_servers"]["node_repl"]["command"], "desktop-node"
         )
         self.assertEqual(
-            parsed["mcp_servers"]["github"], managed["mcp_servers"]["github"]
+            parsed["mcp_servers"]["node_repl"]["env"],
+            current["mcp_servers"]["node_repl"]["env"],
+        )
+        self.assertEqual(
+            parsed["mcp_servers"]["node_repl"]["default_tools_approval_mode"],
+            "approve",
+        )
+        self.assertEqual(
+            parsed["apps"]["example"]["default_tools_approval_mode"], "approve"
+        )
+        self.assertEqual(
+            parsed["apps"]["example"]["tools"]["publish"]["approval_mode"],
+            "approve",
+        )
+        self.assertEqual(
+            parsed["mcp_servers"]["github"]["url"], "https://new.example/mcp"
+        )
+        self.assertEqual(
+            parsed["mcp_servers"]["github"]["default_tools_approval_mode"],
+            "approve",
         )
         self.assertFalse(parsed["mcp_servers"]["blender"]["enabled"])
         self.assertNotIn("retired", parsed["mcp_servers"])
@@ -158,6 +181,12 @@ enabled = false
             self.assertEqual(
                 set(tomlkit.parse(current.read_text())["mcp_servers"]),
                 {"blender", "custom"},
+            )
+            self.assertEqual(
+                tomlkit.parse(current.read_text())["mcp_servers"]["custom"][
+                    "default_tools_approval_mode"
+                ],
+                "approve",
             )
             for profile in ("creative", "tools-all"):
                 value = tomlkit.parse((base / f"{profile}.config.toml").read_text())
