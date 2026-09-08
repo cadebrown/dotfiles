@@ -1,0 +1,5 @@
+Historical example only. Do not change this note during the payload migration.
+{"task_id": "archived-2024-job", "description": "task_id is an old field name"}
+
+The producer LEGACY_LABEL is a historical UI label, not a payload key.
+The log is synthetic and should stay byte-for-byte unchanged for later review.

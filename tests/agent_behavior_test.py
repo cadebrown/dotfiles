@@ -53,6 +53,10 @@ class AgentBehaviorTests(unittest.TestCase):
         baseline, candidate = self.root / "before.md", self.root / "after.md"
         baseline.write_text("Baseline instructions")
         candidate.write_text("Candidate instructions")
+        agent_dir = self.root / "roles"
+        agent_dir.mkdir()
+        role_text = 'name = "extractor"\nmodel = "gpt-5.6-luna"\n'
+        (agent_dir / "extractor.toml").write_text(role_text)
         auth = self.root / "auth.json"
         auth.write_text('{"fixture": "test-token"}')
         codex = self.root / "fake-codex"
@@ -69,6 +73,7 @@ else:
     assert (home/"auth.json").stat().st_mode & 0o777 == 0o600
     assert Path(args[args.index("--cd")+1]).resolve() == Path.cwd()
     assert os.environ["HOME"] == str(home.parent)
+    assert os.environ["UV_CACHE_DIR"] == str(Path(os.environ["TMPDIR"])/"uv-cache")
     assert "OPENAI_API_KEY" not in os.environ
     if os.environ.get("EVAL_TEST_FAIL"):
         sys.exit(2)
@@ -86,7 +91,7 @@ else:
         output = self.root / "results"
         args = argparse.Namespace(output=output, baseline=baseline, candidate=candidate,
                                   cases=["resume"], model="gpt-6-astra", effort="xhigh", codex=str(codex),
-                                  skill=[], browser_modules=None, sandbox="danger-full-access")
+                                  skill=[], agent_dir=agent_dir, browser_modules=None, sandbox="danger-full-access")
         physical_root = self.root / "runtime-physical"
         physical_root.mkdir()
         alias_root = self.root / "runtime-alias"
@@ -104,6 +109,18 @@ else:
         self.assertEqual(manifest["sandbox"], "danger-full-access")
         self.addCleanup(shutil.rmtree, runtime)
         self.assertNotEqual(manifest["variants"]["baseline"]["sha256"], manifest["variants"]["candidate"]["sha256"])
+        self.assertEqual((output / "agents/extractor.toml").read_text(), role_text)
+        self.assertEqual((output / "agents/extractor.toml").stat().st_mode & 0o777, 0o600)
+        self.assertEqual(output.stat().st_mode & 0o777, 0o700)
+        for variant in ("baseline", "candidate"):
+            selected = manifest["runs"][f"{variant}/resume"]
+            role = Path(selected["root"]) / "home/.codex/agents/extractor.toml"
+            self.assertEqual(role.read_text(), role_text)
+            self.assertEqual(role.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(selected["control"]["agents/extractor.toml"], MODULE.digest(role))
+            config = (Path(selected["root"]) / "home/.codex/config.toml").read_text()
+            self.assertIn("multi_agent_v2 = true", config)
+            self.assertIn("max_concurrent_threads_per_session = 2", config)
         run_args = argparse.Namespace(experiment=experiment, variant="candidate", case="resume", auth_file=auth, timeout=30)
         with patch.dict("os.environ", {"OPENAI_API_KEY": "not-for-fixture"}), contextlib.redirect_stdout(io.StringIO()):
             MODULE.run(run_args)
@@ -123,6 +140,83 @@ else:
             MODULE.run(run_args)
         failed_root = Path(manifest["runs"]["baseline/resume"]["root"])
         self.assertFalse((failed_root / "home/.codex/auth.json").exists())
+
+    def test_empty_agent_directory_fails_before_preparation(self):
+        args = argparse.Namespace(agent_dir=self.root, output=self.root / "output")
+        with self.assertRaisesRegex(ValueError, "No custom agent TOML"):
+            MODULE.prepare(args)
+        self.assertFalse(args.output.exists())
+
+    def test_native_usage_preserves_child_identity_without_exporting_content(self):
+        sessions = self.root / "sessions"
+        sessions.mkdir()
+        events = [
+            {"type": "session_meta", "payload": {"id": "child", "source": {"subagent": {
+                "thread_spawn": {"parent_thread_id": "parent", "agent_role": "coder"}}}}},
+            {"type": "session_meta", "payload": {"id": "parent", "source": "exec"}},
+            {"type": "turn_context", "payload": {"model": "gpt-6-astra", "effort": "xhigh"}},
+            {"type": "response_item", "payload": {"text": "private prompt or tool content"}},
+            {"type": "turn_context", "payload": {"model": "gpt-5.6-luna", "effort": "low"}},
+            {"type": "event_msg", "payload": {"type": "token_count", "info": {
+                "total_token_usage": {"input_tokens": 100, "cached_input_tokens": 60, "output_tokens": 10}}}},
+            {"type": "event_msg", "payload": {"type": "token_count", "info": None}},
+            {"type": "event_msg", "payload": {"type": "token_count", "info": "unknown format"}},
+            {"type": "turn_context", "payload": None},
+            None,
+        ]
+        (sessions / "child.jsonl").write_text("\n".join(map(json.dumps, events)) + "\npartial line")
+        (sessions / "empty.jsonl").write_text(json.dumps({"type": "session_meta", "payload": {"id": "empty"}}))
+        report = MODULE.native_usage(self.root)
+        child, empty = report["sessions"]
+        self.assertEqual((child["thread_id"], child["parent_thread_id"], child["role"]), ("child", "parent", "coder"))
+        self.assertEqual((child["model"], child["effort"]), ("gpt-5.6-luna", "low"))
+        self.assertEqual(child["reported_usage"]["input_tokens"], 100)
+        self.assertIsNone(empty["reported_usage"])
+        self.assertNotIn("private prompt", json.dumps(report))
+
+    def test_delegation_verifier_exercises_results_and_preservation(self):
+        fixture = MODULE.FIXTURES / "delegation"
+        workspace = self.root / "maintenance"
+        shutil.copytree(fixture / "input", workspace)
+        command = ["uv", "run", "--no-project", "--offline", str(fixture / "verify.py"), str(workspace)]
+        self.assertNotEqual(subprocess.run(command, capture_output=True).returncode, 0)
+        (workspace / "output").mkdir()
+        shutil.copyfile(fixture / "expected-log.json", workspace / "output/log-summary.json")
+        producer = workspace / "events/producer.py"
+        producer.write_text(producer.read_text().replace("def make_event(task_id,", "def make_event(job_id,")
+                            .replace('"task_id": task_id,', '"job_id": job_id,'))
+        consumer = workspace / "events/consumer.py"
+        consumer.write_text(consumer.read_text().replace("task_id", "job_id"))
+        (workspace / "retry_queue.py").write_text('''class RetryQueue:
+    def __init__(self, base_delay=2, max_delay=30):
+        if type(base_delay) is not int or type(max_delay) is not int or base_delay <= 0 or max_delay < base_delay:
+            raise ValueError("invalid delays")
+        self.base_delay, self.max_delay = base_delay, max_delay
+        self.next_delays = {}
+    def failure(self, job_id):
+        delay = self.next_delays.get(job_id, self.base_delay)
+        self.next_delays[job_id] = min(delay * 2, self.max_delay)
+        return delay
+    def success(self, job_id):
+        self.next_delays.pop(job_id, None)
+''')
+        result = subprocess.run(command, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(len(json.loads(result.stdout)["checks"]), 5)
+        original_report = (workspace / "output/log-summary.json").read_text()
+        report = json.loads(original_report)
+        report["groups"][0]["first_line"] += 1
+        (workspace / "output/log-summary.json").write_text(json.dumps(report))
+        result = subprocess.run(command, text=True, capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+        checks = {c["name"]: c["passed"] for c in json.loads(result.stdout)["checks"]}
+        self.assertFalse(checks["exact log summary and evidence"])
+        (workspace / "output/log-summary.json").write_text(original_report)
+        (workspace / "user-notes.txt").write_text("unintended rewrite")
+        result = subprocess.run(command, text=True, capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+        checks = {c["name"]: c["passed"] for c in json.loads(result.stdout)["checks"]}
+        self.assertFalse(checks["preserved source inputs"])
 
 
 if __name__ == "__main__":

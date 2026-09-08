@@ -1,11 +1,17 @@
 #!/bin/bash
 # Chezmoi re-runs this script whenever managed Codex config, hooks, or the
-# shared MCP server list change.
+# shared MCP server list or focused agent sources change.
 # codex config hash:  {{ include "dot_codex/create_private_config.toml" | sha256sum }}
 # codex hooks hash:   {{ include "dot_codex/hooks.json" | sha256sum }}
 # guard script hash:  {{ include "dot_local/bin/executable_df-chezmoi-guard" | sha256sum }}
 # mcp-servers.txt:    {{ include "../packages/mcp-servers.txt" | sha256sum }}
 # installer hash:     {{ include "../install/codex.sh" | sha256sum }}
+# config renderer:    {{ include "../install/codex-config.py" | sha256sum }}
+# agent scopes:       {{ include "../packages/codex-agent-tools.json" | sha256sum }}
+# agent source hashes:
+{{- range glob (joinPath .chezmoi.sourceDir "dot_codex/agents/*.toml") }}
+#   {{ . | include | sha256sum }} {{ base . }}
+{{- end }}
 # overlay mcp hashes:
 {{- range glob (joinPath .chezmoi.workingTree "dotfiles-*/packages/mcp-servers.txt") }}
 #   {{ . | include | sha256sum }} {{ . }}

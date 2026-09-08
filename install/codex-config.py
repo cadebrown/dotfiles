@@ -16,6 +16,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import tomlkit
+from tomlkit.items import Table
 
 PREFERENCES = {
     ("model",),
@@ -55,6 +56,14 @@ def preapprove_tools(config):
 def merge_config(managed, current, owned_servers):
     merged = deepcopy(managed)
 
+    def copy_entry(target, key, value):
+        copied = deepcopy(value)
+        target[key] = copied
+        if isinstance(copied, Table):
+            # tomlkit may add a separator that reparses into the preceding table.
+            # Restore the original indent so repeated merges cannot grow blanks.
+            copied.trivia.indent = value.trivia.indent
+
     def preserve(target, source, path=()):
         for key, value in source.items():
             location = (*path, key)
@@ -63,13 +72,13 @@ def merge_config(managed, current, owned_servers):
             if path == ("mcp_servers",) and key in owned_servers:
                 continue
             if location in PREFERENCES or (not path and key in RUNTIME):
-                target[key] = deepcopy(value)
+                copy_entry(target, key, value)
             elif key not in target:
                 if location == ("mcp_servers",):
                     target[key] = tomlkit.table()
                     preserve(target[key], value, location)
                 else:
-                    target[key] = deepcopy(value)
+                    copy_entry(target, key, value)
             elif isinstance(value, MutableMapping) and isinstance(
                 target[key], MutableMapping
             ):
@@ -97,6 +106,8 @@ def disable_skills(config, paths):
 
 def atomic_write(path, text):
     if path.exists() and path.read_text() == text:
+        if path.stat().st_mode & 0o777 != 0o600:
+            path.chmod(0o600)
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as stream:
@@ -167,6 +178,54 @@ def sync_profiles(directory, records, owned_servers):
     atomic_write(ownership, json.dumps(profiles, sort_keys=True) + "\n")
 
 
+def render_agents(source_directory, scopes_file, config):
+    """Resolve role tool scopes without copying server definitions into sources."""
+    scopes = json.loads(scopes_file.read_text())
+    if not isinstance(scopes, dict):
+        raise ValueError("Codex agent tool scopes must be an object")
+    servers = config.get("mcp_servers", {})
+    rendered = {}
+    for source in sorted(source_directory.glob("*.toml")):
+        agent = tomlkit.parse(source.read_text())
+        name = agent.get("name")
+        if name != source.stem or re.fullmatch(r"[a-z][a-z0-9_]*", name) is None:
+            raise ValueError(f"Agent name must match its source filename: {source}")
+        if not all(isinstance(agent.get(key), str) and agent[key].strip()
+                   for key in ("description", "developer_instructions")):
+            raise ValueError(f"Agent is missing description or instructions: {source}")
+        if name in scopes:
+            allowed = scopes[name]
+            if not isinstance(allowed, list) or not all(isinstance(item, str) for item in allowed):
+                raise ValueError(f"Agent MCP scope must be a list of names: {name}")
+            missing = set(allowed) - set(servers)
+            if missing:
+                raise ValueError(f"Unknown MCP servers for {name}: {sorted(missing)}")
+            if any(key in agent for key in ("mcp_servers", "apps", "plugins")):
+                raise ValueError(f"Scoped agent tool settings belong in the scope manifest: {name}")
+            # Codex validates transport even on disabled MCP entries. Retain the
+            # resolved transport/auth references, then control visibility per role.
+            agent["mcp_servers"] = deepcopy(servers)
+            for server_name, server in agent["mcp_servers"].items():
+                server["enabled"] = server_name in allowed
+                if server_name not in allowed:
+                    server["required"] = False
+            agent["apps"] = {key: {"enabled": False}
+                             for key in sorted(set(config.get("apps", {})) | {"_default"})}
+            # Plugin reconciliation runs after config sync. Disable discovery so
+            # newly installed plugins cannot leak into this role on first sync.
+            agent.setdefault("features", {})["plugins"] = False
+        result = "# Managed from home/dot_codex/agents and packages/codex-agent-tools.json.\n"
+        result += tomlkit.dumps(agent)
+        tomlkit.parse(result)
+        rendered[source.name] = result
+    if not rendered:
+        raise ValueError(f"No Codex agent sources found: {source_directory}")
+    unknown = set(scopes) - {Path(filename).stem for filename in rendered}
+    if unknown:
+        raise ValueError(f"Tool scopes name missing agent sources: {sorted(unknown)}")
+    return rendered
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--managed", type=Path, required=True)
@@ -175,8 +234,14 @@ def main():
     parser.add_argument("--ownership", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--profiles-dir", type=Path)
+    parser.add_argument("--agent-sources", type=Path)
+    parser.add_argument("--agent-scopes", type=Path)
+    parser.add_argument("--agents-dir", type=Path)
     parser.add_argument("--disable-skill", type=Path, action="append", default=[])
     args = parser.parse_args()
+    agent_options = (args.agent_sources, args.agent_scopes, args.agents_dir)
+    if any(agent_options) and not all(agent_options):
+        parser.error("--agent-sources, --agent-scopes, and --agents-dir must be supplied together")
 
     original = args.current.read_text() if args.current.exists() else None
     current = tomlkit.parse(original or "")
@@ -192,6 +257,7 @@ def main():
     disable_skills(merged, args.disable_skill)
     rendered = tomlkit.dumps(merged)
     tomlkit.parse(rendered)
+    agents = render_agents(args.agent_sources, args.agent_scopes, merged) if all(agent_options) else {}
 
     if args.output == args.current:
         latest = args.current.read_text() if args.current.exists() else None
@@ -202,6 +268,8 @@ def main():
     atomic_write(args.output, rendered)
     if args.profiles_dir:
         sync_profiles(args.profiles_dir, records, registry | previous)
+    for filename, content in agents.items():
+        atomic_write(args.agents_dir / filename, content)
     if args.output == args.current:
         atomic_write(args.ownership, json.dumps(sorted(registry)) + "\n")
 

@@ -1,0 +1,8 @@
+{
+  "extractor": [],
+  "coder": [],
+  "patcher": ["context7"],
+  "explorer": ["context7", "openaiDeveloperDocs", "rust-docs", "crates"],
+  "researcher": ["context7", "openaiDeveloperDocs"],
+  "verifier": []
+}

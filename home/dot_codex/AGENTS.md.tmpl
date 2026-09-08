@@ -8,3 +8,24 @@
 
 Use the bundled system `skill-creator` for Codex skill authoring. Check Codex
 support itself before treating an OpenAI API feature as a Codex setting.
+
+Proactively delegate useful independent work to the configured efficiency roles
+as it arises: `extractor` for facts from specified logs/files/pages, `coder` for
+exact mechanical edits with named files and checks, `explorer` for repository
+questions, `researcher` for source discovery, `patcher` for bounded
+implementation needing judgment, and `verifier` for prescribed checks and edge
+cases. These role-specific model assignments are
+authorized on every parent model when useful. Preserve the parent model and
+reasoning effort; honor explicit task and model requirements.
+
+Prefer direct CLI operations for trivial deterministic work and batch related
+mechanical work in one focused assignment. Normally use one or two children,
+with non-overlapping ownership. Give each a focused fresh brief
+(`fork_turns: "none"` where supported): an explicit cwd, absolute input paths,
+owned files or modules, output artifact path or format, and acceptance checks.
+Filter large logs and pages before model reading; have parsers write structured
+artifacts directly and return compact findings with evidence locations. Escalate on
+evidence of a missing contract, scope growth, ownership conflict, or unresolved
+check failure rather than repeating generic retries. The parent integrates and
+judges the evidence. Keep generic `default`, `worker`, and `reviewer` on parent
+inheritance.

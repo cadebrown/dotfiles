@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,70 @@ SPEC.loader.exec_module(SYNC)
 
 
 class CodexConfigTests(unittest.TestCase):
+    def test_agent_scopes_keep_transports_and_exclude_runtime_integrations(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            sources = base / "sources"
+            sources.mkdir()
+            (sources / "coder.toml").write_text('''name = "coder"
+description = "Exact changes"
+model = "gpt-5.6-luna"
+model_reasoning_effort = "low"
+developer_instructions = "Only the assigned changes."
+[agents]
+enabled = false
+''')
+            (sources / "reviewer.toml").write_text('''name = "reviewer"
+description = "Review"
+developer_instructions = "Inspect correctness."
+''')
+            scopes = base / "scopes.json"
+            scopes.write_text('{"coder": ["docs"]}')
+            config = tomlkit.parse('''model = "gpt-6-astra"
+[mcp_servers.docs]
+url = "https://docs.example/mcp"
+bearer_token_env_var = "DOCS_TOKEN"
+[mcp_servers.runtime]
+command = "runtime-tool"
+required = true
+[apps._default]
+enabled = true
+[apps.mail]
+enabled = true
+[plugins."runtime@example"]
+enabled = true
+''')
+            original = tomlkit.dumps(config)
+            output = SYNC.render_agents(sources, scopes, config)
+            coder = tomlkit.parse(output["coder.toml"])
+            self.assertEqual(coder["model"], "gpt-5.6-luna")
+            self.assertEqual(coder["model_reasoning_effort"], "low")
+            self.assertFalse(coder["agents"]["enabled"])
+            self.assertTrue(coder["mcp_servers"]["docs"]["enabled"])
+            self.assertEqual(coder["mcp_servers"]["docs"]["bearer_token_env_var"], "DOCS_TOKEN")
+            self.assertFalse(coder["mcp_servers"]["runtime"]["enabled"])
+            self.assertFalse(coder["mcp_servers"]["runtime"]["required"])
+            self.assertEqual(coder["mcp_servers"]["runtime"]["command"], "runtime-tool")
+            self.assertTrue(all(not value["enabled"] for value in coder["apps"].values()))
+            self.assertFalse(coder["features"]["plugins"])
+            self.assertNotIn("plugins", coder)
+            reviewer = tomlkit.parse(output["reviewer.toml"])
+            self.assertNotIn("model", reviewer)
+            self.assertNotIn("mcp_servers", reviewer)
+            self.assertEqual(tomlkit.dumps(config), original)
+            self.assertEqual(SYNC.render_agents(sources, scopes, config), output)
+            target = base / "coder.toml"
+            SYNC.atomic_write(target, output["coder.toml"])
+            target.chmod(0o644)
+            SYNC.atomic_write(target, output["coder.toml"])
+            self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+            scopes.write_text('{"coder": ["typo"]}')
+            with self.assertRaisesRegex(ValueError, "Unknown MCP"):
+                SYNC.render_agents(sources, scopes, config)
+            scopes.write_text('{"missing_role": []}')
+            with self.assertRaisesRegex(ValueError, "missing agent sources"):
+                SYNC.render_agents(sources, scopes, config)
+
     def test_semantic_merge_preserves_runtime_across_interleaved_tables(self):
         managed = tomlkit.parse("""model = "gpt-6-astra"
 review_model = "gpt-6-astra"
@@ -151,7 +216,16 @@ enabled = false
             )
             current.write_text(
                 '[mcp_servers.retired]\ncommand = "remove-me"\n[mcp_servers.custom]\ncommand = "keep-me"\n'
+                '[apps.mail]\nenabled = true\n[apps.calendar]\nenabled = true\n'
             )
+            sources = base / "sources"
+            sources.mkdir()
+            (sources / "coder.toml").write_text(
+                'name = "coder"\ndescription = "Exact edits"\n'
+                'developer_instructions = "Change only assigned files."\n'
+            )
+            scopes = base / "scopes.json"
+            scopes.write_text('{"coder": []}')
             ownership.write_text('["retired"]')
             registry.write_text(
                 json.dumps({"name": "blender", "profile": "creative"}) + "\n"
@@ -171,11 +245,20 @@ enabled = false
                 str(ownership),
                 "--profiles-dir",
                 str(base),
+                "--agent-sources", str(sources),
+                "--agent-scopes", str(scopes),
+                "--agents-dir", str(base / "agents"),
             ]
-            subprocess.run(command, check=True, capture_output=True)
+            subprocess.run(command, check=True, capture_output=True,
+                           env={**os.environ, "PYTHONHASHSEED": "1"})
             first = current.read_bytes()
-            subprocess.run(command, check=True, capture_output=True)
+            agent_target = base / "agents/coder.toml"
+            first_agent = agent_target.read_bytes()
+            subprocess.run(command, check=True, capture_output=True,
+                           env={**os.environ, "PYTHONHASHSEED": "2"})
             self.assertEqual(current.read_bytes(), first)
+            self.assertEqual(agent_target.read_bytes(), first_agent)
+            self.assertEqual(agent_target.stat().st_mode & 0o777, 0o600)
             self.assertEqual(current.stat().st_mode & 0o777, 0o600)
             self.assertEqual(json.loads(ownership.read_text()), ["blender"])
             self.assertEqual(

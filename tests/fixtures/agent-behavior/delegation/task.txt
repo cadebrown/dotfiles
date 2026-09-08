@@ -1,0 +1,31 @@
+Please finish these three independent maintenance jobs in this scratch project.
+You can delegate independent work when useful. Keep the final handoff concise:
+the files produced, checks performed, and anything still unresolved.
+
+1. Triage logs/build-output.txt without dumping the whole log into the chat.
+   Write output/log-summary.json with exactly these keys:
+   total_lines (all lines), error_count (actual ERROR-level records), and groups.
+   Each group has code, count, first_line, last_line, and example. Groups are
+   sorted by code. Line numbers are 1-based; example is the complete first error
+   line for that code, without its newline. Count only records whose level field
+   is ERROR, not error-like text in messages. Do not modify the source log.
+
+2. Migrate the event payload field task_id to job_id in events/producer.py and
+   events/consumer.py. Rename the producer's argument too. This is an exact field
+   rename; preserve payload values, timestamp formatting, descriptions, counts,
+   input immutability, and the intentionally literal LEGACY_LABEL = "task_id".
+   No compatibility alias is wanted. Do not modify events/__init__.py or the
+   historical examples in user-notes.txt.
+
+3. Fix RetryQueue in retry_queue.py. failure(job_id) should return base_delay
+   on that job's first failure, double on successive failures, and cap at
+   max_delay. Jobs have independent retry state. success(job_id) clears only
+   that job's state, and clearing an unknown job is a no-op. Different queue
+   instances have independent state. Constructor arguments must be positive
+   integers (not bools), and max_delay must be >= base_delay; otherwise raise
+   ValueError. Preserve the public method names and defaults. Repeated failures
+   after reaching the cap must not construct ever-growing integers.
+
+Run check.py as a starting check, and verify relevant edge cases. You may add
+focused checks, but preserve check.py and user-notes.txt. All input is synthetic;
+there is no need to install dependencies, search the web, or access other repos.

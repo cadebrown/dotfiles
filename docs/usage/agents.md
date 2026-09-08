@@ -125,16 +125,120 @@ are preserved. Self-installed skills rerun their declared force installer.
 The committed digest remains the review/audit baseline. Read-only `check`
 continues to exit nonzero for drift from that baseline.
 
-Codex and Claude each have `researcher` and `reviewer` specialists under their
-managed `agents/` directories. Global instructions authorize bounded parallel
-research, log analysis, tests, and final review while keeping overlapping edits
-in one agent. Codex is capped at six direct children and one level of nesting.
+Claude has `researcher` and `reviewer` specialists under its managed `agents/`
+directory. Codex has the focused roles below. Global instructions authorize
+bounded delegation while keeping overlapping edits in one agent. Codex allows
+up to six concurrent direct children; focused efficiency roles disable their
+own agents. The configured `max_depth = 1` is a V1 fallback, not a V2 nesting
+guarantee for other roles.
 
 `install/agent-tools.sh` deploys `df-agent-doctor` into `$ARCH_BIN` on every
 platform. The command checks the declared tool surface, skill registry, Codex
 plugins/config, qmd, cass, the managed Python/SymPy environment, and the live qmd
 LaunchAgent on macOS. When `dotfiles-nvidia` is present, it also runs the
 overlay's final runtime verifier, including ComputeLab and internal MCP tools.
+
+## Codex delegation
+
+The Codex wrapper authorizes named focused roles on every parent model whenever
+useful independent work appears, including partway through a task. This is an
+instruction policy for choosing work, not a runtime rule that detects or changes
+the parent model or reasoning effort. Explicit task, model, and user directions
+remain authoritative.
+
+Custom role sources live under `home/dot_codex/agents/`. After editing them, run
+`bash install/codex.sh sync-config` to render `~/.codex/agents/` with mode `0600`.
+The installer owns those generated outputs; chezmoi ignores the target directory
+so it cannot overwrite the generated tool scopes. These roles set both model
+and reasoning effort:
+
+| Role | Model / effort | Context controls | Assignment |
+|---|---|---|---|
+| `extractor` | Luna / low | Output 2,000; skills 2,000; web disabled; no registry MCPs | Extract requested facts from specified logs, files, or pages; return evidence locations and missing values. |
+| `coder` | Luna / low | Output 2,000; skills 2,000; web disabled; no registry MCPs | Apply explicit replacements, mappings, or schema transformations to named files, with observable checks. |
+| `explorer` | Terra / medium | Output 4,000; skills 3,000; web disabled | Answer a focused repository question or trace a specific execution path. |
+| `researcher` | Terra / medium | Output 4,000; skills 3,000; web medium | Discover primary sources, verify current claims, and separate evidence from inference. |
+| `patcher` | Terra / medium | Output 4,000; skills 3,000; web disabled | Implement a bounded behavior change that needs coding judgment. |
+| `verifier` | Terra / medium | Output 4,000; skills 3,000; web disabled; no registry MCPs | Run prescribed checks and edge cases, then report evidence for parent integration. |
+| `reviewer` | Inherit parent | Inherit parent | Independently assess correctness, regressions, and missing validation when warranted. |
+
+`default` and `worker` also retain parent inheritance. The focused roles use low
+verbosity and disable child-agent spawning. `researcher` and `reviewer` retain
+their read-only permission setting; the other focused roles inherit the session's
+permissions and are constrained by their role instructions. Role sources do not
+turn inherited permissions into a security boundary. The verifier therefore may
+write its requested artifacts while its instructions prohibit application/source
+edits. Role descriptions and model settings belong in these files, rather than
+being copied into every skill.
+
+The role manifests also set context controls: Luna `extractor` and `coder` start
+with a 2,000-token tool-output limit and a 2,000-token skill-catalog budget;
+Terra `explorer`, `researcher`, `patcher`, and `verifier` start with 4,000 and
+3,000 respectively. `researcher` uses medium web-search context. These are
+starting choices for bounded assignments, not hard execution or spend caps, and
+they do not guarantee savings. Validate them with observed correctness, usage,
+artifacts, and parent rework on representative tasks.
+
+The `coder` contract is deliberately narrower than `patcher`. "Replace these
+three deprecated keys using this exact mapping in these named fixture files,
+then run this verifier" fits `coder`. "Add an option with these semantics and
+make its error handling consistent with the existing API" fits `patcher`.
+Architecture, ambiguous requirements, difficult diagnosis, and final integration
+remain with the parent. If a command can perform the whole task deterministically,
+the parent should run that command directly instead of spawning a model.
+
+Prefer direct CLI operations when one trivial deterministic command can complete
+the work. Otherwise, batch related mechanical work in one assignment and give
+each child the question, explicit cwd, absolute input paths or URLs, owned files
+or modules, output artifact path or format, and acceptance checks. Prefer a
+fresh brief (`fork_turns: "none"` when the available interface supports it) over
+copying the whole conversation. Normally keep one or two useful children active.
+Children report incomplete specifications, ownership conflicts, scope growth,
+and failed checks to the parent; they do not build another delegation tree or
+retry a failure without new evidence.
+
+Have tools filter large material before a model reads it: use `rg`, `jq`, a
+parser, or page extraction. Parsers write structured artifacts directly instead
+of retyping generated data. Keep full logs and extracted datasets in artifacts;
+return the answer, evidence locations, check results, artifacts, and unresolved
+items.
+The goal is to reduce expensive parent context and use cheaper models for
+bounded interpretation. Delegation can increase total tokens, so model price
+alone does not establish savings. Measure usage together with correctness and
+parent rework on representative tasks.
+
+The [executable delegation samples](../../tests/fixtures/agent-behavior/README.md#delegation-sample)
+cover log extraction, an exact field rename, and a bounded retry repair. The
+[first paired result](../../tests/fixtures/agent-behavior/delegation/sample-result.md)
+confirmed Luna routing and passing outputs, but did not demonstrate fewer raw
+tokens.
+
+Tool activation is separate from role instructions and permission settings.
+The [MCP registry](../../packages/mcp-servers.txt) remains the source of endpoints
+and versions; [configuration generation](../../install/codex-config.py) combines
+the [role selection manifest](../../packages/codex-agent-tools.json) with the managed configuration. Generated roles
+include the resolved MCP definitions, disable unrelated servers, and scope apps
+and plugins. Keep endpoint and credential declarations out of the role sources.
+Run `bash install/codex.sh sync-config` after changing either role instructions
+or tool selection, then inspect the actual spawned inventory in a new task.
+A tool allowlist does not restrict what an unrestricted shell can access, and
+a running task may retain its original tool inventory.
+
+`extractor`, `coder`, and `verifier` load no registry MCPs; the extractor can
+fetch supplied URLs with shell tools. `patcher` keeps Context7. `explorer` keeps Context7,
+OpenAI developer docs, Rust docs, and crates.io. `researcher` keeps Context7 and
+OpenAI developer docs plus live native web search with medium context. The other
+efficiency roles disable native web search. Their generated configurations disable plugin
+discovery and known apps as well as unwanted MCPs. New MCP integrations or
+project overrides require another sync and inventory check; these are context
+controls, not a security boundary.
+
+These local files configure Codex clients that load them. They do not deploy
+agent definitions, tools, or model routing into hosted ChatGPT Work. A matching
+hosted project instruction can describe the workflow, but its available models
+and delegation controls must be checked in that product. See OpenAI's
+[subagent documentation](https://learn.chatgpt.com/docs/agent-configuration/subagents)
+for the supported client behavior.
 
 ## Codex workbench
 

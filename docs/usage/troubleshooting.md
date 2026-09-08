@@ -1,5 +1,21 @@
 # Troubleshooting
 
+## Docker bootstrap build reports invalid Ubuntu package signatures
+
+**Symptom:** `./tests/run.sh` fails during `apt-get update` with
+`At least one invalid signature was encountered`, before running tests.
+
+**Possible root cause:** A full Docker data disk prevents complete package
+index writes. On the affected Colima VM, `/var/lib/docker` was at 100% with
+zero available space. This observation does not rule out other signature errors.
+
+**Confirm:** Use `colima ssh -- df -h / /var/lib/docker` and `docker system df`
+to distinguish VM storage exhaustion from host free space.
+
+**Fix:** After choosing an explicitly authorized cleanup or disk expansion,
+restore free space and rerun `./tests/run.sh`. Do not disable signature checking
+or treat this pre-test environment failure as a passing suite.
+
 ## Agent shell loops report installed commands as missing
 
 **Symptom:** `rg`, `curl`, or `stat` works initially, then a generated zsh loop

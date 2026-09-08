@@ -11,7 +11,8 @@
 #   - sync-config: write managed ~/.codex/config.toml from the chezmoi template,
 #                  generate [mcp_servers.*] blocks from packages/mcp-servers.txt
 #                  (shared with install/claude.sh — same format), and preserve
-#                  user model choices and Desktop/runtime integrations
+#                  user model choices and Desktop/runtime integrations; render
+#                  focused agents from home/dot_codex/agents with scoped tools
 #   - sync-hooks:  write ~/.codex/hooks.json + ~/.local/bin/df-chezmoi-guard,
 #                  then update the trusted_hash so codex accepts the hook
 #   - plugins:     reconcile packages/codex-plugins.txt against official markets
@@ -428,8 +429,11 @@ _sync_config() {
     uv run --quiet "$DF_ROOT/install/codex-config.py" \
         --managed "$_managed" --current "$_dest" --output "$_dest" \
         --registry "$_registry" --ownership "$HOME/.codex/.dotfiles-mcp-ownership.json" \
-        --profiles-dir "$HOME/.codex" "${_merge_args[@]}"
-    log_okay "Synced Codex defaults and MCP profiles; preserved model choices and runtime integrations"
+        --profiles-dir "$HOME/.codex" \
+        --agent-sources "$DF_ROOT/home/dot_codex/agents" \
+        --agent-scopes "$DF_PACKAGES/codex-agent-tools.json" \
+        --agents-dir "$HOME/.codex/agents" "${_merge_args[@]}"
+    log_okay "Synced Codex defaults, MCP profiles, and agents; preserved model choices and runtime integrations"
 }
 
 _sync_hooks() {

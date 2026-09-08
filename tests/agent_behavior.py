@@ -10,9 +10,11 @@ import shutil
 import signal
 import subprocess
 import tempfile
+import time
 
 
 FIXTURES = Path(__file__).parent / "fixtures" / "agent-behavior"
+CASES = ("coding", "research", "browser", "resume", "execution", "delegation")
 
 
 def digest(path):
@@ -34,7 +36,8 @@ def environment(root):
     env.update(HOME=str(root / "home"), CODEX_HOME=str(root / "home" / ".codex"),
                XDG_CONFIG_HOME=str(root / "home" / ".config"),
                XDG_DATA_HOME=str(root / "home" / ".local" / "share"),
-               XDG_CACHE_HOME=str(root / "home" / ".cache"), TMPDIR=str(root / "tmp"))
+               XDG_CACHE_HOME=str(root / "home" / ".cache"), TMPDIR=str(root / "tmp"),
+               UV_CACHE_DIR=str(root / "tmp" / "uv-cache"))
     return env
 
 
@@ -46,10 +49,21 @@ def reject_ancestor_instructions(workspace):
 
 
 def prepare(args):
+    agent_dir = getattr(args, "agent_dir", None)
+    agent_files = sorted(agent_dir.glob("*.toml")) if agent_dir else []
+    if agent_dir and not agent_files:
+        raise ValueError(f"No custom agent TOML files found in {agent_dir}")
     output = args.output.resolve()
-    output.mkdir(parents=True, exist_ok=True)
+    output.mkdir(mode=0o700, parents=True, exist_ok=True)
     if (output / "experiment.json").exists():
         raise ValueError("An experiment already exists here; choose a new output directory")
+    if agent_files:
+        (output / "agents").mkdir()
+        for source in agent_files:
+            target = output / "agents" / source.name
+            with open(target, "wb", opener=lambda path, flags: os.open(path, flags, 0o600)) as stream:
+                stream.write(source.read_bytes())
+            target.chmod(0o600)
     for case in args.cases:
         shutil.copytree(FIXTURES / case, output / "fixtures" / case)
     root = Path(tempfile.mkdtemp(prefix="codex-instruction-eval-")).resolve()
@@ -73,6 +87,8 @@ def prepare(args):
             home.mkdir(parents=True)
             (run_root / "tmp").mkdir()
             shutil.copyfile(instruction, home / "AGENTS.md")
+            if agent_files:
+                shutil.copytree(output / "agents", home / "agents")
             for skill in args.skill:
                 shutil.copytree(skill, home / "skills" / skill.name)
             config = (f'model = {json.dumps(args.model)}\n'
@@ -80,6 +96,9 @@ def prepare(args):
                       f'approval_policy = "never"\nsandbox_mode = {json.dumps(args.sandbox)}\n'
                       'web_search = "disabled"\nproject_doc_max_bytes = 65536\n'
                       '[sandbox_workspace_write]\nnetwork_access = true\n')
+            if agent_files:
+                config += ('[features]\nmulti_agent_v2 = true\n'
+                           '[agents]\nmax_concurrent_threads_per_session = 2\n')
             (home / "config.toml").write_text(config)
             artifacts = output / variant / case
             artifacts.mkdir(parents=True)
@@ -126,6 +145,55 @@ def check_controls(run):
             raise ValueError(f"Control changed after preparation: {path}")
 
 
+def native_usage(home):
+    """Read per-session counters without exporting prompts or tool arguments."""
+    sessions = []
+    warnings = []
+    for path in sorted((home / "sessions").rglob("*.jsonl")):
+        metadata, context, usage = None, {}, None
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError as error:
+            warnings.append(f"Could not read {path.name}: {error.strerror}")
+            continue
+        for raw in lines:
+            try:
+                event = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(event, dict):
+                continue
+            payload = event.get("payload", {})
+            if not isinstance(payload, dict):
+                continue
+            if event.get("type") == "session_meta" and metadata is None:
+                # Forked rollouts can also contain copied parent metadata.
+                metadata = payload
+            elif event.get("type") == "turn_context":
+                context = payload
+            elif event.get("type") == "event_msg" and payload.get("type") == "token_count":
+                info = payload.get("info") or {}
+                if not isinstance(info, dict):
+                    continue
+                if isinstance(info.get("total_token_usage"), dict):
+                    usage = {key: value for key, value in info["total_token_usage"].items()
+                             if key in ("input_tokens", "cached_input_tokens", "cache_write_input_tokens",
+                                        "output_tokens", "reasoning_output_tokens", "total_tokens")}
+        if not metadata:
+            continue
+        source = metadata.get("source")
+        subagent = source.get("subagent") if isinstance(source, dict) else None
+        spawn = subagent.get("thread_spawn") if isinstance(subagent, dict) else None
+        spawn = spawn if isinstance(spawn, dict) else {}
+        sessions.append({"thread_id": metadata.get("id"), "parent_thread_id": spawn.get("parent_thread_id"),
+                         "role": spawn.get("agent_role"), "model": context.get("model"),
+                         "effort": context.get("effort"), "reported_usage": usage})
+    return {"sessions": sessions, "warnings": warnings,
+            "note": "Native per-session cumulative counters; do not sum snapshots across turns. "
+                    "Cached input and reasoning output are subsets, not additional tokens. "
+                    "Missing counters are unavailable, not zero. This is not billing data."}
+
+
 def run(args):
     experiment, selected = load_run(args)
     root, artifacts = Path(selected["root"]), Path(selected["artifacts"])
@@ -146,6 +214,7 @@ def run(args):
          ("PLAYWRIGHT_BROWSERS_PATH",) if k in os.environ})
     try:
         for number, prompt in enumerate(selected["prompts"], 1):
+            started_at = time.monotonic()
             command = [experiment["codex"], "exec", "--cd", str(workspace)]
             if thread:
                 command += ["resume", thread]
@@ -177,6 +246,7 @@ def run(args):
             if started:
                 thread = started["thread_id"]
             results.append({"turn": number, "exit_code": completed.returncode, "thread_id": thread,
+                            "elapsed_seconds": round(time.monotonic() - started_at, 3),
                             "usage": [e.get("usage") for e in events if e.get("type") == "turn.completed"],
                             "workspace": inventory(workspace)})
             save(artifacts / "run.json", results)
@@ -188,6 +258,7 @@ def run(args):
                 raise RuntimeError("Native thread id missing; cannot perform a real resume")
     finally:
         auth.unlink(missing_ok=True)
+        save(artifacts / "native-usage.json", native_usage(root / "home" / ".codex"))
     verify(args)
 
 
@@ -212,7 +283,7 @@ def main():
     p.add_argument("--baseline", type=Path, required=True)
     p.add_argument("--candidate", type=Path, required=True)
     p.add_argument("--output", type=Path, required=True)
-    p.add_argument("--cases", nargs="+", choices=("coding", "research", "browser", "resume", "execution"),
+    p.add_argument("--cases", nargs="+", choices=CASES,
                    default=["coding", "research", "browser", "resume"])
     p.add_argument("--model", default="gpt-6-astra")
     p.add_argument("--effort", choices=("low", "medium", "high", "xhigh", "max", "ultra"), default="xhigh")
@@ -220,13 +291,15 @@ def main():
                    default="workspace-write", help="Use the same explicit tool permissions for both variants")
     p.add_argument("--codex", default="codex")
     p.add_argument("--skill", type=Path, action="append", default=[])
+    p.add_argument("--agent-dir", type=Path,
+                   help="Copy identical custom *.toml agent roles into both isolated homes")
     p.add_argument("--browser-modules", type=Path)
     p.set_defaults(func=prepare)
     for name, function in (("run", run), ("verify", verify)):
         p = commands.add_parser(name)
         p.add_argument("experiment", type=Path)
         p.add_argument("variant", choices=("baseline", "candidate"))
-        p.add_argument("case", choices=("coding", "research", "browser", "resume", "execution"))
+        p.add_argument("case", choices=CASES)
         if name == "run":
             p.add_argument("--auth-file", type=Path,
                            default=Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")) / "auth.json")

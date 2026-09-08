@@ -1,0 +1,27 @@
+{
+  "total_lines": 2400,
+  "error_count": 73,
+  "groups": [
+    {
+      "code": "E_COMPILE",
+      "count": 31,
+      "first_line": 49,
+      "last_line": 2068,
+      "example": "2026-08-07T10:00:06.125000+00:00 level=ERROR component=compiler code=E_COMPILE message=\"module dependency did not resolve; unit=49\""
+    },
+    {
+      "code": "E_FETCH",
+      "count": 23,
+      "first_line": 90,
+      "last_line": 2173,
+      "example": "2026-08-07T10:00:11.250000+00:00 level=ERROR component=packages code=E_FETCH message=\"registry mirror request timed out; unit=90\""
+    },
+    {
+      "code": "E_LINK",
+      "count": 19,
+      "first_line": 189,
+      "last_line": 2344,
+      "example": "2026-08-07T10:00:23.625000+00:00 level=ERROR component=linker code=E_LINK message=\"duplicate symbol in synthetic object; unit=62\""
+    }
+  ]
+}

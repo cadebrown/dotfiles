@@ -44,6 +44,63 @@ After changing an MCP pin, environment, or activation, start a new task (and
 restart the harness when it owns the MCP subprocess). A running task keeps its
 initial tool inventory and may retain an older subprocess environment.
 
+## Delegate a focused task
+
+The [Codex delegation guide](agents.md#codex-delegation) defines the roles and
+launch policy. `codex -p fast` selects Luna for the entire session; assigning
+the `coder` or `extractor` role uses Luna for just that child while the selected
+parent model keeps coordinating the main task. Any parent model may launch a
+suitable named role as work appears. This preserves the parent model and effort;
+explicit task and model requirements take priority.
+
+Use `extractor` for specified logs or pages, `coder` for exact mechanical code
+edits, `explorer` for repository investigation, `researcher` for finding sources,
+`patcher` for bounded implementation needing judgment, and `verifier` for
+prescribed checks and edge cases. Here are sample
+briefs to adapt with real inputs and project-native checks:
+
+```text
+Use extractor. Cwd: /absolute/project. Input: /tmp/build-output.log. Group compiler errors by diagnostic
+code and report the count, first occurrence's line number, and exact message.
+Filter before reading. Write the complete grouped data to /tmp/build-errors.json
+and return a compact summary. Unknown codes stay unknown; do not infer causes.
+Check that the group counts equal the number of matched error records.
+```
+
+```text
+Use coder. Cwd: /absolute/project. You own only /absolute/project/fixtures/request-a.json
+and /absolute/project/fixtures/request-b.json.
+Replace the top-level key max_tokens with max_output_tokens in those files,
+preserving its value and every other field. If both keys exist, report the
+conflict without editing that file. Do not change application behavior.
+Check that both files parse, the old key is absent, and all other values match
+their originals. Return the changed files and check results.
+```
+
+```text
+Use patcher. Cwd: /absolute/project. You own /absolute/project/src/config.ts and
+its existing config tests. Add an optional
+positive-integer timeoutMs setting, defaulting to 30000 when absent. Reject zero,
+negative, fractional, and nonnumeric values through the current validation API.
+Preserve other defaults. Run the existing config tests with cases covering those
+inputs. Return the behavior change, checks, and unresolved questions.
+```
+
+Use direct CLI commands for trivial deterministic work; otherwise batch related
+mechanical transformations in one focused assignment. Each child gets a compact
+fresh brief, explicit cwd, absolute inputs, named ownership, an artifact path,
+and acceptance checks. Keep full outputs in the requested artifacts and have the
+parent read the focused result first. `extractor` writes parser-produced
+structured data directly. `coder` and `patcher` fix ordinary in-scope mistakes,
+then escalate missing contracts or scope growth. `verifier` writes test/build
+artifacts but does not edit application/source checks or weaken them; the parent
+judges integration from its exit statuses, evidence, and gaps. Escalate based on
+new evidence rather than repeating generic retries. Exercise samples in an
+isolated workspace before making claims about routing quality or savings; record
+the actual model, reasoning effort, tools, usage, verifier result, and parent
+rework. The role budgets are starting context choices, not hard execution or
+spend caps, and observed validation determines whether they save work.
+
 ## Choose a domain path
 
 | Work | Primary path | Evidence that matters |

@@ -11,6 +11,10 @@ Library/**
 .local/bin/plugin-eval
 .local/bin/local-agent
 
+# Codex role sources are rendered with MCP scopes by install/codex.sh sync-config.
+.codex/agents
+.codex/agents/**
+
 # Runtime artifacts from locally exercising a skill are not installed assets.
 .claude/skills/**/node_modules
 .claude/skills/**/node_modules/**
