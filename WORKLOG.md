@@ -150,3 +150,10 @@ another task committed it separately as f17a5df while this task ran.
 - Started Colima for the required outgoing-commit gate. Publication must pass
   `tests/ci.sh full` in its isolated checkout, then hosted CI and a production
   browser check. Local validation alone is not deployment evidence.
+- The default Docker data disk was full. Used a temporary Colima profile for
+  release validation, with the inherited `DOCKER_HOST` cleared, and restored
+  the default profile to its original stopped state. The test image built
+  successfully with package signature checks intact.
+- Sampled a separate Homebrew Bash 5.3.15 preprocessing stall in `heredoc_write`.
+  Invocation-local `BASH_COMPAT=50` let Bats enumerate all 187 fixtures. Added
+  the diagnosis and bounded workaround to the troubleshooting guide.

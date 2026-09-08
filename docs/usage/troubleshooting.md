@@ -16,6 +16,45 @@ to distinguish VM storage exhaustion from host free space.
 restore free space and rerun `./tests/run.sh`. Do not disable signature checking
 or treat this pre-test environment failure as a passing suite.
 
+For an isolated test profile, verify the daemon before running the gate:
+
+```bash
+env -u DOCKER_HOST DOCKER_CONTEXT=colima-PROFILE docker info --format '{{.Name}}'
+```
+
+Replace `PROFILE` with an existing profile. An inherited `DOCKER_HOST` can keep
+Docker pointed at the default socket despite selecting another context.
+
+## Bats stalls before listing tests on macOS
+
+**Symptom:** Validation prints `Fast Bats tests`, then stops before the test
+count. A `bats-preprocess` process remains idle.
+
+**Observed cause:** On macOS with Homebrew Bash 5.3.15, a process sample showed
+`bats-preprocess` blocked in `heredoc_write → write` while preparing a here-string.
+This is a shell redirection stall before test execution; it does not indicate
+a failing test.
+
+**Confirm:** Inspect the command and sample the affected PID:
+
+```bash
+ps -axo pid,ppid,etime,command | rg bats-preprocess
+macprof sample PID 2 -o - --keep-idle
+```
+
+**Workaround:** Use Bash's temporary-file redirection behavior for this invocation:
+
+```bash
+BASH_COMPAT=50 bats --count tests/agents.bats
+BASH_COMPAT=50 ./tests/ci.sh full
+# Or apply the same setting to the required outgoing-commit gate:
+BASH_COMPAT=50 git push origin main
+```
+
+The count returned 22 on the affected checkout. The full gate still must pass.
+Keep this setting local to the command; compatibility mode changes other Bash
+semantics too. See the [Bash maintainer's explanation of here-document compatibility](https://lists.gnu.org/archive/html/bug-bash/2020-12/msg00085.html).
+
 ## Agent shell loops report installed commands as missing
 
 **Symptom:** `rg`, `curl`, or `stat` works initially, then a generated zsh loop
