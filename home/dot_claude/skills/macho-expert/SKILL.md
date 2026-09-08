@@ -1,6 +1,6 @@
 ---
 name: macho-expert
-description: Provides expertise for inspecting, analyzing, and modifying Mach-O (Mach Object) binaries — the executable format used by macOS and iOS. Use this skill whenever a Mach-O file is involved, including examining headers, load commands, segments, sections, symbol tables, or code signatures; identifying fat/universal binaries and their slices; assessing binary hardening such as PIE, stack canaries, ARC, encryption, hardened runtime, and entitlements; using otool, nm, objdump, codesign, lipo, or dyld_info; modifying Mach-O files with lipo, install_name_tool, strip, or vtool; or writing and reviewing code that parses Mach-O data. Trigger even on casual phrasing like "what's in this .dylib", "is this Mac app 64-bit", "why won't this binary load", or "extract the arm64 slice", and whenever a file is identified as Mach-O, a .dylib, .bundle, or .framework, an iOS app binary, or a macOS executable.
+description: Inspect, explain, or modify Mach-O structure, architecture slices, dynamic loading, code signatures, entitlements, and binary hardening; write or review Mach-O parsers. Use for format and loader analysis, not merely running or building a macOS application.
 allowed-tools: Read Bash Grep Glob WebSearch
 ---
 
@@ -23,6 +23,7 @@ This is **static, on-disk analysis**. For runtime debugging use a debugger (lldb
 
 ## When NOT to Use This Skill
 
+- **Routine macOS work**: Building, launching, testing, or operating an app does not need format analysis merely because its executable is Mach-O.
 - **Other binary formats**: For ELF (Linux) use an ELF-focused tool/skill; for PE/COFF (Windows) use a PE tool. `LIEF` and `llvm-objdump` are cross-format if a single tool is required.
 - **Runtime / dynamic debugging**: Use `lldb` (and `dtrace`/`fs_usage`/Instruments) for runtime behavior; this skill is for the on-disk file.
 - **Deep reverse engineering / decompilation**: Use Ghidra, IDA, Hopper, or Binary Ninja. Use `otool -tV` / `objdump -d` only for light disassembly and dumps.

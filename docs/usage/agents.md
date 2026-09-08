@@ -20,8 +20,8 @@ A typical wrapper looks like:
 ```gotmpl
 # AGENTS.md
 
-This is the global memory for <tool>. Common guidance lives in the shared
-partial; <tool>-specific notes follow.
+Working preferences for <tool>. Shared guidance lives in the partial;
+<tool>-specific exceptions follow.
 
 {{ template "agents-common.md" . }}
 
@@ -41,21 +41,11 @@ means Claude never loads the voice guidance twice.
 
 ### math-common.md
 
-`home/.chezmoitemplates/math-common.md` holds the research-mathematics norms,
-included by all four guidance files. Three things it fixes in place:
-
-- **The proof gate.** A claim counts as proved only when the exact intended
-  statement compiles in Lean with no `sorry`, survives `lake build`, passes an
-  axiom audit, and certifies under `lean4checker --fresh`. Misformalization —
-  proving the wrong statement — is the classic failure, not bad tactics, so
-  formalized statements get unit-tested against known examples first.
-- **Evidence tiers.** CAS output, notebook experiments, and numerical sweeps are
-  *evidence*, never proof, and have to be labeled as such. Literature claims
-  carry a source.
-- **Tool routing**, so agents reach for the verifying tool instead of guessing:
-  Lean state and search → the `lean-lsp` MCP; literature → `asta` and `arxiv`;
-  CAS checks → `wolframscript`; sequences → OEIS; constants → PSLQ via
-  `mathlas`. Registered for every harness from `packages/mcp-servers.txt`.
+`home/.chezmoitemplates/math-common.md` keeps evidence distinctions and routes
+formal certification to `scientific-review`. The exact Lean gate remains in
+that skill's focused reference: intended statement, no `sorry`, `lake build`,
+axiom audit, and `lean4checker --fresh`. Ordinary mathematical discussion does
+not require starting a prover. The [math guide](math.md) documents tool routing.
 
 ## Where each file lives
 
@@ -84,6 +74,31 @@ No bootstrap.sh changes needed — `chezmoi apply` is step 2 of every bootstrap.
 Edit `home/.chezmoitemplates/agents-common.md` directly. The change takes
 effect on every tool the next time they read their config (most pick up
 file changes on session start; some are eager).
+
+Global defaults express durable judgment, authorization, quality, and evidence
+preferences. They preserve first-principles reasoning, substantive pushback,
+the requested phase, selected model/effort, direct application work, and
+editable creative outputs. They do not require history searches for
+self-contained tasks or fixed counts of files, tests, or abstraction examples.
+Detailed procedures stay in relevant skills; provider and package facts stay
+in configuration and these docs.
+
+Evaluate meaningful changes with the `writing-skills` workflow on realistic
+isolated tasks using the same model and reasoning effort for both versions.
+Record the loaded instruction fingerprints, produced artifacts, verifier
+results, and observed usage. Prompt size is one measurement; a small sample
+does not establish a universal quality improvement. The app's own instructions,
+tool schemas, and skill catalog are separate context layers.
+
+### Contextual tool preferences
+
+These are useful when their task arises; they do not need to enter every
+session's global prompt. Prefer `sd` for simple replacements, `bat` for human
+file reading, and `zoxide` for familiar-directory jumps. Use `xh` for quick HTTP
+requests, `hexyl` for binary inspection, `numbat` for units, and `samply record`
+for CPU profiles. `typos` provides a source spelling pass. For symbolic math,
+use the Wolfram skill and [math guide](math.md), which cover engine and API
+alternatives without embedding credentials or changing quota claims globally.
 
 ## Project-level overrides
 

@@ -108,6 +108,31 @@ _npm_install() {
     run_logged "${_npm_install_cmd[@]}" "$@"
 }
 
+_migrate_opencode_owner() {
+    has brew || return 0
+    brew list --formula opencode >/dev/null 2>&1 || return 0
+    local _npm_bin _old _dependents _backup
+    _npm_bin="$(npm prefix -g)/bin/opencode"
+    [[ -x "$_npm_bin" ]] && run_bounded 10 "$_npm_bin" --version >/dev/null \
+        || { log_fail "Cannot retire Homebrew OpenCode until the npm command is healthy"; return 1; }
+    _dependents="$(brew uses --installed opencode)" || return 1
+    [[ -z "$_dependents" ]] \
+        || { log_fail "Homebrew OpenCode still has installed dependents: $_dependents"; return 1; }
+    _old="$(brew --prefix opencode)/bin/opencode"
+    [[ -x "$_old" ]] || { log_fail "Cannot locate the old OpenCode executable for rollback"; return 1; }
+    _backup="$LOCAL_PLAT/share/dotfiles/rollback/opencode-homebrew"
+    ensure_dir "$_backup"
+    chmod 700 "$_backup"
+    _backup="$(mktemp -d "$_backup/migration.XXXXXX")" || return 1
+    cp -pL "$_old" "$_backup/opencode" || return 1
+    cmp -s "$_old" "$_backup/opencode" || return 1
+    brew list --versions opencode > "$_backup/version.txt" || return 1
+    HOMEBREW_NO_AUTOREMOVE=1 run_logged brew uninstall --formula opencode || return 1
+    run_bounded 10 "$_npm_bin" --version >/dev/null \
+        || { log_fail "npm OpenCode failed after migration; rollback executable: $_backup/opencode"; return 1; }
+    log_okay "OpenCode now has one npm owner; rollback executable: $_backup/opencode"
+}
+
 # Source-guard: tests source this file for the helper above.
 [[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
 
@@ -309,6 +334,8 @@ while IFS= read -r pkg; do
         [[ "$_repair_failed" == "1" ]] && log_warn "  fail  $_name (repair installation failed)"
         [[ -n "$_missing" ]] && log_warn "  fail  $_name (missing entrypoints: ${_missing//$'\n'/, })"
         (( _npm_fail++ )) || true
+    elif [[ "$_name" == opencode-ai ]]; then
+        _migrate_opencode_owner || die "OpenCode ownership migration failed"
     fi
 done < <(_read_package_list "$NPM_TXT")
 

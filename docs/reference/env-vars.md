@@ -74,7 +74,8 @@ Set a flag to `0` to skip it.
 | `DF_DO_CURSOR` | 6 | Cursor settings symlinks + extensions. Defaults to `1` on macOS and `0` on Linux; set `1` explicitly when a Linux Cursor CLI is installed. |
 | `DF_DO_VSCODE` | 6 | VS Code settings + extensions. Defaults to `1` on macOS and `0` on Linux; set `1` explicitly when a Linux `code` CLI is installed. |
 | `DF_DO_CMAKE` | 6 | CMake toolchain file deployment |
-| `DF_DO_LOCAL_LLM` | 6.5 | Local LLM tooling (HuggingFace cache + binary checks) |
+| `DF_DO_LOCAL_LLM` | 6.5 | Local LLM tooling (HuggingFace cache + binary checks). Defaults to `0` for `DF_PROFILE=core`, `1` for `full`; explicit overrides are retained. |
+| `DF_DO_OPENCODE` | 6.5 | OpenCode config reconciliation, independent of local inference. Defaults to the value of `DF_DO_NODE` (normally `1`). |
 | `DF_DO_MEMORY` | 6.6 | Agent memory stack (cass + qmd + ~/kb + daemons) |
 | `DF_DO_SKILLS` | 6.65 | Agent skills from `agent-skills.txt` |
 | `DF_DO_BLENDER_MCP` | 6.7 | **Default `1` on macOS, `0` on Linux**. Set to `0` to skip the Blender MCP addon. |

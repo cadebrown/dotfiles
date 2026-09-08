@@ -1,6 +1,6 @@
 ---
 name: writing-skills
-description: Evaluate and improve agent skills against realistic tasks in the target harness and model. Use when creating or changing a workflow skill, diagnosing misrouting, or comparing instruction revisions.
+description: Improve skill discovery and behavior using realistic tasks in the target harness and model. Use when a skill misroutes, a workflow needs validation, or instruction revisions need comparison.
 ---
 
 # Improve skills through actual use
@@ -14,6 +14,20 @@ the user's product, scope, and authorization. Keep the entrypoint focused on
 non-obvious capability routing and constraints; put optional details in linked
 references. Remove prescribed output templates when the task's artifact already
 communicates the result.
+
+Make discovery precise before expanding the body. Describe the operation the
+skill enables and when it helps; broad subject names can attract unrelated
+tasks. Check a representative request and a nearby request that should route
+elsewhere. Where skills overlap, distinguish their operations or outputs while
+preserving useful capabilities. A specialist debugging skill should not load
+merely because an ordinary build runs a binary.
+
+Inspect the target harness's actual discovered catalogue, not just source
+frontmatter. In Codex, `codex -C /project debug prompt-input 'request'` shows
+the model-visible instructions and skill descriptions without running a model.
+This can reveal duplicate names, truncated descriptions, stale paths, or an
+instruction file that never loaded. It does not prove correct skill selection;
+that requires observing a real task run.
 
 Choose evaluation proportional to the change. Frontmatter and link validation
 catch packaging defects. A meaningful workflow change needs a realistic task
@@ -41,6 +55,14 @@ skill revision, raw logs, observed usage, and artifact/verifier results. Compari
 revisions requires the same task and model; a Claude run does not establish
 Astra behavior. Before interpreting a failed score, distinguish tool/environment
 failure from skill behavior.
+
+For paired global-instruction comparisons, the dotfiles checkout includes
+`tests/agent_behavior.py` and `tests/fixtures/agent-behavior/README.md`.
+The helper snapshots both instruction variants, verifies actual loading in
+isolated Codex homes, holds the model and settings fixed, and preserves native
+resume sessions and output evidence. Start with a small representative pair;
+repeat only when the observed difference warrants it. Treat artifact checks,
+manual factual or visual review, and tool failures as separate findings.
 
 For complex skills, a fresh independent agent can forward-test the skill in an
 isolated workspace alongside useful local work. Give it the task and inputs,

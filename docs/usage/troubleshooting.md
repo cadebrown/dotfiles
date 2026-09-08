@@ -1,5 +1,64 @@
 # Troubleshooting
 
+## Quality CI fails with `chezmoi: command not found`
+
+**Symptom:** The fast Bats profile-rendering test exits 127, while the Docker
+bootstrap jobs pass.
+
+**Root cause:** The Quality job runs directly on the hosted runner. Unlike the
+bootstrap container, it did not install chezmoi before rendering login profiles.
+
+**Confirm:** Check the failed step for `tests/profiles.bats` and the missing
+`chezmoi` command; this is a test-environment dependency failure.
+
+**Fix:** The Quality job installs a pinned, checksum-verified chezmoi release
+binary into its tool directory before running Bats. It also installs zsh because
+the test sources both bash and zsh profiles. Keep these dependencies in
+`.github/workflows/ci.yml`; do not skip the rendering test. Use the release binary
+because this chezmoi version's Go module has `exclude` directives and cannot be
+installed with `go install github.com/twpayne/chezmoi/v2@version`.
+
+## Local agents default to MLX but localhost:8080 is unavailable
+
+**Symptom:** Pi or OpenCode starts with the configured local model but cannot
+connect to port 8080.
+
+**Root cause:** Local models are the macOS client defaults, while heavyweight
+login services are intentionally disabled. A working CLI does not mean its
+inference backend is loaded.
+
+**Confirm:** Inspect `local-agent status` and the client model selection. A
+managed default uses `mlx/qwen3.6-27b`; a different configured backend should be
+started through its own workflow.
+
+**Fix:** Run `local-agent pi` or `local-agent opencode`. The helper verifies the
+configured model, starts the managed MLX server on demand if the port is free,
+and leaves login policy unchanged. It uses cached weights only; run
+`bash ~/dotfiles/install/local-llm.sh pull-models` explicitly when weights are
+missing. Logs are in `$LOCAL_PLAT/share/mlxserve/on-demand/server.log`.
+
+For fresh `DF_PROFILE=core` bootstraps, local inference is now skipped by default
+because its packages belong to the full Python manifest. OpenCode's config still
+reconciles independently.
+
+## Upgrade retains an old OpenCode or Ollama package owner
+
+**Symptom:** An existing machine still has the OpenCode Homebrew formula or an
+Ollama.app server after its package registry selects npm OpenCode and formula
+Ollama.
+
+**Root cause:** Removing a package declaration does not uninstall an existing
+package or transfer a running service.
+
+**Confirm:** Use `brew list --versions opencode ollama`, `command -v opencode`,
+and `curl --noproxy '*' -fsS http://127.0.0.1:11434/api/version`.
+
+**Fix:** Rerun `bash ~/dotfiles/install/node.sh` for OpenCode and
+`bash ~/dotfiles/install/macos-services.sh` for Ollama. The migrations verify
+the replacement, preserve rollback receipts, and retain user configuration and
+models. Ollama migration stops when models are loaded, connections are active,
+or port ownership cannot be verified; finish those requests before retrying.
+
 Quick reference for when things go wrong. Check here before digging into scripts.
 
 ---

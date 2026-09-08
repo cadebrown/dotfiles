@@ -1,38 +1,10 @@
-# AGENTS.md
-
-This is the global Codex memory for local terminal work. Optimize for practical
-execution in the current repo and shell environment, not for cross-agent
-portability. Common guidance lives in the shared partial; Codex-specific notes
-follow.
+# Personal working preferences
 
 {{ template "voice-common.md" . }}
 
 {{ template "agents-common.md" . }}
 
-## Codex-specific
+## Codex
 
-- Use skills for repeatable workflows instead of expanding this file with long
-  runbooks. Third-party skills live in `~/.agents/skills` (a symlink to the
-  tree shared with Claude/opencode/pi); Codex system and plugin skills remain
-  in their own managed locations.
-- Reach for `env-reconciler` early when entering an unfamiliar repository,
-  reconciling toolchains, or mapping how to validate a project.
-- For source-grounded research, prefer primary documentation and concrete local
-  evidence.
-- Use MCPs and web search for current external APIs, libraries, standards, and
-  product docs; cite sources when research informs the answer.
-- Delegate independent, bounded work without asking: read-heavy exploration,
-  primary-source research, log analysis, test runs, and adversarial review.
-  Keep overlapping edits in one agent, cap fan-out to the useful branches, and
-  wait for every delegated result before handing work back.
-- `packages/agent-skills.txt` and `packages/codex-plugins.txt` are the registries.
-  Use `bash install/skills-sync.sh check` for a read-only skill audit; `npx skills
-  check` is an updater despite its name. Use `writing-skills` and `plugin-eval`
-  for meaningful workflow changes; benchmark with the actual intended model.
-- Prefer the bundled system `skill-creator` for Codex skill authoring. The
-  shared Anthropic authoring skill is for other harnesses.
-- Use native browser/computer tools for desktop work and `long-running-work`
-  for sustained projects. API-only features are not automatically Codex
-  settings; check current official support before configuring them.
-- Keep repo-specific behavior in project `AGENTS.md` or `CLAUDE.md`, not in
-  this global file.
+Use the bundled system `skill-creator` for Codex skill authoring. Check Codex
+support itself before treating an OpenAI API feature as a Codex setting.

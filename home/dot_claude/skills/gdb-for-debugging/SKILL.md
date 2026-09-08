@@ -1,10 +1,10 @@
 ---
 name: gdb-for-debugging
 description: >-
-  Debug running processes with GDB, strace, and /proc inspection. Use when:
-  process hang, spin loop, segfault, crash, backtrace, attach debugger, ptrace,
-  core dump, thread starvation, accept loop, deadlock, busy wait, or diagnose
-  why a process is stuck.
+  Investigate Linux process crashes, hangs, spin loops, deadlocks, thread
+  starvation, and core dumps with GDB, strace, and /proc inspection. Use when
+  stack, thread, memory, or ptrace evidence is needed, not for a routine build
+  or a known test failure.
 ---
 
 <!-- TOC: Core Principle | Prerequisites | The Loop | Quick Reference | Attach to Running Process | Reading GDB Output | Diagnosing Hangs | Crash & Segfault | Thread Analysis | When GDB Is Blocked | Advanced Techniques | Reverse Debugging (rr) | Memory Corruption & Sanitizers | Hardware Watchpoints | Lock Graph & Deadlock Proof | Async Runtime Debugging | Container & Namespace Debugging | Multi-Process Debugging | Race Condition Methodology | GDB Python Scripting | Core Dump Forensics | Iterative Workflow | Anti-Patterns | Checklist | References -->
@@ -13,42 +13,74 @@ description: >-
 
 > **Core Principle:** Observe first, intervene minimally, detach cleanly. GDB is a scalpel — use it to gather evidence, not to poke randomly.
 
-> **The ptrace Reality:** On modern Linux, `ptrace_scope=1` blocks GDB attach by default. You MUST relax this before attaching, or you'll waste time on "Operation not permitted" errors. This is the #1 thing agents get wrong.
+Linux setup here uses no `sudo`. Diagnose the actual access failure and prefer
+an authorized debugging relationship; don't change host-wide security settings,
+grant capabilities, or alter a running service merely to make attach succeed.
+This applies to recipes in the linked references as well.
 
 ---
 
-## Prerequisites — Do This First
+## Prerequisites and ptrace access
+
+`ptrace_scope=0` is not required for GDB. Yama adds these restrictions to the
+normal credential, dumpability, and other security checks:
+
+| Value | Effect |
+| --- | --- |
+| `0` | Classic ptrace checks still apply; arbitrary access is not granted. |
+| `1` | An otherwise eligible debugger can trace descendants. The target may name an additional debugger with `prctl(PR_SET_PTRACER, debugger_pid, ...)`. |
+| `2` | Both attach and `PTRACE_TRACEME` require `CAP_SYS_PTRACE`. |
+| `3` | Attach and `PTRACE_TRACEME` are prohibited; this setting cannot be lowered. |
+
+Under mode 1, launch a reproducible target under `gdb --args ./binary ...` or
+`strace ./binary ...` when that execution is authorized. If a controlled target
+needs a non-ancestor debugger, use its supported debugging hook or a scoped
+`PR_SET_PTRACER` change in that target; the debugger cannot grant itself this
+exception. A shell backgrounding a program and then launching GDB creates
+siblings, not the required ancestor relationship. Don't broaden the exception
+to `PR_SET_PTRACER_ANY` as a default.
+
+See the kernel's [Yama documentation](https://docs.kernel.org/admin-guide/LSM/Yama.html)
+and the Linux man-pages project's [ptrace access checks](https://man7.org/linux/man-pages/man2/ptrace.2.html).
 
 ```bash
-# 1. Check ptrace policy (MUST be 0 for gdb attach to work)
-cat /proc/sys/kernel/yama/ptrace_scope
-# 0 = classic (any process can attach)  ← REQUIRED
-# 1 = restricted (only parent can attach) ← DEFAULT, blocks gdb -p
+# Confirm the tool and exact target before attaching
+command -v gdb
+id
+ps -p "$PID" -o pid,ppid,user,pcpu,pmem,stat,etime,comm,args
+readlink "/proc/$PID/exe"
 
-# 2. Relax ptrace if needed (requires sudo)
-sudo sh -c 'echo 0 > /proc/sys/kernel/yama/ptrace_scope'
-
-# 3. Verify gdb is installed
-which gdb || sudo apt-get install -y gdb
-
-# 4. Verify the target process exists
-ps -p $PID -o pid,pcpu,pmem,stat,etime,comm,args
+# A missing or unreadable Yama setting does not mean permission is granted
+if [ -r /proc/sys/kernel/yama/ptrace_scope ]; then
+  cat /proc/sys/kernel/yama/ptrace_scope
+else
+  printf '%s\n' 'Yama setting unavailable; inspect the active security controls.'
+fi
+rg '^(Uid|Gid|TracerPid|NoNewPrivs|Seccomp|CapEff):' "/proc/$PID/status"
+readlink /proc/self/ns/user "/proc/$PID/ns/user"
+readlink /proc/self/ns/pid "/proc/$PID/ns/pid"
 ```
 
-**CRITICAL:** After relaxing ptrace, you can leave it at 0 on development machines. On production, restore with `echo 1 > /proc/sys/kernel/yama/ptrace_scope` after debugging.
+On failure, retain the exact command and error. Check debugger/target credentials,
+the target's dumpability, an existing tracer, PID/user namespaces, and container
+seccomp or LSM denials. A nonzero seccomp field alone does not identify the denied
+operation. If a required field is inaccessible, record that limit rather than
+guessing. Mode 0 or matching usernames alone does not prove attach is allowed.
+If GDB is absent, use the managed environment workflow or available diagnostics;
+do not install it through a privileged package-manager fallback.
 
 ---
 
-## The Loop (Mandatory)
+## Evidence loop
 
 ```
 1. TRIAGE        → ps, ss, /proc — what is the process doing?
-2. RELAX PTRACE  → echo 0 > /proc/sys/kernel/yama/ptrace_scope
+2. CHECK ACCESS  → identify an allowed launch/attach relationship
 3. ATTACH GDB    → gdb --batch -ex "thread apply all bt" -p PID
 4. ANALYZE       → Read backtraces, identify hot threads, stuck syscalls
 5. TARGETED DIVE → strace specific threads, inspect /proc/PID/fd
 6. DIAGNOSE      → Map symptoms to root cause
-7. FIX           → Patch code or configuration
+7. FIX           → Patch code or configuration when implementation is in scope
 8. VERIFY        → Confirm fix resolves the issue
 ```
 
@@ -61,11 +93,8 @@ ps -p $PID -o pid,pcpu,pmem,stat,etime,comm,args
 ps -p $PID -o pid,ppid,etime,pcpu,pmem,stat,comm,args
 ps -Lp $PID -o pid,tid,psr,pcpu,stat,wchan:32,comm --sort=-pcpu | head -40
 
-# === RELAX PTRACE + FULL BACKTRACE (the most common operation) ===
-ORIG=$(cat /proc/sys/kernel/yama/ptrace_scope)
-sudo sh -c 'echo 0 > /proc/sys/kernel/yama/ptrace_scope'
+# === FULL BACKTRACE (when this attach is permitted) ===
 gdb --batch -ex "set pagination off" -ex "thread apply all bt full" -p $PID 2>&1 | tee /tmp/gdb_bt_$PID.txt
-# Optionally restore: sudo sh -c "echo $ORIG > /proc/sys/kernel/yama/ptrace_scope"
 
 # === BACKTRACE VIA HOT THREAD TID (attaches to whole process via TID) ===
 gdb --batch -ex "thread apply all bt" -p $TID 2>&1 | head -100
@@ -107,14 +136,14 @@ ps -Lp $PID -o pid,tid,psr,pcpu,stat,wchan:32,comm --sort=-pcpu | head -40
 # Look for: Rl+ (running on CPU) vs Sl+ (sleeping) — running threads are your suspects
 ```
 
-### Step 2: Relax ptrace
+### Step 2: Check the debugging relationship
 
-```bash
-# Save original value, relax, and verify
-ORIG=$(cat /proc/sys/kernel/yama/ptrace_scope)
-sudo sh -c 'echo 0 > /proc/sys/kernel/yama/ptrace_scope'
-printf 'ptrace_scope: before=%s after=%s\n' "$ORIG" "$(cat /proc/sys/kernel/yama/ptrace_scope)"
-```
+Apply the [ptrace access diagnosis](#prerequisites-and-ptrace-access). Under
+mode 1, attach needs an eligible ancestor or target-declared debugger unless
+the debugger already has the required capability. If that relationship is
+absent, use an authorized restart under GDB, a scoped target opt-in, or the
+available fallback evidence. Don't restart a process whose live state is the
+evidence you need to preserve.
 
 ### Step 3: GDB Batch Attach
 
@@ -354,12 +383,12 @@ readelf -sW /tmp/recovered_binary | grep -i 'accept\|poll\|http\|mcp' | head -20
 ### Core Dumps
 
 ```bash
-# Enable core dumps
+# Enable core dumps for this shell's children within the existing hard limit
 ulimit -c unlimited
-echo '/tmp/core.%p.%e' | sudo tee /proc/sys/kernel/core_pattern
+cat /proc/sys/kernel/core_pattern
 
-# After crash, analyze
-gdb /path/to/binary /tmp/core.PID.binary_name
+# After crash, locate the core using the configured pattern or coredumpctl
+gdb /path/to/binary /path/to/actual-core
 # In gdb:
 #   bt full                    — backtrace with local variables
 #   thread apply all bt        — all threads at crash time
@@ -445,25 +474,24 @@ ps -Lp $PID -o pid,tid,pcpu,stat,wchan:30,comm | head -40
 
 ## When GDB Is Blocked (Fallback Techniques)
 
-If ptrace cannot be relaxed (e.g., container, hardened host):
+If an authorized launch or attach is blocked, use evidence available under the
+existing policy. `/proc` access and perf may also be restricted; strace attach
+uses ptrace and is not a bypass for a denied GDB attach.
 
 ```bash
-# 1. /proc thread states (always available)
+# 1. Thread states visible in the current PID namespace
 ps -Lp $PID -o pid,tid,psr,pcpu,stat,wchan:32,comm --sort=-pcpu
 
-# 2. /proc/PID/syscall (may need root)
-for i in $(seq 1 200); do cat /proc/$PID/syscall 2>/dev/null; done | \
-  awk '{print $1}' | sort | uniq -c | sort -nr | head -20
+# 2. Check access before sampling; stop this probe if it is denied
+if cat "/proc/$PID/syscall"; then
+  for i in $(seq 1 200); do cat "/proc/$PID/syscall" || break; done | \
+    awk '{print $1}' | sort | uniq -c | sort -nr | head -20
+fi
 
-# 3. /proc/PID/status (always readable by owner)
+# 3. Status fields exposed by the current /proc policy
 cat /proc/$PID/status | grep -E 'State|Threads|VmRSS|voluntary_ctxt_switches|nonvoluntary_ctxt_switches'
 
-# 4. strace with sudo (if available)
-sudo timeout 5s strace -ff -tt -s 128 -p $PID \
-  -e trace=network,poll,epoll_wait,futex \
-  -o /tmp/strace_out 2>&1
-
-# 5. perf record (if available)
+# 4. perf record (if permitted)
 perf record -F 199 -g -p $PID -- sleep 8
 perf report --stdio --no-children | head -200
 ```
@@ -775,19 +803,19 @@ rr replay \
 rr cpufeatures
 # Needs: hardware perf counters (HPC)
 
-# Install
-sudo apt-get install -y rr
+# Use an installed rr or the managed no-sudo environment workflow
+command -v rr
 
 # Limitations:
 # - Doesn't work in most VMs (needs nested virtualization or HPC passthrough)
-# - Docker: needs --privileged or --cap-add=SYS_PTRACE --cap-add=SYS_ADMIN
+# - Containers: inspect the denied operation and existing capabilities/seccomp
 # - Performance: 1.2-5x recording overhead (much less than valgrind)
 # - x86/x86_64 only (ARM support experimental)
 # - Can't record distributed systems (single machine only)
 # - Can't attach to running process (must start under rr)
 
-# Kernel setting that may need adjustment
-sudo sysctl kernel.perf_event_paranoid=1  # rr needs ≤ 1
+# Inspect perf policy; don't change host policy as a setup side effect
+cat /proc/sys/kernel/perf_event_paranoid
 ```
 
 ### rr + Chaos Mode for Race Condition Hunting
@@ -1190,22 +1218,25 @@ Debugging processes inside containers introduces PID namespace translation, capa
 
 ### Docker Debugging
 
-```bash
-# Method 1: Add capabilities at container start
-docker run --cap-add=SYS_PTRACE --security-opt seccomp=unconfined ...
+Inspect PID visibility and the actual access denial before changing a container.
+Use an existing debugging environment or an authorized disposable reproduction.
+If extra access is necessary, scope it to that container; do not default to
+`--privileged`, disable seccomp wholesale, or change host Yama policy.
 
-# Method 2: nsenter into existing container (from host)
+```bash
+# Inspect the existing container's capability and security configuration
+docker inspect --format '{{json .HostConfig.CapAdd}} {{json .HostConfig.SecurityOpt}}' "$CONTAINER_NAME"
+
+# Enter namespaces only when current namespace permissions allow it
 CONTAINER_PID=$(docker inspect --format '{{.State.Pid}}' $CONTAINER_NAME)
-# Enter the container's namespaces with host tools
-sudo nsenter -t $CONTAINER_PID -m -u -i -n -p -- gdb --batch \
+nsenter -t $CONTAINER_PID -m -u -i -n -p -- gdb --batch \
   -ex "thread apply all bt" -p 1 2>&1
 # Note: PID 1 inside the container is the main process
 
-# Method 3: docker exec with GDB installed in container
-docker exec -it $CONTAINER_NAME bash -c \
-  "apt-get update && apt-get install -y gdb && gdb --batch -ex 'thread apply all bt' -p 1"
+# Use GDB already available in the container, when attach is permitted
+docker exec "$CONTAINER_NAME" gdb --batch -ex 'thread apply all bt' -p 1
 
-# Method 4: Copy binary out, analyze separately
+# Or copy authorized artifacts out for offline analysis
 docker cp $CONTAINER_NAME:/path/to/binary /tmp/
 docker cp $CONTAINER_NAME:/proc/1/maps /tmp/container_maps
 # Offline analysis with addr2line, objdump, etc.
@@ -1227,11 +1258,17 @@ grep NSpid /proc/$HOST_PID/status
 #        ^host    ^container
 # The process is PID 12345 on host, PID 1 in container
 
-# GDB on host using host PID (no nsenter needed if ptrace_scope=0)
-sudo gdb --batch -ex "thread apply all bt" -p $HOST_PID 2>&1
+# Host attach still needs the appropriate credentials and ptrace relationship
+gdb --batch -ex "thread apply all bt" -p $HOST_PID 2>&1
 ```
 
 ### Kubernetes Debugging
+
+Creating a debug container or changing a pod's security context mutates the
+cluster. Use these routes only within existing authorization, diagnose the
+specific restriction, and keep any required privilege limited to the debugging
+workload. An added capability alone does not establish that all access checks
+will pass.
 
 ```bash
 # Exec into the pod
@@ -1242,8 +1279,8 @@ kubectl debug -it $POD_NAME --image=ubuntu --target=$CONTAINER_NAME -- bash
 apt-get update && apt-get install -y gdb strace procps
 # The debug container shares the process namespace
 
-# If securityContext doesn't allow ptrace
-# Add to pod spec:
+# If an authorized debug workload specifically requires CAP_SYS_PTRACE,
+# an example scoped pod setting is:
 # spec:
 #   containers:
 #   - name: myapp
@@ -1569,25 +1606,22 @@ Core dumps capture the complete process state at the moment of death. Deep analy
 ### Core Dump Setup
 
 ```bash
-# Enable core dumps (MUST set before the crash)
+# Enable core dumps for this shell's children within the existing hard limit
 ulimit -c unlimited
 
-# Set a useful naming pattern
-echo '/tmp/core.%p.%e.%t' | sudo tee /proc/sys/kernel/core_pattern
-# %p = PID, %e = executable name, %t = timestamp
-
-# For setuid binaries
-sudo sysctl fs.suid_dumpable=2
-
-# Verify
+# Read the host's existing destination/handler; don't rewrite global settings
 cat /proc/sys/kernel/core_pattern
-ulimit -c  # should show "unlimited"
+ulimit -c
 
 # systemd-coredump (if your system uses it)
 coredumpctl list                    # list all recent core dumps
 coredumpctl info PID                # details about a specific crash
 coredumpctl debug PID               # open in GDB directly
 ```
+
+If core generation is disabled by the hard limit, privilege transitions, or
+host policy, report that constraint. Use an authorized run under GDB or existing
+crash artifacts rather than changing `core_pattern` or `fs.suid_dumpable`.
 
 ### Deep Core Dump Analysis
 
@@ -1705,7 +1739,7 @@ gdb --batch \
 | Bad | Why | Do Instead |
 |-----|-----|-----------|
 | `gdb -p PID` interactively as agent | Blocks your session forever | Always use `--batch` |
-| Attach without checking ptrace_scope | Wastes time on "Operation not permitted" | Check & relax first |
+| Treat an attach denial as a reason to relax Yama | Changes global policy without diagnosing the cause | Check the exact access failure and use an allowed debugging relationship |
 | Kill process to "debug" it | Destroys the evidence | Attach GDB, capture state, THEN decide |
 | `strace -f -e all` on production | Can slow process 100x | Use `-e trace=network,futex` selectively |
 | Attach to wrong PID | Disrupts innocent process | Triple-check PID matches target |
@@ -1729,7 +1763,7 @@ gdb --batch \
 ## Checklist (Before Debugging)
 
 - [ ] Target PID confirmed with `ps -p $PID -o pid,comm,args`
-- [ ] ptrace_scope checked (`cat /proc/sys/kernel/yama/ptrace_scope`) and relaxed if needed
+- [ ] Applicable ptrace checks and an allowed debugging relationship identified; no automatic policy changes
 - [ ] Thread-level `ps -Lp` captured — identified hot threads
 - [ ] Socket state captured with `ss` (if network service)
 - [ ] Binary location verified (`readlink -f /proc/$PID/exe`) — not `(deleted)`
@@ -1739,7 +1773,7 @@ gdb --batch \
 - [ ] Build profile matches (debug/release) the failing execution
 - [ ] For race conditions: considered TSAN or rr before GDB
 - [ ] For memory corruption: considered ASAN before manual analysis
-- [ ] For containers: verified SYS_PTRACE capability
+- [ ] For containers: checked PID visibility, credentials, capabilities, and relevant seccomp/LSM restrictions
 - [ ] Cleanup plan for orphaned GDB/target processes
 
 ---

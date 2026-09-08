@@ -9,5 +9,16 @@ Library/**
 .local/bin/git-wt
 .local/bin/df-agent-doctor
 .local/bin/plugin-eval
+.local/bin/local-agent
+
+# Runtime artifacts from locally exercising a skill are not installed assets.
+.claude/skills/**/node_modules
+.claude/skills/**/node_modules/**
+.claude/skills/**/test-results
+.claude/skills/**/test-results/**
+.claude/skills/**/playwright-report
+.claude/skills/**/playwright-report/**
+.claude/skills/**/__pycache__
+.claude/skills/**/__pycache__/**
 
 AGENTS.md

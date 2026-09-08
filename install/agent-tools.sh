@@ -11,7 +11,7 @@ log_section "agent helper commands"
 
 ensure_dir "$ARCH_BIN"
 
-for _command in df-agent-doctor plugin-eval; do
+for _command in df-agent-doctor plugin-eval local-agent; do
     _source="$DF_ROOT/home/dot_local/bin/executable_$_command"
     _destination="$ARCH_BIN/$_command"
     [[ -f "$_source" ]] || die "Missing $_command source: $_source"

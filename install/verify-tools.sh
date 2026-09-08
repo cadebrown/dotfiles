@@ -112,8 +112,10 @@ if [[ "${DF_DO_CODEX:-1}" != "0" ]]; then
     _require_command codex
 fi
 
-if [[ "${DF_DO_LOCAL_LLM:-1}" != "0" ]]; then
+if [[ "${DF_DO_OPENCODE:-${DF_DO_NODE:-1}}" != "0" ]]; then
     _require_smoke opencode opencode --version
+fi
+if [[ "${DF_DO_LOCAL_LLM:-1}" != "0" ]]; then
     if [[ "$OS" == "darwin" ]]; then
         _require_smoke ollama ollama --version
         _require_smoke mlx-lm mlx_lm.generate --help

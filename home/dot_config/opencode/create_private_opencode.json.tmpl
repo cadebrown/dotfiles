@@ -8,6 +8,8 @@ Linux: no MLX — defaults to anthropic/claude-haiku-4-5 (cheap + tool calling).
 Anthropic / OpenAI providers are auto-discovered from ANTHROPIC_API_KEY /
 OPENAI_API_KEY env vars (sourced by ~/.zprofile from ~/.<service>.env).
 Only the local mlx provider needs an explicit block.
+install/opencode.sh scopes MCP namespaces and creates specialists from the active
+catalog. Agent/provider model choices in an existing config survive reconciliation.
 
 Hooks live in plugin/ (TS files using Bun shell), not here — see
 ~/.config/opencode/plugin/git-context.ts.
@@ -45,10 +47,12 @@ Hooks live in plugin/ (TS files using Bun shell), not here — see
     "plan":   { "model": "anthropic/{{ .models.fable }}" },
     "build":  { "model": "mlx/qwen3.6-27b" },
     "review": {
+      "description": "Review code without edits or delegation; use read-only documentation tools",
       "model": "anthropic/{{ .models.sonnet }}",
       "mode": "subagent",
       "permission": {
         "edit": "deny",
+        "task": "deny",
         "bash": {
           "*": "deny",
           "git diff*": "allow",
@@ -69,10 +73,12 @@ Hooks live in plugin/ (TS files using Bun shell), not here — see
     "plan":   { "model": "anthropic/{{ .models.fable }}" },
     "build":  { "model": "anthropic/{{ .models.haiku }}" },
     "review": {
+      "description": "Review code without edits or delegation; use read-only documentation tools",
       "model": "anthropic/{{ .models.sonnet }}",
       "mode": "subagent",
       "permission": {
         "edit": "deny",
+        "task": "deny",
         "bash": {
           "*": "deny",
           "git diff*": "allow",
@@ -86,5 +92,5 @@ Hooks live in plugin/ (TS files using Bun shell), not here — see
   },
 {{- end }}
 
-  "permission": "allow"
+  "permission": { "*": "allow" }
 }

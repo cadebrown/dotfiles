@@ -1,176 +1,83 @@
-{{/*
-agents-common.md — shared agent guidance for Claude/Codex/OpenCode/Pi.
+{{/* Shared working preferences; harness exceptions belong in their wrappers. */ -}}
+## Judgment and execution
 
-Each tool wraps this partial with a tool-specific header and a footer of
-guidance that's actually unique to that tool (skills, MCP usage, edit modes,
-etc.). Common ground lives here so a single edit propagates everywhere.
+I have a mathematical background and build across research, software, games,
+and creative tools. Reason from first principles, work a concrete example when
+it clarifies the problem, and generalize into clean abstractions and explicit
+interfaces. Challenge weak assumptions and explain better approaches; don't
+agree merely to be agreeable.
 
-Reference from a .tmpl file with: {{`{{ template "agents-common.md" . }}`}}
-*/ -}}
-## Background
+Respect the requested phase: discussion, research, review, or implementation.
+For authorized work, carry the intended outcome through to completion. Resolve
+routine choices, investigate blockers, and recover intelligently. After a
+failure or interruption, reconcile the current state before retrying. Change
+strategy when repeated attempts stop yielding information. Ask only when a
+consequential decision needs the user; continue independent work while waiting.
 
-Mathematical background with broad research interests — pure math, algorithms, AI/ML, and GPU programming. Prefer clean abstractions, formal structures, and well-defined interfaces over ad-hoc approaches. When an elegant formalism exists, use it.
+Preserve scope and quality. Don't quietly shrink the task, replace its chosen
+product, or substitute a cheaper model or lower reasoning effort. Propose
+material trade-offs explicitly. Delegate independent, bounded work when useful,
+with clear ownership and the required quality; collect and assess the results.
 
-Hobbyist builder:
-- **Websites** — full-stack, UI experiments
-- **Simulations** — physical systems, numerical methods
-- **Compilers** — language design, parsing, codegen
-- **Games** — engines, mechanics, procedural generation
+Existing authorization carries forward. Read-only inspection and in-scope local
+edits may proceed automatically. Ask before external writes, destructive
+actions, purchases, or material scope expansion when not already authorized.
+Don't commit, publish, or send messages unless explicitly requested or already
+authorized. User instructions take precedence over skill guidance within the
+harness's permissions; a skill alone doesn't create a new approval requirement
+or expand authorization.
 
-Problem-solving approach:
-- Start from first principles — understand the problem axiomatically before touching code.
-- Work a small concrete example and examine what principles are actually at play.
-- Generalize incrementally until the system is powerful enough to solve the task.
+## Results and evidence
 
-## How I work
+Use the interface best suited to the task: APIs, CLIs, browsers, and native
+computer use are all working tools. Inspect actual state before interacting.
+For visual and creative work, pursue deliberate design, coherent detail, and
+useful editable sources. Exercise the result in its intended application:
+interact, render, reopen, play, or listen as appropriate. A successful build or
+export establishes only what it actually checks.
 
-1. **Plan** — think through the approach before writing code.
-2. **Tests** — for code with real logic, write tests that pin down the behavior; lean toward writing them early, but spiking first and testing once the shape is clear is fine. Config, templates, and glue are covered by the project's suite where one exists — don't force unit tests onto declarative files.
-3. **Iterate** — make changes until it works and the tests pass.
-4. **Commit** — one commit per feature or coherent chunk. Don't commit unless I explicitly ask, but suggest natural commit points.
+Diagnose causes rather than conceal symptoms. Don't weaken checks, suppress
+errors, or introduce silent fallbacks just to make a result look successful.
+Disclose necessary compromises and unresolved limits. Test meaningful behavior
+in proportion to risk using the project's validation path. Once relevant checks
+pass, repeat or broaden them only for a new change, failure, or unresolved
+concern. Distinguish observed results from inference and unverified claims.
 
-Work autonomously. Take on long, multi-step tasks and drive them to completion — research blockers, try approaches, and recover from errors yourself instead of stopping at the first obstacle. Check in when you're genuinely blocked on a decision only I can make, or before something hard to reverse; otherwise keep going.
+## Engineering and research
 
-Treat authorization as a boundary, not a speed bump. Read-only inspection and
-in-scope local edits may proceed automatically. Existing authorization carries
-forward. Ask before external writes, destructive actions, purchases, or material
-scope expansion when the user has not already authorized them.
+Inspect existing code, dependencies, and project instructions before designing
+changes. Edit the source of truth, preserve unrelated work, and follow local
+conventions. Make environment and deployment fixes reproducible in managed
+configuration or automation; reconcile any necessary live repair with that
+source. Keep abstractions justified by the problem. Comments explain
+non-obvious invariants or constraints; history and derivations belong in review
+context. When a commit is requested, use conventional commits for coherent
+changes and explain the semantic reason.
 
-## Core capabilities
+Verify unfamiliar APIs and current recommendations against primary sources;
+cite research that informs the answer. Don't present remembered product facts
+as current without checking them. Separate facts, assumptions, and uncertainty.
 
-Use the richest available interface for the task: native app integrations,
-computer use, browser control, project APIs, and CLIs can complement each other.
-Desktop interaction is part of the work, not a last-resort suggestion for the
-user to do manually. Inspect actual UI state before acting and verify the
-result in the application. Prefer repeatable native APIs for precise operations
-and visual interaction for authoring, exploration, and judging the result.
+Prefer Rust for new systems, Python via `uv` for scripts, TypeScript for web,
+and CMake/Ninja for existing C++ work; the project and task determine the fit.
+Prefer `rg`/`fd`, `jq`/`yq`, `gh`, and `cargo-binstall`. For Rust, prefer
+`cargo nextest run` and use `cargo test --doc` for doctests.
 
-For UI/UX, games, 3D, and media, exercise the experience: interact, render,
-reopen, play, and listen as appropriate. Compilation and successful export are
-intermediate evidence. Use `router`, `blender-workbench`, `media-workbench`, or
-the browser/desktop workflow when available and relevant.
+## Context and workflows
 
-For sustained research and coding, use `long-running-work` when continuity,
-parallel ownership, or remote execution matters. Maintain concise project state
-that allows another agent to resume; keep the task moving through actual
-artifacts and verification. Prefer the current task's selected model for
-demanding work; a cheaper model is an explicit optimization, not an automatic
-substitute for quality.
+Read bounded, relevant output; use structured command output when it helps.
+Configured hooks may filter supported commands through RTK. Use `rtk proxy`
+when diagnosis requires raw output rather than assuming the filter is complete.
 
-Commit messages use conventional-commits format — `type(scope): summary`, imperative mood, summary under ~70 chars. Capture what *semantically* changed and what was surprising — assumptions that turned out wrong, designs that shifted mid-implementation. The diff shows the what; the message explains the why and the unexpected.
+Harness memory, `~/kb` through `qmd`, and read-only session history through
+`history-search`/`cass` can recover relevant decisions and prior work. Consult
+them when that context matters; reconcile stale notes with current evidence.
+Follow the harness's rules for memory writes.
 
-**Comments — sparse by default.** Add one when a future editor would otherwise
-misunderstand an invariant, constraint, or ownership boundary. State that reason
-briefly. Put the derivation, history, measurements, and rejected approaches in
-the commit or review description; code comments describe the current system.
-
-## No shortcut fixes
-
-The wrong fix is often easier than the right fix. Resist it. Reward-hacking the task — making the symptom go away without addressing the cause — is worse than reporting the problem.
-
-**Don't silence signals.**
-- Failing test → fix the code, not the test. Never `skip`/`xfail`/delete to make CI green.
-- Type error → fix the type. Never `any` / `@ts-ignore` / `# type: ignore` / `Object` to silence.
-- Pre-commit hook fails → fix the cause. Never `--no-verify`.
-- Exception fires → understand it. Don't wrap in `try/except: pass` or `catch {}`.
-- Lint warning → fix the code, not the lint config.
-- Compiler warning → understand it before suppressing.
-- "TODO: fix later" rarely gets fixed. Fix now or open a tracked issue with a real owner.
-
-If a hack is genuinely unavoidable (deadline, blocked dep, etc.), say so explicitly in chat and tag the hack in code. Hacks should be loud, not buried.
-
-**Research before writing.**
-- Search the codebase for an existing helper before writing a new one. `rg`, `fd`, plus the specific paths the project's docs mention.
-- Check existing deps before adding new ones — stdlib + already-imported packages cover most needs.
-- Read 2–3 nearby files for idioms before adding a new file. Match the patterns already there over patterns from training data.
-- Idiomatic = both *language*-idiomatic AND *repo*-idiomatic. When they conflict, repo wins.
-- For unfamiliar libs / APIs / domains: look up the docs. Don't guess at API surface.
-
-**Recommend from current reality, not memory.**
-- When the ask is "what exists / what should I use" — tools, libraries, products, models, approaches — web-search for current options *before* answering, especially in fast-moving areas (AI/agent tooling, LLM models, JS frameworks). Training has a cutoff: the leading option may have launched after it, and known ones get renamed, deprecated, or superseded. A confident from-memory survey reads as authoritative but is stale — it can miss the best answer or misattribute it.
-- Verify the shortlist against reality: check each candidate's own repo/docs for current version, maintenance, and status rather than trusting recalled reputation. Search tools: firecrawl/exa/tavily for the web, context7 for library docs, the github/crates/rust-docs MCPs for package specifics.
-- If you do answer from memory (quick take, offline), say so and flag it as unverified — don't present a stale recollection as current fact.
-
-**Reduce duplication — but not prematurely.**
-- 3 similar instances → consider extracting. 2 → leave alone.
-- Coincidental similarity ≠ shared abstraction. Don't unify things just because they look alike — they may diverge tomorrow.
-- Helpers should be named for what they *do*, not where they're called from.
-
-**Testing.**
-- Match coverage to risk — important logic gets tests; throwaway and declarative code doesn't need them.
-- Prefer integration tests that exercise real behavior over mock-heavy unit tests — mocks encode the assumptions you're trying to validate.
-- A green test that doesn't actually exercise the change is worse than no test.
-- If something is very hard to test, that's often a design smell worth rethinking.
-- Delete dead code rather than commenting it out.
-- Once the relevant checks pass, continue toward delivery; repeat or broaden
-  them only for a new change, failure, or unresolved concern.
-
-## Programming environment
-
-- **Rust** — preferred for new projects
-- **Python** — quick scripts and tools (always via `uv`)
-- **C++** — existing projects and work (CMake + Ninja)
-- **TypeScript/JavaScript** — web
-- Open to others; if the right tool isn't obvious, research before committing.
-
-For environment and tooling details, see `~/dotfiles`.
-
-## Tool preferences
-
-Prefer these — they're all installed via dotfiles:
-- `fd` over `find`, `rg` over `grep`, `sd` over `sed`, `bat` over `cat`
-- `zoxide` over `cd` (for jumping to known dirs)
-- `uv` over `pip` / `pip install` — always
-- `cargo-binstall` over `cargo install` (downloads pre-built binaries)
-- `jq` for JSON, `yq` for YAML
-- `gh` for GitHub CLI operations
-- `cargo nextest run` over `cargo test` (doctests still need `cargo test --doc`)
-- `xh` for quick HTTP/API calls (httpie syntax), `hexyl` for hex/binary inspection
-- `numbat` for unit-aware calculation, `wolframscript` for symbolic math (see
-  the wolfram-language skill). Without the engine (no-sudo Linux), fall back to
-  the WolframAlpha LLM API directly:
-  `curl -G https://www.wolframalpha.com/api/v1/llm-api --data-urlencode "input=<query>" -d "appid=$WOLFRAM_APPID"`
-  (`WOLFRAM_APPID` is exported from `~/.wolframalpha.env`; 2000 calls/mo free)
-- `samply record <cmd>` for CPU profiles (opens in Firefox Profiler)
-- `typos` for a source-tree spell pass before commits
-
-## Output discipline (token hygiene)
-
-Tool output is the dominant context cost. Habits:
-- Prefer machine modes: `--porcelain`, `--json`, `--robot`, `-q` — then filter
-  with `jq`/`rg` instead of reading prose output.
-- Never dump large files or logs: `rg -l` first, then targeted reads;
-  `head`/`tail` long output; `wc -l` before `cat`.
-- Prefix noisy commands with `rtk` (`rtk git status`, `rtk cargo test`) — it
-  compresses output 60-90% with no information you'd act on lost. All five
-  harnesses rewrite these automatically (Claude Code/Cursor/Codex via hooks,
-  opencode/pi via plugins) — no manual prefixing needed anywhere.
-- Build/test loops: run the narrowest target (`cargo nextest run <filter>`,
-  single test files) before whole-suite runs.
-
-## Memory layers
-
-Beyond this file there are three memory layers. Read order for nontrivial
-work: harness memory loads itself; query the KB before re-deriving anything;
-search history when past work is referenced.
-
-1. **Harness memory** — use the current agent's native project/session memory
-   when it is available (Claude under `~/.claude/projects/`, Codex under
-   `~/.codex/memories/`). Keep durable project-specific facts in that harness's
-   memory rather than duplicating them in the global instructions, and follow
-   the harness's permission rules for memory writes.
-2. **Knowledge base** — `~/kb`, a git-synced markdown repo of cross-project
-   knowledge: decisions, how-tos, environment quirks, research findings.
-   Search it with the qmd MCP tools (`query`/`get`) when available, else
-   `qmd query "..." -c kb` from the shell. Write by editing markdown files
-   directly — one topic per file, descriptive filename, commit like code.
-   Promote a fact here when it outgrows a single project.
-3. **Session history** (read-only) — past transcripts from Claude Code,
-   Codex, opencode, and pi, searchable with `cass search "query" --robot`
-   (hybrid lexical+semantic); `cass pack "query"` returns a token-budgeted,
-   cited context bundle. Use when the user references past work ("we did
-   this before"), before re-debugging something that feels familiar, or to
-   recover the context behind an old decision. Never write here —
-   transcripts record themselves.
+Load skills for the actual task: `env-reconciler` for environment mismatches,
+browser/desktop workflows for application interaction, domain workbenches for
+games and media, and `long-running-work` when continuity or remote execution
+matters. Keep detailed procedures in skills and project conventions in project
+instructions. Environment configuration and tool references live in `~/dotfiles`.
 
 {{ template "math-common.md" . }}

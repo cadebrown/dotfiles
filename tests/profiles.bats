@@ -21,6 +21,27 @@ setup() {
     [[ "$output" == *"$REPO/packages/pip-full.txt"* ]]
 }
 
+@test "local inference follows the package profile and retains explicit overrides" {
+    run env -u DF_DO_LOCAL_LLM DF_PROFILE=core bash -c \
+        'source "$1/install/_lib.sh"; printf "%s\n" "$DF_DO_LOCAL_LLM"' _ "$REPO"
+    [ "$status" -eq 0 ]
+    [ "$output" = 0 ]
+    run env -u DF_DO_LOCAL_LLM DF_PROFILE=full bash -c \
+        'source "$1/install/_lib.sh"; printf "%s\n" "$DF_DO_LOCAL_LLM"' _ "$REPO"
+    [ "$status" -eq 0 ]
+    [ "$output" = 1 ]
+    run env DF_DO_LOCAL_LLM=1 DF_PROFILE=core bash -c \
+        'source "$1/install/_lib.sh"; printf "%s\n" "$DF_DO_LOCAL_LLM"' _ "$REPO"
+    [ "$status" -eq 0 ]
+    [ "$output" = 1 ]
+}
+
+@test "core local-LLM verification succeeds without optional runtimes" {
+    run env -u DF_DO_LOCAL_LLM DF_PROFILE=core bash "$REPO/install/local-llm.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Local inference is not selected"* ]]
+}
+
 @test "every Python tool declares its required entrypoint contract" {
     local manifest
     for manifest in "$REPO/packages/pip.txt" "$REPO/packages/pip-full.txt"; do

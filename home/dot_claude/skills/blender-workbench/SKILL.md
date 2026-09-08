@@ -7,6 +7,8 @@ description: Create, edit, render, animate, and export Blender scenes using bpy,
 
 Use project-owned `bpy` scripts for repeatable modeling, materials, animation, rendering, and exports. Use the live MCP bridge for interaction with an open Blender scene; use Computer Use to inspect composition, editor state, and rendered results.
 
+For a new asset or visual direction, adapt [creative-brief.md](assets/creative-brief.md) into the project. Annotate reference views and the exact aspects they support; keep proposed choices separate from explicit user approval. Use low-cost frames or viewport comparisons to settle consequential visual choices before expanding the scene. The bundled diorama is an agent-produced capability example, not an approved personal style.
+
 The helper runs each batch operation in a separate Blender process. It never attaches to an existing GUI or saves changes to an input `.blend`. Scripts passed to `run` have normal Python capabilities; inspect unknown code before executing it.
 
 ```bash
@@ -25,3 +27,5 @@ uv run ~/.claude/skills/blender-workbench/scripts/blender_workbench.py --help
 For Blender API details, engine selection, and asset export considerations, read [batch-workflows.md](references/batch-workflows.md). For GUI sessions, telemetry, and bridge coordination, read [live-bridge.md](references/live-bridge.md).
 
 Match validation to the artifact: inspect images for composition and material quality; reopen saved scenes; import game exports and inspect their geometry/materials/animation. For game work, validate the imported asset in the target engine as well. A successfully parsed GLB alone does not establish visual parity or playable behavior.
+
+Hand off the `.blend`, project scripts, required textures/fonts, and a short note identifying the editable collection, camera, materials, and animation controls. Explain which exported effects were baked or omitted. Keep feedback and the selected reference version with those sources so the next edit starts from the intended direction.

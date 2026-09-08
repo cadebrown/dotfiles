@@ -27,6 +27,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 _mode="${1:-check}"
 
 log_section "Local LLM tooling ($_mode)"
+if [[ "$_mode" == check && "$DF_DO_LOCAL_LLM" == 0 ]]; then
+    log_okay "Local inference is not selected for the $DF_PROFILE profile"
+    exit 0
+fi
 
 ### Data directories ###
 # HuggingFace weights (mlx-lm) go under LOCAL_PLAT (PLAT-isolated, avoids NFS).

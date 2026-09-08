@@ -185,11 +185,9 @@ codex() {
 
 # OpenCode consumes the same short-lived MCP credentials as Codex and starts
 # in auto-approve mode. Explicit deny rules (the review agent) still apply.
+{{ template "opencode-credentials.sh" . }}
 opencode() {
-    GH_TOKEN="${GH_TOKEN:-$(command gh auth token 2>/dev/null)}" \
-    GOOGLE_MCP_TOKEN="${GOOGLE_MCP_TOKEN:-$(command gcloud auth application-default print-access-token 2>/dev/null)}" \
-    GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-$(command gcloud config get-value project 2>/dev/null)}" \
-        command opencode --auto "$@"
+    _opencode_with_defaults "$@"
 }
 
 # mlxserve — MLX OpenAI-compat server on :8080 (default Qwen3.6-27B 8bit)

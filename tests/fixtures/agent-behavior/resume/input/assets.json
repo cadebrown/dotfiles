@@ -1,0 +1,6 @@
+[
+  {"id": "zeta", "status": "ready", "bytes": 4096, "path": "zeta.glb"},
+  {"id": "alpha", "status": "ready", "bytes": 1024, "path": "alpha.png"},
+  {"id": "small", "status": "ready", "bytes": 1023, "path": "small.png"},
+  {"id": "draft", "status": "draft", "bytes": 8192, "path": "draft.blend"}
+]

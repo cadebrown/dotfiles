@@ -1,6 +1,6 @@
 ---
 name: browser-workbench
-description: Use when building, debugging, or visually verifying browser experiences using shared native browser sessions, repeatable Playwright workflows, recorded interactions, headless runs, and targeted performance debugging.
+description: Build, debug, and visually verify web interfaces with native browser control and repeatable Playwright flows. Use webmcp-workbench when adding or testing page-provided agent actions.
 ---
 
 # Browser workbench
@@ -14,10 +14,16 @@ Use the browser throughout implementation: inspect the rendered experience, exer
 - **Portable alternative:** `agent-browser`; read its version-matched `agent-browser skills get core` guide before commands. Use a separately named session and explicit browser executable when comparing it with Playwright. Report observed behavior rather than assuming a smaller snapshot improves task quality.
 - **Browser debugging:** `codex -p browser` enables Chrome DevTools MCP with pinned code and usage/CrUX telemetry disabled. Use console, network, and performance evidence when they answer the actual problem.
 - **Design sources:** the official Figma plugin provides design context when connected. Its account connection is distinct from local plugin installation. Use the installed Figma skill for the requested operation.
+- **Page-provided actions:** use `webmcp-workbench` to add or validate semantic tools in a web app. Discover tools from the current page through the browser's supported interface. Keep visual inspection in the loop; a tool response does not establish what the user sees.
 
 ## Work loop
 
 Start the project's documented development server and verify the route. Inspect desktop and narrow-screen layouts, then exercise the main flow and relevant loading/error/empty states. Check console errors and failed requests when behavior is wrong. For visual work, read actual screenshots; DOM assertions alone do not establish layout quality.
+
+Use the project's creative brief and annotated references when shaping a new
+interface. Distinguish user-approved direction from suggested examples, and
+respect an explicit request to discuss concepts before implementation. The
+`desktop-workbench` creative-reference resources can seed a brief when useful.
 
 Use stable roles, labels, and test IDs in reusable tests. Keep app/window identifiers and browser profiles explicit. Store screenshots, traces, and videos alongside the task artifacts, with the URL, viewport, browser version, and source revision needed to reproduce them. Do not export signed-in storage state unless the task needs it.
 

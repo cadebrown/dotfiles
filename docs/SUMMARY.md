@@ -17,6 +17,8 @@
 - [AeroSpace window management](usage/aerospace.md)
 - [Local AI coding](usage/local-llm.md)
 - [AI workbench](usage/ai-workbench.md)
+- [WebMCP workbench](usage/webmcp.md)
+- [Creative references and demonstrations](usage/creative-workflows.md)
 - [Game development](usage/gamedev.md)
 - [Research mathematics](usage/math.md)
 - [Scientific review](usage/scientific-review.md)

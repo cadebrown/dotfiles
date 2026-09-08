@@ -86,6 +86,12 @@ case "$DF_PROFILE" in
     core|full) ;;
     *) die "DF_PROFILE must be 'core' or 'full' (got '$DF_PROFILE')" ;;
 esac
+if [[ "$DF_PROFILE" == core ]]; then
+    DF_DO_LOCAL_LLM="${DF_DO_LOCAL_LLM:-0}"
+else
+    DF_DO_LOCAL_LLM="${DF_DO_LOCAL_LLM:-1}"
+fi
+export DF_DO_LOCAL_LLM
 
 ### PLATFORM ###
 

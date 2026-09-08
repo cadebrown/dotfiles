@@ -22,6 +22,12 @@ Distinguish the tool's capability from the task's authority. The user may alread
 
 For exported files, check the saved artifact and reopen it in the target application. An action returning successfully is not evidence that a dialog closed, an edit landed, or an export completed.
 
+## References and demonstrated workflows
+
+For creative work with meaningful design choices, keep a short project brief using [creative-brief.md](assets/creative-brief.md). Annotate what each reference contributes and whether that aspect is proposed or explicitly approved. A supplied reference, generated example, or successful tool run does not establish the user's taste. Carry feedback into that project's brief and editable sources.
+
+When the user wants to teach a workflow by showing it, use [Record & Replay](references/record-and-replay.md) and [workflow-template.md](assets/workflow-template.md). Refine the demonstrated intent into parameters and observable outcomes. Recording is optional; do not start one merely to inspect an app or run an existing workflow.
+
 ## CLI session example (macOS)
 
 When the chosen harness supports Peekaboo directly:

@@ -1,20 +1,14 @@
-# AGENTS.md
-
-Loaded by opencode (referenced from `instructions` in `~/.config/opencode/opencode.json`).
-Common guidance lives in the shared partial; opencode-specific notes follow.
+# Personal working preferences
 
 {{ template "voice-common.md" . }}
 
 {{ template "agents-common.md" . }}
 
-## OpenCode-specific
+## OpenCode
 
-- **Agents**: `plan` runs Fable, `build` runs local MLX (Qwen3.6-27B), and the
-  read-only `review` subagent runs Sonnet. Switch with `/agent <name>` in the TUI.
-- **Full-auto mode**: build and plan agents run without permission prompts. The
-  `review` subagent remains read-only and rejects unmatched shell commands.
-- **MCP**: generated into the `mcp` block of opencode.json from the shared
-  `packages/mcp-servers.txt` registry. Every generated tool namespace is enabled.
-- **Plugin events** (for reference, when adding new plugins): `session.created`,
-  `session.idle`, `tool.execute.before`/`.after`, `file.edited`, `permission.asked`.
-  Plugins live in `~/.config/opencode/plugin/*.ts` (Bun-executed; `$` is Bun shell).
+Build and plan carry a small documentation/KB tool set. Route domain work to the
+matching agent: `research`, `browser`, `creative`, `desktop`, `cloud`, `workspace`,
+`math`, or `repository`. These specialists inherit the active model. Inspect
+`~/.config/opencode/opencode.json` for their MCP namespaces and additional
+`mcp-*` specialists. Switch agents or delegate a bounded task when its tools are
+needed. The `review` agent is read-only and cannot delegate.

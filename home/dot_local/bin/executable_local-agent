@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+_repo="${DF_DOTFILES_REPO:-$HOME/dotfiles}"
+source "$_repo/install/_lib.sh"
+[[ -x "$PYTHON_ENV/bin/python" ]] || die "Run install/python.sh before using local-agent"
+if [[ "${1:-}" == opencode ]]; then
+    source "$_repo/home/.chezmoitemplates/opencode-credentials.sh"
+    shift
+    _with_opencode_mcp_credentials exec "$PYTHON_ENV/bin/python" "$_repo/install/local-agent.py" opencode "$@"
+fi
+exec "$PYTHON_ENV/bin/python" "$_repo/install/local-agent.py" "$@"

@@ -31,7 +31,7 @@ flowchart TD
         V["cursor/vscode.sh<br/>DF_DO_CURSOR / DF_DO_VSCODE"]
         K["cmake.sh<br/>DF_DO_CMAKE"]
     end
-    S6 --> S65["6.5  local LLM<br/>DF_DO_LOCAL_LLM"]
+    S6 --> S65["6.5  local LLM + OpenCode config<br/>DF_DO_LOCAL_LLM / DF_DO_OPENCODE"]
     S65 --> S66["6.6  agent memory stack<br/>DF_DO_MEMORY"]
     S66 --> S67["6.7  blender-mcp addon<br/>DF_DO_BLENDER_MCP"]
     S66 --> S7["7  auth.sh walk<br/>DF_DO_AUTH (default 0)"]
@@ -49,16 +49,16 @@ flowchart TD
 | 0.6 | inline | Re-source the cloned repo's `_lib.sh`, rebinding repo, overlay, PLAT, and platform-local paths authoritatively. | Yes |
 | 1 | `install/chezmoi.sh` | Download chezmoi to `$ARCH_BIN/chezmoi`. Skipped if file already executable. | Yes |
 | 2 | (inline) | `chezmoi init --apply --force --exclude=scripts`. Renders `home/*.tmpl` into `~/`. `--exclude=scripts` skips `run_onchange_*.sh.tmpl` (bootstrap calls install scripts directly). | Yes |
-| 2.5 | `install/git-tools.sh`, `install/agent-tools.sh` | Deploy architecture-independent helper commands into `$ARCH_BIN`, including `git-wt` and `df-agent-doctor`. | Yes |
+| 2.5 | `install/git-tools.sh`, `install/agent-tools.sh` | Deploy architecture-independent helper commands into `$ARCH_BIN`, including `git-wt`, `df-agent-doctor`, and the explicit `local-agent` launcher. | Yes |
 | 2.7 | inline | Sanity-check that `$ARCH_BIN`, `$CARGO_HOME`, `$RUSTUP_HOME`, `$NVM_DIR` parents exist and aren't broken symlinks. Aborts if anything's wrong. | Yes |
 | 3 | `install/zsh.sh` | Clone or update oh-my-zsh + plugins. | Yes |
 | 4 | `install/homebrew.sh` (macOS) or `install/linux-packages.sh` | Install Homebrew, run `brew bundle install --file=Brewfile`, optionally `brew upgrade` and `brew upgrade --cask --greedy`. | Yes |
 | 4.5 | `install/quarto.sh` | Verify the macOS cask or install a checksum-verified rootless Linux release under `$LOCAL_PLAT`. | Yes |
-| 5 | `install/macos-services.sh` | Register Colima as a launchd service; symlink Docker plugins. macOS only. | Yes |
+| 5 | `install/macos-services.sh` | Wire Docker plugins and apply the opt-in login-service policy. Reconcile an idle app-owned Ollama server to the formula with model-inventory verification and rollback. macOS only. | Yes |
 | 5.5 | `install/macos-settings.sh` | `defaults write` for Dock, Finder, keyboard, trackpad, Safari, iTerm2, screen lock. Sudo-gated extras (skipped if sudo unavailable): power management, Touch ID for sudo (`/etc/pam.d/sudo_local`, with pam_reattach so it works in tmux), and a global 60-min sudo ticket (`/etc/sudoers.d/df-ticket`). | Yes |
 | 5.6 | `install/macos-quick-actions.sh` | Deploy `*.workflow` bundles to `~/Library/Services/`; flush `pbs`. | Yes |
 | 6 | various | See language-runtime table below. Each script is independent; failures cascade only via `die` (not `log_warn`). | Yes |
-| 6.5 | `install/local-llm.sh` + `install/opencode.sh` | Create `$LOCAL_PLAT/.cache/huggingface`; verify ollama/mlx-lm/mlx-openai-server/opencode binaries. | Yes |
+| 6.5 | `install/local-llm.sh` + `install/opencode.sh` | Verify the selected local-inference tools (`full` by default; skipped by `core`). Independently verify and reconcile OpenCode when `DF_DO_OPENCODE` is enabled. | Yes |
 | 6.6 | `install/memory.sh` | Agent memory stack: cass binary/archive setup (indexing is manual), ~/kb knowledge repo, qmd collections/embeddings, qmd daemon. | Yes |
 | 6.65 | `install/skills-sync.sh` | Install agent skills from `agent-skills.txt` into the shared `~/.claude/skills` tree. | Yes |
 | 6.7 | `install/blender-mcp.sh` | Download `addon.py` into Blender's user addons, enable it headlessly, and verify the enabled state. Default-on on macOS where the Brewfile installs Blender; default-off on Linux. | Yes |

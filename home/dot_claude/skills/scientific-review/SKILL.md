@@ -1,6 +1,6 @@
 ---
 name: scientific-review
-description: Audit a scientific claim, manuscript, or peer-review record against traceable literature, metadata, computation, and formal proof. Use for evidence-led literature reviews, review responses, and claim-evidence matrices; not for a bare web search or a proof with no literature component.
+description: Audit scientific claims, manuscripts, or peer-review records against traceable evidence, or certify completed Lean proofs. Use for literature reviews, review responses, claim-evidence matrices, and final formal certification; use lean4 for routine proof development.
 ---
 
 # Scientific Review
@@ -8,6 +8,11 @@ description: Audit a scientific claim, manuscript, or peer-review record against
 Treat discovery, evidence, reproduction, and proof as different products. A
 retrieved paper or a successful computation supports a claim; it does not prove
 it. Preserve the boundary in both the investigation and the final wording.
+
+For final certification of an AI-generated or exported Lean proof, read
+[the formal certification gate](references/formal-certification.md). Apply that
+gate directly when certification is the task; literature-review artifacts are
+not required for a proof-only request.
 
 ## Start with the review target
 
@@ -28,7 +33,7 @@ unless the user put them in scope.
 | Dataset/software DOI and PID relationships | DataCite REST v2 | Use the public read API; repository credentials are only for an authorized project. |
 | Public submission, review, rebuttal, decision | OpenReview API v2 | Respect venue permissions and anonymity; do not infer hidden identities. |
 | Local bibliography, notes, attachment inventory | Zotero local API | Keep requests on `localhost`; never expose the library as a remote service. |
-| Exact formal claim | `lean-lsp` MCP and the project toolchain | Exact statement, no `sorry`, build, and axiom audit are the proof gate. |
+| Exact formal claim | `lean4`, `lean-lsp` MCP when available, and the project toolchain | Apply the [formal certification gate](references/formal-certification.md) before claiming final certification. |
 | Symbolic/numeric check | Wolfram MCP or `wolframscript` | Save code, inputs, precision, and output; label the result as computation. |
 
 Use primary publisher, repository, or official API records to resolve conflicts.

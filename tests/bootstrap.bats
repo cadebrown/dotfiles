@@ -76,6 +76,9 @@ teardown() {
     # Run-onchange scripts are actions, not deployed files; chezmoi reports
     # them as pending in diff even after a successful apply.
     run env PAGER=cat chezmoi diff --exclude=scripts
+    if [[ "$status" -ne 0 || -n "$output" ]]; then
+        printf '%s\n' "$output" >&3
+    fi
     [ "$status" -eq 0 ]
     # diff should be empty — if not, something drifted since apply
     [ -z "$output" ]

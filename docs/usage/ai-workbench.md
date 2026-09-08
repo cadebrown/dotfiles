@@ -49,6 +49,7 @@ initial tool inventory and may retain an older subprocess environment.
 | Work | Primary path | Evidence that matters |
 |---|---|---|
 | Browser UI | `browser-workbench`, Playwright CLI, then `codex -p browser` for DevTools evidence | Screenshots at relevant viewports, interaction result, console/network/trace when relevant |
+| WebMCP app actions | `webmcp-workbench`, page-defined tools sharing the app's own state and permissions | Native tool discovery and invocation, visible state changes, persistence, and working ordinary controls |
 | Native desktop | Codex Computer Use or `desktop-workbench`; `codex -p desktop` for scriptable apps | A fresh observation of the target application and the reopened export or changed state |
 | Blender and game assets | `blender-workbench`; `codex -p creative` only for a live scene | Rendered frame, reopened `.blend`, and an imported engine export |
 | Motion graphics and editing | `media-workbench`, Remotion, Kdenlive, FFmpeg | Playback, representative frames, legible type, and audible output |
@@ -79,6 +80,12 @@ account authorization, Desktop availability, and canvas-write access are
 separate from this dotfiles setup; check the active Figma connection before
 asking an agent to read or change a design.
 
+Use the [WebMCP workbench](webmcp.md) when your application should expose
+meaningful actions to agents in the same live page. Its reusable simulation lab
+provides an editable example and checks the ordinary UI alongside the tool
+interface. WebMCP is page-scoped; it does not require enabling another global
+MCP server. Client support must be verified through the current browser.
+
 ## Desktop, 3D, and media
 
 Use Computer Use for application work. On macOS, background and locked-mode
@@ -100,6 +107,12 @@ uv run ~/.claude/skills/blender-workbench/scripts/blender_workbench.py --help
 ```
 
 ## Long-running and remote work
+
+For repeatable creative work, start with the
+[creative reference and demonstration workflow](creative-workflows.md).
+Project briefs separate confirmed requirements, proposed direction, and
+reference provenance. Record & Replay can teach a stable Mac workflow through
+a demonstration; it is not a recording service enabled by bootstrap.
 
 Use a task's native resume path for active Codex work. For a persistent Linux
 build, experiment, render, or server, keep the process in `tmux` over SSH and

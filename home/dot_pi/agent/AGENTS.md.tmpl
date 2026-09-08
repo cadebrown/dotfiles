@@ -1,34 +1,11 @@
-# AGENTS.md
-
-Auto-loaded by pi from `~/.pi/agent/AGENTS.md`. Common guidance lives in the
-shared partial; pi-specific notes follow.
+# Personal working preferences
 
 {{ template "voice-common.md" . }}
 
 {{ template "agents-common.md" . }}
 
-## Pi-specific
+## Pi
 
-- **Default backend**: MLX on `http://localhost:8080/v1` — mlx-openai-server
-  serving `unsloth/Qwen3.6-27B-MLX-8bit` as `qwen3.6-27b` (reasoning-tuned,
-  8-bit, q8 KV cache). Start it with `mlxserve` before launching pi.
-  Switch with `/model` if MLX isn't running — Anthropic Fable/Sonnet/Opus/Haiku
-  and OpenAI GPT-5 are available via env keys.
-- **/login** is for swapping to subscription billing (Claude Pro/Max,
-  ChatGPT Plus/Pro, GitHub Copilot). Default behavior reads API keys from
-  env, which is API-billed — only `/login` if I want to flip a session.
-- **No MCP**: pi doesn't have built-in MCP support. Reach for a pi
-  extension (`~/.pi/agent/extensions/*.ts`) or a Skill if I need a tool.
-- **Sessions** live under `~/.pi/agent/sessions/`. `/tree` navigates forks.
-
-## Local-model gotchas
-
-- `compat.supportsDeveloperRole: false` is set in `models.json` for the MLX
-  provider because mlx-openai-server rejects OpenAI's `developer` role — the
-  model itself IS reasoning-tuned (the server runs `--reasoning-parser
-  qwen3_5`, which strips `<think>` blocks from output).
-- Tool calls use `--tool-call-parser qwen3_coder` deliberately: Qwen3.6 emits
-  Qwen3-Coder's XML tool-call wire format (verified via raw probe — see the
-  mlxserve notes in `home/dot_zshrc.tmpl`). If a call comes back malformed,
-  check the server was launched with `--tool-call-parser qwen3_coder
-  --enable-auto-tool-choice` before suspecting pi config.
+Inspect active provider and extension configuration when resolving tool or
+connection problems. Use `/login` only when the user requests a change of
+authentication or billing method.

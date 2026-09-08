@@ -1,23 +1,32 @@
 ---
 name: dynamic-analysis
-description: Use when you need to run a binary, trace execution, or observe runtime behavior. Runtime analysis via QEMU emulation, GDB debugging, and Frida hooking - syscall tracing (strace), breakpoints, memory inspection, function interception. Keywords - "run binary", "execute", "debug", "trace syscalls", "set breakpoint", "qemu", "gdb", "frida", "strace", "watch memory"
+description: Investigate binary behavior through runtime instrumentation or reverse engineering with QEMU, GDB, Frida, or syscall tracing. Use for emulation, memory inspection, and function interception; ordinary builds, tests, and command execution do not need this skill.
 ---
 
-# Dynamic Analysis (Phase 4)
+# Dynamic Analysis
 
 ## Purpose
 
-Observe actual runtime behavior. Verify hypotheses from static analysis. Capture data that's only visible during execution.
+Investigate runtime behavior that needs instrumentation: verify hypotheses from
+static analysis and capture execution data through emulation, debugging, syscall
+tracing, or function hooks. Routine execution of a known project command does
+not require this workflow.
 
-## Human-in-the-Loop Requirement
+## Execution scope and isolation
 
-**CRITICAL: All execution requires human approval.**
+Use the existing authorization for the analysis; don't ask again merely because
+the workflow executes a binary. Establish the target, intended observations,
+and appropriate execution environment. For an untrusted sample, inspect its
+origin and expected effects and use containment appropriate to those effects.
+Ask when the proposed execution would exceed the authorized scope or require
+an unresolved choice about exposed files, devices, or network access.
 
-Before running ANY binary:
-1. Confirm sandbox configuration is acceptable
-2. Verify network isolation if required
-3. Document what execution will attempt
-4. Get explicit approval
+QEMU user-mode is an emulator, not a sandbox: it translates target syscalls into
+host syscalls. Isolation must come from the surrounding VM, container, or OS
+controls, with the actual mounts, credentials, network, and privileges checked.
+Neither a timeout nor syscall logging provides isolation. See the
+[QEMU user-mode model](https://www.qemu.org/docs/master/user/main.html#system-call-translation)
+and [QEMU security requirements](https://www.qemu.org/docs/master/system/security.html#non-virtualization-use-case).
 
 ## Platform Support Matrix
 
@@ -29,7 +38,11 @@ Before running ANY binary:
 | macOS (any) | x86-32 | Docker `--platform linux/i386` | Medium |
 | Windows | Any | WSL2 → Linux method | Medium |
 
-### macOS Docker Setup (One-Time)
+### macOS Docker Setup (When Needed)
+
+Use an existing runtime and registered emulation when available. Registering
+binfmt handlers changes the runtime; use the privileged setup below only when
+that change is authorized, not for executing the analysis sample itself.
 
 ```bash
 # Start Docker runtime (Colima, Docker Desktop, etc.)
@@ -58,15 +71,16 @@ docker run -v /tmp/samples:/work:ro ...
 
 | Method | Isolation | Granularity | Best For |
 |--------|-----------|-------------|----------|
-| QEMU -strace | High | Syscall level | Initial behavior mapping |
-| QEMU + GDB | High | Instruction level | Detailed debugging |
-| Docker | High | Process level | Cross-arch on macOS |
-| Frida | Medium | Function level | Hooking without recompilation |
-| On-device | Low | Full system | When emulation fails |
+| QEMU -strace | Provided by surrounding environment | Syscall level | Initial behavior mapping |
+| QEMU + GDB | Provided by surrounding environment | Instruction level | Detailed debugging |
+| Docker | Depends on runtime and configuration | Process level | Cross-arch on macOS |
+| Frida | Inherits target environment | Function level | Hooking without recompilation |
+| On-device | Inherits device controls | Full system | When emulation fails |
 
 ## Option A: QEMU User-Mode with Syscall Trace
 
-**Safest approach - runs in isolation with syscall logging.**
+Use syscall logging for initial behavior mapping inside the chosen execution
+environment; QEMU does not establish that environment's isolation.
 
 ### Setup
 
@@ -371,13 +385,18 @@ scp user@device:/tmp/trace.log .
 
 ### Minimal Sandbox (nsjail)
 
+This example retains nsjail's network namespace. The
+[`--disable_clone_newnet` option](https://github.com/google/nsjail) would remove
+that separation; add network access only when the experiment requires it and
+the access is authorized. Verify the sysroot, mounts, and UID/GID mappings for
+the actual host before using the example.
+
 ```bash
 nsjail \
   --mode o \
   --chroot /sysroot \
   --user 65534 \
   --group 65534 \
-  --disable_clone_newnet \
   --rlimit_as 512 \
   --time_limit 60 \
   -- /binary

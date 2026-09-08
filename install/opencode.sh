@@ -67,6 +67,59 @@ _emit_opencode_mcp() {
     rm -f "$_stream"
 }
 
+_scope_opencode_mcp() {
+    local _registry
+    _registry="$(mcp_servers_each --all | jq -sc 'map({key:.name,value:.profile}) | from_entries')" || return 1
+    jq --argjson registry "$_registry" '
+        def permissions:
+            if type == "string" then {"*":.} else . // {} end;
+        def namespace: gsub("[^a-zA-Z0-9_-]"; "_");
+        (.mcp // {} | keys) as $names
+        | ($names | map({name:., namespace:(namespace)})) as $servers
+        | if ($servers | map(.namespace) | unique | length) != ($servers | length)
+          then error("MCP server names collide after OpenCode namespace normalization") else . end
+        | ["context7", "qmd", "openaiDeveloperDocs", "rust-docs", "crates"] as $core
+        | {
+            research:"Research web sources, papers, citations, and model repositories",
+            browser:"Operate and inspect browser pages with Chrome DevTools",
+            creative:"Create, inspect, and render Blender scenes",
+            desktop:"Operate native macOS applications and desktop workflows",
+            cloud:"Inspect and manage cloud resources and deployments",
+            workspace:"Work with Google Workspace mail, calendars, and documents",
+            math:"Explore mathematics, symbolic computation, and Lean proofs",
+            repository:"Inspect and manage GitHub repositories, issues, and pull requests"
+          } as $descriptions
+        | (reduce $names[] as $name ({};
+            ($registry[$name] // "" | split("-")[0] // "") as $profile
+            | (if ($core | index($name)) != null then "core"
+               elif $name == "github" then "repository"
+               elif $descriptions | has($profile) then $profile
+               else "mcp-" + ($name | namespace) end) as $group
+            | .[$group] += [$name])) as $groups
+        # Longer namespaces must follow shorter prefixes (foo_* vs foo_bar_*).
+        | ($servers | sort_by(.namespace | length)) as $ordered
+        | def scope($allowed):
+            reduce $ordered[] as $server ({};
+                .[$server.namespace + "_*"] =
+                    (if ($allowed | index($server.name)) != null then "allow" else "deny" end));
+        def scoped($allowed):
+            permissions | delpaths([$servers[] | [.namespace + "_*"]]) + scope($allowed);
+        .permission |= scoped([])
+        | .agent //= {}
+        | .agent.review.permission |= (permissions + {edit:"deny", task:"deny"})
+        | reduce ["build", "plan", "review"][] as $name (.;
+            .agent[$name] //= {}
+            | .agent[$name].permission |= scoped($groups.core // []))
+        | reduce ($groups | keys[] | select(. != "core")) as $group (.;
+            .agent[$group] = ((.agent[$group] // {}) + {
+                mode:"all",
+                description:(($descriptions[$group] // "Use this additional MCP capability")
+                    + ". MCP: " + ($groups[$group] | join(", ")) + "."),
+                permission:((.agent[$group].permission // {}) | scoped($groups[$group]))
+            }))
+    '
+}
+
 _sync_config() {
     log_section "OpenCode config"
     has jq || die "jq missing — cannot generate opencode config"
@@ -83,11 +136,13 @@ _sync_config() {
     _tmp="$(mktemp)"
     printf '%s' "$_base" | jq --argjson mcp "$_mcp" --argjson existing "$_existing" '
         ($existing.mcp // {}) as $old
+        | . *= ($existing | del(.mcp,.agent))
+        | .agent = ((.agent // {}) * ($existing.agent // {}))
         | .mcp = (reduce ($mcp | to_entries[]) as $e ($old;
             .[$e.key] = (($old[$e.key] // {} | del(.type,.command,.url,.headers,.enabled)) + $e.value
                 + (if ($old[$e.key].enabled | type) == "boolean"
                    then {enabled:$old[$e.key].enabled} else {} end))))
-    ' > "$_tmp" \
+    ' | _scope_opencode_mcp > "$_tmp" \
         || { log_fail "opencode config assembly failed"; rm -f "$_tmp"; return 1; }
 
     ensure_dir "$HOME/.config/opencode"

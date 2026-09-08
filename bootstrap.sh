@@ -84,6 +84,7 @@
 #   DF_DO_VSCODE        — set to 0 to skip VS Code extension install
 #   DF_DO_CMAKE         — set to 0 to skip CMake toolchain file install
 #   DF_DO_LOCAL_LLM     — set to 0 to skip local LLM tooling setup
+#   DF_DO_OPENCODE      — set to 0 to skip OpenCode config sync (independent of local inference)
 #   DF_DO_MEMORY        — set to 0 to skip the agent memory stack (qmd/cass/~kb)
 #   DF_DO_SKILLS        — set to 0 to skip agent-skills sync (agent-skills.txt)
 #   DF_DO_BLENDER_MCP   — set to 0 to skip blender-mcp addon (default: macOS 1, Linux 0)
@@ -648,9 +649,11 @@ if [[ "${DF_DO_LOCAL_LLM:-1}" != "0" ]]; then
     else
         bash "$DF_INSTALL_DIR/local-llm.sh" || die "local-llm.sh failed"
     fi
-    bash "$DF_INSTALL_DIR/opencode.sh" || die "opencode.sh failed"
 else
     log_info "Skipping local LLM tooling (DF_DO_LOCAL_LLM=0)"
+fi
+if [[ "${DF_DO_OPENCODE:-${DF_DO_NODE:-1}}" != "0" ]]; then
+    bash "$DF_INSTALL_DIR/opencode.sh" || die "opencode.sh failed"
 fi
 
 ### 6.6. agent memory stack ###

@@ -40,6 +40,9 @@ The repo is designed for:
 - When touching install behavior, verify the corresponding `DF_DO_*` flow in `bootstrap.sh`.
 - When touching package ownership, check the package lists for duplicates first.
 - When touching shell environment behavior, keep zsh and bash login profiles aligned unless divergence is intentional.
+- Agent instructions share `home/.chezmoitemplates/agents-common.md`; tone lives in `voice-common.md`. Keep tool inventories, provider setup, and registry maintenance in this repo's docs and skills rather than global prompts.
+- `packages/agent-skills.txt` owns installer-managed skills; repo-owned skills live under `home/dot_claude/skills/`. Never give a skill both owners. `bash install/skills-sync.sh check` is read-only; `npx skills check` may update skills.
+- Use the installed `writing-skills` workflow and the selected model for meaningful instruction or skill comparisons. Preserve native memory-write permissions; benchmarking does not authorize memory updates.
 
 ## Validation
 

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mission Control · WebMCP workbench</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">ORBITAL COMPUTE / LIVE SIMULATION</p>
+          <h1>Mission Control</h1>
+          <p class="subtitle">A local dashboard where the interface and WebMCP tools use one action layer.</p>
+        </div>
+        <div class="connection" id="webmcp-status" aria-live="polite">Checking page tools…</div>
+      </header>
+
+      <section class="hero-grid" aria-label="Simulation status">
+        <article class="signal-card primary"><span>Simulation tick</span><strong id="tick">014</strong><small id="tick-note">Stable trajectory</small></article>
+        <article class="signal-card"><span>System confidence</span><strong id="confidence">82%</strong><small id="confidence-note">Nominal</small></article>
+        <article class="signal-card"><span>Burn reserve</span><strong id="reserve">72</strong><small>units remaining</small></article>
+        <article class="signal-card"><span>Focus</span><strong id="focus">Stability</strong><small id="focus-note">Protect the baseline</small></article>
+      </section>
+
+      <section class="workspace">
+        <article class="panel simulation-panel">
+          <div class="panel-heading"><div><p class="eyebrow">SIMULATION</p><h2>Trajectory console</h2></div><span class="chip" id="trajectory-chip">stable</span></div>
+          <div class="orbit" aria-hidden="true"><i class="orbit-ring ring-one"></i><i class="orbit-ring ring-two"></i><i class="core"></i><i class="satellite"></i></div>
+          <div class="simulation-controls" role="group" aria-label="Simulation controls">
+            <button class="button primary-button" id="advance-button" type="button">Advance 1 tick</button>
+            <button class="button quiet-button" id="reset-button" type="button">Reset simulation</button>
+            <button class="button quiet-button" id="export-button" type="button">Export JSON</button>
+          </div>
+          <p class="event-log" id="event-log">System initialized. Awaiting next action.</p>
+        </article>
+
+        <article class="panel focus-panel">
+          <div class="panel-heading"><div><p class="eyebrow">OPERATOR INTENT</p><h2>Choose a focus</h2></div></div>
+          <div class="focus-list" role="group" aria-label="Focus selection">
+            <button class="focus-option" data-focus="stability" type="button"><b>Stability</b><span>Protect trajectory and reserve.</span></button>
+            <button class="focus-option" data-focus="latency" type="button"><b>Latency</b><span>Accelerate research feedback.</span></button>
+            <button class="focus-option" data-focus="coverage" type="button"><b>Coverage</b><span>Expand active experiments.</span></button>
+          </div>
+        </article>
+
+        <article class="panel work-panel">
+          <div class="panel-heading"><div><p class="eyebrow">WORK QUEUE</p><h2>Experiments</h2></div><span class="chip" id="work-count">0 active</span></div>
+          <form id="work-form" class="work-form">
+            <label>Experiment name<input id="work-title" name="title" minlength="3" maxlength="48" required placeholder="e.g. Thermal sweep"></label>
+            <label>Lane<select id="work-lane" name="lane"><option value="research">Research</option><option value="build">Build</option><option value="validate">Validate</option></select></label>
+            <label>Effort<input id="work-effort" name="effort" type="number" min="1" max="8" value="3" required></label>
+            <button class="button primary-button" type="submit">Queue experiment</button>
+          </form>
+          <ol class="work-list" id="work-list" aria-live="polite"></ol>
+        </article>
+      </section>
+      <footer>State is stored locally in this browser and can be exported as editable JSON. No network or account actions are exposed.</footer>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
