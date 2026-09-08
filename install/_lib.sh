@@ -126,30 +126,16 @@ ARCH="$(uname -m)"
 # Normalize DF_USE_PLAT: accept 1/true/yes/on as enabled (matches the chezmoi
 # template, which writes use_plat=true|false). Without this, `DF_USE_PLAT=true`
 # would silently render profiles PLAT-on while install scripts go flat.
-case "${DF_USE_PLAT:-0}" in
-    1|true|yes|on|TRUE|YES|ON) DF_USE_PLAT=1 ;;
-    *) DF_USE_PLAT=0 ;;
-esac
+# shellcheck source=install/_runtime-paths.sh
+source "$DF_ROOT/install/_runtime-paths.sh"
+_normalize_plat_layout
 
-# PLAT detection: scan install/plat/ for .plat_check.sh scripts (highest level first).
-# Always run regardless of DF_USE_PLAT — capability flags from .plat_env.sh
-# (RUSTFLAGS=-Ctarget-cpu=..., HOMEBREW_OPTFLAGS=-march=..., etc.) are still
-# useful in flat mode for binaries this machine actually compiles.
-PLAT=""
-_PLAT_SCRIPT_DIR="$DF_ROOT/install/plat"
-if [[ -d "$_PLAT_SCRIPT_DIR" ]]; then
-    _PLAT_OS="$(uname -s)"
-    while IFS= read -r _plat_dir; do
-        _check="$_plat_dir/.plat_check.sh"
-        if [[ -f "$_check" ]] && /bin/sh "$_check" 2>/dev/null; then
-            PLAT="$(basename "$_plat_dir")"
-            [[ -f "$_plat_dir/.plat_env.sh" ]] && source "$_plat_dir/.plat_env.sh"
-            break
-        fi
-    done < <(ls -1d "$_PLAT_SCRIPT_DIR"/plat_"${_PLAT_OS}"_*/ 2>/dev/null | sort -r)
-    unset _PLAT_OS _plat_dir _check
+# Install-time capability flags are useful even in flat mode. Runtime
+# launchers use the same detection only when they need PLAT isolation.
+_detect_plat "$DF_ROOT"
+if [[ -n "$PLAT" && -f "$DF_ROOT/install/plat/$PLAT/.plat_env.sh" ]]; then
+    source "$DF_ROOT/install/plat/$PLAT/.plat_env.sh"
 fi
-unset _PLAT_SCRIPT_DIR
 
 # When PLAT isolation is on, a matching spec is required (the directory name
 # embeds $PLAT). When off, missing spec is fine — capability flags just don't
@@ -161,17 +147,7 @@ fi
 
 # Resolve ~/.local through any symlink so tool configs (rustup, cargo, nvm)
 # store the real physical path. Prevents stale entries if ~/.local moves.
-_LOCAL_ROOT="$HOME/.local"
-if [[ -L "$_LOCAL_ROOT" ]]; then
-    _LOCAL_ROOT="$(readlink -f "$_LOCAL_ROOT")"
-fi
-
-if [[ "$DF_USE_PLAT" == "1" ]]; then
-    LOCAL_PLAT="$_LOCAL_ROOT/$PLAT"
-else
-    LOCAL_PLAT="$_LOCAL_ROOT"
-fi
-unset _LOCAL_ROOT
+_resolve_local_plat
 ARCH_BIN="$LOCAL_PLAT/bin"
 
 # Standard per-machine tool paths — always derived from LOCAL_PLAT.
@@ -778,19 +754,6 @@ _qmd_wait_healthy() {
         (( _i++ )) || true
     done
     return 1
-}
-
-# Resolve LOCAL_PLAT from current $HOME/.local (handling symlinks) and the
-# DF_USE_PLAT flag. Sets LOCAL_PLAT but does NOT touch derived vars — call
-# _re_derive_plat_vars after this if anything else has changed.
-_resolve_local_plat() {
-    local _root="$HOME/.local"
-    [[ -L "$_root" ]] && _root="$(readlink -f "$_root")"
-    if [[ "${DF_USE_PLAT:-0}" == "1" ]]; then
-        LOCAL_PLAT="$_root/$PLAT"
-    else
-        LOCAL_PLAT="$_root"
-    fi
 }
 
 # Re-derive all PLAT-dependent variables from the current LOCAL_PLAT.

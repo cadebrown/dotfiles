@@ -8,7 +8,7 @@
     ],
     "sessionEnd": [
       {
-        "command": "bash ./hooks/sync-dotfiles-cursor.sh"
+        "command": "bash ./hooks/sync-dotfiles-cursor.sh --session-end"
       }
     ],
     "beforeSubmitPrompt": [

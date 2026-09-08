@@ -18,7 +18,8 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 case "$url" in
-    */install/_lib.sh) cp "$REPO_SOURCE/install/_lib.sh" "$out" ;;
+    */install/_lib.sh|*/install/_runtime-paths.sh|*/install/scratch.sh|*/install/dirs.sh)
+        cp "$REPO_SOURCE/install/${url##*/}" "$out" ;;
     *) printf 'unexpected curl URL: %s\n' "$url" >&2; exit 1 ;;
 esac
 SH
@@ -27,6 +28,9 @@ SH
 #!/bin/sh
 if [ "$1" = clone ]; then
     cp -R "$REPO_SOURCE" "$3"
+    if [ "${REMOTE_OMIT_PLAT:-0}" = 1 ]; then
+        mv "$3/install/plat" "$3/install/plat.unavailable"
+    fi
     exit 0
 fi
 exec /usr/bin/git "$@"
@@ -52,7 +56,7 @@ SH
 }
 
 run_remote_bootstrap() {
-    local use_plat="$1"
+    local use_plat="$1" preclone_installers="${2:-0}" omit_plat="${3:-0}"
     make_fake_chezmoi "$use_plat"
 
     run bash -c '
@@ -60,7 +64,8 @@ run_remote_bootstrap() {
         env \
             HOME="$2" PATH="$3:/usr/bin:/bin" REPO_SOURCE="$4" \
             DF_USE_PLAT="$5" DF_NAME=Test DF_EMAIL=test@example.com \
-            DF_DO_SCRATCH=0 DF_DO_DIRS=0 DF_DO_ZSH=0 DF_DO_PACKAGES=0 \
+            DF_DO_SCRATCH="$6" DF_DO_DIRS="$6" DF_SCRATCH= DF_SCRATCH_LINK="$2/no-scratch" \
+            REMOTE_OMIT_PLAT="$7" DF_DO_ZSH=0 DF_DO_PACKAGES=0 \
             DF_DO_LLDB=0 DF_DO_QUARTO=0 DF_DO_MACOS_SERVICES=0 DF_DO_MACOS_SETTINGS=0 \
             DF_DO_MACOS_QUICK_ACTIONS=0 DF_DO_PYTHON=0 DF_DO_NODE=0 \
             DF_DO_RUST=0 DF_DO_GO=0 DF_DO_JULIA=0 DF_DO_LEAN=0 \
@@ -70,7 +75,7 @@ run_remote_bootstrap() {
             DF_DO_MEMORY=0 DF_DO_SKILLS=0 DF_DO_BLENDER_MCP=0 \
             DF_DO_AUTH=0 DF_DO_OVERLAYS=0 \
             bash < "$4/bootstrap.sh"
-    ' _ "$BATS_TEST_TMPDIR/unrelated" "$TEST_HOME" "$FAKE_BIN" "$REPO" "$use_plat"
+    ' _ "$BATS_TEST_TMPDIR/unrelated" "$TEST_HOME" "$FAKE_BIN" "$REPO" "$use_plat" "$preclone_installers" "$omit_plat"
 }
 
 @test "piped bootstrap clones to HOME/dotfiles from an unrelated directory" {
@@ -88,4 +93,22 @@ run_remote_bootstrap() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"DF_USE_PLAT=1"* ]]
     [[ "$output" == *"LOCAL_PLAT=$TEST_HOME/.local/plat_"* ]]
+}
+
+@test "piped PLAT bootstrap runs pre-clone scratch and directory installers" {
+    run_remote_bootstrap 1 1
+
+    [ "$status" -eq 0 ]
+    [ -d "$TEST_HOME/dev" ]
+    [ -d "$TEST_HOME/bones" ]
+    [[ "$output" == *'No scratch space detected'* ]]
+    [[ "$output" == *"LOCAL_PLAT=$TEST_HOME/.local/plat_"* ]]
+}
+
+@test "piped bootstrap ends PLAT deferral before validating its cloned repository" {
+    run_remote_bootstrap 1 1 1
+
+    [ "$status" -ne 0 ]
+    [ -d "$TEST_HOME/dev" ]
+    [[ "$output" == *'DF_USE_PLAT=1 but no matching plat spec'* ]]
 }

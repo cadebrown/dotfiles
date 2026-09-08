@@ -113,7 +113,7 @@ chmod +x "$_python_wrapper"
 mv -f "$_python_wrapper" "$ARCH_BIN/python"
 ln -sfn python "$ARCH_BIN/python3"
 
-"$ARCH_BIN/python" -c 'import sympy'
+"$ARCH_BIN/python" -c 'import sympy, yaml'
 log_okay "Interactive Python: $("$ARCH_BIN/python" --version), SymPy $("$ARCH_BIN/python" -c 'import sympy; print(sympy.__version__)')"
 
 log_info "Preparing the refreshable Google MCP transport"

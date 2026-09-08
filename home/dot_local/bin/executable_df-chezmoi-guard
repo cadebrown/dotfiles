@@ -9,55 +9,94 @@ set -uo pipefail
 command -v jq >/dev/null 2>&1 || exit 0
 command -v chezmoi >/dev/null 2>&1 || exit 0
 
-data="$(cat)"
-cwd="$(printf '%s' "$data" | jq -r '.cwd // env.PWD // ""')"
-
 resolve_path() {
-    local path="$1"
-    [[ -n "$path" ]] || return 0
-
-    case "$path" in
-        "~") path="$HOME" ;;
-        # NB: quote the pattern — in ${path#~/} bash tilde-expands the
-        # PATTERN itself, so it strips "$HOME/" instead of a literal "~/"
-        # and tilde paths sail past the guard unresolved.
-        "~/"*) path="$HOME/${path#"~/"}" ;;
-    esac
-
-    if [[ "$path" != /* ]]; then
-        path="${cwd:-$PWD}/$path"
-    fi
-
-    (cd "$(dirname "$path")" 2>/dev/null && printf '%s/%s\n' "$(pwd)" "$(basename "$path")") \
-        || printf '%s\n' "$path"
+    local file="$1" parent suffix
+    parent="${file%/*}"
+    suffix="${file##*/}"
+    # Resolve existing ancestors physically, even when an Add File target's
+    # parent has not been created yet. Use shell builtins on this hot path.
+    while [[ -n "$parent" && ! -d "$parent" ]]; do
+        suffix="${parent##*/}/$suffix"
+        parent="${parent%/*}"
+    done
+    (cd -P "${parent:-/}" 2>/dev/null && printf '%s/%s' "${PWD%/}" "$suffix") \
+        || printf '%s' "$file"
 }
 
 emit_candidates() {
-    printf '%s' "$data" | jq -r '
-        .tool_input.file_path?,
-        .tool_input.filePath?,
-        .tool_input.path?
-        | select(type == "string" and length > 0)
-    '
-
-    printf '%s' "$data" | jq -r '.tool_input.command? // empty' \
-        | sed -nE \
-            -e 's/^\*\*\* (Add|Update|Delete) File: (.*)$/\2/p' \
-            -e 's/^\*\*\* Move to: (.*)$/\1/p'
+    local candidate file referent depth
+    while IFS= read -r -d '' candidate; do
+        # Preserve trailing newlines through shell command substitution.
+        file="$(resolve_path "$candidate"; printf '.')"
+        file="${file%.}"
+        printf '%s\0' "$file"
+        # Keep the symlink itself in the lookup, then check its referent too.
+        # A non-managed alias must not allow writes into a managed target.
+        depth=0
+        while [[ -L "$file" && "$depth" -lt 40 ]]; do
+            referent="$(readlink "$file" && printf '.')" || break
+            referent="${referent%$'\n'.}"
+            [[ "$referent" == /* ]] || referent="${file%/*}/$referent"
+            file="$(resolve_path "$referent"; printf '.')"
+            file="${file%.}"
+            printf '%s\0' "$file"
+            depth=$((depth + 1))
+        done
+    done < <(printf '%s' "$candidates" | jq -j '.[] | . + "\u0000"')
 }
 
-blocked=0
-while IFS= read -r candidate; do
-    [[ -n "$candidate" ]] || continue
-    file="$(resolve_path "$candidate")"
-    src="$(chezmoi source-path "$file" 2>/dev/null)" || continue
-    [[ -n "$src" ]] || continue
+# Parse once and retain JSON encoding until the NUL-delimited pipe: filenames
+# from Edit/Write may contain newlines, and shell command substitution drops NULs.
+candidates="$(jq -c '
+    (.cwd // env.PWD // "") as $cwd
+    | [.tool_input.file_path?, .tool_input.filePath?, .tool_input.path?,
+       ((.tool_input.command? // "") | split("\n")[]
+        | (capture("^\\*\\*\\* (?:(?:Add|Update|Delete) File: |Move to: )(?<file>.*)$")?) | .file)]
+    | map(select(type == "string" and length > 0)
+        | if . == "~" then env.HOME
+          elif startswith("~/") then env.HOME + .[1:] else . end
+        | if startswith("/") then . else $cwd + "/" + . end)
+    | unique
+')" || exit 0
+[[ "$candidates" != '[]' ]] || exit 0
 
-    printf 'Blocked: %s is managed by chezmoi.\n' "$file" >&2
-    printf 'Edit the source: %s\n' "$src" >&2
-    printf "(then run 'chezmoi apply' to deploy)\n" >&2
-    blocked=1
-done < <(emit_candidates | awk '!seen[$0]++')
-
-[[ "$blocked" == 0 ]] || exit 2
+# A fresh ownership snapshot avoids one chezmoi process per patch file without
+# caching away newly managed targets. source-path with multiple arguments aborts
+# on the first unmanaged path, so it cannot safely implement the batch lookup.
+ownership="$(chezmoi managed --path-style all --format json 2>/dev/null)" || exit 0
+# chezmoi keeps the configured destination's lexical spelling. Resolve its root
+# once so homes reached through a symlink match physically resolved candidates.
+# Relative entry names remain unchanged, preserving managed symlink ownership.
+destination_root="$(printf '%s' "$ownership" | jq -j '
+    to_entries | .[0] // empty | .key as $relative
+    | (.value.absolute | rtrimstr("/" + $relative)) + "."
+')" || exit 0
+destination_root="${destination_root%.}"
+[[ -n "$destination_root" ]] || exit 0
+physical_root="$(resolve_path "$destination_root/."; printf '.')"
+physical_root="${physical_root%.}"
+blocked="$(printf '%s' "$ownership" | jq -r --arg physical_root "$physical_root" --rawfile paths <(
+    emit_candidates
+) '
+    def normalize:
+        split("/") | reduce .[] as $part ([];
+            if $part == "" or $part == "." then .
+            elif $part == ".." then .[:-1] else . + [$part] end)
+        | "/" + join("/");
+    # managed omits the destination root, which source-path also protects.
+    to_entries | .[0] as $first
+    | [.[] | .value, (.value + {absolute: ($physical_root + "/" + .key)})] +
+      (if $first == null then [] else [{
+          absolute: ($first.value.absolute | rtrimstr("/" + $first.key)),
+          sourceAbsolute: ($first.value.sourceAbsolute | rtrimstr("/" + $first.value.sourceRelative))
+      }] | . + [.[0] + {absolute: $physical_root}] end)
+    | INDEX(.absolute | normalize) as $managed
+    | $paths | split("\u0000") | map(select(length > 0) | normalize) | unique[]
+    | . as $file | $managed[$file] // empty
+    | "Blocked: \($file) is managed by chezmoi.\nEdit the source: \(.sourceAbsolute)\n(then run '\''chezmoi apply'\'' to deploy)"
+')" || exit 0
+if [[ -n "$blocked" ]]; then
+    printf '%s\n' "$blocked" >&2
+    exit 2
+fi
 exit 0

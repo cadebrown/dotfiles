@@ -6,7 +6,7 @@
 #     <age>/<T>t/<C>c · <In>/<Out> (<cache>% cached) · $<cost> (+$<last>) · <tags>
 #
 # Each segment renders independently — if any piece errors, the others still
-# show. Pure bash + jq + git CLI (no external statusline binary).
+# show. Bash + jq + git CLI, with a stdlib Python transcript cache.
 #
 # Reads JSON via stdin (Claude Code's contract):
 #   .workspace.current_dir     string  cwd of the agent
@@ -21,8 +21,9 @@
 #   (additional fields tolerated but ignored)
 #
 # Performance:
-#   - Cache hit (~5s TTL, keyed by session_id) — typical 30-50ms.
-#   - Cache miss / cold — 100-130ms baseline.
+#   - Git counters have a 5s TTL, keyed by session_id.
+#   - Transcript stats reuse unchanged records and parse only appended JSONL.
+#     Cold reads scan the file; replacement/truncation invalidates the cache.
 #   - Pathological huge-repo cases bounded at ~2.1s via 2s caps on
 #     `git status --porcelain` and `git diff --shortstat`. On timeout the
 #     stale cache values are reused when available, else the placeholder
@@ -148,20 +149,25 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 0
 fi
 
-CWD="$(printf       '%s' "$INPUT" | jq -r '.workspace.current_dir // .cwd // "."')"
-MODEL_NAME="$(printf '%s' "$INPUT" | jq -r '.model.display_name // ""')"
-MODEL_ID="$(printf   '%s' "$INPUT" | jq -r '.model.id // ""')"
-TRANSCRIPT="$(printf '%s' "$INPUT" | jq -r '.transcript_path // ""')"
-SESSION_ID="$(printf '%s' "$INPUT" | jq -r '.session_id // ""')"
-#  Claude Code wraps effort as {"level":"max"} — extract .level if object, else use as-is.
-EFFORT="$(printf     '%s' "$INPUT" | jq -r '
+# Parse once; NUL delimiters preserve empty values and whitespace in paths.
+# read -d works with macOS Bash 3.2 as well as newer Bash.
+for _field in CWD MODEL_NAME MODEL_ID TRANSCRIPT SESSION_ID EFFORT COST_USD CTX_PCT_IN CTX_SIZE_IN SUBAGENT; do
+    IFS= read -r -d '' "$_field" || true
+done < <(printf '%s' "$INPUT" | jq -j '
     (.model.effort // .effort // .effortLevel // "") as $e |
-    if ($e | type) == "object" then ($e.level // "") else $e end
-')"
-# Cost + context come straight from Claude Code (no pricing table needed).
-COST_USD="$(printf    '%s' "$INPUT" | jq -r '.cost.total_cost_usd // empty')"
-CTX_PCT_IN="$(printf  '%s' "$INPUT" | jq -r '.context_window.used_percentage // empty')"
-CTX_SIZE_IN="$(printf '%s' "$INPUT" | jq -r '.context_window.context_window_size // empty')"
+    [(.workspace.current_dir // .cwd // "."),
+     (.model.display_name // ""), (.model.id // ""),
+     (.transcript_path // ""), (.session_id // ""),
+     (if ($e | type) == "object" then ($e.level // "") else $e end),
+     (.cost.total_cost_usd // ""),
+     (.context_window.used_percentage // ""),
+     (.context_window.context_window_size // ""),
+     (if (.agent // null) != null and (.agent | tostring) != "" and (.agent | tostring) != "null" then "1"
+      elif (.agent_id // null) != null then "1"
+      elif (.is_subagent // false) == true then "1"
+      elif (.parent_session_id // null) != null then "1"
+      else "" end)] | .[] | tostring, "\u0000"
+')
 
 if [[ "${DEBUG:-0}" == "1" ]]; then
     {
@@ -171,7 +177,7 @@ if [[ "${DEBUG:-0}" == "1" ]]; then
     } >&2
 fi
 
-# ─── compute session stats (single jq pass, shared by model + session segs) ─
+# ─── compute session stats (incremental cache, jq compatibility fallback) ─
 # Fields produced:
 #   $turns  $ctx  $tin $tout $tcr $tcw5 $tcw1   (sums + last-turn ctx, as before)
 #   $age    seconds between first and last assistant timestamps
@@ -182,6 +188,12 @@ LIN=0 LOUT=0 LCR=0 LCW5=0 LCW1=0
 HAVE_STATS=0
 PCT=""
 if [[ -n "$TRANSCRIPT" && -r "$TRANSCRIPT" ]]; then
+    # Runtime execution avoids a package-manager startup per refresh. The helper
+    # has no third-party dependencies. Keep jq compatibility if Python is absent.
+    _stats_helper="${BASH_SOURCE[0]%/*}/statusline_stats.py"
+    if [[ -r "$_stats_helper" ]] && command -v python3 >/dev/null 2>&1; then
+        _stats="$(python3 "$_stats_helper" "$TRANSCRIPT" 2>/dev/null)"
+    else
     _stats="$(jq -s -r '
         [ .[] | select(.type == "assistant") ] as $a |
         ($a | length) as $turns |
@@ -210,6 +222,7 @@ if [[ -n "$TRANSCRIPT" && -r "$TRANSCRIPT" ]]; then
         ($u.cache_creation.ephemeral_1h_input_tokens     // 0) as $lcw1 |
         "\($turns) \($ctx) \($tin) \($tout) \($tcr) \($tcw5) \($tcw1) \($age) \($tools) \($lin) \($lout) \($lcr) \($lcw5) \($lcw1)"
     ' "$TRANSCRIPT" 2>/dev/null)"
+    fi
     if [[ -n "$_stats" ]]; then
         read -r TURNS CTX TIN TOUT TCR TCW5 TCW1 AGE TOOLS LIN LOUT LCR LCW5 LCW1 <<<"$_stats"
         HAVE_STATS=1
@@ -238,15 +251,6 @@ if [[ -n "$_wtmeta" ]]; then
     _gcd="$(printf '%s\n' "$_wtmeta" | tail -1)"
     [[ -n "$_gd" && "$_gd" != "$_gcd" ]] && IN_WORKTREE=1
 fi
-# Subagent: best-effort. Claude Code may set `.agent`, `.agent_id`, or similar
-# in the statusline JSON when rendering inside a sub-agent context. Field name
-# isn't documented yet; we check a few likely candidates and degrade silently.
-SUBAGENT="$(printf '%s' "$INPUT" | jq -r '
-    if (.agent      // null) != null and (.agent      | tostring) != "" and (.agent      | tostring) != "null" then "1"
-    elif (.agent_id // null) != null then "1"
-    elif (.is_subagent // false) == true then "1"
-    elif (.parent_session_id // null) != null then "1"
-    else "" end' 2>/dev/null)"
 
 # ─── segment: directory ──────────────────────────────────────────────────
 # Three rendering modes, picked by where CWD sits:

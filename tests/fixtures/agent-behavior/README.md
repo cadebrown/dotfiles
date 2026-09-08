@@ -67,6 +67,7 @@ change; it does not simulate a crash, offline work, or a scheduler wakeup.
 
 | Case | Independent checks | Human review |
 | --- | --- | --- |
+| Execution (opt-in) | Generated zsh script, literal counts, spaces, zero matches, alternate cwd, unchanged inputs | Shell-variable safety and output discipline |
 | Coding | Interval coverage on 200 reproducible generated inputs, edge cases, nonmutation, invalid inputs | Scope and usefulness of model-written tests |
 | Research | Output exists, length bound, primary-source citations | Factual accuracy, inference boundaries, recommendation usefulness |
 | Browser | Real Chromium keyboard/toggle/reset/slider interactions, viewport overflow, runtime errors, screenshots | Design, readability, motion, honest visual inspection |

@@ -136,3 +136,116 @@ check_launchers() {
         done
     done
 }
+
+@test "task runtime preserves caller environment and never sources installer credentials" {
+    write_runtimes "$FLAT"
+    write_runtimes "$ISOLATED"
+    install_helpers
+    printf 'exit 27\n' > "$FAKE_HOME/.unrelated.env"
+    local directory layout
+    for layout in 0 1; do
+        directory="$FLAT"
+        [[ "$layout" == 1 ]] && directory="$ISOLATED"
+        cat > "$directory/python/bin/python" <<'SH'
+#!/bin/sh
+printf 'git=%s\ncflags=%s\nrustflags=%s\npath=%s\n' "${GIT_CONFIG_GLOBAL:-unset}" "${CFLAGS:-unset}" "${RUSTFLAGS:-unset}" "$PATH"
+printf 'arg=%s\n' "$@"
+SH
+        printf '%s\n' "$layout" > "$MARKER"
+        run env -i HOME="$FAKE_HOME" PATH=/usr/bin:/bin DF_DOTFILES_REPO="$FAKE_REPO" \
+            GIT_CONFIG_GLOBAL="$FAKE_HOME/custom-git-config" \
+            "$FAKE_HOME/.local/bin/df-task" checkpoint --note 'literal $PATH and spaces'
+        [ "$status" -eq 0 ]
+        [ "${lines[0]}" = "git=$FAKE_HOME/custom-git-config" ]
+        [ "${lines[1]}" = 'cflags=unset' ]
+        [ "${lines[2]}" = 'rustflags=unset' ]
+        [ "${lines[3]}" = 'path=/usr/bin:/bin' ]
+        [ "${lines[7]}" = 'arg=literal $PATH and spaces' ]
+    done
+}
+
+@test "runtime paths follow relocated local symlinks in both layouts" {
+    write_runtimes "$FLAT"
+    write_runtimes "$ISOLATED"
+    install_helpers
+    local scratch="$BATS_TEST_TMPDIR/scratch" relocated="$BATS_TEST_TMPDIR/moved scratch" layout directory
+    mv "$FLAT" "$scratch"
+    scratch="$(cd "$scratch" && pwd -P)"
+    ln -s "$scratch" "$FLAT"
+    for layout in 0 1; do
+        directory="$scratch"
+        [[ "$layout" == 1 ]] && directory="$scratch/${ISOLATED##*/}"
+        check_launchers "$directory" "$directory/uv/cache" DF_USE_PLAT="$layout"
+    done
+    mv "$scratch" "$relocated"
+    relocated="$(cd "$relocated" && pwd -P)"
+    rm "$FLAT"
+    ln -s "$relocated" "$FLAT"
+    for layout in 0 1; do
+        directory="$relocated"
+        [[ "$layout" == 1 ]] && directory="$relocated/${ISOLATED##*/}"
+        check_launchers "$directory" "$directory/uv/cache" DF_USE_PLAT="$layout"
+    done
+}
+
+@test "task launcher rejects missing selected runtime without using another Python" {
+    write_runtimes "$FLAT"
+    write_runtimes "$ISOLATED"
+    install_helpers
+    rm "$ISOLATED/python/bin/python"
+    run env -i HOME="$FAKE_HOME" PATH="$FLAT/python/bin:/usr/bin:/bin" \
+        DF_DOTFILES_REPO="$FAKE_REPO" DF_USE_PLAT=1 "$FAKE_HOME/.local/bin/df-task" list
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'Run install/python.sh before using df-task'* ]]
+    [[ "$output" != *runtime=* ]]
+}
+
+@test "runtime resolver and installer agree on accepted explicit layout values" {
+    local value expected
+    for value in 0 1 true yes on TRUE YES ON false unknown ''; do
+        expected="$(env -i HOME="$FAKE_HOME" PATH=/usr/bin:/bin DF_USE_PLAT="$value" \
+            /bin/bash -ec 'source "$1/install/_lib.sh"; printf "%s" "$LOCAL_PLAT"' fixture "$FAKE_REPO")"
+        run env -i HOME="$FAKE_HOME" PATH=/usr/bin:/bin DF_USE_PLAT="$value" \
+            /bin/bash -ec 'source "$1/install/agent-runtime.sh" --runtime-only; printf "%s" "$LOCAL_PLAT"' fixture "$FAKE_REPO"
+        [ "$status" -eq 0 ]
+        [ "$output" = "$expected" ]
+    done
+}
+
+@test "runtime requires a matching host specification only in PLAT layout" {
+    local minimal_repo="$BATS_TEST_TMPDIR/minimal"
+    mkdir -p "$minimal_repo/install"
+    cp "$REPO/install/agent-runtime.sh" "$REPO/install/_runtime-paths.sh" "$minimal_repo/install/"
+    run env -i HOME="$FAKE_HOME" PATH=/usr/bin:/bin DF_USE_PLAT=0 \
+        /bin/bash -ec 'source "$1/install/agent-runtime.sh" --runtime-only; printf "%s" "$PYTHON_ENV"' fixture "$minimal_repo"
+    [ "$status" -eq 0 ]
+    [ "$output" = "$FLAT/python" ]
+    run env -i HOME="$FAKE_HOME" PATH=/usr/bin:/bin DF_USE_PLAT=1 PLAT=stale-host \
+        /bin/bash -ec 'source "$1/install/agent-runtime.sh" --runtime-only' fixture "$minimal_repo"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'no matching plat spec'* ]]
+}
+
+@test "Google runtime retains uv isolation without sourcing installer credentials" {
+    write_runtimes "$FLAT"
+    write_runtimes "$ISOLATED"
+    install_helpers
+    printf 'exit 27\n' > "$FAKE_HOME/.unrelated.env"
+    local directory layout
+    for layout in 0 1; do
+        directory="$FLAT"
+        [[ "$layout" == 1 ]] && directory="$ISOLATED"
+        cat > "$directory/bin/uv" <<'SH'
+#!/bin/sh
+printf 'python=%s\ntools=%s\nbin=%s\n' "$UV_PYTHON_INSTALL_DIR" "$UV_TOOL_DIR" "$UV_TOOL_BIN_DIR"
+printf 'arg=%s\n' "$@"
+SH
+        run env -i HOME="$FAKE_HOME" PATH=/usr/bin:/bin DF_DOTFILES_REPO="$FAKE_REPO" DF_USE_PLAT="$layout" \
+            "$FAKE_HOME/.local/bin/df-google-mcp" https://run.googleapis.com/mcp
+        [ "$status" -eq 0 ]
+        [ "${lines[0]}" = "python=$directory/uv/python" ]
+        [ "${lines[1]}" = "tools=$directory/uv/tools" ]
+        [ "${lines[2]}" = "bin=$directory/bin" ]
+        [ "${lines[8]}" = 'arg=https://run.googleapis.com/mcp' ]
+    done
+}

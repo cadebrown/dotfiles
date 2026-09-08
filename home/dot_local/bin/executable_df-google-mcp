@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 _repo="${DF_DOTFILES_REPO:-$HOME/dotfiles}"
-# shellcheck source=install/_lib.sh
-source "$_repo/install/agent-runtime.sh" >&2
+# shellcheck source=install/agent-runtime.sh
+source "$_repo/install/agent-runtime.sh" --runtime-only >&2
 export PATH="$ARCH_BIN:$HOME/.local/bin:$PATH"
 export UV_CACHE_DIR="${UV_CACHE_DIR:-$LOCAL_PLAT/uv/cache}"
 _uv="$(command -v uv || true)"
-[[ -n "$_uv" ]] || die "Run install/python.sh before using df-google-mcp"
+[[ -n "$_uv" ]] || { printf '%s\n' "Run install/python.sh before using df-google-mcp" >&2; exit 1; }
 exec "$_uv" --quiet run --locked --script "$_repo/install/google-mcp.py" "$@"

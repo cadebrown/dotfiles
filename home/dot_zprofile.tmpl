@@ -31,27 +31,9 @@
 # collapse duplicates rather than accumulate them.
 typeset -U path
 
-# TODO: consider caching PLAT detection result, lazy-loading oh-my-zsh,
-# and profiling startup with zsh/zprof if shell init becomes slow.
-
 # Capability detection (no env-var side effects — those happen below in the
 # parent shell so they actually propagate).
-_plat_detect() {
-    local _os _scan _dir _check
-    _os="$(uname -s)"
-    _scan="$HOME/dotfiles/install/plat"
-    [[ -d "$_scan" ]] || return 1
-    for _dir in $(ls -1d "$_scan"/plat_"${_os}"_*/ 2>/dev/null | sort -r); do
-        _check="$_dir/.plat_check.sh"
-        if [[ -f "$_check" ]] && /bin/sh "$_check" 2>/dev/null; then
-            printf '%s' "$(basename "$_dir")"
-            return 0
-        fi
-    done
-    return 1
-}
-_PLAT_DETECTED="$(_plat_detect 2>/dev/null)" || _PLAT_DETECTED=""
-unset -f _plat_detect
+{{ template "plat-detect.sh" . }}
 
 # Source the matching .plat_env.sh in the parent shell so its exports stick.
 if [[ -n "$_PLAT_DETECTED" ]]; then
@@ -96,23 +78,24 @@ unset _local_root
 
 ### HOMEBREW ###
 # Source Homebrew first so PLAT paths can prepend on top of it.
+# Name the shell explicitly so brew does not spawn ps to discover its parent.
 
 {{ if eq .chezmoi.os "darwin" -}}
 # Test the brew BINARY, not the directory — Homebrew itself stores tap-trust
 # state at ~/.homebrew/trust.json on macOS, so a bare -e dir test would
 # misfire onto the Linux user-prefix branch (bit us June 2026).
 if [ -x "$HOME/.homebrew/bin/brew" ]; then
-    eval "$(~/.homebrew/bin/brew shellenv)"
+    eval "$(~/.homebrew/bin/brew shellenv zsh)"
 elif [ -x "/opt/homebrew/bin/brew" ]; then
-    eval "$(/opt/homebrew/bin/brew shellenv)"
+    eval "$(/opt/homebrew/bin/brew shellenv zsh)"
 elif [ -e "/usr/local/bin/brew" ]; then
     # Intel Mac fallback (Homebrew installs to /usr/local on x86-64)
-    eval "$(/usr/local/bin/brew shellenv)"
+    eval "$(/usr/local/bin/brew shellenv zsh)"
 fi
 {{ else -}}
 # Linux: Homebrew installed per-PLAT, no container needed
 if [ -x "$_LOCAL_PLAT/brew/bin/brew" ]; then
-    eval "$($_LOCAL_PLAT/brew/bin/brew shellenv)"
+    eval "$($_LOCAL_PLAT/brew/bin/brew shellenv zsh)"
 fi
 {{ end -}}
 
@@ -144,13 +127,9 @@ fi
 export NVM_DIR="$_LOCAL_PLAT/nvm"
 # Add default node to PATH for non-interactive shells (scripts, CI).
 # The full nvm is lazy-loaded in .zshrc for interactive use.
-if [ -r "$NVM_DIR/alias/default" ]; then
-    IFS= read -r _nvm_default < "$NVM_DIR/alias/default"
-    _nvm_default="${_nvm_default#v}"
-    _nvm_default_dir="$(printf '%s\n' "$NVM_DIR/versions/node"/v"$_nvm_default".* | sort -V | tail -1)"
-    [ -d "$_nvm_default_dir/bin" ] && path=("$_nvm_default_dir/bin" $path)
-    unset _nvm_default _nvm_default_dir
-fi
+{{ template "nvm-default.sh" . }}
+[ -n "$_nvm_default_dir" ] && path=("$_nvm_default_dir/bin" $path)
+unset _nvm_default_dir
 
 ### RUST ###
 

@@ -212,7 +212,7 @@ def main():
     p.add_argument("--baseline", type=Path, required=True)
     p.add_argument("--candidate", type=Path, required=True)
     p.add_argument("--output", type=Path, required=True)
-    p.add_argument("--cases", nargs="+", choices=("coding", "research", "browser", "resume"),
+    p.add_argument("--cases", nargs="+", choices=("coding", "research", "browser", "resume", "execution"),
                    default=["coding", "research", "browser", "resume"])
     p.add_argument("--model", default="gpt-6-astra")
     p.add_argument("--effort", choices=("low", "medium", "high", "xhigh", "max", "ultra"), default="xhigh")
@@ -226,7 +226,7 @@ def main():
         p = commands.add_parser(name)
         p.add_argument("experiment", type=Path)
         p.add_argument("variant", choices=("baseline", "candidate"))
-        p.add_argument("case", choices=("coding", "research", "browser", "resume"))
+        p.add_argument("case", choices=("coding", "research", "browser", "resume", "execution"))
         if name == "run":
             p.add_argument("--auth-file", type=Path,
                            default=Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")) / "auth.json")

@@ -18,8 +18,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 _mode="${1:-install}"
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     case "$_mode" in
-        install|sync-mcp) ;;
-        *) die "Usage: claude.sh [install|sync-mcp]" ;;
+        install|sync-mcp|sync-hooks) ;;
+        *) die "Usage: claude.sh [install|sync-mcp|sync-hooks]" ;;
     esac
 fi
 
@@ -253,6 +253,16 @@ if [[ "${DF_MODE:-}" == "upgrade" ]]; then
     (( _update_fail == 0 )) || die "Claude plugin update failed for $_update_fail declared plugin(s)"
 fi
 
+fi
+
+if [[ "${BASH_SOURCE[0]}" == "$0" && ( "$_mode" == install || "$_mode" == sync-hooks ) ]]; then
+    # Plugin updates replace cache directories: always re-generate our narrow
+    # no-op gates afterward. Keep plugin skills/commands and relevant hooks.
+    [[ -x "$HOME/.claude/hook-scope.sh" ]] \
+        || die "Missing Claude hook dispatcher; apply chezmoi sources first"
+    uv run --no-project python "$DF_ROOT/install/claude-hook-scope.py" \
+        || die "Claude hook scope reconciliation failed"
+    [[ "$_mode" != sync-hooks ]] || exit 0
 fi
 
 ### MCP SERVERS (all platforms) ###

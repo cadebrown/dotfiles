@@ -132,8 +132,8 @@ teardown() {
     [[ -f "$HOME/.pythonrc" ]]
 }
 
-@test "plain Python is managed and includes SymPy" {
-    run python -c 'import sys, sympy; print(sys.version_info.major, sympy.__version__)'
+@test "plain Python includes scientific and agent-validator dependencies" {
+    run python -c 'import sys, sympy, yaml; assert yaml.safe_load("name: example") == {"name": "example"}; print(sys.version_info.major, sympy.__version__)'
     [ "$status" -eq 0 ]
     [[ "$output" =~ ^3\  ]]
 }

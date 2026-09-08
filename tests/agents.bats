@@ -112,6 +112,7 @@ setup() {
     local fake_repo="$BATS_TEST_TMPDIR/deferred-plat"
     mkdir -p "$fake_repo/install" "$fake_repo/packages"
     cp "$REPO/install/_lib.sh" "$fake_repo/install/_lib.sh"
+    cp "$REPO/install/_runtime-paths.sh" "$fake_repo/install/_runtime-paths.sh"
 
     run env HOME="$BATS_TEST_TMPDIR/home" DF_USE_PLAT=1 bash -c \
         'source "$1/install/_lib.sh"' _ "$fake_repo"

@@ -13,7 +13,9 @@
 #
 # Edits made in Cursor's UI go through the symlink into ~/.config/cursor/.
 # User hooks (~/.cursor/hooks.json from chezmoi) run `chezmoi add` on composer
-# session start/end and before each agent prompt so edits propagate into
+# session start/end and before each agent prompt only when files change.
+# Extension inventory runs at session end or via sync-extensions, never on prompts.
+# Settings edits propagate into
 # home/dot_config/cursor/
 # in the repo; commit when ready.
 #
@@ -145,7 +147,8 @@ if [[ "$_CMD" == "sync-extensions" || "$_CMD" == "sync" ]]; then
 
     # Get installed extensions from Cursor. Over Remote-SSH the CLI prefixes a
     # banner line ("Extensions installed on SSH: <host>:"), so keep only IDs.
-    _cursor_exts="$(cursor --list-extensions 2>/dev/null | grep -E '^[A-Za-z0-9][A-Za-z0-9_-]*\.[A-Za-z0-9][A-Za-z0-9_-]*$' || true)"
+    _cursor_listing="$(cursor --list-extensions)" || die "Failed to list Cursor extensions"
+    _cursor_exts="$(printf '%s\n' "$_cursor_listing" | grep -E '^[A-Za-z0-9][A-Za-z0-9_-]*\.[A-Za-z0-9][A-Za-z0-9_-]*$' || true)"
     [[ -n "$_cursor_exts" ]] || die "Failed to list Cursor extensions"
 
     _sync_ignored="$(awk '$1 == "#" && $2 == "sync-ignore" { print $3 }' "$EXT_TXT" | sort -u)"
@@ -171,7 +174,12 @@ if [[ "$_CMD" == "sync-extensions" || "$_CMD" == "sync" ]]; then
 
     # Preserve comment header (lines starting with #), then write sorted union
     _header="$(grep '^\s*#' "$EXT_TXT" || true)"
-    printf '%s\n%s\n' "$_header" "$_union" > "$EXT_TXT"
+    _ext_tmp="$(mktemp "${EXT_TXT}.XXXXXX")"
+    trap 'rm -f "$_ext_tmp"' EXIT
+    cp -p "$EXT_TXT" "$_ext_tmp"
+    printf '%s\n%s\n' "$_header" "$_union" > "$_ext_tmp"
+    mv -f "$_ext_tmp" "$EXT_TXT"
+    trap - EXIT
 
     _count="$(echo "$_new" | wc -l | tr -d ' ')"
     log_info "Added $_count new extension(s):"

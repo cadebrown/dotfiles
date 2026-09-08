@@ -1,5 +1,55 @@
 # Troubleshooting
 
+## Agent shell loops report installed commands as missing
+
+**Symptom:** `rg`, `curl`, or `stat` works initially, then a generated zsh loop
+prints repeated `command not found` errors. Assigning `status` can also fail.
+
+**Root cause:** zsh's `path` array is tied to `PATH`; assigning a file name to
+`path` replaces command search directories. `status` is a read-only parameter.
+
+**Fix:** Use variables such as `file_path` and `exit_status`. Select Bash
+explicitly for scripts written for Bash. This is a shell-variable problem,
+not a reason to reinstall the missing-looking commands.
+
+## Bundled skill validation fails with missing yaml
+
+**Symptom:** `quick_validate.py` exits with `ModuleNotFoundError: No module
+named 'yaml'` before validating a skill.
+
+**Root cause:** The bundled validator imports PyYAML using the plain `python3`
+environment. PyYAML was absent from the managed interactive library manifest.
+
+**Confirm:** `python3 -c 'import yaml; print(yaml.__version__)'`.
+
+**Fix:** PyYAML is now declared in `packages/python.txt`; `install/python.sh`
+installs it alongside SymPy and the public runtime verifier checks both imports.
+For an isolated invocation using a different Python, run
+`uv run --with pyyaml /path/to/quick_validate.py /path/to/skill`.
+
+## Agent test commands retry unsupported quiet or filter arguments
+
+**Symptom:** `cargo nextest run -q` rejects `-q`, or `cargo test first second`
+rejects the second positional filter.
+
+**Fix:** Follow the project's test recipe. For nextest, use
+`cargo nextest run --cargo-quiet --status-level fail --final-status-level fail`.
+For a selected nextest subset, use its `-E 'test(first) | test(second)'`
+expression. Cargo test accepts one positional substring filter; run separate
+commands for independent filters, and run `cargo test --doc` for doctests.
+Keep test exit codes visible when filtering logs.
+
+## Large tool responses defeat output compression
+
+**Symptom:** Returning whole downloads or JSON documents fills agent context
+even with RTK enabled.
+
+**Fix:** Save complete downloads/logs to files, return selected fields using
+`jq` or the CLI's `--json`/`--jq` options, and inspect bounded excerpts. RTK's
+estimated savings are not a guarantee that every command is compressed. Batch
+independent reads and prefer a completion-aware wait (for example
+`gh run watch RUN_ID --exit-status`) over rapid repeated status polling.
+
 ## Quality CI fails with `chezmoi: command not found`
 
 **Symptom:** The fast Bats profile-rendering test exits 127, while the Docker

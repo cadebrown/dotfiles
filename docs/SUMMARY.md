@@ -26,6 +26,7 @@
 - [Research mathematics](usage/math.md)
 - [Scientific review](usage/scientific-review.md)
 - [Agent guidance (CLAUDE.md / AGENTS.md)](usage/agents.md)
+- [Agent hook overhead](usage/agent-overhead.md)
 - [Troubleshooting](usage/troubleshooting.md)
 
 # Reference

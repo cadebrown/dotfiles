@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 _repo="${DF_DOTFILES_REPO:-$HOME/dotfiles}"
-_python="$(/bin/bash -ec 'source "$1/install/agent-runtime.sh"; printf "%s" "$PYTHON_ENV/bin/python"' df-task "$_repo")"
+# shellcheck source=install/agent-runtime.sh
+source "$_repo/install/agent-runtime.sh" --runtime-only
+_python="$PYTHON_ENV/bin/python"
 [[ -x "$_python" ]] || { printf '%s\n' "Run install/python.sh before using df-task" >&2; exit 1; }
 exec "$_python" "$HOME/.local/lib/dotfiles/df_task.py" "$@"

@@ -3,128 +3,39 @@
 # Triggered from ~/.cursor/hooks.json (sessionStart, sessionEnd, beforeSubmitPrompt).
 #
 # DF_CURSOR_HOOK_SYNC_EXTENSIONS=0  — skip install/cursor.sh sync-extensions
-# DF_CURSOR_HOOK_DEBOUNCE_SECS=N    — skip duplicate syncs within N seconds (default 4)
+# Unchanged live/source hashes skip imports; extensions sync only at session end.
+# Cache and advisory locks are per checkout/home under XDG_CACHE_HOME (or ~/.cache).
 
 set -euo pipefail
 
-# Cursor hook processes often inherit a minimal PATH (Dock / Launcher). Prepend the
-# same tiers shell profiles use so chezmoi + cursor CLI resolve reliably.
-_df_prepend_path() {
+# Cursor hook processes often inherit a minimal PATH (Dock / Launcher). Add
+# fallback directories without overriding tools already selected by the caller.
+_df_fallback_path() {
   case ":${PATH:-}:" in *:"$1":*) return 0 ;; esac
   [[ -d "$1" ]] || return 0
-  PATH="$1${PATH:+:$PATH}"
+  PATH="${PATH:+$PATH:}$1"
 }
-_df_prepend_path "$HOME/.local/bin"
+_df_fallback_path "$HOME/.local/bin"
 for _plat_bin in "$HOME/.local"/plat_*/bin; do
-  [[ -e "$_plat_bin" ]] && _df_prepend_path "$_plat_bin"
+  [[ -e "$_plat_bin" ]] && _df_fallback_path "$_plat_bin"
 done
 unset _plat_bin
-_df_prepend_path "/opt/homebrew/bin"
-_df_prepend_path "/usr/local/bin"
+_df_fallback_path "/opt/homebrew/bin"
+_df_fallback_path "/usr/local/bin"
 export PATH
 
 DF_ROOT="${DF_ROOT:-{{ .chezmoi.workingTree }}}"
 export DF_ROOT
 
-_before_submit=0
-[[ "${1:-}" == "--before-submit" ]] && _before_submit=1
-
-_DEBOUNCE="${DF_CURSOR_HOOK_DEBOUNCE_SECS:-4}"
-_STAMP="${TMPDIR:-/tmp}/df-cursor-hook-sync.timestamp"
-_now="$(date +%s)"
-_skip_sync=0
-if [[ -f "$_STAMP" ]] && [[ "$_DEBOUNCE" =~ ^[0-9]+$ ]] && ((_DEBOUNCE > 0)); then
-  _last="$(cat "$_STAMP" 2>/dev/null || echo 0)"
-  if ((_now - _last < _DEBOUNCE)); then
-    _skip_sync=1
-  fi
+# Bootstrap installs Python in the managed runtime. PATH resolution also supports
+# system Python on a minimal host; this helper has no third-party dependencies.
+_python="$(command -v python3 || true)"
+_helper="$(dirname "${BASH_SOURCE[0]}")/sync_dotfiles_cursor.py"
+if [[ -n "$_python" && -f "$_helper" ]]; then
+  exec "$_python" "$_helper" "$@"
 fi
-
-_cursor_json_complete() {
-  local _file="$1" _open _close _first _last
-  [[ -s "$_file" ]] || return 1
-  case "${_file##*/}" in
-    settings.json)    _open="{"; _close="}" ;;
-    keybindings.json) _open="["; _close="]" ;;
-    *) return 1 ;;
-  esac
-  _first="$(awk '!/^[[:space:]]*(\/\/|$)/ { sub(/^[[:space:]]*/, ""); print substr($0, 1, 1); exit }' "$_file")"
-  _last="$(awk '!/^[[:space:]]*(\/\/|$)/ { line=$0 } END { sub(/[[:space:]]*\/\/.*$/, "", line); sub(/[[:space:]]*$/, "", line); print substr(line, length(line), 1) }' "$_file")"
-  [[ "$_first" == "$_open" && "$_last" == "$_close" ]]
-}
-
-_sync() {
-  if [[ "$_skip_sync" == 1 ]]; then
-    return 0
-  fi
-  if ! command -v chezmoi >/dev/null 2>&1; then
-    printf '%s\n' "[df-cursor-hook] chezmoi not on PATH; skipping source sync" >&2
-    return 0
-  fi
-
-  local f _source _backup _source_existed _any=0 _err
-  for f in "${HOME}/.config/cursor/settings.json" "${HOME}/.config/cursor/keybindings.json"; do
-    [[ -f "$f" ]] || continue
-    if ! _cursor_json_complete "$f"; then
-      printf '%s\n' "[df-cursor-hook] refusing invalid Cursor JSON ($f)" >&2
-      continue
-    fi
-
-    _source="${DF_ROOT}/home/dot_config/cursor/${f##*/}"
-    _backup="$(mktemp)"
-    _source_existed=0
-    if [[ -f "$_source" ]]; then
-      cp -p "$_source" "$_backup"
-      _source_existed=1
-    fi
-
-    if ! _err="$(chezmoi add "$f" 2>&1)"; then
-      if [[ "$_source_existed" == 1 ]]; then
-        mv "$_backup" "$_source"
-      else
-        rm -f "$_source" "$_backup"
-      fi
-      printf '%s\n' "[df-cursor-hook] chezmoi add failed ($f): ${_err//$'\n'/ }" >&2
-      continue
-    fi
-    if ! _cursor_json_complete "$_source"; then
-      if [[ "$_source_existed" == 1 ]]; then
-        mv "$_backup" "$_source"
-      else
-        rm -f "$_source" "$_backup"
-      fi
-      printf '%s\n' "[df-cursor-hook] rejected unstable Cursor JSON ($f)" >&2
-      continue
-    fi
-    rm -f "$_backup"
-    _any=1
-  done
-
-  # Strip per-machine keys from the synced source so they don't pollute the repo.
-  local _settings_src="${DF_ROOT}/home/dot_config/cursor/settings.json"
-  if [[ -f "$_settings_src" ]] && command -v jq >/dev/null 2>&1; then
-    if ! jq -e 'if type == "object" then del(."remote.SSH.remotePlatform") else error("expected object") end' \
-        "$_settings_src" > "$_settings_src.tmp"; then
-      rm -f "$_settings_src.tmp"
-    else
-      mv "$_settings_src.tmp" "$_settings_src"
-    fi
-  fi
-
-  if [[ "$_any" == 1 ]]; then
-    printf '%s\n' "[df-cursor-hook] chezmoi add (cursor JSON) → ${DF_ROOT}/home/dot_config/cursor/" >&2
-  fi
-
-  if [[ "${DF_CURSOR_HOOK_SYNC_EXTENSIONS:-1}" == "1" ]] && command -v cursor >/dev/null 2>&1; then
-    bash "${DF_ROOT}/install/cursor.sh" sync-extensions >/dev/null 2>&1 || true
-  fi
-
-  echo "$_now" > "$_STAMP"
-}
-
-_sync
-
-if [[ "$_before_submit" == 1 ]]; then
+printf '%s\n' '[df-cursor-hook] Python 3 or sync helper missing; rerun bootstrap/chezmoi apply' >&2
+if [[ "${1:-}" == "--before-submit" ]]; then
   printf '%s\n' '{"continue":true}'
 else
   printf '%s\n' '{}'

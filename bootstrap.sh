@@ -134,14 +134,18 @@ if [[ "$_BOOTSTRAP_LOCAL" == "1" ]]; then
     # shellcheck source=install/_lib.sh
     source "$_LIB"
 else
-    # Running via curl | bash — fetch _lib.sh temporarily
-    curl -fsSL "https://raw.githubusercontent.com/${DF_REPO}/main/install/_lib.sh" \
-        -o "$_BOOTSTRAP_TMP/_lib.sh"
+    # Preserve the library's install/ layout for its shared path helper and
+    # any pre-clone installers fetched below.
+    mkdir -p "$_BOOTSTRAP_TMP/install"
+    for _bootstrap_library in _lib.sh _runtime-paths.sh; do
+        curl -fsSL "https://raw.githubusercontent.com/${DF_REPO}/main/install/$_bootstrap_library" \
+            -o "$_BOOTSTRAP_TMP/install/$_bootstrap_library"
+    done
+    unset _bootstrap_library
     # The temporary download has no install/plat tree. Require the matching
     # platform only after the real repository has been cloned and re-sourced.
     export DF_DEFER_PLAT_REQUIRE=1
-    source "$_BOOTSTRAP_TMP/_lib.sh"
-    unset DF_DEFER_PLAT_REQUIRE
+    source "$_BOOTSTRAP_TMP/install/_lib.sh"
 fi
 
 DF_INSTALL_DIR="$DF_ROOT/install"
@@ -228,8 +232,8 @@ if [[ "${DF_DO_SCRATCH:-1}" != "0" ]]; then
     if [[ ! -f "$_SCRATCH_SH" ]]; then
         # curl | bash mode — fetch scratch.sh temporarily
         curl -fsSL "https://raw.githubusercontent.com/${DF_REPO}/main/install/scratch.sh" \
-            -o "$_BOOTSTRAP_TMP/scratch.sh"
-        _SCRATCH_SH="$_BOOTSTRAP_TMP/scratch.sh"
+            -o "$_BOOTSTRAP_TMP/install/scratch.sh"
+        _SCRATCH_SH="$_BOOTSTRAP_TMP/install/scratch.sh"
     fi
     bash "$_SCRATCH_SH"
     unset _SCRATCH_SH
@@ -252,8 +256,8 @@ if [[ "${DF_DO_DIRS:-1}" != "0" ]]; then
     _DIRS_SH="$DF_INSTALL_DIR/dirs.sh"
     if [[ ! -f "$_DIRS_SH" ]]; then
         curl -fsSL "https://raw.githubusercontent.com/${DF_REPO}/main/install/dirs.sh" \
-            -o "$_BOOTSTRAP_TMP/dirs.sh"
-        _DIRS_SH="$_BOOTSTRAP_TMP/dirs.sh"
+            -o "$_BOOTSTRAP_TMP/install/dirs.sh"
+        _DIRS_SH="$_BOOTSTRAP_TMP/install/dirs.sh"
     fi
     bash "$_DIRS_SH"
     unset _DIRS_SH
@@ -321,6 +325,11 @@ fi
 # Re-source the real library after cloning. Besides the install directory, this
 # rebinds DF_ROOT/DF_PACKAGES/overlays and performs authoritative PLAT detection.
 DF_INSTALL_DIR="$DF_PATH/install"
+# Pre-clone scratch/dirs installers also source the temporary library. End
+# their deferral before validating the actual checkout's platform specs.
+if [[ "$_BOOTSTRAP_LOCAL" == 0 ]]; then
+    unset DF_DEFER_PLAT_REQUIRE
+fi
 # shellcheck source=install/_lib.sh
 source "$DF_INSTALL_DIR/_lib.sh"
 DF_INSTALL_DIR="$DF_ROOT/install"

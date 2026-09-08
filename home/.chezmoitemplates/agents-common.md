@@ -68,6 +68,10 @@ Prefer `rg`/`fd`, `jq`/`yq`, `gh`, and `cargo-binstall`. For Rust, prefer
 Read bounded, relevant output; use structured command output when it helps.
 Configured hooks may filter supported commands through RTK. Use `rtk proxy`
 when diagnosis requires raw output rather than assuming the filter is complete.
+Select needed fields or excerpts before returning large results; keep complete
+logs in files. Batch independent reads and use completion-aware waits or
+backoff for repeated status checks. In zsh, use names such as `file_path` and
+`exit_status`; `path` changes PATH and `status` is read-only.
 
 Harness memory, `~/kb` through `qmd`, and read-only session history through
 `history-search`/`cass` can recover relevant decisions and prior work. Consult

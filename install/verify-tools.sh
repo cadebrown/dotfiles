@@ -64,10 +64,10 @@ fi
 if [[ "${DF_DO_PYTHON:-1}" != "0" ]]; then
     _require_exec "python" "$ARCH_BIN/python"
     if [[ -x "$ARCH_BIN/python" ]] \
-        && "$ARCH_BIN/python" -c 'import sympy' </dev/null >/dev/null 2>&1; then
-        log_okay "python imports sympy"
+        && "$ARCH_BIN/python" -c 'import sympy, yaml' </dev/null >/dev/null 2>&1; then
+        log_okay "python imports sympy and yaml"
     else
-        log_fail "managed python cannot import sympy"
+        log_fail "managed python cannot import sympy and yaml"
         _fail=$((_fail + 1))
     fi
 fi

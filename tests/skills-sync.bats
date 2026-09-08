@@ -10,6 +10,7 @@ setup() {
     mkdir -p "$FIXTURE/install" "$FIXTURE/packages" \
         "$FAKE_HOME/.claude/skills/example" "$FAKE_HOME/.agents" "$STUB_BIN"
     cp "$REPO/install/_lib.sh" "$FIXTURE/install/_lib.sh"
+    cp "$REPO/install/_runtime-paths.sh" "$FIXTURE/install/_runtime-paths.sh"
     cp "$REPO/install/skills-sync.sh" "$FIXTURE/install/skills-sync.sh"
     printf 'example npx owner/repo example\n' > "$FIXTURE/packages/agent-skills.txt"
     printf '%s\n' '---' 'name: example' '---' 'version 1' \

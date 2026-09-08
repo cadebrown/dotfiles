@@ -5,3 +5,5 @@
 # manifest is only for libraries expected to work from a plain `python` shell.
 
 sympy
+# Bundled agent skill validators use the plain python3 entrypoint.
+PyYAML
