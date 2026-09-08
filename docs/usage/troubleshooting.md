@@ -1763,6 +1763,50 @@ subprocess environment.
 
 ---
 
+## Persistent Playwright profile loses login cookies after close
+
+**Symptom.** A Playwright CLI 0.1.19 profile reopens with local storage intact,
+but its persistent login cookie has disappeared.
+
+**Root cause.** The CLI daemon's context-close callback reenters graceful
+shutdown. On this Mac the second shutdown force-kills Chrome before cookies
+are flushed to disk. A persistent profile directory alone does not verify
+working login persistence.
+
+**Fix.** `df-browser close` includes a guarded compatibility adapter for owned
+sessions. It removes only the known duplicate-shutdown listener before normal
+close, retaining Playwright's completion listeners. Unknown implementations
+leave the profile open with a clear error. The
+[browser workspace guide](browser-sessions.md#playwright-cli-shutdown-compatibility)
+documents the adapter and the real-browser regression test to run after updates.
+
+## Google Cloud MCP stops authenticating during a long session
+
+**Symptom.** An official Google Cloud MCP connects successfully, then starts
+returning authentication errors after its initial access token expires.
+
+**Root cause.** Older Codex/OpenCode launchers minted `GOOGLE_MCP_TOKEN` once at
+startup, and Claude's old `headersHelper` minted it at connection time. Neither
+path refreshed the token while the same connection remained active.
+
+**Fix.** The current registry emits `df-google-mcp` as a local stdio transport
+for all four harnesses. It uses Google's ADC refresh interface before HTTP
+requests. Refresh the installed helpers and affected configuration:
+
+```bash
+bash ~/dotfiles/install/agent-tools.sh
+df-google-mcp --check-runtime
+bash ~/dotfiles/install/codex.sh sync-config
+bash ~/dotfiles/install/claude.sh sync-mcp
+bash ~/dotfiles/install/opencode.sh sync-config
+bash ~/dotfiles/install/cursor.sh sync-mcp
+```
+
+Restart the affected harness connection so it starts the relay. Existing ADC
+continues to work; revoked credentials, disabled services, and missing IAM
+permissions still need their own fixes. See
+[Google Cloud MCP credentials](google-cloud-mcp.md).
+
 ## Codex MCP OAuth fails: "Authorization server response missing required issuer"
 
 **Symptom.** `codex mcp login <server>` (or first use of an OAuth MCP server in

@@ -15,9 +15,9 @@ required = false
 default_tools_approval_mode = "writes"
 
 [mcp_servers.gcsrv]
-url = "https://gc.example/mcp"
-bearer_token_env_var = "GOOGLE_MCP_TOKEN"
-env_http_headers = { "x-goog-user-project" = "GOOGLE_CLOUD_PROJECT" }
+command = "<HOME>/.local/bin/df-google-mcp"
+args = ["https://gc.example/mcp"]
+env_vars = ["GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_QUOTA_PROJECT", "CLOUDSDK_CONFIG"]
 startup_timeout_sec = 20
 tool_timeout_sec = 60
 required = false

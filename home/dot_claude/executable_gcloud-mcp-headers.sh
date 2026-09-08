@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
+# Legacy helper for custom configs. Registry-managed Google Cloud connections
+# use df-google-mcp, which refreshes credentials throughout the session.
 # ~/.claude/gcloud-mcp-headers.sh — dynamic MCP headers for Google's official
 # remote Cloud MCP servers (run, cloudresourcemanager, storage, bigquery —
 # all *.googleapis.com/mcp). Workspace uses the community workspace-mcp stdio
 # server instead (own OAuth client via ~/.google.env), not this helper.
 #
-# Claude Code runs this at connection time (headersHelper in ~/.claude.json,
-# registered by install/claude.sh); stdout must be a JSON object of header
+# Claude Code runs this at connection time when selected by a custom
+# headersHelper configuration; stdout must be a JSON object of header
 # name → value. Google's MCP servers authenticate with Application Default
 # Credentials, so we mint a short-lived OAuth access token and pass it as a
 # bearer, plus the quota/billing project Google requires for user creds.

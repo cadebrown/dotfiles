@@ -116,6 +116,10 @@ ln -sfn python "$ARCH_BIN/python3"
 "$ARCH_BIN/python" -c 'import sympy'
 log_okay "Interactive Python: $("$ARCH_BIN/python" --version), SymPy $("$ARCH_BIN/python" -c 'import sympy; print(sympy.__version__)')"
 
+log_info "Preparing the refreshable Google MCP transport"
+UV_CACHE_DIR="${UV_CACHE_DIR:-$LOCAL_PLAT/uv/cache}" \
+    run_logged "$_uv" run --locked --script "$DF_ROOT/install/google-mcp.py" --check-runtime
+
 ### CLI tools ###
 #
 # Each selected tool is installed via `uv tool install`, giving it an

@@ -56,5 +56,12 @@ These are separate mechanisms: detached processes keep running; checkpoints
 recover state; schedulers start later runs; Goal mode pursues an explicit
 objective. Pick what the task needs and verify the actual mechanism is active.
 
+On this dotfiles setup, `df-task checkpoint --note "..." --next "..."` records
+an explicit handoff, and `df-task job render --pid <pid> --log <path>` records an
+existing job. Both use `CODEX_THREAD_ID`, or an explicit `--session <id>`.
+`df-task resume --session <id>` inspects the checkpoint and current job identities.
+Lifecycle hooks record interruptions and compaction, not semantic progress;
+they never restart work. See `~/dotfiles/docs/usage/durable-tasks.md` for details.
+
 Current references: [long-running work](https://learn.chatgpt.com/docs/long-running-work)
 and [non-interactive Codex](https://learn.chatgpt.com/docs/non-interactive-mode).

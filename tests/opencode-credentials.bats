@@ -28,7 +28,7 @@ EOF
     chmod +x "$CREDENTIAL_FIXTURE/bin/"*
 }
 
-@test "OpenCode shared launcher refreshes only existing credentials on bash and zsh" {
+@test "OpenCode launcher resolves GitHub and leaves Google refresh to its transport" {
     local shell_name
     for shell_name in bash zsh; do
         rm -f "$CREDENTIAL_FIXTURE/calls"
@@ -39,8 +39,8 @@ EOF
             ' _ "$REPO"
         [ "$status" -eq 0 ]
         [ "$output" = client-ran ]
-        [ "$(wc -l < "$CREDENTIAL_FIXTURE/calls" | tr -d ' ')" = 3 ]
-        [ "$(cat "$CREDENTIAL_FIXTURE/received")" = $'fixture-github\nfixture-google\nfixture-project' ]
+        [ "$(cat "$CREDENTIAL_FIXTURE/calls")" = 'gh auth token' ]
+        [ "$(cat "$CREDENTIAL_FIXTURE/received")" = fixture-github ]
         [ "$(cat "$CREDENTIAL_FIXTURE/arguments")" = '--auto prompt with spaces' ]
     done
 }

@@ -63,6 +63,11 @@ Inspect the live capability before relying on it.
 
 ## Browser and UI/UX
 
+Use [`df-browser`](browser-sessions.md) for persistent project/service browser
+workspaces, private login state, and screenshots and traces kept outside the
+repository. Existing signed-in browser tabs are available through explicit
+extension attachment.
+
 Use Playwright CLI for named, repeatable sessions and project-owned regression
 tests. The `browser` profile enables the pinned Chrome DevTools MCP with its
 usage and CrUX telemetry disabled. Use it for console, request, and performance
@@ -107,6 +112,15 @@ uv run ~/.claude/skills/blender-workbench/scripts/blender_workbench.py --help
 ```
 
 ## Long-running and remote work
+
+[`df-task`](durable-tasks.md) records lightweight native lifecycle checkpoints
+and explicitly registered jobs, logs, and artifacts. `codex -p deep` also keeps
+the host awake during active turns. Use `df-task list` and `df-task resume` to
+inspect saved state and recover the native resume command after interruption.
+
+The [Google Cloud MCP transport](google-cloud-mcp.md) refreshes ADC within a
+running session across Codex, Claude Code, OpenCode, and Cursor. No launch-time
+Google access token needs to be renewed by reopening the harness.
 
 For repeatable creative work, start with the
 [creative reference and demonstration workflow](creative-workflows.md).

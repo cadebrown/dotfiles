@@ -49,7 +49,7 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
-@test "agent doctor installer deploys and repairs the command in ARCH_BIN" {
+@test "agent helper installer deploys and repairs commands in ARCH_BIN and shared launchers" {
     local fake_home="$BATS_TEST_TMPDIR/agent-tools-home"
     local destination
 
@@ -61,6 +61,13 @@ setup() {
     local evaluator="$(dirname "$destination")/plugin-eval"
     [ -x "$evaluator" ]
     cmp -s "$REPO/home/dot_local/bin/executable_plugin-eval" "$evaluator"
+    local helper
+    for helper in df-task df-browser df-google-mcp; do
+        cmp -s "$REPO/home/dot_local/bin/executable_$helper" "$(dirname "$destination")/$helper"
+        cmp -s "$REPO/home/dot_local/bin/executable_$helper" "$fake_home/.local/bin/$helper"
+        [ -x "$fake_home/.local/bin/$helper" ]
+    done
+    cmp -s "$REPO/home/dot_local/lib/dotfiles/df_task.py" "$fake_home/.local/lib/dotfiles/df_task.py"
 
     printf '#!/usr/bin/env bash\nexit 0\n' > "$destination"
     chmod 755 "$destination"

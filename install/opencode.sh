@@ -41,7 +41,10 @@ _emit_opencode_mcp() {
        && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth \
        && IFS= read -r _ccid && IFS= read -r _profile && IFS= read -r _risk \
        && IFS= read -r _extras; do
-        if [[ "$_kind" == "stdio" ]]; then
+        if [[ "$_auth" == "gcloud" ]]; then
+            _def="$(jq -nc --arg command "$HOME/.local/bin/df-google-mcp" --arg url "$_url" \
+                '{type:"local", command:[$command,$url], enabled:true}')"
+        elif [[ "$_kind" == "stdio" ]]; then
             _def="$(jq -nc --arg cmd "$_cmd" \
                 '{type:"local", command:($cmd|split(" ")), enabled:true}')"
         else
@@ -54,7 +57,6 @@ _emit_opencode_mcp() {
                 exa)      _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"x-api-key":"{env:EXA_API_KEY}"}, enabled:true}')" ;;
                 asta)     _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"x-api-key":"{env:ASTA_API_KEY}"}, enabled:true}')" ;;
                 hf)       _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:HF_TOKEN}"}, enabled:true}')" ;;
-                gcloud)   _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, headers:{"Authorization":"Bearer {env:GOOGLE_MCP_TOKEN}", "x-goog-user-project":"{env:GOOGLE_CLOUD_PROJECT}"}, enabled:true}')" ;;
                 "")       _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, enabled:true}')" ;;
                 *)        log_warn "  $_name: unknown auth '$_auth' — unauthenticated" >&2
                           _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, enabled:true}')" ;;

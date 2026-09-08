@@ -56,7 +56,10 @@ _sync_cursor_mcp() {
        && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth \
        && IFS= read -r _ccid && IFS= read -r _profile && IFS= read -r _risk \
        && IFS= read -r _extras; do
-            if [[ "$_kind" == "stdio" ]]; then
+            if [[ "$_auth" == "gcloud" ]]; then
+                _def="$(jq -nc --arg command "$HOME/.local/bin/df-google-mcp" --arg url "$_url" \
+                    '{command:$command, args:[$url]}')"
+            elif [[ "$_kind" == "stdio" ]]; then
                 _login_cmd="$_cmd"
                 [[ "$_login_cmd" == "bash -lc "* ]] \
                     && _login_cmd="${_login_cmd#bash -lc }"
@@ -85,12 +88,6 @@ _sync_cursor_mcp() {
                     exa)      _hname="x-api-key"; _hval="${EXA_API_KEY:-}" ;;
                     asta)     _hname="x-api-key"; _hval="${ASTA_API_KEY:-}" ;;
                     hf)       _hname="Authorization"; _hval="${HF_TOKEN:+Bearer $HF_TOKEN}" ;;
-                    # Expected, not a degradation: ADC tokens are short-lived
-                    # and the Cursor GUI has no way to refresh them, so these
-                    # servers are Claude/Codex-only by design.
-                    gcloud)   log_info "  $_name: skipped (short-lived ADC auth is unavailable to the Cursor GUI)"
-                              _remove="$(jq -c --arg name "$_name" '. + [$name]' <<< "$_remove")"
-                              continue ;;
                     *)        log_warn "  $_name: unknown auth source '$_auth' — registering unauthenticated" ;;
                 esac
 

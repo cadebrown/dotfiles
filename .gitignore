@@ -6,6 +6,7 @@
 dotfiles-*/
 docs/book/
 old/
+__pycache__/
 # stray rustdoc JSON (rust-docs MCP / `rustdoc` defaults output here); real docs live in docs/
 /doc/
 

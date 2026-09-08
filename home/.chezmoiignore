@@ -20,5 +20,7 @@ Library/**
 .claude/skills/**/playwright-report/**
 .claude/skills/**/__pycache__
 .claude/skills/**/__pycache__/**
+.local/lib/**/__pycache__
+.local/lib/**/__pycache__/**
 
 AGENTS.md

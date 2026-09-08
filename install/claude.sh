@@ -265,9 +265,8 @@ fi
 # Auth sources (see packages/mcp-servers.txt header):
 #   gh        → headersHelper script resolved at connection time. No stored
 #               token, so rotation needs no reconciliation.
-#   gcloud    → headersHelper (gcloud-mcp-headers.sh) mints a short-lived ADC
-#               access token + x-goog-user-project at connection time. Powers
-#               Google's official remote MCP servers; nothing stored.
+#   gcloud    → df-google-mcp stdio relay refreshes ADC for each HTTP request;
+#               no access token is stored in the harness configuration.
 #   context7  → CONTEXT7_API_KEY header from ~/.context7.env; optional —
 #               registers unauthenticated when the credential is missing.
 
@@ -437,13 +436,9 @@ _register_mcps() {
                     _label="$_transport → $_url [auth=gh via headersHelper]"
                     ;;
                 gcloud)
-                    # Google ADC: headersHelper mints a short-lived access token
-                    # (+ x-goog-user-project) at connection time. Same no-token-
-                    # at-rest model as gh; refreshes on each reconnect.
-                    has gcloud || log_warn "  $_name: gcloud not installed — helper emits no auth until 'bash install/auth.sh google'"
-                    _json="$(jq -nc --arg t "$_transport" --arg url "$_url" \
-                        '{type: $t, url: $url, headersHelper: "~/.claude/gcloud-mcp-headers.sh"}')"
-                    _label="$_transport → $_url [auth=gcloud via headersHelper]"
+                    _json="$(jq -nc --arg command "$HOME/.local/bin/df-google-mcp" --arg url "$_url" \
+                        '{type:"stdio", command:$command, args:[$url]}')"
+                    _label="stdio relay → $_url [refreshable Google ADC]"
                     ;;
                 *)
                     if _pair="$(_resolve_header_source "$_auth_source")"; then

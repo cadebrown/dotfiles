@@ -97,6 +97,7 @@ setup() {
     cat > "$HOME/.claude.json" <<'EOF'
 {"mcpServers":{
   "scitesrv":{"type":"http","url":"https://old.example/mcp"},
+  "gcsrv":{"type":"http","url":"https://gc.example/mcp","headersHelper":"~/.claude/gcloud-mcp-headers.sh","headers":{"Authorization":"Bearer obsolete-secret"}},
   "misskey":{"type":"http","url":"https://key.example/obsolete-secret/v2/mcp"},
   "tool":{"type":"stdio","command":"old","args":[],"env":{"CUSTOM":"retained"}},
   "custom":{"command":"mine","args":["custom-flag"]}
@@ -119,6 +120,10 @@ EOF
     _register_mcps >/dev/null
     [ "$_fail" -eq 0 ]
     jq -e '.mcpServers.scitesrv.url == "https://scite.example/mcp"
+        and .mcpServers.gcsrv.type == "stdio"
+        and .mcpServers.gcsrv.command == (env.HOME + "/.local/bin/df-google-mcp")
+        and .mcpServers.gcsrv.args == ["https://gc.example/mcp"]
+        and (.mcpServers.gcsrv | has("headersHelper") or has("headers") or has("url") | not)
         and .mcpServers.tool.command == "uvx"
         and .mcpServers.tool.env.CUSTOM == "retained"
         and .mcpServers.custom == {command:"mine",args:["custom-flag"]}
@@ -137,6 +142,7 @@ EOF
     cat > "$HOME/.config/opencode/opencode.json" <<'EOF'
 {"mcp":{
   "scitesrv":{"type":"remote","url":"https://old.example/mcp","enabled":false,"timeout":9000},
+  "gcsrv":{"type":"remote","url":"https://gc.example/mcp","headers":{"Authorization":"Bearer obsolete-secret"},"enabled":false},
   "misskey":{"type":"remote","url":"https://key.example/obsolete-secret/v2/mcp","enabled":true},
   "custom":{"type":"local","command":["mine"],"enabled":true}
 }}
@@ -144,6 +150,10 @@ EOF
     chezmoi() { printf '{}\n'; }
     _sync_config >/dev/null
     jq -e '.mcp.scitesrv.url == "https://scite.example/mcp"
+        and .mcp.gcsrv.type == "local"
+        and .mcp.gcsrv.command == [(env.HOME + "/.local/bin/df-google-mcp"),"https://gc.example/mcp"]
+        and .mcp.gcsrv.enabled == false
+        and (.mcp.gcsrv | has("headers") or has("url") | not)
         and .mcp.scitesrv.enabled == false
         and .mcp.scitesrv.timeout == 9000
         and .mcp.custom == {type:"local",command:["mine"],enabled:true}
@@ -187,7 +197,9 @@ EOF
         and .mcpServers.tool.env.CUSTOM == "retained"
         and .mcpServers.custom == {command:"mine",args:["custom-flag"]}
         and (.mcpServers | has("misskey") | not)
-        and (.mcpServers | has("gcsrv") | not)
+        and .mcpServers.gcsrv.command == (env.HOME + "/.local/bin/df-google-mcp")
+        and .mcpServers.gcsrv.args == ["https://gc.example/mcp"]
+        and (.mcpServers.gcsrv | has("headers") | not)
         and (.mcpServers | has("biomedsrv") | not)' "$HOME/.cursor/mcp.json"
 }
 
@@ -208,7 +220,7 @@ EOF
 @test "opencode emitter matches golden" {
     source "$REPO_ROOT/install/opencode.sh"
     mcp_fixture_env
-    _emit_opencode_mcp 2>/dev/null | jq -S . > "$BATS_TEST_TMPDIR/opencode.json"
+    _emit_opencode_mcp 2>/dev/null | jq -S . | mcp_fixture_normalize > "$BATS_TEST_TMPDIR/opencode.json"
     diff -u "$BATS_TEST_DIRNAME/golden/opencode-mcp.json" "$BATS_TEST_TMPDIR/opencode.json"
 }
 
@@ -216,7 +228,7 @@ EOF
     source "$REPO_ROOT/install/cursor.sh"
     mcp_fixture_env
     _sync_cursor_mcp >/dev/null 2>&1
-    jq -S . "$HOME/.cursor/mcp.json" > "$BATS_TEST_TMPDIR/cursor.json"
+    jq -S . "$HOME/.cursor/mcp.json" | mcp_fixture_normalize > "$BATS_TEST_TMPDIR/cursor.json"
     diff -u "$BATS_TEST_DIRNAME/golden/cursor-mcp.json" "$BATS_TEST_TMPDIR/cursor.json"
 }
 
@@ -255,7 +267,8 @@ EOF
     source "$REPO_ROOT/install/codex.sh"
     mcp_fixture_env
     _emit_mcp_blocks_to "$BATS_TEST_TMPDIR/codex.toml" >/dev/null 2>&1
-    diff -u "$BATS_TEST_DIRNAME/golden/codex-mcp.toml" "$BATS_TEST_TMPDIR/codex.toml"
+    mcp_fixture_normalize < "$BATS_TEST_TMPDIR/codex.toml" > "$BATS_TEST_TMPDIR/codex-normalized.toml"
+    diff -u "$BATS_TEST_DIRNAME/golden/codex-mcp.toml" "$BATS_TEST_TMPDIR/codex-normalized.toml"
 }
 
 @test "codex approval mode follows MCP risk" {

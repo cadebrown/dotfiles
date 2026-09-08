@@ -36,13 +36,12 @@
     "url": "https://exa.example/mcp"
   },
   "gcsrv": {
+    "command": [
+      "<HOME>/.local/bin/df-google-mcp",
+      "https://gc.example/mcp"
+    ],
     "enabled": true,
-    "headers": {
-      "Authorization": "Bearer {env:GOOGLE_MCP_TOKEN}",
-      "x-goog-user-project": "{env:GOOGLE_CLOUD_PROJECT}"
-    },
-    "type": "remote",
-    "url": "https://gc.example/mcp"
+    "type": "local"
   },
   "ghsrv": {
     "enabled": true,

@@ -3,6 +3,13 @@
 # (each install script re-sources _lib.sh, which resets DF_PACKAGES and
 # re-sources the real ~/.*.env files — this function re-pins everything).
 
+mcp_fixture_normalize() {
+    local _line
+    while IFS= read -r _line || [[ -n "$_line" ]]; do
+        printf '%s\n' "${_line//"$HOME"/<HOME>}"
+    done
+}
+
 mcp_fixture_env() {
     local _tests_dir
     _tests_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -221,7 +221,14 @@ _emit_mcp_blocks_to() {
                 printf 'enabled = false\n' >> "$out"
             fi
 
-            if [[ "$_kind" == "stdio" ]]; then
+            if [[ "$_auth_source" == "gcloud" ]]; then
+                {
+                    printf 'command = "%s"\n' "$(_toml_escape "$HOME/.local/bin/df-google-mcp")"
+                    printf 'args = ["%s"]\n' "$(_toml_escape "$_url")"
+                    printf 'env_vars = ["GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_QUOTA_PROJECT", "CLOUDSDK_CONFIG"]\n'
+                } >> "$out"
+                log_info "    $_name (stdio relay, refreshable Google ADC)"
+            elif [[ "$_kind" == "stdio" ]]; then
                 _head="${_cmd%% *}"
                 if [[ "$_cmd" == *" "* ]]; then
                     _tail="${_cmd#* }"
@@ -266,9 +273,6 @@ _emit_mcp_blocks_to() {
                 # resolves credentials at launch instead of storing them:
                 #   gh       → bearer_token_env_var, filled by the codex() shell
                 #              wrapper (GH_TOKEN) — token never lands on disk
-                #   gcloud   → bearer_token_env_var (GOOGLE_MCP_TOKEN) + env_http_
-                #              headers x-goog-user-project, both filled by the
-                #              codex() wrapper at launch (ADC access token)
                 #   context7 → env_http_headers, read from the environment
                 #              (zprofile sources ~/.context7.env)
                 if [[ -n "$_auth_source" ]]; then
@@ -277,12 +281,6 @@ _emit_mcp_blocks_to() {
                             printf 'bearer_token_env_var = "GH_TOKEN"\n' >> "$out"
                             has gh || log_warn "    $_name: gh not installed — GH_TOKEN stays empty until 'gh auth login'"
                             log_info "    $_name ($_transport, auth=gh via GH_TOKEN)"
-                            ;;
-                        gcloud)
-                            printf 'bearer_token_env_var = "GOOGLE_MCP_TOKEN"\n' >> "$out"
-                            printf 'env_http_headers = { "x-goog-user-project" = "GOOGLE_CLOUD_PROJECT" }\n' >> "$out"
-                            has gcloud || log_warn "    $_name: gcloud not installed — GOOGLE_MCP_TOKEN stays empty until 'bash install/auth.sh google'"
-                            log_info "    $_name ($_transport, auth=gcloud via GOOGLE_MCP_TOKEN)"
                             ;;
                         context7)
                             if [[ -f "$HOME/.context7.env" ]]; then
@@ -439,6 +437,7 @@ _sync_config() {
 
 _sync_hooks() {
     local _hooks_src _hooks_dest _guard_src _guard_dest _hook_hash _hook_key
+    local _event_name _event_key _g _h
     log_section "Codex Hooks Sync"
 
     _hooks_src="$DF_ROOT/home/dot_codex/hooks.json"
@@ -448,35 +447,32 @@ _sync_hooks() {
 
     [[ -f "$_hooks_src" ]] || die "Missing managed Codex hooks: $_hooks_src"
     [[ -f "$_guard_src" ]] || die "Missing chezmoi guard hook: $_guard_src"
+    has jq || die "jq is required to sync all managed Codex lifecycle hooks"
 
     ensure_dir "$HOME/.codex"
     ensure_dir "$HOME/.local/bin"
+    ensure_dir "$HOME/.local/lib/dotfiles"
+    ensure_dir "$HOME/.config/dotfiles"
+    if [[ ! -f "$HOME/.config/dotfiles/agent-layout" ]]; then
+        printf '%s\n' "$DF_USE_PLAT" > "$HOME/.config/dotfiles/agent-layout"
+    fi
 
     install -m 644 "$_hooks_src" "$_hooks_dest"
     install -m 755 "$_guard_src" "$_guard_dest"
+    install -m 755 "$DF_ROOT/home/dot_local/bin/executable_df-task" "$HOME/.local/bin/df-task"
+    install -m 644 "$DF_ROOT/home/dot_local/lib/dotfiles/df_task.py" "$HOME/.local/lib/dotfiles/df_task.py"
 
-    # Trust every PreToolUse hook (group index : hook index). Codex records
-    # trust per hook hash; a managed edit re-computes and re-trusts here so
-    # no interactive /hooks review is needed on any machine.
-    local _g _h _n_groups _n_hooks _hook_key _hook_hash
-    if has jq; then
-        _n_groups="$(jq '.hooks.PreToolUse | length' "$_hooks_dest")"
-    else
-        _n_groups=1   # pre-jq fallback only understands the first hook
-    fi
-    for (( _g=0; _g<_n_groups; _g++ )); do
-        if has jq; then
-            _n_hooks="$(jq --argjson g "$_g" '.hooks.PreToolUse[$g].hooks | length' "$_hooks_dest")"
-        else
-            _n_hooks=1
-        fi
-        for (( _h=0; _h<_n_hooks; _h++ )); do
-            _hook_key="$HOME/.codex/hooks.json:pre_tool_use:${_g}:${_h}"
-            _hook_hash="$(_managed_pre_tool_hook_hash "$_hooks_dest" "$_g" "$_h")"
-            _trust_hook "$HOME/.codex/config.toml" "$_hook_key" "$_hook_hash"
-            log_okay "Trusted Codex hook [$_g:$_h] → $_hook_hash"
-        done
-    done
+    # Codex trust identities include the event and both array indices.
+    while IFS=$'\t' read -r _event_name _event_key _g _h; do
+        _hook_key="$HOME/.codex/hooks.json:${_event_key}:${_g}:${_h}"
+        _hook_hash="$(_managed_hook_hash "$_hooks_dest" "$_event_name" "$_event_key" "$_g" "$_h")"
+        _trust_hook "$HOME/.codex/config.toml" "$_hook_key" "$_hook_hash"
+        log_okay "Trusted Codex hook $_event_name [$_g:$_h]"
+    done < <(jq -r '
+        .hooks | to_entries[] | .key as $event | .value | to_entries[] as $group
+        | $group.value.hooks | keys[] as $hook
+        | [$event, ($event | [scan("[A-Z][a-z]*")] | map(ascii_downcase) | join("_")), $group.key, $hook] | @tsv
+    ' "$_hooks_dest")
 
 
     log_okay "Synced Codex hooks → $_hooks_dest"
@@ -502,17 +498,17 @@ _managed_hook_hash() {
               | $group.hooks[$h] as $hook
               | {
                   event_name: $eventKey,
-                  matcher: $group.matcher,
                   hooks: [
                     ({
                       type: $hook.type,
                       command: $hook.command,
-                      timeout: ($hook.timeout // 600),
+                      timeout: ($hook.timeout // (if $eventName == "SessionEnd" or $eventName == "Interrupt" then 1 else 600 end)),
                       async: ($hook.async // false)
                     }
                     + if ($hook | has("statusMessage")) then {statusMessage: $hook.statusMessage} else {} end)
                   ]
                 }
+                + if $group.matcher != null then {matcher: $group.matcher} else {} end
             ' "$_hooks_file"
         )"
     else
@@ -587,7 +583,7 @@ _toml_section_key_matches() {
 _check_setup() {
     local _config _rules _hooks _guard _profile _pfile _guard_rc _hook_hash
     local _want_model _mcp_name _mcp_risk _mcp_approval
-    local _g _h _n_groups _n_hooks _hook_key
+    local _g _h _event_name _event_key _hook_key
     log_section "Codex Healthcheck"
 
     _config="$HOME/.codex/config.toml"
@@ -646,17 +642,19 @@ _check_setup() {
         || die "Codex hook does not use shared chezmoi guard"
     ! grep -q 'format-hook' "$_hooks" \
         || die "Stale Codex format-hook still present in $_hooks"
-    _n_groups="$(jq '.hooks.PreToolUse | length' "$_hooks")"
-    for (( _g=0; _g<_n_groups; _g++ )); do
-        _n_hooks="$(jq --argjson g "$_g" '.hooks.PreToolUse[$g].hooks | length' "$_hooks")"
-        for (( _h=0; _h<_n_hooks; _h++ )); do
-            _hook_key="$HOME/.codex/hooks.json:pre_tool_use:${_g}:${_h}"
-            _hook_hash="$(_managed_pre_tool_hook_hash "$_hooks" "$_g" "$_h")"
-            _toml_section_key_matches "$_config" "[hooks.state.\"$_hook_key\"]" \
-                trusted_hash "$_hook_hash" \
-                || die "Codex hook trust hash is stale for [$_g:$_h] in $_config"
-        done
-    done
+    [[ -x "$HOME/.local/bin/df-task" && -f "$HOME/.local/lib/dotfiles/df_task.py" ]] \
+        || die "Missing durable task checkpoint helper"
+    while IFS=$'\t' read -r _event_name _event_key _g _h; do
+        _hook_key="$HOME/.codex/hooks.json:${_event_key}:${_g}:${_h}"
+        _hook_hash="$(_managed_hook_hash "$_hooks" "$_event_name" "$_event_key" "$_g" "$_h")"
+        _toml_section_key_matches "$_config" "[hooks.state.\"$_hook_key\"]" \
+            trusted_hash "$_hook_hash" \
+            || die "Codex hook trust hash is stale for $_event_name [$_g:$_h] in $_config"
+    done < <(jq -r '
+        .hooks | to_entries[] | .key as $event | .value | to_entries[] as $group
+        | $group.value.hooks | keys[] as $hook
+        | [$event, ($event | [scan("[A-Z][a-z]*")] | map(ascii_downcase) | join("_")), $group.key, $hook] | @tsv
+    ' "$_hooks")
 
     codex debug prompt-input "healthcheck" >/dev/null \
         || die "Codex config parse failed for default profile"

@@ -28,6 +28,12 @@
       },
       "url": "https://exa.example/mcp"
     },
+    "gcsrv": {
+      "args": [
+        "https://gc.example/mcp"
+      ],
+      "command": "<HOME>/.local/bin/df-google-mcp"
+    },
     "ghsrv": {
       "headers": {
         "Authorization": "Bearer fixture-fixture-github"

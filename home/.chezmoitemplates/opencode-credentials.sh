@@ -1,7 +1,5 @@
 _with_opencode_mcp_credentials() {
     GH_TOKEN="${GH_TOKEN:-$(command gh auth token 2>/dev/null)}" \
-    GOOGLE_MCP_TOKEN="${GOOGLE_MCP_TOKEN:-$(command gcloud auth application-default print-access-token 2>/dev/null)}" \
-    GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-$(command gcloud config get-value project 2>/dev/null)}" \
         "$@"
 }
 

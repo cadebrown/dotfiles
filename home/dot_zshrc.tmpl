@@ -144,16 +144,13 @@ alias codexr='codex -p review'
 # reference them via *_env_var, keeping tokens off disk. Lazy (resolved per
 # codex launch, not per shell startup); caller-provided values win.
 #   GH_TOKEN          → GitHub MCP (bearer_token_env_var)
-#   GOOGLE_MCP_TOKEN  → Google official MCP servers (ADC access token, ~1h)
-#   GOOGLE_CLOUD_PROJECT → x-goog-user-project quota project for the above
+# Google Cloud MCPs refresh ADC credentials inside df-google-mcp.
 codex() {
     GH_TOKEN="${GH_TOKEN:-$(command gh auth token 2>/dev/null)}" \
-    GOOGLE_MCP_TOKEN="${GOOGLE_MCP_TOKEN:-$(command gcloud auth application-default print-access-token 2>/dev/null)}" \
-    GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-$(command gcloud config get-value project 2>/dev/null)}" \
         command codex "$@"
 }
 
-# OpenCode consumes the same short-lived MCP credentials as Codex and starts
+# OpenCode consumes the same GitHub MCP credentials as Codex and starts
 # in auto-approve mode. Explicit deny rules (the review agent) still apply.
 {{ template "opencode-credentials.sh" . }}
 opencode() {
