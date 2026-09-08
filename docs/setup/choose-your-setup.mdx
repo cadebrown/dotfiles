@@ -1,0 +1,75 @@
+---
+title: Choose your setup
+description: Build and review a bootstrap command for a workstation, a Linux host, or a shared home without running anything from the browser.
+sidebar:
+  order: 1
+---
+
+import { Tabs, TabItem, Steps } from '@astrojs/starlight/components';
+import SetupConfigurator from '@components/SetupConfigurator.astro';
+
+Use this page to make the installation choices explicit. The configuration generator produces a command for a checkout at `~/dotfiles`. It does not inspect your computer or run a shell command.
+
+## Start with the target
+
+<Tabs syncKey="target-platform">
+<TabItem label="macOS">
+
+- Install the Xcode Command Line Tools when prompted by Homebrew.
+- Allow administrator authentication for initial Homebrew setup.
+- Review the [macOS workstation guide](/workflows/macos-workstation/) for services, input preferences, window management, and GUI integrations.
+- A configured MCP client does not grant Accessibility, Automation, Screen Recording, or account access.
+
+</TabItem>
+<TabItem label="Linux">
+
+- The public package-manager bootstrap runs without sudo and installs into the managed local prefix.
+- Custom-prefix Homebrew may compile packages that cannot use relocated bottles.
+- Use PLAT isolation if multiple architectures share one home directory.
+- Review the [new-machine workflows](/workflows/new-machines/) and [runtime paths](/architecture/runtime-paths/) before enabling scratch relocation.
+
+</TabItem>
+</Tabs>
+
+## Compose the command
+
+<SetupConfigurator />
+
+`DF_PROFILE=core` narrows optional Python and Cargo tools. It does **not** select a minimal Homebrew manifest or uninstall tools left by a previous full setup. Explicit `DF_DO_*` gates control individual stages. Turning a stage off generally skips reconciliation; it is not an uninstall operation.
+
+## Run and verify
+
+<Steps>
+
+1. Clone and inspect the source:
+
+   ```bash title="Create the local checkout"
+   git clone https://github.com/cadebrown/dotfiles ~/dotfiles
+   cd ~/dotfiles
+   less bootstrap.sh
+   ```
+
+2. Copy the generated command, review the [bootstrap guide](/setup/bootstrap/), then run it from an interactive terminal. Identity prompts are cached by chezmoi.
+
+3. Read the final verification and degradation output. Check the runtime paths independently:
+
+   ```bash title="Inspect the resulting environment"
+   bash ~/dotfiles/install/verify-path.sh
+   command -v git node npm python cargo
+   ```
+
+4. Open a new login shell, then follow the relevant [operator guide](/usage/updates/). Preserve the selected flags and output with the machine's setup notes.
+
+</Steps>
+
+## Match a recipe to the problem
+
+| Use case | Main choice | Relevant evidence |
+| --- | --- | --- |
+| Personal workstation | Full profile, selected GUI integrations | New shell resolves managed tools; app settings visible in the app |
+| Narrower CI or SSH host | Core plus explicit stage gates | Required command smoke tests on that host |
+| Shared NFS home | `DF_USE_PLAT=1` | Per-host PLAT and resolved executable paths |
+| Local model experiments | Full profile on Apple Silicon macOS; enable local LLM tools | Model license, successful load, end-to-end task, measured latency |
+| Blender automation | Blender installed; addon selected | Bridge health, render, saved `.blend`, reopen/import evidence |
+
+Source contracts: [bootstrap.sh](https://github.com/cadebrown/dotfiles/blob/main/bootstrap.sh), [shared runtime defaults](https://github.com/cadebrown/dotfiles/blob/main/install/_lib.sh), and [package profiles](/architecture/package-ownership/).

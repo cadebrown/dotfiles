@@ -4,11 +4,12 @@ set -euo pipefail
 
 usage() {
     cat <<'HELP'
-Usage: tests/ci.sh [full|quality|shell|fast|macos|infrastructure]
+Usage: tests/ci.sh [full|quality|shell|fast|docs|macos|infrastructure]
   full            quality, infrastructure, macOS smoke on Darwin, Docker bootstrap (default)
-  quality         shell, fast tests, documentation, secrets, workflow lint
+  quality         shell, fast tests, docs, secrets, workflow lint
   shell           Bash syntax and ShellCheck, including platform environments
   fast            Quality job's fixture-based Bats suite
+  docs            Astro check plus rendered handbook artifact verification
   macos           shell and constrained-PATH smoke tests (requires Darwin)
   infrastructure  OpenTofu format, backend-free init, and validation
 Missing tools or a failed check stop validation. Install dependencies explicitly.
@@ -19,7 +20,7 @@ if [[ $# -gt 1 ]]; then usage >&2; exit 2; fi
 mode="${1:-full}"
 case "$mode" in
     -h|--help) usage; exit 0 ;;
-    full|quality|shell|fast|macos|infrastructure) ;;
+    full|quality|shell|fast|docs|macos|infrastructure) ;;
     *) printf 'ci: unknown mode: %s\n' "$mode" >&2; usage >&2; exit 2 ;;
 esac
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -86,12 +87,17 @@ fast_checks() {
         tests/verify-path.bats
 }
 
+docs_checks() {
+    require bash npm
+    make_tmp
+    DOCS_OUT_DIR="$ci_tmp/docs" bash tests/docs.sh
+}
+
 quality_checks() {
-    require bash shellcheck bats jq chezmoi zsh mdbook mdbook-mermaid gitleaks actionlint zizmor
+    require bash shellcheck bats jq chezmoi zsh gitleaks actionlint zizmor
     shell_checks
     fast_checks
-    printf '==> Documentation\n'
-    mdbook build docs --dest-dir "$ci_tmp/book"
+    docs_checks
     printf '==> Secrets and workflow lint\n'
     gitleaks git --no-banner --redact .
     actionlint
@@ -137,6 +143,7 @@ infrastructure_checks() {
 case "$mode" in
     shell) shell_checks ;;
     fast) fast_checks ;;
+    docs) docs_checks ;;
     quality) quality_checks ;;
     macos) macos_checks ;;
     infrastructure) infrastructure_checks ;;

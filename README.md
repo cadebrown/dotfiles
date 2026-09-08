@@ -1,4 +1,4 @@
-# dotfiles
+# Cade's Dotfiles
 
 My personal dotfiles for both MacOS and Linux machine setup. A single command bootstraps and sets up my development environment. A few key features:
 
@@ -12,8 +12,8 @@ Fork this repo and modify for your own setup!
 ## Bootstrap
 
 ```sh
-DF_NAME="Your Name" DF_EMAIL="you@example.com" \
-  curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | \
+  DF_NAME="Your Name" DF_EMAIL="you@example.com" bash
 ```
 
 `DF_NAME` / `DF_EMAIL` are needed when piping into `bash` -- the pipe occupies stdin, so chezmoi can't prompt. They're cached in `~/.config/chezmoi/chezmoi.toml`. Re-run anytime to converge -- it installs what's missing, skips what's current.
@@ -141,7 +141,8 @@ dotfiles/
 │   ├── scratch.sh             # NFS scratch space symlinks
 │   └── verify-path.sh         # PATH diagnostic tool
 │
-├── docs/                      # mdBook → dotfiles.cade.io
+├── docs/                      # Authoritative technical handbook Markdown
+├── site/                      # Astro + Starlight → dotfiles.cade.io
 ├── infra/cloudflare/          # OpenTofu config for Cloudflare Pages
 └── tests/                     # Docker-based bats test suite
 ```
@@ -198,7 +199,10 @@ Prefer cargo > npm > pip > Homebrew. Never install the same tool in two layers.
 ### Work on docs
 
 ```sh
-mdbook serve docs/ --open    # live reload at localhost:3000
+npm --prefix site ci --ignore-scripts
+npx --prefix site --no-install playwright install chromium
+npm --prefix site run dev
+./tests/ci.sh docs            # typecheck, build, links, source/feature coverage
 ```
 
 Every push to `main` auto-deploys to [dotfiles.cade.io](https://dotfiles.cade.io) via Cloudflare Pages.

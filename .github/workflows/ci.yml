@@ -20,12 +20,23 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install handbook dependencies
+        run: npm --prefix site ci --ignore-scripts
+
+      - name: Install Chromium for Mermaid rendering
+        run: npx --prefix site --no-install playwright install --with-deps chromium
+
       - name: Install validation tools
         uses: taiki-e/install-action@b6b84cf49ebfe0176417bdce007c624f0db37f20 # v2.86.2
         with:
           tool: |
-            mdbook@0.5.4
-            mdbook-mermaid@0.17.1
             zizmor@1.29.0
 
       - name: Install Go validation tools

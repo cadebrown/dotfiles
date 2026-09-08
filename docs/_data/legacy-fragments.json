@@ -1,0 +1,1587 @@
+{
+  "schemaVersion": 1,
+  "sourceRevision": "HEAD",
+  "source": "Original Markdown heading anchors before the Astro handbook migration.",
+  "placements": {
+    "/": {
+      "cades-dotfiles": "_top",
+      "what-gets-installed": "find-tools-and-guides",
+      "dotfiles-and-shell": "change-a-setting",
+      "packages": "find-tools-and-guides",
+      "languages": "find-tools-and-guides",
+      "ai-tools": "use-an-agent",
+      "macos-specific": "set-up-a-machine",
+      "auth-opt-in": "set-up-a-machine",
+      "home-directories": "change-a-setting",
+      "plat-isolation-optional": "set-up-a-machine",
+      "macos-vs-linux": "set-up-a-machine",
+      "bootstrap-modes": "update-or-troubleshoot",
+      "sections": "find-tools-and-guides"
+    }
+  },
+  "routes": {
+    "/intro.html": {
+      "target": "/",
+      "source": "docs/intro.md",
+      "fragments": [
+        {
+          "id": "cades-dotfiles",
+          "heading": "cade's dotfiles",
+          "depth": 1
+        },
+        {
+          "id": "what-gets-installed",
+          "heading": "What gets installed",
+          "depth": 2
+        },
+        {
+          "id": "dotfiles-and-shell",
+          "heading": "Dotfiles and shell",
+          "depth": 3
+        },
+        {
+          "id": "packages",
+          "heading": "Packages",
+          "depth": 3
+        },
+        {
+          "id": "languages",
+          "heading": "Languages",
+          "depth": 3
+        },
+        {
+          "id": "ai-tools",
+          "heading": "AI tools",
+          "depth": 3
+        },
+        {
+          "id": "macos-specific",
+          "heading": "macOS-specific",
+          "depth": 3
+        },
+        {
+          "id": "auth-opt-in",
+          "heading": "Auth (opt-in)",
+          "depth": 3
+        },
+        {
+          "id": "home-directories",
+          "heading": "Home directories",
+          "depth": 3
+        },
+        {
+          "id": "plat-isolation-optional",
+          "heading": "PLAT isolation (optional)",
+          "depth": 2
+        },
+        {
+          "id": "macos-vs-linux",
+          "heading": "macOS vs Linux",
+          "depth": 2
+        },
+        {
+          "id": "bootstrap-modes",
+          "heading": "Bootstrap modes",
+          "depth": 2
+        },
+        {
+          "id": "sections",
+          "heading": "Sections",
+          "depth": 2
+        }
+      ]
+    },
+    "/setup/bootstrap.html": {
+      "target": "/setup/bootstrap/",
+      "source": "docs/setup/bootstrap.md",
+      "fragments": [
+        {
+          "id": "bootstrap-a-new-machine",
+          "heading": "Bootstrap a new machine",
+          "depth": 1
+        },
+        {
+          "id": "one-liner",
+          "heading": "One-liner",
+          "depth": 2
+        },
+        {
+          "id": "interactive-prompts-for-name--email",
+          "heading": "Interactive (prompts for name + email)",
+          "depth": 3
+        },
+        {
+          "id": "modes",
+          "heading": "Modes",
+          "depth": 2
+        },
+        {
+          "id": "macos",
+          "heading": "macOS",
+          "depth": 2
+        },
+        {
+          "id": "requirements",
+          "heading": "Requirements",
+          "depth": 3
+        },
+        {
+          "id": "what-gets-installed",
+          "heading": "What gets installed",
+          "depth": 3
+        },
+        {
+          "id": "linux",
+          "heading": "Linux",
+          "depth": 2
+        },
+        {
+          "id": "requirements-1",
+          "heading": "Requirements",
+          "depth": 3
+        },
+        {
+          "id": "what-gets-installed-1",
+          "heading": "What gets installed",
+          "depth": 3
+        },
+        {
+          "id": "skipping-steps",
+          "heading": "Skipping steps",
+          "depth": 2
+        },
+        {
+          "id": "debug-mode",
+          "heading": "Debug mode",
+          "depth": 2
+        },
+        {
+          "id": "shared-home-directories-nfsgpfs",
+          "heading": "Shared home directories (NFS/GPFS)",
+          "depth": 2
+        },
+        {
+          "id": "scratch-space-large-quota-environments",
+          "heading": "Scratch space (large quota environments)",
+          "depth": 3
+        },
+        {
+          "id": "auth-api-tokens",
+          "heading": "Auth (API tokens)",
+          "depth": 2
+        }
+      ]
+    },
+    "/setup/chezmoi.html": {
+      "target": "/setup/chezmoi/",
+      "source": "docs/setup/chezmoi.md",
+      "fragments": [
+        {
+          "id": "managing-dotfiles",
+          "heading": "Managing dotfiles",
+          "depth": 1
+        },
+        {
+          "id": "data-flow",
+          "heading": "Data flow",
+          "depth": 2
+        },
+        {
+          "id": "the-quick-version",
+          "heading": "The quick version",
+          "depth": 2
+        },
+        {
+          "id": "how-files-map",
+          "heading": "How files map",
+          "depth": 2
+        },
+        {
+          "id": "template-variables",
+          "heading": "Template variables",
+          "depth": 2
+        },
+        {
+          "id": "editing-dotfiles",
+          "heading": "Editing dotfiles",
+          "depth": 2
+        },
+        {
+          "id": "shared-home-directory-safety",
+          "heading": "Shared home directory safety",
+          "depth": 2
+        },
+        {
+          "id": "multi-machine-sync",
+          "heading": "Multi-machine sync",
+          "depth": 2
+        },
+        {
+          "id": "files-that-other-tools-also-write",
+          "heading": "Files that other tools also write",
+          "depth": 2
+        }
+      ]
+    },
+    "/setup/packages.html": {
+      "target": "/setup/packages/",
+      "source": "docs/setup/packages.md",
+      "fragments": [
+        {
+          "id": "package-management",
+          "heading": "Package management",
+          "depth": 1
+        },
+        {
+          "id": "the-layers",
+          "heading": "The layers",
+          "depth": 2
+        },
+        {
+          "id": "adding-a-package--priority-order",
+          "heading": "Adding a package \u2014 priority order",
+          "depth": 2
+        },
+        {
+          "id": "1-cargo--rust-crates",
+          "heading": "1. cargo \u2014 Rust crates",
+          "depth": 3
+        },
+        {
+          "id": "2-npm--npm-specific-tools",
+          "heading": "2. npm \u2014 npm-specific tools",
+          "depth": 3
+        },
+        {
+          "id": "3-uv--python-libraries-and-cli-tools",
+          "heading": "3. uv \u2014 Python libraries and CLI tools",
+          "depth": 3
+        },
+        {
+          "id": "4-homebrew--non-language-specific-tools-and-c-libraries",
+          "heading": "4. Homebrew \u2014 non-language-specific tools and C libraries",
+          "depth": 3
+        },
+        {
+          "id": "5-vs-code--cursor-extensions",
+          "heading": "5. VS Code / Cursor extensions",
+          "depth": 3
+        },
+        {
+          "id": "6-custom-install-script",
+          "heading": "6. Custom install script",
+          "depth": 3
+        },
+        {
+          "id": "local-ai-tools",
+          "heading": "Local AI tools",
+          "depth": 2
+        },
+        {
+          "id": "research-mathematics",
+          "heading": "Research mathematics",
+          "depth": 2
+        },
+        {
+          "id": "dont-duplicate-across-layers",
+          "heading": "Don't duplicate across layers",
+          "depth": 2
+        },
+        {
+          "id": "why-cargo-over-homebrew-for-rust-tools",
+          "heading": "Why cargo over Homebrew for Rust tools",
+          "depth": 2
+        },
+        {
+          "id": "why-homebrew-for-linux",
+          "heading": "Why Homebrew for Linux",
+          "depth": 2
+        },
+        {
+          "id": "compiler-toolchains",
+          "heading": "Compiler toolchains",
+          "depth": 2
+        },
+        {
+          "id": "default-llvm-homebrew-clang",
+          "heading": "Default: LLVM (Homebrew clang)",
+          "depth": 3
+        },
+        {
+          "id": "switching-toolchains",
+          "heading": "Switching toolchains",
+          "depth": 3
+        },
+        {
+          "id": "disabling-the-toolchain",
+          "heading": "Disabling the toolchain",
+          "depth": 3
+        },
+        {
+          "id": "cuda",
+          "heading": "CUDA",
+          "depth": 3
+        },
+        {
+          "id": "compiler-caching-ccache--sccache",
+          "heading": "Compiler caching (ccache / sccache)",
+          "depth": 3
+        },
+        {
+          "id": "openssh-from-homebrew",
+          "heading": "openssh from Homebrew",
+          "depth": 3
+        },
+        {
+          "id": "source-files",
+          "heading": "Source files",
+          "depth": 3
+        },
+        {
+          "id": "updating-all-packages",
+          "heading": "Updating all packages",
+          "depth": 2
+        }
+      ]
+    },
+    "/setup/plat.html": {
+      "target": "/setup/plat/",
+      "source": "docs/setup/plat.md",
+      "fragments": [
+        {
+          "id": "plat-isolation",
+          "heading": "PLAT isolation",
+          "depth": 1
+        },
+        {
+          "id": "the-decision-in-30-seconds",
+          "heading": "The decision in 30 seconds",
+          "depth": 2
+        },
+        {
+          "id": "layouts-side-by-side",
+          "heading": "Layouts side-by-side",
+          "depth": 2
+        },
+        {
+          "id": "what-plat-directories-look-like",
+          "heading": "What PLAT directories look like",
+          "depth": 2
+        },
+        {
+          "id": "enabling-plat-isolation",
+          "heading": "Enabling PLAT isolation",
+          "depth": 2
+        },
+        {
+          "id": "disabling--migrating-off-plat",
+          "heading": "Disabling / migrating off PLAT",
+          "depth": 2
+        },
+        {
+          "id": "failure-modes-plat-exists-to-prevent",
+          "heading": "Failure modes PLAT exists to prevent",
+          "depth": 2
+        },
+        {
+          "id": "why-opt-in-by-default",
+          "heading": "Why opt-in by default",
+          "depth": 2
+        }
+      ]
+    },
+    "/setup/auth.html": {
+      "target": "/setup/auth/",
+      "source": "docs/setup/auth.md",
+      "fragments": [
+        {
+          "id": "auth-api-tokens",
+          "heading": "Auth (API tokens)",
+          "depth": 1
+        },
+        {
+          "id": "quick-reference",
+          "heading": "Quick reference",
+          "depth": 2
+        },
+        {
+          "id": "service-registry",
+          "heading": "Service registry",
+          "depth": 2
+        },
+        {
+          "id": "how-tokens-get-loaded",
+          "heading": "How tokens get loaded",
+          "depth": 2
+        },
+        {
+          "id": "per-prompt-ux",
+          "heading": "Per-prompt UX",
+          "depth": 2
+        },
+        {
+          "id": "the-gh-derive-trick-github_token",
+          "heading": "The gh-derive trick (GITHUB_TOKEN)",
+          "depth": 2
+        },
+        {
+          "id": "adding-a-new-service",
+          "heading": "Adding a new service",
+          "depth": 2
+        },
+        {
+          "id": "file-security",
+          "heading": "File security",
+          "depth": 2
+        }
+      ]
+    },
+    "/setup/scratch.html": {
+      "target": "/setup/scratch/",
+      "source": "docs/setup/scratch.md",
+      "fragments": [
+        {
+          "id": "scratch-space",
+          "heading": "Scratch space",
+          "depth": 1
+        },
+        {
+          "id": "how-it-works",
+          "heading": "How it works",
+          "depth": 2
+        },
+        {
+          "id": "codex-specifics",
+          "heading": "Codex specifics",
+          "depth": 3
+        },
+        {
+          "id": "why-not-codex_home",
+          "heading": "Why not CODEX_HOME?",
+          "depth": 3
+        },
+        {
+          "id": "why-not-symlink-the-whole-dir-and-chezmoiignore-it",
+          "heading": "Why not symlink the whole dir and .chezmoiignore it?",
+          "depth": 3
+        },
+        {
+          "id": "configuring",
+          "heading": "Configuring",
+          "depth": 2
+        },
+        {
+          "id": "what-not-to-symlink",
+          "heading": "What NOT to symlink",
+          "depth": 2
+        },
+        {
+          "id": "filesystem-caveats",
+          "heading": "Filesystem caveats",
+          "depth": 2
+        },
+        {
+          "id": "re-running",
+          "heading": "Re-running",
+          "depth": 2
+        }
+      ]
+    },
+    "/setup/overlays.html": {
+      "target": "/setup/overlays/",
+      "source": "docs/setup/overlays.md",
+      "fragments": [
+        {
+          "id": "overlays",
+          "heading": "Overlays",
+          "depth": 1
+        },
+        {
+          "id": "discovery-model",
+          "heading": "Discovery model",
+          "depth": 2
+        },
+        {
+          "id": "what-an-overlay-can-provide",
+          "heading": "What an overlay can provide",
+          "depth": 2
+        },
+        {
+          "id": "creating-an-overlay",
+          "heading": "Creating an overlay",
+          "depth": 2
+        },
+        {
+          "id": "chezmoi-integration",
+          "heading": "chezmoi integration",
+          "depth": 2
+        },
+        {
+          "id": "why-overlays-vs-forks",
+          "heading": "Why overlays vs forks",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/updates.html": {
+      "target": "/usage/updates/",
+      "source": "docs/usage/updates.md",
+      "fragments": [
+        {
+          "id": "day-to-day-workflow",
+          "heading": "Day-to-day workflow",
+          "depth": 1
+        },
+        {
+          "id": "update-and-upgrade",
+          "heading": "Update and upgrade",
+          "depth": 2
+        },
+        {
+          "id": "add-a-package",
+          "heading": "Add a package",
+          "depth": 2
+        },
+        {
+          "id": "edit-a-dotfile",
+          "heading": "Edit a dotfile",
+          "depth": 2
+        },
+        {
+          "id": "sync-dotfiles-from-the-repo",
+          "heading": "Sync dotfiles from the repo",
+          "depth": 2
+        },
+        {
+          "id": "aerospace-config-v2",
+          "heading": "AeroSpace config (v2)",
+          "depth": 2
+        },
+        {
+          "id": "update-ai-agent-instructions",
+          "heading": "Update AI agent instructions",
+          "depth": 2
+        },
+        {
+          "id": "add-an-env-var-or-path-entry",
+          "heading": "Add an env var or PATH entry",
+          "depth": 2
+        },
+        {
+          "id": "work-on-the-docs",
+          "heading": "Work on the docs",
+          "depth": 2
+        },
+        {
+          "id": "deploy-infrastructure-changes",
+          "heading": "Deploy infrastructure changes",
+          "depth": 2
+        },
+        {
+          "id": "commit-and-push",
+          "heading": "Commit and push",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/validation.html": {
+      "target": "/usage/validation/",
+      "source": "docs/usage/validation.md",
+      "fragments": [
+        {
+          "id": "validation-before-publishing",
+          "heading": "Validation before publishing",
+          "depth": 1
+        },
+        {
+          "id": "install-the-push-gate",
+          "heading": "Install the push gate",
+          "depth": 2
+        },
+        {
+          "id": "what-a-passing-gate-establishes",
+          "heading": "What a passing gate establishes",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/git-worktrees.html": {
+      "target": "/usage/git-worktrees/",
+      "source": "docs/usage/git-worktrees.md",
+      "fragments": [
+        {
+          "id": "git-worktrees",
+          "heading": "Git worktrees",
+          "depth": 1
+        },
+        {
+          "id": "convert-a-clone",
+          "heading": "Convert a clone",
+          "depth": 2
+        },
+        {
+          "id": "create-a-personal-branch",
+          "heading": "Create a personal branch",
+          "depth": 2
+        },
+        {
+          "id": "add-an-existing-branch",
+          "heading": "Add an existing branch",
+          "depth": 2
+        },
+        {
+          "id": "forge-usernames",
+          "heading": "Forge usernames",
+          "depth": 2
+        },
+        {
+          "id": "other-worktree-operations",
+          "heading": "Other worktree operations",
+          "depth": 2
+        },
+        {
+          "id": "help",
+          "heading": "Help",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/aerospace.html": {
+      "target": "/usage/aerospace/",
+      "source": "docs/usage/aerospace.md",
+      "fragments": [
+        {
+          "id": "aerospace-v2",
+          "heading": "AeroSpace (v2)",
+          "depth": 1
+        },
+        {
+          "id": "source-of-truth",
+          "heading": "Source of truth",
+          "depth": 2
+        },
+        {
+          "id": "design-principles",
+          "heading": "Design principles",
+          "depth": 2
+        },
+        {
+          "id": "main-keymap",
+          "heading": "Main keymap",
+          "depth": 2
+        },
+        {
+          "id": "service-mode",
+          "heading": "Service mode",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/local-llm.html": {
+      "target": "/usage/local-llm/",
+      "source": "docs/usage/local-llm.md",
+      "fragments": [
+        {
+          "id": "local-ai-coding",
+          "heading": "Local AI coding",
+          "depth": 1
+        },
+        {
+          "id": "overview",
+          "heading": "Overview",
+          "depth": 2
+        },
+        {
+          "id": "quick-start",
+          "heading": "Quick start",
+          "depth": 2
+        },
+        {
+          "id": "mlxserve-and-mlx-openai-server",
+          "heading": "mlxserve and mlx-openai-server",
+          "depth": 2
+        },
+        {
+          "id": "pre-pulled-models",
+          "heading": "Pre-pulled models",
+          "depth": 2
+        },
+        {
+          "id": "per-tool-config",
+          "heading": "Per-tool config",
+          "depth": 2
+        },
+        {
+          "id": "opencode-capability-routing",
+          "heading": "OpenCode capability routing",
+          "depth": 3
+        },
+        {
+          "id": "switching-to-cloud",
+          "heading": "Switching to cloud",
+          "depth": 3
+        },
+        {
+          "id": "ollama-fallback",
+          "heading": "Ollama (fallback)",
+          "depth": 2
+        },
+        {
+          "id": "run_onchange-hooks",
+          "heading": "run_onchange hooks",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/ai-workbench.html": {
+      "target": "/usage/ai-workbench/",
+      "source": "docs/usage/ai-workbench.md",
+      "fragments": [
+        {
+          "id": "ai-workbench",
+          "heading": "AI workbench",
+          "depth": 1
+        },
+        {
+          "id": "start-a-task",
+          "heading": "Start a task",
+          "depth": 2
+        },
+        {
+          "id": "delegate-a-focused-task",
+          "heading": "Delegate a focused task",
+          "depth": 2
+        },
+        {
+          "id": "choose-a-domain-path",
+          "heading": "Choose a domain path",
+          "depth": 2
+        },
+        {
+          "id": "browser-and-uiux",
+          "heading": "Browser and UI/UX",
+          "depth": 2
+        },
+        {
+          "id": "desktop-3d-and-media",
+          "heading": "Desktop, 3D, and media",
+          "depth": 2
+        },
+        {
+          "id": "long-running-and-remote-work",
+          "heading": "Long-running and remote work",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/durable-tasks.html": {
+      "target": "/usage/durable-tasks/",
+      "source": "docs/usage/durable-tasks.md",
+      "fragments": [
+        {
+          "id": "durable-codex-tasks",
+          "heading": "Durable Codex tasks",
+          "depth": 1
+        },
+        {
+          "id": "during-a-task",
+          "heading": "During a task",
+          "depth": 2
+        },
+        {
+          "id": "after-an-interruption",
+          "heading": "After an interruption",
+          "depth": 2
+        },
+        {
+          "id": "storage-and-hook-behavior",
+          "heading": "Storage and hook behavior",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/browser-sessions.html": {
+      "target": "/usage/browser-sessions/",
+      "source": "docs/usage/browser-sessions.md",
+      "fragments": [
+        {
+          "id": "browser-workspaces",
+          "heading": "Browser workspaces",
+          "depth": 1
+        },
+        {
+          "id": "open-use-and-resume",
+          "heading": "Open, use, and resume",
+          "depth": 2
+        },
+        {
+          "id": "existing-authenticated-tabs",
+          "heading": "Existing authenticated tabs",
+          "depth": 2
+        },
+        {
+          "id": "login-and-expiry-observations",
+          "heading": "Login and expiry observations",
+          "depth": 2
+        },
+        {
+          "id": "private-auth-transfer",
+          "heading": "Private auth transfer",
+          "depth": 2
+        },
+        {
+          "id": "screenshots-traces-and-cleanup",
+          "heading": "Screenshots, traces, and cleanup",
+          "depth": 2
+        },
+        {
+          "id": "playwright-cli-shutdown-compatibility",
+          "heading": "Playwright CLI shutdown compatibility",
+          "depth": 3
+        },
+        {
+          "id": "validation",
+          "heading": "Validation",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/google-cloud-mcp.html": {
+      "target": "/usage/google-cloud-mcp/",
+      "source": "docs/usage/google-cloud-mcp.md",
+      "fragments": [
+        {
+          "id": "google-cloud-mcp-credentials",
+          "heading": "Google Cloud MCP credentials",
+          "depth": 1
+        },
+        {
+          "id": "use",
+          "heading": "Use",
+          "depth": 2
+        },
+        {
+          "id": "failure-behavior",
+          "heading": "Failure behavior",
+          "depth": 2
+        },
+        {
+          "id": "validation-and-sources",
+          "heading": "Validation and sources",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/webmcp.html": {
+      "target": "/usage/webmcp/",
+      "source": "docs/usage/webmcp.md",
+      "fragments": [
+        {
+          "id": "webmcp-site-tools",
+          "heading": "WebMCP site tools",
+          "depth": 1
+        },
+        {
+          "id": "start-from-the-local-demo",
+          "heading": "Start from the local demo",
+          "depth": 2
+        },
+        {
+          "id": "compatibility-boundary",
+          "heading": "Compatibility boundary",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/creative-workflows.html": {
+      "target": "/usage/creative-workflows/",
+      "source": "docs/usage/creative-workflows.md",
+      "fragments": [
+        {
+          "id": "creative-references-and-demonstrated-workflows",
+          "heading": "Creative references and demonstrated workflows",
+          "depth": 1
+        },
+        {
+          "id": "work-from-annotated-references",
+          "heading": "Work from annotated references",
+          "depth": 2
+        },
+        {
+          "id": "concrete-examples",
+          "heading": "Concrete examples",
+          "depth": 2
+        },
+        {
+          "id": "teach-a-workflow-by-demonstration",
+          "heading": "Teach a workflow by demonstration",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/gamedev.html": {
+      "target": "/usage/gamedev/",
+      "source": "docs/usage/gamedev.md",
+      "fragments": [
+        {
+          "id": "game-development-stack",
+          "heading": "Game development stack",
+          "depth": 1
+        },
+        {
+          "id": "asset-and-render-workflow",
+          "heading": "Asset and render workflow",
+          "depth": 2
+        },
+        {
+          "id": "engine-projects",
+          "heading": "Engine projects",
+          "depth": 2
+        },
+        {
+          "id": "a-useful-loop",
+          "heading": "A useful loop",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/math.html": {
+      "target": "/usage/math/",
+      "source": "docs/usage/math.md",
+      "fragments": [
+        {
+          "id": "research-mathematics-stack",
+          "heading": "Research mathematics stack",
+          "depth": 1
+        },
+        {
+          "id": "overview",
+          "heading": "Overview",
+          "depth": 2
+        },
+        {
+          "id": "the-proof-gate",
+          "heading": "The proof gate",
+          "depth": 2
+        },
+        {
+          "id": "workspaces",
+          "heading": "Workspaces",
+          "depth": 2
+        },
+        {
+          "id": "gotchas",
+          "heading": "Gotchas",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/scientific-review.html": {
+      "target": "/usage/scientific-review/",
+      "source": "docs/usage/scientific-review.md",
+      "fragments": [
+        {
+          "id": "scientific-review",
+          "heading": "Scientific review",
+          "depth": 1
+        },
+        {
+          "id": "research-record",
+          "heading": "Research record",
+          "depth": 2
+        },
+        {
+          "id": "tool-boundaries",
+          "heading": "Tool boundaries",
+          "depth": 2
+        },
+        {
+          "id": "reproducibility-and-publication",
+          "heading": "Reproducibility and publication",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/agents.html": {
+      "target": "/usage/agents/",
+      "source": "docs/usage/agents.md",
+      "fragments": [
+        {
+          "id": "agent-guidance",
+          "heading": "Agent guidance",
+          "depth": 1
+        },
+        {
+          "id": "the-shared-partial",
+          "heading": "The shared partial",
+          "depth": 2
+        },
+        {
+          "id": "voice-commonmd",
+          "heading": "voice-common.md",
+          "depth": 3
+        },
+        {
+          "id": "math-commonmd",
+          "heading": "math-common.md",
+          "depth": 3
+        },
+        {
+          "id": "where-each-file-lives",
+          "heading": "Where each file lives",
+          "depth": 2
+        },
+        {
+          "id": "adding-a-new-tool",
+          "heading": "Adding a new tool",
+          "depth": 2
+        },
+        {
+          "id": "editing-the-shared-content",
+          "heading": "Editing the shared content",
+          "depth": 2
+        },
+        {
+          "id": "contextual-tool-preferences",
+          "heading": "Contextual tool preferences",
+          "depth": 3
+        },
+        {
+          "id": "project-level-overrides",
+          "heading": "Project-level overrides",
+          "depth": 2
+        },
+        {
+          "id": "skills-shared-across-tools",
+          "heading": "Skills (shared across tools)",
+          "depth": 2
+        },
+        {
+          "id": "codex-delegation",
+          "heading": "Codex delegation",
+          "depth": 2
+        },
+        {
+          "id": "codex-workbench",
+          "heading": "Codex workbench",
+          "depth": 2
+        },
+        {
+          "id": "other-harnesses",
+          "heading": "Other harnesses",
+          "depth": 2
+        },
+        {
+          "id": "memory-layers",
+          "heading": "Memory layers",
+          "depth": 2
+        },
+        {
+          "id": "remote-clipboard",
+          "heading": "Remote clipboard",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/agent-overhead.html": {
+      "target": "/usage/agent-overhead/",
+      "source": "docs/usage/agent-overhead.md",
+      "fragments": [
+        {
+          "id": "agent-hook-overhead",
+          "heading": "Agent hook overhead",
+          "depth": 1
+        },
+        {
+          "id": "runtime-and-shell-paths",
+          "heading": "Runtime and shell paths",
+          "depth": 2
+        },
+        {
+          "id": "relevant-claude-hooks",
+          "heading": "Relevant Claude hooks",
+          "depth": 2
+        },
+        {
+          "id": "status-line-edit-guard-and-cursor",
+          "heading": "Status line, edit guard, and Cursor",
+          "depth": 2
+        },
+        {
+          "id": "validation-and-measurements",
+          "heading": "Validation and measurements",
+          "depth": 2
+        }
+      ]
+    },
+    "/usage/troubleshooting.html": {
+      "target": "/usage/troubleshooting/",
+      "source": "docs/usage/troubleshooting.md",
+      "fragments": [
+        {
+          "id": "troubleshooting",
+          "heading": "Troubleshooting",
+          "depth": 1
+        },
+        {
+          "id": "docker-bootstrap-build-reports-invalid-ubuntu-package-signatures",
+          "heading": "Docker bootstrap build reports invalid Ubuntu package signatures",
+          "depth": 2
+        },
+        {
+          "id": "agent-shell-loops-report-installed-commands-as-missing",
+          "heading": "Agent shell loops report installed commands as missing",
+          "depth": 2
+        },
+        {
+          "id": "bundled-skill-validation-fails-with-missing-yaml",
+          "heading": "Bundled skill validation fails with missing yaml",
+          "depth": 2
+        },
+        {
+          "id": "agent-test-commands-retry-unsupported-quiet-or-filter-arguments",
+          "heading": "Agent test commands retry unsupported quiet or filter arguments",
+          "depth": 2
+        },
+        {
+          "id": "large-tool-responses-defeat-output-compression",
+          "heading": "Large tool responses defeat output compression",
+          "depth": 2
+        },
+        {
+          "id": "shellcheck-rejects-the-runtime-selected-platform-environment",
+          "heading": "ShellCheck rejects the runtime-selected platform environment",
+          "depth": 2
+        },
+        {
+          "id": "quality-ci-fails-with-chezmoi-command-not-found",
+          "heading": "Quality CI fails with chezmoi: command not found",
+          "depth": 2
+        },
+        {
+          "id": "native-opencode-test-cannot-find-an-installed-binary",
+          "heading": "Native OpenCode test cannot find an installed binary",
+          "depth": 2
+        },
+        {
+          "id": "local-agents-default-to-mlx-but-localhost8080-is-unavailable",
+          "heading": "Local agents default to MLX but localhost:8080 is unavailable",
+          "depth": 2
+        },
+        {
+          "id": "upgrade-retains-an-old-opencode-or-ollama-package-owner",
+          "heading": "Upgrade retains an old OpenCode or Ollama package owner",
+          "depth": 2
+        },
+        {
+          "id": "colima-intermittently-rewrites-or-breaks-sshconfig",
+          "heading": "Colima intermittently rewrites or breaks ~/.ssh/config",
+          "depth": 2
+        },
+        {
+          "id": "tool-not-found-after-bootstrap",
+          "heading": "Tool not found after bootstrap",
+          "depth": 2
+        },
+        {
+          "id": "codex-install-fails-with-marketplace-unavailable-openai-bundled",
+          "heading": "Codex install fails with marketplace unavailable: openai-bundled",
+          "depth": 2
+        },
+        {
+          "id": "codex-plugin-healthcheck-reports-a-plugin-was-dropped-upstream",
+          "heading": "Codex plugin healthcheck reports a plugin was dropped upstream",
+          "depth": 2
+        },
+        {
+          "id": "claude-plugin-fails-plugin-x-not-found-in-any-configured-marketplace",
+          "heading": "Claude plugin fails: Plugin \"X\" not found in any configured marketplace",
+          "depth": 2
+        },
+        {
+          "id": "the-same-vs-code--cursor-extensions-report-fail-on-every-upgrade-run",
+          "heading": "The same VS Code / Cursor extensions report fail on every upgrade run",
+          "depth": 2
+        },
+        {
+          "id": "cursor-reports-enoent-for-usersettingsjson-and-ignores-user-settings",
+          "heading": "Cursor reports ENOENT for User/settings.json and ignores user settings",
+          "depth": 2
+        },
+        {
+          "id": "brew-bundle-fails-no-available-formula--this-command-requires-the-tap",
+          "heading": "Brew bundle fails: No available formula \u2026 This command requires the tap",
+          "depth": 2
+        },
+        {
+          "id": "brew-bundle-reports-upgrading-x-has-failed-after-installing-x",
+          "heading": "Brew bundle reports Upgrading X has failed! after installing X",
+          "depth": 2
+        },
+        {
+          "id": "brew-cleanup-fails-with-device-or-resource-busy-nfs",
+          "heading": "Brew cleanup fails with Device or resource busy .../.nfs...",
+          "depth": 2
+        },
+        {
+          "id": "ruby-upgrade-writes-outside-its-new-keg-during-make-install",
+          "heading": "Ruby upgrade writes outside its new keg during make install",
+          "depth": 2
+        },
+        {
+          "id": "apache-serf-cannot-find-asmsocketh",
+          "heading": "apache-serf cannot find asm/socket.h",
+          "depth": 2
+        },
+        {
+          "id": "gecode-patch-reports-that-its-configure-target-moved",
+          "heading": "Gecode patch reports that its configure target moved",
+          "depth": 2
+        },
+        {
+          "id": "clang-cannot-load-libz3-during-an-in-progress-upgrade",
+          "heading": "Clang cannot load libz3 during an in-progress upgrade",
+          "depth": 2
+        },
+        {
+          "id": "openssh-upgrade-fails-with-inreplace-failed--sshd_config",
+          "heading": "OpenSSH upgrade fails with inreplace failed ... sshd_config",
+          "depth": 2
+        },
+        {
+          "id": "brew-has-the-current-keg-but-still-uses-an-older-version",
+          "heading": "Brew has the current keg but still uses an older version",
+          "depth": 2
+        },
+        {
+          "id": "brew-bundle-reports-a-circular-libtiff-webp-dependency",
+          "heading": "Brew Bundle reports a circular libtiff, webp dependency",
+          "depth": 2
+        },
+        {
+          "id": "rust-fails-after-homebrew-says-its-packages-are-satisfied",
+          "heading": "Rust fails after Homebrew says its packages are satisfied",
+          "depth": 2
+        },
+        {
+          "id": "cask-upgrade-fails-it-seems-there-is-already-an-app-at-applicationsxapp",
+          "heading": "Cask upgrade fails: It seems there is already an App at '/Applications/X.app'",
+          "depth": 2
+        },
+        {
+          "id": "a-homebrew-package-is-months-behind-upstream-linux",
+          "heading": "A Homebrew package is months behind upstream (Linux)",
+          "depth": 2
+        },
+        {
+          "id": "upgrade-finishes-installing-then-the-version-audit-calls-newer-tools-outdated",
+          "heading": "Upgrade finishes installing, then the version audit calls newer tools outdated",
+          "depth": 2
+        },
+        {
+          "id": "skill-upgrade-reports-both-up-to-date-and-committed-digest-drift",
+          "heading": "Skill upgrade reports both \u201cup to date\u201d and committed-digest drift",
+          "depth": 2
+        },
+        {
+          "id": "glibc_xy-not-found-from-a-homebrew-binary-linux",
+          "heading": "GLIBC_x.y not found from a Homebrew binary (Linux)",
+          "depth": 2
+        },
+        {
+          "id": "node_module_version-mismatch--err_dlopen_failed-from-an-npm-tool",
+          "heading": "NODE_MODULE_VERSION mismatch / ERR_DLOPEN_FAILED from an npm tool",
+          "depth": 2
+        },
+        {
+          "id": "nvm-rejects-prefix-or-globalconfig-in-npmrc",
+          "heading": "nvm rejects prefix or globalconfig in ~/.npmrc",
+          "depth": 2
+        },
+        {
+          "id": "a-homebrew-binary-cant-find-libxson-after-an-upgrade",
+          "heading": "A Homebrew binary can't find libX.so.N after an upgrade",
+          "depth": 2
+        },
+        {
+          "id": "nvm-or-node-not-available-in-a-script",
+          "heading": "nvm or node not available in a script",
+          "depth": 2
+        },
+        {
+          "id": "chezmoi-keeps-prompting-for-nameemail",
+          "heading": "chezmoi keeps prompting for name/email",
+          "depth": 2
+        },
+        {
+          "id": "chezmoi-diff-shows-unexpected-changes",
+          "heading": "chezmoi diff shows unexpected changes",
+          "depth": 2
+        },
+        {
+          "id": "path-order-is-wrong--wrong-binary-is-resolving",
+          "heading": "PATH order is wrong \u2014 wrong binary is resolving",
+          "depth": 2
+        },
+        {
+          "id": "nsys--ncu-resolve-to-the-cuda-toolkit-copy-not-the-standalone-install",
+          "heading": "nsys / ncu resolve to the CUDA toolkit copy, not the standalone install",
+          "depth": 2
+        },
+        {
+          "id": "cloudflare-pages-build-failing",
+          "heading": "Cloudflare Pages build failing",
+          "depth": 2
+        },
+        {
+          "id": "two-machines-fighting-over-dotfiles-on-a-shared-home",
+          "heading": "Two machines fighting over dotfiles on a shared home",
+          "depth": 2
+        },
+        {
+          "id": "a-symlinked-codex-or-claude-turned-back-into-a-real-directory",
+          "heading": "A symlinked ~/.codex or ~/.claude turned back into a real directory",
+          "depth": 2
+        },
+        {
+          "id": "duplicate-plat-paths-in-path-both-v3-and-v4-showing-up",
+          "heading": "Duplicate PLAT paths in PATH (both v3 and v4 showing up)",
+          "depth": 2
+        },
+        {
+          "id": "lost-shell-history",
+          "heading": "Lost shell history",
+          "depth": 2
+        },
+        {
+          "id": "migrating-off-plat-isolation",
+          "heading": "Migrating off PLAT isolation",
+          "depth": 2
+        },
+        {
+          "id": "brew-zsh-tab-completion-leaves-remnant-characters-linux",
+          "heading": "Brew zsh tab completion leaves remnant characters (Linux)",
+          "depth": 2
+        },
+        {
+          "id": "copypaste-from-a-remote-ssh-session-pastes-as-mojibake-\u00e2-\u00e2-\u00e3",
+          "heading": "Copy/paste from a remote SSH session pastes as mojibake (\u00e2\u20ac\u2122, \u00c2, \u00c3\u00a9)",
+          "depth": 2
+        },
+        {
+          "id": "python-is-python-2-or-cannot-import-sympy",
+          "heading": "python is Python 2 or cannot import SymPy",
+          "depth": 2
+        },
+        {
+          "id": "python314-build-fails-on-linux-uuid-or-test_datetime-errors",
+          "heading": "Python@3.14 build fails on Linux (uuid or test_datetime errors)",
+          "depth": 2
+        },
+        {
+          "id": "cass-source-build-fails-with-rustc-1940-is-not-supported-or-e0554",
+          "heading": "cass source build fails with rustc 1.94.0 is not supported or E0554",
+          "depth": 2
+        },
+        {
+          "id": "cass-search-misses-sessions-you-know-happened",
+          "heading": "cass search misses sessions you know happened",
+          "depth": 2
+        },
+        {
+          "id": "cass-index-fails-with-graph-topology-attestation-failed",
+          "heading": "cass index fails with graph topology attestation failed",
+          "depth": 2
+        },
+        {
+          "id": "every-cass-command-fails-unable-to-open-database-file-but-sqlite3-opens-it-fine",
+          "heading": "Every cass command fails: unable to open database file (but sqlite3 opens it fine)",
+          "depth": 2
+        },
+        {
+          "id": "macos-still-asks-cass-would-like-to-access-data-from-other-apps",
+          "heading": "macOS still asks: \"cass would like to access data from other apps\"",
+          "depth": 2
+        },
+        {
+          "id": "npm-install--g-fails-with-ebusy--unlink-nfsxxxx-qmd-upgrade",
+          "heading": "npm install -g fails with EBUSY \u2026 unlink '.nfsXXXX' (qmd upgrade)",
+          "depth": 2
+        },
+        {
+          "id": "qmd-is-running-but-its-health-check-cannot-connect-to-1270018181",
+          "heading": "qmd is running but its health check cannot connect to 127.0.0.1:8181",
+          "depth": 2
+        },
+        {
+          "id": "import-sageall--cysignals-dies-with-typeerror-signal-handler-must-be-signalsig_ign-signalsig_dfl-or-a-callable-object",
+          "heading": "import sage.all / cysignals dies with TypeError: signal handler must be signal.SIG_IGN, signal.SIG_DFL, or a callable object",
+          "depth": 2
+        },
+        {
+          "id": "pdflatex-command-not-found-on-macos-with-mactex-installed",
+          "heading": "pdflatex: command not found on macOS with MacTeX installed",
+          "depth": 2
+        },
+        {
+          "id": "brew-bundle-installs-nothing-new-and-exits-0",
+          "heading": "brew bundle installs nothing new and exits 0",
+          "depth": 2
+        },
+        {
+          "id": "a-gui-apps-config-is-permanently-dirty-in-chezmoi-status",
+          "heading": "A GUI app's config is permanently dirty in chezmoi status",
+          "depth": 2
+        },
+        {
+          "id": "codex--p-domain-cannot-see-its-expected-mcp-tools",
+          "heading": "codex -p <domain> cannot see its expected MCP tools",
+          "depth": 2
+        },
+        {
+          "id": "persistent-playwright-profile-loses-login-cookies-after-close",
+          "heading": "Persistent Playwright profile loses login cookies after close",
+          "depth": 2
+        },
+        {
+          "id": "google-cloud-mcp-stops-authenticating-during-a-long-session",
+          "heading": "Google Cloud MCP stops authenticating during a long session",
+          "depth": 2
+        },
+        {
+          "id": "codex-mcp-oauth-fails-authorization-server-response-missing-required-issuer",
+          "heading": "Codex MCP OAuth fails: \"Authorization server response missing required issuer\"",
+          "depth": 2
+        },
+        {
+          "id": "mac-app-store-reports-no-downloads-initiated",
+          "heading": "Mac App Store reports No downloads initiated",
+          "depth": 2
+        },
+        {
+          "id": "homebrew-lldb-installs-but-fails-its-runtime-checks",
+          "heading": "Homebrew LLDB installs but fails its runtime checks",
+          "depth": 2
+        },
+        {
+          "id": "python-tools-repeatedly-report-missing-entrypoints",
+          "heading": "Python tools repeatedly report missing entrypoints",
+          "depth": 2
+        }
+      ]
+    },
+    "/reference/env-vars.html": {
+      "target": "/reference/env-vars/",
+      "source": "docs/reference/env-vars.md",
+      "fragments": [
+        {
+          "id": "environment-variables",
+          "heading": "Environment variables",
+          "depth": 1
+        },
+        {
+          "id": "configuration",
+          "heading": "Configuration",
+          "depth": 2
+        },
+        {
+          "id": "behavior-toggles",
+          "heading": "Behavior toggles",
+          "depth": 2
+        },
+        {
+          "id": "scratch-space",
+          "heading": "Scratch space",
+          "depth": 2
+        },
+        {
+          "id": "skip-flags",
+          "heading": "Skip flags",
+          "depth": 2
+        },
+        {
+          "id": "internal-set-by-_libsh-not-user-facing",
+          "heading": "Internal (set by _lib.sh, not user-facing)",
+          "depth": 2
+        },
+        {
+          "id": "pre-seeding-chezmoi",
+          "heading": "Pre-seeding chezmoi",
+          "depth": 2
+        }
+      ]
+    },
+    "/reference/bootstrap-flow.html": {
+      "target": "/reference/bootstrap-flow/",
+      "source": "docs/reference/bootstrap-flow.md",
+      "fragments": [
+        {
+          "id": "bootstrap-flow",
+          "heading": "Bootstrap flow",
+          "depth": 1
+        },
+        {
+          "id": "step-details",
+          "heading": "Step details",
+          "depth": 2
+        },
+        {
+          "id": "step-6-in-detail",
+          "heading": "Step 6 in detail",
+          "depth": 2
+        },
+        {
+          "id": "modes",
+          "heading": "Modes",
+          "depth": 2
+        },
+        {
+          "id": "reading-the-source",
+          "heading": "Reading the source",
+          "depth": 2
+        }
+      ]
+    },
+    "/infra/docs-and-hosting.html": {
+      "target": "/infra/docs-and-hosting/",
+      "source": "docs/infra/docs-and-hosting.md",
+      "fragments": [
+        {
+          "id": "docs-and-hosting",
+          "heading": "Docs and hosting",
+          "depth": 1
+        },
+        {
+          "id": "how-it-works",
+          "heading": "How it works",
+          "depth": 2
+        },
+        {
+          "id": "local-development",
+          "heading": "Local development",
+          "depth": 2
+        },
+        {
+          "id": "doc-structure",
+          "heading": "Doc structure",
+          "depth": 2
+        },
+        {
+          "id": "infrastructure-management",
+          "heading": "Infrastructure management",
+          "depth": 2
+        },
+        {
+          "id": "what-opentofu-creates",
+          "heading": "What OpenTofu creates",
+          "depth": 3
+        },
+        {
+          "id": "cloudflare-provider-v5-migration",
+          "heading": "Cloudflare provider v5 migration",
+          "depth": 3
+        }
+      ]
+    }
+  }
+}

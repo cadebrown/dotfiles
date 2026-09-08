@@ -50,8 +50,26 @@ while read -r local_ref local_oid remote_ref remote_oid extra; do
         printf 'Commit %s has no shared CI entrypoint that is executable; refusing unvalidated push.\n' "$commit_oid" >&2
         exit 1
     fi
+    site_has_lock=0
+    if [[ -f "$scratch_dir/repo/site/package-lock.json" ]]; then
+        site_has_lock=1
+        printf 'Provisioning locked handbook dependencies for %s in the isolated checkout.\n' "$commit_oid" >&2
+        if ! (
+            cd "$scratch_dir/repo/site"
+            npm ci --ignore-scripts || exit
+            PLAYWRIGHT_BROWSERS_PATH=0 npx --no-install playwright install chromium || exit
+        ); then
+            printf 'Push blocked: handbook dependency setup failed for %s in the isolated checkout.\n' "$commit_oid" >&2
+            exit 1
+        fi
+    fi
     printf 'Validating %s -> %s (%s) in an isolated checkout.\n' "$local_ref" "$remote_ref" "$commit_oid" >&2
-    if ! "$scratch_dir/repo/tests/ci.sh" full; then
+    if (( site_has_lock )); then
+        validation=(env PLAYWRIGHT_BROWSERS_PATH=0 "$scratch_dir/repo/tests/ci.sh" full)
+    else
+        validation=("$scratch_dir/repo/tests/ci.sh" full)
+    fi
+    if ! "${validation[@]}"; then
         printf 'Push blocked: validation failed for %s. Fix the failure and commit the correction.\n' "$commit_oid" >&2
         exit 1
     fi

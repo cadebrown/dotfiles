@@ -5,6 +5,16 @@
 !.claude/rules/
 dotfiles-*/
 docs/book/
+site/node_modules/
+site/dist/
+site/.astro/
+site/src/content/docs/
+site/src/data/*.json
+site/public/_redirects
+site/public/llms.txt
+site/public/evidence/
+site/artifacts/
+site/artifacts-*.log
 old/
 __pycache__/
 # stray rustdoc JSON (rust-docs MCP / `rustdoc` defaults output here); real docs live in docs/

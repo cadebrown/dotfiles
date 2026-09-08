@@ -24,7 +24,8 @@ The repo is designed for:
 - Full local CI validation: `./tests/ci.sh full`
 - Docker bootstrap tests only: `./tests/run.sh`
 - Enable this checkout's push gate: `./tests/install-hooks.sh`
-- Serve docs locally: `mdbook serve docs/ --open`
+- Preview the handbook: `npm --prefix site run dev`
+- Validate the handbook: `./tests/ci.sh docs`
 - Preview dotfile changes: `chezmoi diff`
 
 ## High-Value Invariants
@@ -33,7 +34,7 @@ The repo is designed for:
 - Linux setup must avoid sudo.
 - Install scripts must be idempotent.
 - Dotfile sources live in `home/`; rendered targets in `~/` are not the source of truth.
-- `docs/book/` is generated output. Edit Markdown under `docs/`, not generated HTML.
+- Markdown under `docs/` is authoritative. `site/src/content/docs/` is generated staging and `site/dist/` is production output; do not edit either.
 - Avoid duplicate package ownership across Cargo, npm, pip, and Homebrew.
 
 ## Editing Guidance
@@ -52,5 +53,7 @@ The repo is designed for:
 - Keep the repository push gate enabled. It validates each outgoing commit in an isolated checkout; working-tree fixes and earlier test runs do not validate an uncorrected commit.
 - After an authorized push, verify the hosted CI result for that commit before reporting CI success. Local validation cannot establish another OS/architecture's result.
 - For bootstrap/install logic, prefer `./tests/run.sh`.
-- For docs-only changes, make sure the edited source is under `docs/`, not `docs/book/`.
+- Documentation changes must update `docs/`; do not edit generated staging or production files. Run `./tests/ci.sh docs` before treating a handbook change as complete.
+- A feature that changes an installer, runtime, package manifest, or managed configuration must also update `docs/_data/features.json`. Document its use case, configuration, runnable example, expected result, limitations, upstream documentation, and authoritative repository sources. Add a focused demo or screenshot when it makes the behavior easier to assess.
+- Measured claims require environment, date, and sample provenance. A feature or change is incomplete until its documentation and evidence checks pass.
 - For chezmoi-managed files, reason about both the source in `home/` and the deployed target path in `~/`.

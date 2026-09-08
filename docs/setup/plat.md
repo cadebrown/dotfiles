@@ -1,116 +1,86 @@
 # PLAT isolation
 
-PLAT (PLATform) is the per-architecture directory namespacing scheme this repo uses to make a single `$HOME` work across machines with **different CPU architectures**. It's **off by default** because most users have one machine.
+PLAT gives each incompatible machine using one shared home a distinct runtime
+tree. It is off by default because a single machine needs the simpler flat
+layout.
 
 ## The decision in 30 seconds
 
 ```text
-Do you share $HOME across machines with different CPUs (NFS, etc.)?
-├── No  →  leave DF_USE_PLAT=0 (default).  Done.
-└── Yes →  set DF_USE_PLAT=1 on every machine that shares the home.
-           Each machine installs into ~/.local/$PLAT/ instead of ~/.local/.
-           One home, many machines, no clobbering.
+Shared HOME across different CPU architectures?
+├── no  → use DF_USE_PLAT=0 (default)
+└── yes → use DF_USE_PLAT=1 on every participating host
+          each host installs under ~/.local/$PLAT/
 ```
 
-| | `DF_USE_PLAT=0` (default) | `DF_USE_PLAT=1` |
-|---|---|---|
-| **Layout** | flat `~/.local/{bin,brew,cargo,nvm,…}` | per-PLAT `~/.local/$PLAT/{bin,brew,cargo,nvm,…}` |
-| **`$LOCAL_PLAT`** | `$HOME/.local` | `$HOME/.local/$PLAT` |
-| **Capability flags** | still applied (CPU-tuned `-march`, `RUSTFLAGS`, `HOMEBREW_OPTFLAGS`) | same |
-| **PATH entries** | `~/.local/bin` first | `~/.local/$PLAT/bin` first, then `~/.local/bin` |
-| **Disk per machine** | one tree (~few GB) | one tree per PLAT (~few GB × N) |
-| **Right for** | single laptop, workstation, VM | NFS-shared `$HOME` across heterogeneous CPUs (HPC, lab racks) |
+| | Flat default | PLAT isolation |
+| --- | --- | --- |
+| local root | `~/.local` | `~/.local/$PLAT` |
+| executable path | `~/.local/bin` | `~/.local/$PLAT/bin` first |
+| suitable for | one laptop, VM, workstation | heterogeneous NFS/GPFS home |
+| cost | one runtime tree | disk per platform |
+
+Capability flags are detected in both layouts; PLAT changes directory isolation,
+not CPU tuning.
 
 ## Layouts side-by-side
 
 ```text
-DF_USE_PLAT=0  (default, flat)        DF_USE_PLAT=1  (NFS-shared homes)
-─────────────────────────────         ────────────────────────────────────
-~/.local/                             ~/.local/
-├── bin/                              ├── plat_Darwin_arm64/
-│   ├── chezmoi                       │   ├── bin/{chezmoi,uv,claude}
-│   ├── uv                            │   ├── brew/        (Apple Silicon)
-│   └── claude                        │   ├── cargo/bin/   (arm64 binaries)
-├── brew/        (one prefix)         │   └── nvm/         (arm64 node)
-├── cargo/bin/   (host arch)          ├── plat_Linux_x86-64-v3/
-└── nvm/                              │   ├── brew/        (AVX2 glibc)
-                                      │   └── ...
-$_LOCAL_PLAT = ~/.local                └── plat_Linux_x86-64-v4/   (AVX-512)
-                                          └── ...
-
-                                      $_LOCAL_PLAT = ~/.local/$_PLAT
-                                      (set per-shell from CPU detection)
+flat                         PLAT-isolated shared home
+~/.local/bin                ~/.local/plat_Darwin_arm64/bin
+~/.local/cargo              ~/.local/plat_Linux_x86-64-v3/cargo
+~/.local/nvm                ~/.local/plat_Linux_aarch64/nvm
 ```
 
-Even with PLAT off, `.plat_env.sh` still sources at shell start so the host CPU gets `-march=x86-64-v3`, `RUSTFLAGS=-C target-cpu=apple-m1`, etc. Capability detection is independent of directory layout — only `LOCAL_PLAT` changes.
+`LOCAL_PLAT` is the installer root selected by [`install/_lib.sh`](../../install/_lib.sh).
+Managed login profiles export the same path as `$_LOCAL_PLAT` for interactive
+inspection and project commands.
 
 ## What PLAT directories look like
 
-`PLAT` is a string of the form `plat_{OS}_{cpu-target}`. Examples:
-
-```text
-plat_Darwin_arm64        # Apple Silicon
-plat_Darwin_x86-64       # Intel Mac
-plat_Linux_aarch64       # ARM Linux (Graviton, Ampere)
-plat_Linux_x86-64-v4     # AVX-512 (Ice Lake+, Zen 4+)
-plat_Linux_x86-64-v3     # AVX2    (Haswell+, Zen 2+)
-plat_Linux_x86-64-v2     # SSE4.2  (Nehalem+)
-```
-
-Detection: shell startup scans `~/dotfiles/install/plat/plat_${OS}_*/` (highest level first), runs each spec's `.plat_check.sh`, picks the first that exits 0, then sources `.plat_env.sh` for compiler flags.
+Names are `plat_{OS}_{cpu-target}`, for example `plat_Darwin_arm64`,
+`plat_Linux_aarch64`, `plat_Linux_x86-64-v3`, and `plat_Linux_x86-64-v4`.
+Detection selects the highest matching `install/plat/` specification and sources
+its environment. PLAT-on fails if no matching spec exists; flat mode can run
+without one.
 
 ## Enabling PLAT isolation
 
-**Per-machine, persistent** (recommended):
-
 ```sh
-# Edit chezmoi data
-chezmoi edit ~/.config/chezmoi/chezmoi.toml
-# Set:
-#     use_plat = true
+# persistent chezmoi setting
+chezmoi edit ~/.config/chezmoi/chezmoi.toml  # set use_plat = true
 chezmoi apply
-exec zsh -l    # reload shell so $_LOCAL_PLAT picks up the new path
-```
+exec zsh -l
 
-**One-shot via env var:**
-
-```sh
+# or one bootstrap invocation
 DF_USE_PLAT=1 ~/dotfiles/bootstrap.sh
 ```
 
-The env var is normalized — `1`, `true`, `yes`, `on` (case-insensitive) all enable.
+The environment parser accepts `1`, `true`, `yes`, or `on`.
 
 ## Disabling / migrating off PLAT
 
-When you switch a machine from `DF_USE_PLAT=1` back to flat, the old `~/.local/$PLAT/` tree becomes orphaned (multi-GB of cargo registry, nvm node versions, uv tools, etc., all stranded). One-shot cleanup:
+Disable the setting, open a fresh login shell, then run the explicit cleanup:
 
 ```sh
-# 1. Set DF_USE_PLAT=0 (or remove use_plat=true from chezmoi data)
-# 2. Reload shell so the running session sees the flat layout
-# 3. Run the decommission script:
 bash ~/dotfiles/install/plat-decommission.sh
+~/dotfiles/bootstrap.sh
 ```
 
-The script is **standalone** — never invoked by `bootstrap.sh` (including upgrade mode), to prevent accidental data loss. Safety guarantees:
-
-- **Refuses to run** if `DF_USE_PLAT=1` is currently set in the environment (won't nuke the active install)
-- **Asks for confirmation** before deleting (skip with `DF_FORCE=1`)
-- **Idempotent** — running with no `~/.local/plat_*/` dirs is a no-op
-- After cleanup, re-run `~/dotfiles/bootstrap.sh` to repopulate the flat layout
+The cleanup is never part of bootstrap. It refuses an active PLAT environment,
+asks before removal (unless explicitly forced), and is a no-op when no old trees
+remain. Inspect its target before confirming.
 
 ## Failure modes PLAT exists to prevent
 
-If you skip PLAT but actually share `$HOME` across architectures, you get one of these:
-
-- **Wrong-arch binary on PATH** — Linux machine sees Apple Silicon `~/.local/bin/uv`; runs and immediately segfaults with `Bad CPU type` or `cannot execute binary file`.
-- **Cargo registry corruption** — two machines share `~/.local/cargo/registry/` and race-update the index Git repo. Eventually one machine's `cargo build` fails with "object file is broken."
-- **nvm node-version collisions** — one machine's Node 24 binary is x86_64 ELF; another machine sees the same path containing arm64. `node --version` fails.
-- **Brew prefix incompatibility** — Brew's bottle relocation embeds the prefix path in binaries. Running `brew install foo` on machine A then trying to use `foo` on machine B without re-installing fails because the embedded RPATH is for A's libgcc.
-
-PLAT is the heavy hammer that solves all of these by giving each architecture its own tree. The cost is disk space (a few GB × number of machines) and one extra path segment in `$_LOCAL_PLAT`.
+Without isolation, shared hosts can resolve a wrong-architecture executable or
+share nonportable Cargo, nvm, and Homebrew state. Typical symptoms are an
+unexecutable binary, cache corruption, or a relocated-prefix failure. PLAT keeps
+those compiled trees apart while still sharing text configuration.
 
 ## Why opt-in by default
 
-Most people have one machine. The per-PLAT directory adds a layer of indirection, breaks tools that hard-code their own install location (`uv self update` was the canonical bug), and makes default tutorials more confusing. The mainstream answer to "what about binaries on shared `$HOME`?" in the broader ecosystem is **don't share that part of `$HOME`** (move `~/.local` to local disk per host). PLAT exists for the cases where that's not an option — typically HPC NFS where you can't.
-
-See `install/_lib.sh` (the `### PLATFORM ###` block) for the implementation.
+The extra path segment costs disk and complicates tools that hard-code their
+installation root. Prefer the flat layout unless a shared heterogeneous home
+actually creates the collision risk. [Runtime paths](/architecture/runtime-paths/)
+and [scratch space](/setup/scratch/) cover the related layout decisions.

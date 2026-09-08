@@ -28,3 +28,4 @@ Instructions for `install/` scripts and bootstrap-related setup logic.
 
 - Use `./tests/run.sh` for meaningful changes.
 - For package-manager changes, also inspect the package lists for duplicate ownership.
+- Installer behavior is not complete until its feature entry in `docs/_data/features.json` and its operator documentation cover configuration, an example, expected result, limitations, upstream references, and the authoritative source path. Run `./tests/ci.sh docs` with the relevant installer checks.

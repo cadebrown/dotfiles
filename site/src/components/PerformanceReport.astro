@@ -1,0 +1,41 @@
+---
+import snapshot from '../../../docs/_data/performance.json';
+const seconds = (value: number) => (value / 1000).toFixed(2);
+const kib = (value: number) => (value / 1024).toFixed(1);
+const max = snapshot.build.maximumMs;
+---
+<section class="measurement" aria-labelledby="measurement-title">
+  <div class="measurement-top"><div><span class="measurement-label">LOCAL PRODUCTION BUILD</span><h3 id="measurement-title">{seconds(snapshot.build.medianMs)} s <span>median</span></h3></div><p>{snapshot.environment.cpu}<br />{snapshot.environment.platform} / {snapshot.environment.architecture} / Node {snapshot.environment.node}</p></div>
+  <svg viewBox={`0 0 660 ${snapshot.build.samplesMs.length * 44 + 28}`} role="img" aria-labelledby="build-chart-title build-chart-desc">
+    <title id="build-chart-title">Local production build durations</title>
+    <desc id="build-chart-desc">{snapshot.build.samplesMs.map((value,index) => `Run ${index + 1}: ${seconds(value)} seconds`).join('. ')}</desc>
+    {snapshot.build.samplesMs.map((value,index) => <g><text x="0" y={28 + index * 44} class="chart-label">Run {index + 1}</text><rect x="65" y={10 + index * 44} width={value / max * 490} height="25" rx="3" /><text x={75 + value / max * 490} y={28 + index * 44} class="chart-value">{seconds(value)} s</text></g>)}
+  </svg>
+  <p class="measurement-caption">Captured {new Date(snapshot.capturedAt).toISOString().slice(0,10)}. {snapshot.build.samplesMs.length} sequential runs; dependencies and Chromium already installed. Other host workloads were not isolated.</p>
+  <table><caption>HTML payloads from the last measured build</caption><thead><tr><th scope="col">Page</th><th scope="col">HTML</th><th scope="col">gzip estimate</th></tr></thead><tbody>{snapshot.pages.map((page) => <tr><th scope="row"><a href={page.route}>{page.route}</a></th><td>{kib(page.htmlBytes)} KiB</td><td>{kib(page.gzipBytes)} KiB</td></tr>)}</tbody></table>
+  <p>These numbers measure local build time and HTML artifacts. CSS, fonts, images, scripts, and search indexes are additional resources. They do not measure browser rendering, network latency, Core Web Vitals, shell startup, or model inference.</p>
+  <details><summary>Source and method</summary><dl><dt>Revision</dt><dd><code>{snapshot.revision}</code> {snapshot.workingTreeDirty && '(working tree modified)'}</dd><dt>Source fingerprint</dt><dd><code>{snapshot.sourceSha256}</code></dd><dt>Method</dt><dd>{snapshot.method}</dd></dl><p><a href="/evidence/performance.json">Download the measurement JSON</a></p></details>
+</section>
+<style>
+  .measurement { border:1px solid var(--sl-color-hairline-light); padding:1.25rem; border-radius:.4rem; }
+  .measurement-top { display:flex; justify-content:space-between; gap:1.5rem; align-items:center; }
+  .measurement-label { font: .75rem var(--sl-font-mono); color:var(--sl-color-gray-2); }
+  h3 { margin:.4rem 0; font:600 2.2rem var(--sl-font); }
+  h3 span { font:1rem var(--sl-font); color:var(--sl-color-gray-2); }
+  .measurement-top p { font-size:.86rem; color:var(--sl-color-gray-2); }
+  svg { width:100%; height:auto; margin:1.5rem 0 0; overflow:visible; }
+  rect { fill:var(--sl-color-accent); }
+  .chart-label,.chart-value { fill:var(--sl-color-text); font:13px var(--sl-font-mono); }
+  .measurement-caption { font-size:.86rem; color:var(--sl-color-gray-2); }
+  table { width:100%; border-collapse:collapse; margin:1.5rem 0; }
+  caption { text-align:left; font-weight:650; margin-bottom:.5rem; }
+  th,td { padding:.55rem .6rem; border-bottom:1px solid var(--sl-color-hairline-light); text-align:left; font-size:.89rem; }
+  td { font-family:var(--sl-font-mono); white-space:nowrap; }
+  th a { overflow-wrap:anywhere; }
+  details { margin-top:1rem; padding:.8rem; background:var(--sl-color-bg-sidebar); }
+  summary { cursor:pointer; font-weight:650; }
+  dt { font-weight:650; margin-top:.6rem; }
+  dd { margin-left:0; overflow-wrap:anywhere; font-size:.9rem; }
+  dd code { white-space:normal; font-size:.76rem; }
+  @media(max-width:35rem) { .measurement { padding:.8rem; } .measurement-top { align-items:start; flex-direction:column; gap:0; } th,td { padding:.45rem .3rem; font-size:.76rem; } }
+</style>

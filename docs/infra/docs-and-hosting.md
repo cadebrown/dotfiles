@@ -1,47 +1,65 @@
-# Docs and hosting
+---
+title: Docs and hosting
+description: The Astro/Starlight build, rendered artifact verification, Cloudflare Pages handoff, and OpenTofu boundary.
+---
 
-The documentation site at [dotfiles.cade.io](https://dotfiles.cade.io) is built with [mdBook](https://rust-lang.github.io/mdBook/) and deployed automatically on every push to `main`.
+## Docs and hosting
+
+The handbook at [dotfiles.cade.io](https://dotfiles.cade.io) is rendered with
+[Astro](https://docs.astro.build/) 7.3.2 and
+[Starlight](https://starlight.astro.build/) 0.42. Markdown under `docs/` is the
+authoritative source; the generator stages it under `site/src/content/docs/`,
+and the verified static artifact is `site/dist/`.
+
+[`.node-version`](../../.node-version) selects Node 24 for GitHub CI and
+Cloudflare Pages. Pages reads this repository file before running the build;
+see [build image version overrides](https://developers.cloudflare.com/pages/configuration/build-image/).
+
+The mdBook-to-Astro migration also changes the Pages project's output directory
+from `docs/book` to `site/dist`. Updating `main.tf` in Git does not update the
+live project. Before the first Astro publication, review and apply that
+infrastructure change through the workflow below, then verify the actual Pages
+build and deployed URLs. Local builds and configuration validation establish
+neither of those remote outcomes.
 
 ## How it works
 
-```
+```text
 push to main
   → Cloudflare Pages detects the push
   → runs infra/cloudflare/build.sh
-    → downloads pinned mdbook + mdbook-mermaid binaries
-    → runs `mdbook build docs`
-  → deploys docs/book/ to dotfiles.cade.io
+    → npm ci --ignore-scripts in site/
+    → installs Playwright Chromium for Mermaid SVG rendering
+    → runs `npm --prefix site run verify`
+  → deploys site/dist/ to dotfiles.cade.io
 ```
 
 The entire pipeline is defined in two files:
 
 - **`infra/cloudflare/main.tf`** -- OpenTofu config that creates the Cloudflare Pages project, binds the custom domain (`dotfiles.cade.io`), and sets up the CNAME DNS record
-- **`infra/cloudflare/build.sh`** -- build script that downloads pinned prebuilt binaries directly from GitHub Releases, then builds
+- **`infra/cloudflare/build.sh`** -- build script that installs locked site dependencies, Chromium, and runs the same rendered-artifact verifier
 
 ## Local development
 
 ```sh
-mdbook serve docs/ --open    # live reload at localhost:3000
+npm --prefix site ci --ignore-scripts
+npx --prefix site --no-install playwright install chromium
+npm --prefix site run dev
 ```
 
-Changes to any `.md` file under `docs/` are reflected instantly in the browser.
+Changes to Markdown under `docs/` are staged into the running handbook. See
+[author handbook documentation](../contributing/documentation.md) for source,
+SVG, WebP, and snippet guidance.
 
 ## Doc structure
 
 ```
-docs/
-├── book.toml        # mdBook config (title, theme, repo link)
-├── SUMMARY.md       # Table of contents / sidebar nav
-├── intro.md         # Homepage
-├── setup/
-│   ├── bootstrap.md # Bootstrap instructions per platform
-│   ├── chezmoi.md   # Dotfile management with chezmoi
-│   └── packages.md  # Package layers (cargo, npm, pip, brew)
-├── usage/
-│   ├── updates.md   # Day-to-day workflow
-│   └── troubleshooting.md
-└── infra/
-    └── docs-and-hosting.md   # This page
+docs/                       # authoritative Markdown and feature data
+site/
+├── astro.config.mjs         # Starlight navigation and rendering
+├── scripts/generate.mjs     # source → staging generator
+├── src/content/docs/        # generated staging; do not edit
+└── dist/                    # verified static output; do not edit
 ```
 
 ## Infrastructure management
@@ -69,5 +87,3 @@ tofu apply tfplan      # apply only that reviewed plan
 ### Cloudflare provider v5 migration
 
 Commit `f8a35b6` is the latest-v4 checkpoint required by Cloudflare's v5 migration path. Before the first v5 plan against an existing deployment, back up the remote state, check out that commit, run `tofu init -upgrade` and a refresh-only plan, then return to the v5 configuration and review a saved plan. CI validates configuration only; it never plans or applies Cloudflare changes.
-
-This same pattern (OpenTofu + Cloudflare Pages + mdBook) is used across other projects at `cade.io`.

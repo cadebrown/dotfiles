@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-09-08T20:36:44.797Z",
+  "command": "npm --prefix site run measure -- --runs 3",
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpu": "Apple M3 Max",
+    "logicalCpus": 16,
+    "node": "v24.20.0"
+  },
+  "revision": "f17a5df177af4c3cb6a9ff6ecbaef3af9dbffb7d",
+  "workingTreeDirty": true,
+  "sourceSha256": "28d4500e46cfbd5ea78adcacacc6b07e817d03eae8df399ab37a6611d973d9a6",
+  "method": "Three or more sequential local production builds with dependencies and Chromium already installed. The link validator invalidates the content cache on each build. Other host workloads were not isolated. HTML bytes and gzip-9 bytes come from the final measured artifact; gzip values are a transfer-size estimate, not observed HTTP payloads.",
+  "limitations": "This is a local build and artifact snapshot, not a Core Web Vitals, network, shell startup, model inference, CI, deployment, or physical-device benchmark. The source fingerprint excludes this measurement file and generated staging data to avoid a self-reference.",
+  "build": {
+    "samplesMs": [
+      4753.3,
+      5555.8,
+      6124.5
+    ],
+    "medianMs": 5555.8,
+    "minimumMs": 4753.3,
+    "maximumMs": 6124.5
+  },
+  "pages": [
+    {
+      "route": "/",
+      "htmlBytes": 58779,
+      "gzipBytes": 11940
+    },
+    {
+      "route": "/architecture/overview/",
+      "htmlBytes": 70501,
+      "gzipBytes": 14452
+    },
+    {
+      "route": "/agents/codex/",
+      "htmlBytes": 54097,
+      "gzipBytes": 11586
+    },
+    {
+      "route": "/reference/packages/",
+      "htmlBytes": 172663,
+      "gzipBytes": 26259
+    },
+    {
+      "route": "/reference/skills/",
+      "htmlBytes": 78988,
+      "gzipBytes": 17992
+    },
+    {
+      "route": "/setup/choose-your-setup/",
+      "htmlBytes": 61885,
+      "gzipBytes": 13970
+    }
+  ]
+}

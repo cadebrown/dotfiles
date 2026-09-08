@@ -1,0 +1,52 @@
+<section class="setup-configurator" aria-label="Build a bootstrap command" data-setup-configurator>
+  <fieldset><legend>Target machine</legend><label><input type="radio" name="target-os" value="macos" checked /> macOS</label><label><input type="radio" name="target-os" value="linux" /> Linux</label></fieldset>
+  <fieldset><legend>Tool profile</legend><label><input type="radio" name="tool-profile" value="core" checked /> Core</label><label><input type="radio" name="tool-profile" value="full" /> Full</label></fieldset>
+  <fieldset class="setup-options"><legend>Explicit options</legend><label><input type="checkbox" name="shared-home" /> Isolate binaries by platform for a shared home</label><label><input type="checkbox" name="local-ai" disabled aria-describedby="local-ai-requirements" /> Include local-model tooling</label><p id="local-ai-requirements">Local MLX tooling requires the Full profile on an Apple Silicon Mac. Model downloads are a separate opt-in step.</p><label><input type="checkbox" name="blender" /> Install the Blender MCP addon (requires Blender)</label></fieldset>
+  <p class="setup-explanation" data-setup-explanation>Core narrows optional Python/Cargo tools. Homebrew still installs its declared package set.</p>
+  <div class="command-heading"><strong>Review, then run from your terminal</strong><button type="button" data-copy-command>Copy command</button></div>
+  <pre tabindex="0"><code data-setup-command>DF_PROFILE=core DF_USE_PLAT=0 DF_DO_LOCAL_LLM=0 DF_DO_BLENDER_MCP=0 ~/dotfiles/bootstrap.sh</code></pre>
+  <p class="copy-status" role="status" aria-live="polite" data-copy-status>This page generates a command; it does not execute it.</p>
+</section>
+<script>
+  const root = document.querySelector<HTMLElement>('[data-setup-configurator]');
+  if (root) {
+    const code = root.querySelector<HTMLElement>('[data-setup-command]')!;
+    const explanation = root.querySelector<HTMLElement>('[data-setup-explanation]')!;
+    const status = root.querySelector<HTMLElement>('[data-copy-status]')!;
+    const update = () => {
+      const os = root.querySelector<HTMLInputElement>('[name=target-os]:checked')!.value;
+      const profile = root.querySelector<HTMLInputElement>('[name=tool-profile]:checked')!.value;
+      const localAi = root.querySelector<HTMLInputElement>('[name=local-ai]')!;
+      localAi.disabled = os !== 'macos' || profile !== 'full';
+      if (localAi.disabled) localAi.checked = false;
+      const enabled = (name: string) => root.querySelector<HTMLInputElement>(`[name=${name}]`)!.checked ? '1' : '0';
+      code.textContent = `DF_PROFILE=${profile} \\\nDF_USE_PLAT=${enabled('shared-home')} \\\nDF_DO_LOCAL_LLM=${enabled('local-ai')} \\\nDF_DO_BLENDER_MCP=${enabled('blender')} \\\n~/dotfiles/bootstrap.sh`;
+      explanation.textContent = `${profile === 'core' ? 'Core narrows optional Python/Cargo tools; Homebrew still installs its declared package set.' : 'Full includes optional Python/Cargo tools in addition to the shared package set.'} ${os === 'macos' ? 'On macOS, Homebrew setup can require administrator authentication.' : 'On Linux, the public package-manager setup is rootless; macOS-only stages skip themselves.'}`;
+      status.textContent = 'This page generates a command; it does not execute it.';
+    };
+    root.addEventListener('change', update);
+    root.querySelector('[data-copy-command]')!.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(code.textContent!); status.textContent = 'Command copied. Review the prerequisites before running it.'; }
+      catch { status.textContent = 'Clipboard unavailable. Select and copy the command above.'; }
+    });
+    update();
+  }
+</script>
+<style>
+  .setup-configurator { padding:1.2rem; background:var(--sl-color-bg-sidebar); border:1px solid var(--sl-color-hairline-light); border-radius:.5rem; margin:1.5rem 0; }
+  fieldset { border:0; padding:0; margin:0 0 1rem; display:flex; flex-wrap:wrap; gap:.7rem 1.5rem; }
+  legend { font-weight:650; margin-bottom:.4rem; }
+  fieldset label { display:flex; align-items:center; gap:.55rem; margin:0; }
+  fieldset input { accent-color:var(--sl-color-accent); width:1.05rem; height:1.05rem; margin:0; flex-shrink:0; }
+  label:has(input:disabled) { color:var(--sl-color-gray-3); }
+  #local-ai-requirements { margin:0 0 .5rem 1.6rem; font-size:.9rem; }
+  .setup-options { display:grid; gap:.5rem; }
+  p { font-size:1rem; color:var(--sl-color-gray-2); }
+  .command-heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:1.5rem 0 .7rem; font-size:.95rem; }
+  .command-heading > * { margin:0; }
+  button { color:var(--sl-color-text-accent); font:inherit; background:var(--sl-color-bg); border:1px solid var(--sl-color-gray-4); border-radius:.25rem; padding:.5rem .7rem; cursor:pointer; }
+  pre { padding:1rem; overflow-x:auto; border:1px solid var(--sl-color-hairline-light); background:var(--sl-color-bg); border-radius:.3rem; white-space:pre-wrap; }
+  code { font-family:var(--sl-font-mono); font-size:.95rem; line-height:1.6; overflow-wrap:anywhere; }
+  .copy-status { font-size:.85rem; }
+  @media(max-width:35rem) { .command-heading { align-items:start; flex-direction:column; } }
+</style>

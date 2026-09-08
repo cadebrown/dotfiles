@@ -1,6 +1,13 @@
 # Day-to-day workflow
 
----
+Use the normal bootstrap for updates; edit managed sources for configuration changes.
+
+| Task | Jump to |
+| --- | --- |
+| Refresh tools | [Update and upgrade](#update-and-upgrade) |
+| Install something new | [Add a package](#add-a-package) |
+| Change configuration | [Edit a dotfile](#edit-a-dotfile) · [Agent instructions](#update-ai-agent-instructions) |
+| Change this site | [Work on the docs](#work-on-the-docs) |
 
 ## Update and upgrade
 
@@ -41,22 +48,13 @@ bash ~/dotfiles/install/python.sh
 ## Edit a dotfile
 
 ```sh
-chezmoi edit ~/.zshrc          # opens in $EDITOR, applies on save
-chezmoi edit ~/.zprofile       # zsh login shell
-chezmoi edit ~/.bash_profile   # bash login shell
-chezmoi edit ~/.gitconfig
+chezmoi edit ~/.zshrc          # edit the managed source
+chezmoi diff ~/.zshrc          # inspect the pending change
+chezmoi apply ~/.zshrc         # apply this target
+exec zsh -l                    # load it in a new login shell
 ```
 
-Or edit the source directly and apply:
-
-```sh
-$EDITOR ~/dotfiles/home/dot_zshrc.tmpl
-$EDITOR ~/dotfiles/home/dot_zprofile.tmpl
-$EDITOR ~/dotfiles/home/dot_bash_profile.tmpl
-chezmoi apply
-```
-
-Preview before applying: `chezmoi diff`
+Find other targets in the [configuration map](../reference/managed-configuration.md). Plain `chezmoi edit` edits source only; `--apply` applies after editing and `--watch` applies on save.
 
 ---
 
@@ -76,77 +74,30 @@ Window-management docs are now in [AeroSpace window management](aerospace.md).
 
 ## Update AI agent instructions
 
-Claude and Codex now diverge intentionally:
+Change shared guidance once; keep harness-specific behavior in its wrapper.
+
+| Change | Authoritative source / guide |
+| --- | --- |
+| Shared preferences and tone | [Instruction architecture](../agents/instructions.md) |
+| Codex profiles, roles, rules, or themes | [Codex guide](../agents/codex.md) · [managed sources](../../home/dot_codex/) |
+| Claude hooks and status line | [Claude guide](../agents/claude.md) · [status-line source](../../home/dot_claude/executable_statusline.sh) |
+| A skill | [Skill ownership and sync](../agents/skills.md) |
+
+For a Codex configuration change:
 
 ```sh
-chezmoi edit ~/.claude/CLAUDE.md
-chezmoi edit ~/.codex/AGENTS.md
+"${EDITOR:-vi}" ~/dotfiles/home/dot_codex/create_private_config.toml
+bash ~/dotfiles/install/codex.sh sync-config
+bash ~/dotfiles/install/codex.sh check
 ```
 
-Use `~/.claude/CLAUDE.md` for Claude-specific memory and `~/.codex/AGENTS.md` for Codex-specific guidance. Keep only genuinely shared preferences aligned.
-
-Claude Code's status line is a custom bash script at `home/dot_claude/executable_statusline.sh` (no npm dependency). Edit it with `chezmoi edit ~/.claude/statusline.sh`. The header comment documents the shape; `DEBUG=1` env var dumps parsed input + intermediate values to stderr.
-
-Codex also has global skills and rules (edit source-of-truth in the repo):
-
-```sh
-$EDITOR ~/dotfiles/home/dot_codex/create_private_config.toml
-$EDITOR ~/dotfiles/home/dot_codex/rules/dotfiles.rules
-chezmoi apply
-~/dotfiles/install/codex.sh sync-config
-```
-
-Codex binary/config health commands:
-
-```sh
-~/dotfiles/install/codex.sh upgrade      # install latest binary + sync config + healthcheck
-~/dotfiles/install/codex.sh sync-config  # sync managed config; preserve runtime trust sections
-~/dotfiles/install/codex.sh check        # verify binary, profiles, and rules
-```
-
-Skills live under `home/dot_claude/skills/` in the repo, apply to `~/.claude/skills/`,
-and reach Codex/opencode/pi through the `~/.agents/skills` symlink.
-Custom domain skills included:
-- `web-shipping`
-- `simulation-lab`
-- `compiler-workbench`
-- `game-systems`
-
-Custom Codex themes live under `home/dot_codex/themes/` and sync to `~/.codex/themes/`:
-- `neon-noir`
-- `sunburst-candy`
-- `minty-terminal`
-
-Useful Codex commands after updating:
-
-```sh
-codex --profile fast
-codex --profile review
-codex --profile deep
-codex   # default: Sol/high, unrestricted host access, no prompts
-codex -c 'tui.theme="neon-noir"'
-codex -c 'tui.theme="sunburst-candy"'
-codex -c 'tui.theme="minty-terminal"'
-codex mcp list
-codex execpolicy check --pretty --rules ~/.codex/rules/dotfiles.rules -- git status
-codex '$env-reconciler Map this repository and propose the first validation step.'
-codex '$simulation-lab Define state variables and a minimal validation case for this model.'
-```
-
-Codex schema note: profiles are delta-only overlay files at `~/.codex/<name>.config.toml`
-with top-level keys (Codex 0.134+); the old `[profiles.*]` tables in config.toml are
-ignored. Managed sources: `home/dot_codex/{deep,review,fast}.config.toml`.
-
-Default Codex mode uses the built-in `:danger-full-access` permission profile and
-`approval_policy = "never"`. MCP and connector tools are also configured for
-prompt-free execution. Use `-p deep` for extra-high reasoning, `-p fast` for
-Luna/low, or `-p review` for deliberately read-only work.
+Sync preserves runtime trust sections. Start a new session to load changed profiles or tool inventories. For the complete command and permission reference, use [agent guidance](agents.md#codex-workbench).
 
 ---
 
 ## Add an env var or PATH entry
 
-Edit both `home/dot_zprofile.tmpl` and `home/dot_bash_profile.tmpl` (they should stay identical). For anything arch-specific use `$_LOCAL_PLAT` (set at shell startup):
+Keep [zsh](../../home/dot_zprofile.tmpl) and [bash](../../home/dot_bash_profile.tmpl) login behavior aligned. Use `$_LOCAL_PLAT` for architecture-specific shell state:
 
 ```sh
 export MY_TOOL_HOME="$_LOCAL_PLAT/my-tool"
@@ -160,7 +111,11 @@ Also add the variable to `install/_lib.sh` so install scripts can reference the 
 ## Work on the docs
 
 ```sh
-cd ~/dotfiles/docs && mdbook serve --open   # live reload at localhost:3000
+cd ~/dotfiles
+npm --prefix site ci --ignore-scripts
+npx --prefix site --no-install playwright install chromium
+npm --prefix site run dev
+./tests/ci.sh docs
 ```
 
 Every push to `main` auto-deploys to [dotfiles.cade.io](https://dotfiles.cade.io) via Cloudflare Pages.

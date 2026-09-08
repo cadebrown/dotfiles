@@ -1,398 +1,200 @@
 # Package management
 
-Every package layer has a declarative text file and an idempotent install script. All scripts skip already-installed items — safe to re-run at any time.
+Manifests declare ownership; installers reconcile them idempotently. Find the
+owner before adding a tool, then run its installer or the normal bootstrap.
 
 ## The layers
 
-| Layer | File | Install script | Platform |
-|---|---|---|---|
-| System packages | `packages/Brewfile` | `install/homebrew.sh` / `install/linux-packages.sh` | macOS (bottles) / Linux (native, no container) |
-| Rust tools | `packages/cargo.txt` | `install/rust.sh` | All |
-| Plain Python libraries | `packages/python.txt` | `install/python.sh` | All |
-| Python CLI tools | `packages/pip.txt`, `packages/pip-full.txt` | `install/python.sh` | All |
-| Global npm | `packages/npm.txt`, `packages/npm-allow-scripts.txt` | `install/node.sh` | All |
-| Go CLI tools | `packages/go.txt` | `install/go.sh` | All (respects `# linux-only` / `# macos-only`) |
-| Claude plugins | `packages/claude-plugins.txt` | `install/claude.sh` | All |
-| Agent skills | `packages/agent-skills.txt`, `packages/agent-skills.lock.json` | `install/skills-sync.sh` | All (shared `~/.claude/skills` tree) |
-| MCP servers (Claude + Codex) | `packages/mcp-servers.txt` | `install/claude.sh`, `install/codex.sh` | All |
-| Codex CLI/config | `home/dot_codex/` | `install/codex.sh` | All |
-| Cursor extensions | `packages/cursor-extensions.txt` | `install/cursor.sh` | All |
-| VS Code extensions | `packages/vscode-extensions.txt` | `install/vscode.sh` | All |
+| Owner | Manifest | Installer | Use for |
+| --- | --- | --- | --- |
+| Homebrew | `packages/Brewfile` | `install/homebrew.sh` | system tools, libraries, casks |
+| Cargo | `packages/cargo.txt` | `install/rust.sh` | Rust CLIs with suitable releases |
+| uv | `packages/python.txt`, `pip*.txt` | `install/python.sh` | Python libraries and isolated CLIs |
+| npm/nvm | `packages/npm*.txt` | `install/node.sh` | Node CLIs |
+| Go | `packages/go.txt` | `install/go.sh` | Go CLIs |
+| agents/editors | package lists plus `home/dot_*` | matching installer | plugins, skills, MCP, extensions, config |
 
----
+Use one owner per executable. A duplicate Homebrew/npm, pip/uv, or Cargo/tap
+install produces ambiguous upgrades and PATH behavior. See
+[package ownership](/architecture/package-ownership/) for the contract.
 
 ## Adding a package — priority order
 
-Choose the first layer that applies. Native installers first, Homebrew as fallback:
+1. Prefer the language-native list when it owns the tool: Cargo, npm, uv, or Go.
+2. Use Homebrew for system dependencies, GUI apps, SDKs, and tools without a
+   suitable native path.
+3. Add a focused installer only when neither list expresses its lifecycle.
+
+Before editing, search all ownership sources and identify a probe:
+
+```sh
+cd ~/dotfiles
+rg -n '(^|/)tool-name([ @#]|$)' packages install home
+# edit the selected manifest, then run its installer
+bash install/rust.sh                 # example for packages/cargo.txt
+command -v tool-name && tool-name --version
+```
+
+The [source manifests](../../packages/) are the current inventory. Comments in
+each list carry platform and exception rules.
 
 ### 1. cargo — Rust crates
 
-```sh
-# Add to packages/cargo.txt
-fd-find
-ripgrep
-bat
-typst-cli
-my-new-tool
-```
-
-Re-run: `bash ~/dotfiles/install/rust.sh`
-
-`install/rust.sh` uses [cargo-binstall](https://github.com/cargo-bins/cargo-binstall): it tries to
-download a pre-built binary from GitHub releases first (fast, no compilation), and falls back to
-`cargo install` (source compilation) if no binary is available.
-
-On Linux, cargo-binstall avoids the manylinux container round-trip entirely. On macOS, it downloads
-the same pre-built binary that Homebrew bottles provide — same quality, faster install.
-
-On Linux, musl targets are preferred over gnu (`--targets <arch>-unknown-linux-musl,...`): static
-musl builds have no glibc dependency, while gnu prebuilts from modern CI runners (Ubuntu 24.04 =
-glibc 2.39) refuse to load on older hosts. After each install the crate's binaries are smoke-tested;
-one that fails with a dynamic-loader error is force-refetched (musl-first) and, if still broken,
-rebuilt from source against the host glibc.
-
-> **macOS note:** Source compilation requires running from a normal terminal. The macOS Sequoia
-> linker enforces `com.apple.provenance` on object files and will block compilation in sandboxed
-> contexts (e.g., certain CI environments). This isn't an issue for day-to-day use.
+Add a crate name to `packages/cargo.txt`. `install/rust.sh` uses cargo-binstall
+when a compatible release binary exists, otherwise compiles from source. On
+Linux it prefers musl candidates to avoid a too-new glibc; a failing binary is
+retried from a compatible source path. A macOS source build needs a normal
+terminal because Sequoia's linker provenance rules can reject sandboxed builds.
 
 ### 2. npm — npm-specific tools
 
-```sh
-# packages/npm.txt
-@earendil-works/pi-coding-agent
-```
-
-Re-run: `bash ~/dotfiles/install/node.sh`
-
-`npm-allow-scripts.txt` is the reviewed lifecycle-script allowlist for global
-tools. The installer passes it per command instead of persisting a policy in
-`~/.npmrc`.
-
-nvm owns Node, npm, and npm's global prefix under the PLAT-specific `$NVM_DIR`.
-Keep `~/.npmrc` for registry/auth and npm behavior only; do not set `prefix` or
-`globalconfig`. `packages/npm.txt` is the source of truth for global CLIs, and
-`install/node.sh` reconciles them into the supported default Node LTS tree.
-
-Currently ships [`pi`](https://pi.dev) — a multi-provider coding agent (Claude / OpenAI / Gemini / etc.). The official `pi.dev/install.sh` ultimately runs `npm install -g @earendil-works/pi-coding-agent`, so we list it here directly.
-
-Other CLI agents are installed via their native packagers:
-- `claude-code` → `install/claude.sh` (Anthropic GCS binary)
-- `codex` → unpinned `@openai/codex` in `packages/npm.txt`; managed config and healthcheck via `install/codex.sh`
-- `opencode` → `brew "opencode"` (`packages/Brewfile`)
-
-Codex CLI config, rules, themes, and MCP servers are managed from `home/dot_codex/`
-(skills live in `home/dot_claude/skills/`, shared via the `~/.agents/skills` symlink).
-`install/codex.sh sync-config` preserves runtime trust/plugin sections while refreshing the
-managed config. Chezmoi also runs this sync when `home/dot_codex/create_private_config.toml` changes.
+Add global CLIs to `packages/npm.txt`. nvm owns Node and its global prefix under
+`$NVM_DIR`; do not set npm `prefix` or `globalconfig` in `~/.npmrc`.
+`packages/npm-allow-scripts.txt` is the reviewed lifecycle-script allowlist.
+Codex's package is npm-owned while [`install/codex.sh`](../../install/codex.sh)
+owns configuration and its health check.
 
 ### 3. uv — Python libraries and CLI tools
 
+`packages/python.txt` feeds the managed interactive `python`; `pip.txt` and
+`pip-full.txt` declare isolated CLI environments. Put project dependencies in
+the project `pyproject.toml` and lockfile instead:
+
 ```sh
-# packages/python.txt: libraries available from plain `python`
-sympy
-
-# packages/pip.txt (core) or packages/pip-full.txt (full profile): CLI tools
-ruff
-some-macos-tool  # macos-only (requires Metal / only available on macOS)
-some-linux-tool  # linux-only (requires a Linux driver/runtime)
+uv init example && cd example
+uv add numpy
+uv run python -c 'import numpy; print(numpy.__version__)'
 ```
-
-Re-run: `bash ~/dotfiles/install/python.sh`
-
-`packages/python.txt` is installed into `$PYTHON_ENV`; the `$LOCAL_PLAT/bin/python`
-wrapper runs that environment. Each package in `pip.txt` and `pip-full.txt` gets
-its own isolated venv via `uv tool install`, with entrypoints in `$LOCAL_PLAT/bin/`.
-
-`DF_PROFILE=full` is the default and installs both manifests. Use
-`DF_PROFILE=core` for a small bootstrap or CI environment; the core profile
-also keeps the Rust toolchain while skipping optional `cargo.txt` tools.
-
-**Comment conventions** parsed by `install/python.sh`:
-- `# macos-only` — skipped on Linux (e.g. `mlx-lm` requires Apple Metal/MLX framework)
-- `# linux-only` — skipped on macOS (e.g. `nvitop` requires NVIDIA's Linux NVML runtime)
-- `# python=X.Y` — pins to a specific Python version for that tool (e.g. `mlx-openai-server` needs 3.12 because `outlines-core` has no cp313/cp314 wheels)
 
 ### 4. Homebrew — non-language-specific tools and C libraries
 
-```ruby
-# packages/Brewfile
-brew "tool-name"
-
-# macOS-only (casks, GUI apps, macOS-specific services)
-if OS.mac?
-  cask "some-app"
-  brew "macos-only-tool"
-end
-```
-
-Re-run: `brew bundle --file=~/dotfiles/packages/Brewfile`
-
-`if OS.mac?` blocks are silently skipped on Linux. Everything outside those blocks runs on both platforms.
-
-Prefer Homebrew for tools that aren't available via cargo/npm/pip, have complex C dependencies, or are
-macOS-specific (casks, GUI apps).
+Use `packages/Brewfile` for formulae, casks, SDKs, and shared libraries.
+Bootstrap owns `brew bundle`; use the manifest rather than `brew install` for a
+durable addition. Linux uses its rootless managed prefix, while macOS uses the
+standard Homebrew prefix.
 
 ### 5. VS Code / Cursor extensions
 
-Both editors have separate extension lists since marketplace availability differs (Cursor uses OpenVSX, which doesn't carry every Microsoft-restricted extension).
-
-```sh
-# packages/vscode-extensions.txt   (VS Code marketplace)
-# packages/cursor-extensions.txt   (OpenVSX, Cursor)
-ms-python.python
-charliermarsh.ruff
-myriad-dreamin.tinymist     # Typst LSP — works in both
-```
-
-Re-run: `bash ~/dotfiles/install/vscode.sh` and/or `bash ~/dotfiles/install/cursor.sh`
-
-Bootstrap selects both editors by default on macOS and neither on Linux. On a
-Linux workstation or Remote-SSH host with an editor CLI installed, opt in with
-`DF_DO_VSCODE=1` or `DF_DO_CURSOR=1`. A selected installer fails if the CLI is
-missing, an extension install exits nonzero, or the final extension inventory
-does not contain every declared ID.
-
-To capture newly installed extensions back into the file (union — never removes):
-
-```sh
-bash ~/dotfiles/install/vscode.sh sync-extensions
-bash ~/dotfiles/install/cursor.sh sync-extensions
-```
-
-> **Note:** Both editors' settings are tracked under
-> `home/dot_config/{vscode,cursor}/`. Credential fields contain environment
-> references; secret values stay in the corresponding `~/.<service>.env` files.
+Add marketplace identifiers to `packages/vscode-extensions.txt` or
+`packages/cursor-extensions.txt`, then run the matching installer. Settings
+live under `home/dot_config/`; extensions and settings are separate state. See
+[shell, terminal, and editor workflow](/workflows/shell-editor-terminal/).
 
 ### 6. Custom install script
 
-Look at an existing `install/` script for patterns and follow them. Add a `DF_DO_*` flag to `bootstrap.sh`.
-
----
+When a tool needs its own lifecycle, add an idempotent `install/<name>.sh`,
+source `_lib.sh`, wire a documented bootstrap gate, and add a meaningful probe.
+Changing managed behavior also requires the feature entry described in
+[documentation guidance](/contributing/documentation/).
 
 ## Local AI tools
 
-Local LLM inference and coding agents are split across three layers:
+| Tool | Owner | Operational boundary |
+| --- | --- | --- |
+| Ollama | Brewfile | installation does not start or query its server |
+| mlx-lm / mlx-openai-server | `pip-full.txt` | Apple Silicon-oriented optional workflow |
+| OpenCode | [`npm.txt`](../../packages/npm.txt) (`opencode-ai`) plus `install/opencode.sh` | npm owns the binary; the installer reconciles configuration |
+| local-model tooling | `install/local-llm.sh` | validate model, license, and task separately |
 
-| Tool | Layer | Notes |
-|---|---|---|
-| `ollama` | `packages/Brewfile` (macOS only) | Inference server; installed as Homebrew formula, managed as a LaunchAgent |
-| `opencode` | `packages/Brewfile` | TUI coding agent by the SST team |
-| `mlx-lm` | `packages/pip-full.txt` | Apple Silicon Metal inference; full profile only |
-| `just` | `packages/cargo.txt` | Command runner / Makefile alternative |
-
-`install/local-llm.sh` creates the PLAT-isolated HuggingFace cache directory (`$LOCAL_PLAT/.cache/huggingface`)
-and verifies that the expected binaries are present. `install/opencode.sh` verifies the opencode binary; opencode's backend config is pure chezmoi (`opencode.json.tmpl`, MLX primary).
-
-See [Local AI coding](../usage/local-llm.md) for usage details.
-
----
+Use [AI workbench](/usage/ai-workbench/) for an end-to-end workflow; executable
+checks do not establish model quality or a running service.
 
 ## Research mathematics
 
-Two of these get their own install script because neither has a usable Homebrew
-path on no-sudo Linux; the rest are ordinary package-list entries.
+| Tool family | Owner | Project proof/result boundary |
+| --- | --- | --- |
+| Lean | `install/lean.sh` / elan | project `lean-toolchain`, `lake build` |
+| TeX and Quarto | installer plus Brewfile/TinyTeX | source and render command |
+| Julia | Brewfile plus `install/julia.sh` | project `Pkg` environment |
+| solvers and research CLIs | Brewfile, Cargo, or uv lists | project lockfiles and evidence |
 
-| Tool | Layer | Notes |
-|---|---|---|
-| Lean 4 + `lake` | `install/lean.sh` | elan (Lean's rustup) → `$LOCAL_PLAT/elan`. Toolchains are ~1.5 GB and arch-specific, hence PLAT-isolated. Pin lives in the script; override with `DF_LEAN_TOOLCHAIN`. |
-| TeX | `install/latex.sh` | macOS: `cask "mactex"`. Linux: TinyTeX under `$LOCAL_PLAT/tex/.TinyTeX`, with `tlmgr sys_bin` pointed at `$ARCH_BIN`. |
-| PARI/GP, FLINT, z3, minizinc, cadical, kissat | `packages/Brewfile` | `gp` collides with the `gp='git push'` alias — use `command gp`. |
-| Sage, Zotero | `packages/Brewfile` casks (macOS) | Homebrew core has no Sage formula; per-project passagemath wheels are the uv-native route. |
-| Julia / `juliaup` | `packages/Brewfile` + `install/julia.sh` | The rolling release channel and depots are PLAT-isolated; OSCAR.jl stays project-local. |
-| R | `packages/Brewfile` | Statistical runtime; project packages stay reproducible through `renv`. |
-| `leanblueprint`, `marimo`, `paper-qa`, `papis`, … | `packages/pip-full.txt` | Full-profile `uv tool install` entries. |
-| `rga` (ripgrep-all) | `packages/cargo.txt` | Full-text search across a PDF/EPUB paper library. |
-
-Agent-side wiring (lean-lsp, arxiv, mathlas, asta MCP servers, and the
-verification-first norms in `math-common.md`) is covered in
-[Agent guidance](../usage/agents.md).
-
----
+Read [research tooling](/workflows/research-tooling/) for concrete project
+commands and [math workflows](/usage/math/) for proof claims.
 
 ## Don't duplicate across layers
 
-**Do not install the same tool in both cargo.txt and Brewfile.** `$LOCAL_PLAT` paths come first on PATH — the Homebrew copy would install but never be used. If a tool is in `cargo.txt`, it must not be in `Brewfile`, and vice versa.
-
----
+Search before adding, retain one owner, and remove a duplicate only through its
+own manager after checking what currently resolves on PATH. This repository does
+not use a universal package lock because each manager has different platform and
+binary semantics.
 
 ## Why cargo over Homebrew for Rust tools
 
-Tools like `fd`, `sd`, `bat`, `ripgrep`, `git-delta`, `difftastic`, `procs`, `bottom`,
-`ast-grep`, `zoxide`, and `hyperfine` live in `cargo.txt` because:
-
-- `$CARGO_HOME/bin/` is already under `$LOCAL_PLAT/` — PLAT isolation is free
-- `cargo-binstall` downloads pre-built GitHub release binaries — fast, no compilation
-
-Tools that have no pre-built binary and are painful to compile (or only make sense on macOS) go in
-`Brewfile` under `if OS.mac?`.
-
----
+Cargo-binstall can use upstream release artifacts and falls back to source,
+while keeping Rust CLIs in the Rust manifest. Prefer Homebrew where the package
+is a library, system dependency, or macOS application rather than a standalone
+Rust CLI.
 
 ## Why Homebrew for Linux
 
-Homebrew on Linux installs natively on the host (no container, no sudo). It bundles its own
-glibc, making binaries fully self-contained regardless of the host's glibc version.
-
-**The glibc keg tracks the formula.** Homebrew's Linux bottles carry the glibc floor of the
-CI image that built them, and a builder move comes with a formula bump (Ubuntu 22.04 → 24.04
-and glibc 2.35 → 2.39 in July 2026). Since glibc is installed by `linux-packages.sh` rather
-than the `Brewfile`, nothing else would ever upgrade it — and a keg left behind makes every
-formula poured afterwards die with ``version `GLIBC_2.38' not found``. Each run reconciles the
-keg first, then checks the kegs installed since the last run against what the keg provides.
-The keg is built for the architecture baseline, not the build host's CPU, so a prefix built on
-an AVX-512 node still runs on every other machine sharing the home.
-
-**Custom prefix tradeoff:** Installing to `$LOCAL_PLAT/brew/` instead of the standard
-`/home/linuxbrew/.linuxbrew` enables a rootless flat prefix by default and per-CPU
-isolation when PLAT mode is enabled, but bottles
-built for the standard prefix can't always be relocated:
-
-- **Relocatable packages** (jq, CLI tools with simple dependencies) pour as bottles — patchelf
-  rewrites RPATH and they work fine
-- **Deep path embedding** (Python, Perl, git, vim, ffmpeg, imagemagick) build from source
-  on first install. Homebrew uses all available CPU cores (auto-detects `nproc`), so builds
-  are fast on modern hardware.
-
-Once built, packages are cached. Subsequent runs and upgrades are bottle-only.
-
-**Compilers:** `gcc` and `llvm` are keg-only (Homebrew doesn't create unversioned `gcc`/`clang`
-symlinks to avoid shadowing system compilers). `linux-packages.sh` creates symlinks in
-`$LOCAL_PLAT/bin/` so `gcc` → the highest installed GCC and `clang` → `llvm@21/bin/clang`.
-
-See [Compiler toolchains](#compiler-toolchains) below for CMake integration.
-
-**Python@3.14 patches:** On Linux, `install/patch-homebrew-python.sh` automatically patches
-the python@3.14 formula to fix build issues (uuid module detection, test_datetime PGO hangs).
-Patches are applied during bootstrap and protected by `HOMEBREW_NO_AUTO_UPDATE=1`.
-
-The same `Brewfile` works on macOS and Linux. `if OS.mac?` blocks are silently skipped on Linux.
-
----
-
----
+The managed Linux prefix provides current formulae without sudo and keeps them
+inside the same runtime-root contract as other compiled state. It is not a
+replacement for a project's pinned dependencies.
 
 ## Compiler toolchains
 
-CMake compiler selection is handled by toolchain files deployed per-PLAT, not by raw
-`CC`/`CXX` env vars. `install/cmake.sh` copies them from `install/cmake/toolchains/`
-to `$LOCAL_PLAT/cmake/toolchains/` on every bootstrap run (always overwrites, so they
-stay in sync with the repo).
-
 ### Default: LLVM (Homebrew clang)
 
-Toolchain files are versioned: `llvm-21.cmake`, `llvm-22.cmake`, `gcc-13.cmake`, `gcc-15.cmake`, plus a shared `_brew.cmake` helper.
-
-When Homebrew LLVM is present, `~/.profile` auto-sets:
+Managed CMake toolchain files are copied to the installer runtime root; in a
+managed login shell that is `$_LOCAL_PLAT/cmake/toolchains`.
+The [login profile](../../home/dot_profile.tmpl) selects `llvm-22.cmake` on
+macOS when Homebrew LLVM is available; Linux prefers `gcc-13.cmake`. Each falls
+back to the other if its preferred compiler is unavailable. An existing
+`CMAKE_TOOLCHAIN_FILE` takes precedence. To choose LLVM explicitly:
 
 ```sh
-export CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/llvm-22.cmake"
-# (highest installed LLVM version wins; falls back to llvm-21)
+ls "${_LOCAL_PLAT:?open a managed login shell first}/cmake/toolchains"
+cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/llvm-22.cmake"
+cmake --build build
 ```
-
-The toolchain configures:
-
-| CMake variable | Value |
-|---|---|
-| `CMAKE_C_COMPILER` | `$_LOCAL_PLAT/brew/opt/llvm@22/bin/clang` (or unversioned `opt/llvm/`) |
-| `CMAKE_CXX_COMPILER` | `$_LOCAL_PLAT/brew/opt/llvm@22/bin/clang++` |
-| `CMAKE_AR` / `CMAKE_RANLIB` | `llvm-ar`, `llvm-ranlib` (LTO needs the matching tool) |
-| `CMAKE_LINKER_TYPE` | `MOLD` > `LLD` (Linux only; macOS uses Apple's ld) |
-| `CMAKE_CUDA_COMPILER` | `$_LOCAL_PLAT/.cuda/bin/nvcc` (when the NVIDIA overlay is enabled) |
-| `CMAKE_CUDA_HOST_COMPILER` | `clang++` (when CUDA available) |
-
-CMake auto-detects `nm`/`objcopy`/`objdump`/`strip` from `CC`, so the toolchain files only override what actually matters.
 
 ### Switching toolchains
 
-Per-invocation:
-
-```sh
-CMAKE_TOOLCHAIN_FILE="$_LOCAL_PLAT/cmake/toolchains/gcc-15.cmake" cmake -B build
-```
-
-The shell does not define `tc`: Linux reserves that command for iproute2 traffic
-control. Set `CMAKE_TOOLCHAIN_FILE` explicitly or use a CMake preset.
-
-Per-project (`CMakePresets.json`):
-
-```json
-{ "cacheVariables": { "CMAKE_TOOLCHAIN_FILE": "/absolute/path/to/gcc-15.cmake" } }
-```
-
-The GCC toolchains use versioned binaries (`gcc-15`, `g++-15`, etc.) because Homebrew doesn't create unversioned `gcc` symlinks on macOS. Linux gets unversioned symlinks via `linux-packages.sh`, but the versioned files work on both. Linker priority on Linux: **mold → lld → gold → system ld**.
+Set `CMAKE_TOOLCHAIN_FILE` per project or configure preset; do not rely on a
+global default for a reproducible project build. The profile defaults to
+`gcc-13.cmake` on Linux where available and `llvm-22.cmake` on macOS where
+available; an already-set `CMAKE_TOOLCHAIN_FILE` wins.
 
 ### Disabling the toolchain
 
+Clear the profile default for a command that needs its own compiler selection:
+
 ```sh
-unset CMAKE_TOOLCHAIN_FILE   # let CMake auto-detect compilers
+env -u CMAKE_TOOLCHAIN_FILE cmake -S . -B build-system
 ```
+
+Or set the project file explicitly. Confirm `cmake -LAH` reports the expected
+compiler.
 
 ### CUDA
 
-The NVIDIA overlay installs the versions in
-`dotfiles-nvidia/packages/cuda-versions.txt` under `$LOCAL_PLAT/.cudas/` and
-sets the per-PLAT default symlink automatically. The first declaration is the
-default; select a different declared install explicitly with:
-
-```sh
-DF_CUDA_DEFAULT=public_cuda_12.8.0 ~/dotfiles/bootstrap.sh
-```
-
-Set `DF_DO_CUDA=0` to skip the overlay CUDA stage.
-
-`~/.profile` resolves the symlink at login and exports:
-
-- `CUDA_PATH` and `CUDAToolkit_ROOT` — picked up by CMake's `find_package(CUDAToolkit)`
-  and most other build systems
-- Prepends `$CUDA_PATH/bin` to `PATH` so `nvcc` is on the path
-
-Both toolchain files also set `CMAKE_CUDA_COMPILER` to `$LOCAL_PLAT/.cuda/bin/nvcc` when the
-symlink exists, so `enable_language(CUDA)` works without any project-level configuration.
-
-The PLAT-scoped path keeps different machines on a shared NFS home isolated.
+CUDA is overlay-specific. Enable the overlay and select its documented CMake
+toolchain only on a host with the required NVIDIA driver and toolkit.
 
 ### Compiler caching (ccache / sccache)
 
-`~/.profile` configures ccache and sccache automatically when they're installed:
-
-| Setting | Value | Why |
-|---|---|---|
-| `CCACHE_BASEDIR` | scratch root or `$HOME` | Rewrites absolute paths to relative before hashing — builds in different directories share cache hits |
-| `CCACHE_COMPILERCHECK` | `content` | Hash compiler by content, not mtime — survives brew reinstalls and module swaps |
-| `CCACHE_SLOPPINESS` | `file_stat_matches,time_macros` | Use mtime+size for include checks; cache TUs with `__DATE__`/`__TIME__` |
-| `CCACHE_HARDLINK` | `1` | Hardlink cached objects instead of copying — halves I/O on cache hits |
-| `CCACHE_MAXSIZE` | 2% of partition, clamped [10G, 100G] | Auto-sized to scratch partition |
-| `RUSTC_WRAPPER` | `sccache` | Rust compiler caching |
-| `SCCACHE_CACHE_SIZE` | 2% of partition, clamped [10G, 100G] | Same auto-sizing as ccache |
-
-CMake integration: `CMAKE_C_COMPILER_LAUNCHER=ccache` and `CMAKE_CXX_COMPILER_LAUNCHER=ccache` are exported automatically.
+The profiles configure cache directories and size bounds under the local/scratch
+layout. Caches improve rebuilds but are disposable derived state; a cache hit
+does not validate compiler correctness.
 
 ### openssh from Homebrew
 
-The Brewfile installs `openssh` cross-platform (not just macOS) to avoid OpenSSL version
-mismatches between the system ssh and Homebrew-linked libraries. On Linux, the system
-ssh may link against a different OpenSSL than Homebrew's, causing `git push` failures
-when Homebrew's git shells out to ssh. Brew's openssh uses Homebrew's OpenSSL consistently.
+Use the managed OpenSSH only when its path precedes the system client, then
+check `ssh -V` and `ssh -G host`. See [shell workflow](/workflows/shell-editor-terminal/)
+for the managed SSH policy.
 
 ### Source files
 
-Toolchain source files live in `install/cmake/toolchains/` — edit them there, not in the
-deployed copies under `$LOCAL_PLAT/`. Re-deploy with:
-
-```sh
-bash ~/dotfiles/install/cmake.sh
-```
-
-Then wipe the CMake cache (`rm -rf build/CMakeCache.txt build/CMakeFiles`) for the changes
-to take effect in an existing build directory.
-
----
+The authoritative compiler inputs are [`install/cmake.sh`](../../install/cmake.sh),
+[`home/dot_profile.tmpl`](../../home/dot_profile.tmpl), and the files in
+[`install/cmake/toolchains/`](../../install/cmake/toolchains/).
 
 ## Updating all packages
 
 ```sh
-~/dotfiles/bootstrap.sh update    # pull + refresh (install missing, skip current)
-~/dotfiles/bootstrap.sh upgrade   # update + brew upgrade + cargo upgrade
+~/dotfiles/bootstrap.sh update
+~/dotfiles/bootstrap.sh upgrade  # accepts managed upgrades
 ```
 
-`update` refreshes tools without upgrading existing versions. `upgrade` additionally enables Homebrew upgrades and forces cargo-binstall to re-check for newer binaries. Both are idempotent — safe to run at any time.
+Keep the degradation summary and use [updates](/usage/updates/) when a selected
+tool fails to reconcile.

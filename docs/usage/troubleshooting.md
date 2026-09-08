@@ -1151,9 +1151,10 @@ for e in json.load(sys.stdin)['result']['data']: print(e['line'])
 ```
 
 Common causes:
-- **`cargo-binstall: command not found`** — `/opt/buildhome/.cargo/bin` not on PATH; check `infra/cloudflare/build.sh`
-- **`mdbook: command not found`** — binstall failed; check network or fall back to `cargo install mdbook --locked`
-- **Build output not found** — confirm `destination_dir = "docs/book"` in `infra/cloudflare/main.tf`
+- **Unsupported Node version** — the handbook requires Node 22.12 or newer; CI selects Node 24. Check the build environment and `site/package.json`.
+- **Chromium executable missing** — Mermaid renders during the build. Install the matching browser with `npx --prefix site --no-install playwright install chromium`; keep `PLAYWRIGHT_BROWSERS_PATH` identical for installation and the build.
+- **Invalid link or missing feature coverage** — run `./tests/ci.sh docs`, then fix the named Markdown link, source path, or explicit entry in `docs/_data/features.json`. Do not disable the checker.
+- **Build output not found** — confirm `destination_dir = "site/dist"` in `infra/cloudflare/main.tf`. The Astro build is verified before upload.
 
 ---
 

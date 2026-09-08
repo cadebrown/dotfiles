@@ -1,0 +1,81 @@
+---
+import DefaultPageTitle from '@astrojs/starlight/components/PageTitle.astro';
+import PageLinks from './PageLinks.astro';
+import catalog from '../data/catalog.json';
+const kind = Astro.url.pathname.match(/^\/reference\/(packages|skills|mcp)\/$/)?.[1];
+const column = kind === 'packages' ? 'Manager' : kind === 'skills' ? 'Owner' : 'Profile';
+const records = kind === 'packages' ? catalog.packages : kind === 'skills' ? catalog.skills : catalog.servers;
+const options = [...new Set(records.map((r) => kind === 'packages' ? ('manager' in r ? r.manager : '') : kind === 'skills' ? ('owner' in r ? r.owner : '') : ('profile' in r ? r.profile : '')))].sort();
+---
+<PageLinks><DefaultPageTitle {...Astro.props} /></PageLinks>
+{kind && <section class="catalog-controls" aria-label="Filter this catalog" data-catalog-controls>
+  <div class="catalog-search"><label for="catalog-query">Find a {kind === 'skills' ? 'skill' : kind === 'mcp' ? 'server' : 'tool'}</label><input type="search" id="catalog-query" placeholder="Name, purpose, or source path…" autocomplete="off" /></div>
+  <div><label for="catalog-filter">{column}</label><select id="catalog-filter" data-column={column}><option value="">All {column.toLowerCase()}s</option>{options.map((value) => <option value={value}>{value}</option>)}</select></div>
+  <p id="catalog-status" role="status" aria-live="polite">{records.length} entries · source linked</p>
+</section>}
+<script>
+  function setupCatalog() {
+    const controls = document.querySelector<HTMLElement>('[data-catalog-controls]');
+    const table = document.querySelector<HTMLTableElement>('.sl-markdown-content table');
+    if (!controls || !table || controls.dataset.ready) return;
+    controls.dataset.ready = 'true';
+    const query = controls.querySelector<HTMLInputElement>('#catalog-query')!;
+    const filter = controls.querySelector<HTMLSelectElement>('#catalog-filter')!;
+    const status = controls.querySelector<HTMLElement>('#catalog-status')!;
+    const headers = [...table.querySelectorAll('thead th')].map((cell) => cell.textContent?.trim());
+    table.classList.add('catalog-table');
+    for (const row of table.querySelectorAll<HTMLTableRowElement>('tbody tr')) {
+      [...row.cells].forEach((cell, index) => cell.dataset.label = headers[index] ?? '');
+    }
+    const filterIndex = headers.indexOf(filter.dataset.column ?? '');
+    const rows = [...table.querySelectorAll<HTMLTableRowElement>('tbody tr')].map((row) => ({ row, text: row.textContent?.toLowerCase() ?? '', category: row.cells[filterIndex]?.textContent?.trim() }));
+    const filterKey = (filter.dataset.column ?? '').toLowerCase();
+    const params = new URLSearchParams(window.location.search);
+    query.value = params.get('q') ?? '';
+    const initialFilter = params.get(filterKey) ?? '';
+    filter.value = [...filter.options].some((option) => option.value === initialFilter) ? initialFilter : '';
+    const update = (save = false) => {
+      const words = query.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      let shown = 0;
+      for (const item of rows) {
+        item.row.hidden = !words.every((word) => item.text.includes(word)) || !!filter.value && item.category !== filter.value;
+        if (!item.row.hidden) shown++;
+      }
+      status.textContent = `${shown} of ${rows.length} entries${shown === 0 ? ' · Try a different name or clear the filters.' : ' · source linked'}`;
+      if (save) {
+        const url = new URL(window.location.href);
+        if (query.value.trim()) url.searchParams.set('q', query.value.trim()); else url.searchParams.delete('q');
+        if (filter.value) url.searchParams.set(filterKey, filter.value); else url.searchParams.delete(filterKey);
+        url.hash = '';
+        window.history.replaceState(null, '', url);
+      }
+    };
+    const revealTarget = () => {
+      let id;
+      try { id = decodeURIComponent(window.location.hash.slice(1)); } catch { return; }
+      const target = id ? document.getElementById(id) : null;
+      if (!target || !table.contains(target)) return;
+      if (target.closest('tr')?.hidden) {
+        query.value = ''; filter.value = ''; update();
+        const url = new URL(window.location.href);
+        url.searchParams.delete('q'); url.searchParams.delete(filterKey);
+        window.history.replaceState(null, '', url);
+      }
+      target.scrollIntoView({ block: 'center' });
+    };
+    query.addEventListener('input', () => update(true));
+    filter.addEventListener('change', () => update(true));
+    window.addEventListener('hashchange', revealTarget);
+    update();
+    revealTarget();
+  }
+  setupCatalog();
+  document.addEventListener('astro:page-load', setupCatalog);
+</script>
+<style>
+  .catalog-controls { display: grid; grid-template-columns: minmax(0,1fr) minmax(9rem,.5fr); gap: .8rem 1rem; margin-top: 1.5rem; padding: 1rem; background: var(--sl-color-bg-sidebar); border: 1px solid var(--sl-color-hairline-light); border-radius: .4rem; }
+  label { display:block; font-size:.95rem; font-weight:650; margin-bottom:.35rem; }
+  input, select { width:100%; color:var(--sl-color-text); background:var(--sl-color-bg); border:1px solid var(--sl-color-gray-4); padding:.65rem .75rem; border-radius:.25rem; font:inherit; font-size:1rem; min-height:2.8rem; }
+  p { grid-column:1/-1; margin:0; font-family:var(--sl-font-mono); font-size:.75rem; color:var(--sl-color-gray-2); }
+  @media(max-width:35rem) { .catalog-controls { grid-template-columns:1fr; } }
+</style>

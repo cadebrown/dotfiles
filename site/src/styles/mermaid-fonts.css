@@ -1,0 +1,11 @@
+/* Loaded directly by build-time Chromium before measuring diagram labels. */
+@font-face {
+  font-family: 'Ubuntu Mono';
+  font-weight: 400;
+  src: url('../../node_modules/@fontsource/ubuntu-mono/files/ubuntu-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Ubuntu Mono';
+  font-weight: 700;
+  src: url('../../node_modules/@fontsource/ubuntu-mono/files/ubuntu-mono-latin-700-normal.woff2') format('woff2');
+}

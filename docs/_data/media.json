@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "images": [
+    {
+      "file": "site/public/media/handbook-home.webp",
+      "route": "/",
+      "capturedAt": "2026-09-08",
+      "source": "Codex in-app browser, local Astro production preview at 127.0.0.1:4388",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "capture": "viewport capture, dark theme",
+      "width": 1425,
+      "height": 990,
+      "bytes": 71136,
+      "encoding": "WebP quality 88, effort 6; maximum width 1600, no upscaling",
+      "sha256": "7d285b48c209dd0a797a287ea10e038c38f22141772137187444bbe955bf0f30",
+      "scope": "Documentation interface only; no machine installation or remote deployment is established."
+    },
+    {
+      "file": "site/public/media/setup-configurator.webp",
+      "route": "/setup/choose-your-setup/#compose-the-command",
+      "capturedAt": "2026-09-08",
+      "source": "Codex in-app browser, local Astro production preview at 127.0.0.1:4388",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "capture": "viewport capture, dark theme",
+      "width": 1425,
+      "height": 990,
+      "bytes": 69090,
+      "encoding": "WebP quality 88, effort 6; maximum width 1600, no upscaling",
+      "sha256": "b0140513801f2657febb0bf40e603888c0a27dd13bff6c31ae4b8ae66696f8c0",
+      "scope": "Documentation interface only; no machine installation or remote deployment is established."
+    },
+    {
+      "file": "site/public/media/handbook-search.webp",
+      "route": "/setup/choose-your-setup/",
+      "capturedAt": "2026-09-08",
+      "source": "Codex in-app browser, local Astro production preview at 127.0.0.1:4388",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "capture": "viewport capture, dark theme",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 52810,
+      "encoding": "WebP quality 88, effort 6; maximum width 1600, no upscaling",
+      "sha256": "dcec8439d605ffcc8eddeba71bd97b2c7cd2e0ab147a25843ca5eb28f926a87f",
+      "scope": "Documentation interface only; no machine installation or remote deployment is established."
+    },
+    {
+      "file": "site/public/media/catalog-mobile.webp",
+      "route": "/reference/packages/?q=blender&manager=homebrew-cask",
+      "capturedAt": "2026-09-08",
+      "source": "Codex in-app browser, local Astro production preview at 127.0.0.1:4388",
+      "viewport": {
+        "width": 390,
+        "height": 1120
+      },
+      "capture": "viewport capture with Blender and homebrew-cask filters, light theme",
+      "width": 375,
+      "height": 1077,
+      "bytes": 25266,
+      "encoding": "WebP quality 88, effort 6; maximum width 1600, no upscaling",
+      "sha256": "d79744bd97d54fdf2c05915542fd953737f4da47362f1e0ef06f982f78e69dc6",
+      "scope": "Documentation interface only; no machine installation or remote deployment is established."
+    }
+  ]
+}

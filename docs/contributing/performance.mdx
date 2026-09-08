@@ -1,0 +1,74 @@
+---
+title: Performance and measurement
+description: Reproduce the handbook's local build measurements and use a defensible method for shell, hook, browser, and local-model performance claims.
+---
+
+import PerformanceReport from '@components/PerformanceReport.astro';
+
+Performance is a property of a specific workload and environment. This page publishes one reproducible local snapshot and explains how to extend the same discipline to shell startup, agent hooks, browser workflows, and local models.
+
+## Measured handbook build
+
+<PerformanceReport />
+
+The snapshot records its capture date, Node version, CPU, revision, dirty-worktree status, and a content fingerprint. Run the measurement again after a meaningful implementation or dependency change; it does not update on every documentation edit.
+
+```bash title="Reproduce the snapshot"
+npm --prefix site run measure -- --runs 3
+./tests/ci.sh docs
+```
+
+The measurement script runs production builds, preserves each build log under `site/artifacts/`, measures wall-clock duration, and reads the final HTML artifact. It replaces `docs/_data/performance.json` only after all samples succeed. The final docs gate verifies the newly rendered report.
+
+## Keep the browser workload small
+
+- **Static HTML** carries the article, sidebar, source links, code, tables, and diagrams.
+- **Mermaid runs during the build** and emits inline SVG. Its rendering engine is not shipped to readers.
+- **Pagefind** provides a static search index; there is no search backend to maintain.
+- **Three local WOFF2 fonts** use Latin subsets and `font-display: swap`; the system font stack supplies missing glyphs.
+- **WebP screenshots** have explicit dimensions and useful alternative text. Diagrams remain vectors.
+- **Small client scripts** handle catalog filters, the command configurator, and image zoom. Catalogs remain readable as complete tables without JavaScript.
+
+These are design decisions, not measured speedup claims. Test transfer size, request behavior, keyboard interaction, and rendering on the deployment and device that matter.
+
+## Shell and hook measurements
+
+For shell startup, state whether the shell is login or interactive, whether filesystem and executable caches are warm, and whether the command actually loads the managed profile. A bare `zsh -f` measurement does not describe the full configured environment.
+
+Agent-hook benchmarks should use representative event payloads. Distinguish no-op events from applicable rules, unchanged files from edits, and cache hits from transcript rescans. The repository already has a comparison harness:
+
+```bash title="Compare Cursor hook subprocess behavior"
+# Substitute a real pre-change commit from this repository.
+uv run tests/cursor-hook-benchmark.py --baseline PRE_CHANGE_REF
+```
+
+See [Agent hook overhead](/usage/agent-overhead/) for the scope and cache invariants. Hook subprocess timings are not additive estimates of complete model-response latency.
+
+## Local-model measurements
+
+Before comparing model results, record:
+
+1. Model identifier, revision, quantization, license, and runtime version.
+2. Hardware, available memory, power mode, and concurrent workloads.
+3. Prompt/context size, output limit, tool access, sampling settings, and the actual task.
+4. Load time, time to first token, steady generation rate, total elapsed time, peak memory, and task correctness where available.
+5. Cold and warm runs, failures, retries, and the number of samples.
+
+Use [Local AI coding](/usage/local-llm/) to establish a working task loop before benchmarking. Token throughput alone does not establish that the model can complete a repository change or use the required tools reliably.
+
+## Minimum evidence record
+
+```json title="Measurement record shape"
+{
+  "question": "Does this change reduce warm hook latency?",
+  "baseline_revision": "actual-before-commit",
+  "candidate_revision": "actual-after-commit",
+  "environment": "hardware, OS, runtime versions",
+  "command": "exact reproducible command",
+  "samples": "path to raw measurements",
+  "correctness": "path to verifier result",
+  "limitations": "unmeasured paths and confounding workloads"
+}
+```
+
+This is a schema example, not a benchmark result. Preserve raw observations before reducing them to medians or charts, and retain correctness checks when optimizing.

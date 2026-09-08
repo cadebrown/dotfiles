@@ -1,161 +1,100 @@
-# cade's dotfiles
+---
+title: Cade's Dotfiles
+description: Set up a macOS or Linux machine, change managed configuration, and use the included development tools and agents.
+---
 
-Personal dotfiles for macOS and Linux. One command bootstraps a complete dev environment — idempotent, no sudo on Linux, and (optionally) safe on shared NFS home directories across CPU architectures.
+My macOS and Linux development environment: shells, languages, editors, and agents. [Package lists](https://github.com/cadebrown/dotfiles/tree/main/packages) select the tools; [configuration templates](https://github.com/cadebrown/dotfiles/tree/main/home) set them up.
 
-```sh
-DF_NAME="Your Name" DF_EMAIL="you@example.com" \
-  curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
+<nav class="quick-links" aria-label="Quick start tasks">
+<a href="#set-up-a-machine">Install</a>
+<a href="#change-a-setting">Configure</a>
+<a href="#use-an-agent">Use an agent</a>
+<a href="#find-tools-and-guides">Find a tool</a>
+<a href="#update-or-troubleshoot">Update & fix</a>
+</nav>
+
+<figure class="setup-flow" aria-label="Two paths from repository sources to installed tools and configuration">
+<div class="flow-lane">
+<a class="flow-node" data-stage="source" href="/setup/packages/"><span class="flow-label">Package lists</span><code>packages/*</code><span>Homebrew, Cargo, npm, uv</span></a>
+<svg class="flow-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h18m-6-6 6 6-6 6" /></svg>
+<a class="flow-node" data-stage="apply" href="/setup/bootstrap/"><span class="flow-label">Install and check</span><code>bootstrap.sh</code><span>Runs the installers</span></a>
+<svg class="flow-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h18m-6-6 6 6-6 6" /></svg>
+<a class="flow-node" data-stage="result" href="/architecture/runtime-paths/"><span class="flow-label">On your machine</span><strong>Tools and runtimes</strong><span>Homebrew and local prefixes</span></a>
+</div>
+<div class="flow-lane">
+<a class="flow-node" data-stage="source" href="/reference/managed-configuration/"><span class="flow-label">Configuration source</span><code>home/*</code><span>Shells, editors, agents</span></a>
+<svg class="flow-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h18m-6-6 6 6-6 6" /></svg>
+<a class="flow-node" data-stage="apply" href="/setup/chezmoi/"><span class="flow-label">Render and apply</span><code>chezmoi apply</code><span>Uses this machine's settings</span></a>
+<svg class="flow-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h18m-6-6 6 6-6 6" /></svg>
+<a class="flow-node" data-stage="result" href="/reference/managed-configuration/"><span class="flow-label">In your home directory</span><code>~/.zshrc, ~/.config/</code><span>Plus each agent's config</span></a>
+</div>
+<figcaption>Bootstrap runs both paths. After setup, you can apply configuration changes separately.</figcaption>
+</figure>
+
+## Set up a machine
+
+From an interactive terminal:
+
+```sh title="Install from a checkout"
+git clone https://github.com/cadebrown/dotfiles ~/dotfiles
+~/dotfiles/bootstrap.sh
 ```
 
-`DF_NAME` / `DF_EMAIL` are needed when piping into `bash` (the pipe occupies stdin, so chezmoi can't prompt); from a local clone, `~/dotfiles/bootstrap.sh` prompts interactively. Re-run anytime to converge.
+Expect name/email prompts, installer progress, then a tool check. Linux runs without sudo; initial macOS Homebrew setup may request administrator authentication.
 
-**Pick your path:**
+- [Choose a setup](/setup/choose-your-setup/) — Full is the default. Core narrows Python/Cargo tools; both use the same Homebrew list.
+- [Shared home?](/setup/plat/) Configure PLAT isolation before installing.
+- [Installation steps](/setup/bootstrap/) · [Sign in to services](/setup/auth/)
 
-| Goal | Page |
-| --- | --- |
-| Set up a brand-new machine | [Bootstrap](setup/bootstrap.md) |
-| Sync the latest changes | [Day-to-day workflow](usage/updates.md) |
-| Add or remove a tool | [Package management](setup/packages.md) |
-| Understand PLAT isolation | [PLAT isolation](setup/plat.md) |
-| Set up API tokens | [Auth](setup/auth.md) |
-| Create a private extension | [Overlays](setup/overlays.md) |
-| Look up a `DF_*` flag | [Env-var reference](reference/env-vars.md) |
-| Trace what `bootstrap.sh` actually does | [Bootstrap flow](reference/bootstrap-flow.md) |
+## Change a setting
 
----
+Edit [the zsh source](https://github.com/cadebrown/dotfiles/blob/main/home/dot_zshrc.tmpl), inspect the diff, then apply:
 
-## What gets installed
-
-### Dotfiles and shell
-
-[chezmoi](https://chezmoi.io) manages dotfiles as templates in `home/` and applies them to `~/`. Both **zsh** and **bash** get identical login profiles with PLAT detection, PATH setup, and tool activation.
-
-- **zsh**: oh-my-zsh with [pure](https://github.com/sindresorhus/pure) prompt, autosuggestions, fast-syntax-highlighting, completions, and lazy nvm loading (~140ms startup)
-- **bash**: minimal config with git branch prompt, shared aliases, zoxide, fzf completions
-- **git**: global config with name/email from chezmoi data, delta as pager
-- **SSH**: templated config from `home/dot_ssh/config.tmpl`
-
-### Packages
-
-A single `packages/Brewfile` drives both platforms. On macOS, Homebrew installs native bottles plus casks (GUI apps). On Linux, Homebrew installs to a custom prefix (`$_LOCAL_PLAT/brew/`) with its own glibc — fully self-contained, no sudo.
-
-`if OS.mac?` blocks in the Brewfile handle macOS-only casks and tools; Linux skips them silently.
-
-### Languages
-
-| Language | Tool | Install location | Package list |
-| --- | --- | --- | --- |
-| **Rust** | rustup + cargo-binstall | `$LOCAL_PLAT/rustup/`, `$LOCAL_PLAT/cargo/` | `packages/cargo.txt` |
-| **Node.js** | nvm (lazy-loaded in zsh) | `$LOCAL_PLAT/nvm/` | `packages/npm.txt` |
-| **Python** | uv-managed plain Python + isolated CLI tools | `$PYTHON_ENV`, `$LOCAL_PLAT/uv/tools/`, entrypoints in `$LOCAL_PLAT/bin/` | `packages/python.txt`, `packages/pip.txt` + full profile |
-
-Rust tools install via `cargo-binstall` (downloads pre-built binaries from GitHub releases when available, falls back to source). Plain `python` uses the small `$PYTHON_ENV` environment and includes SymPy. Python CLI tools each get their own isolated venv via `uv tool install`. On macOS, rustup comes from Homebrew (code-signed, required on Sequoia+ where the linker enforces provenance).
-
-### AI tools
-
-- **Claude Code** — native binary from Anthropic's release bucket, plus plugins (`packages/claude-plugins.txt`) and MCP servers (`packages/mcp-servers.txt`)
-- **Codex CLI** — npm-installed binary (`@openai/codex` in `npm.txt`), with managed config + hooks under `home/dot_codex/` and `[mcp_servers.*]` blocks generated from the shared `packages/mcp-servers.txt`
-- **Cursor / VS Code** — extension lists in `packages/{cursor,vscode}-extensions.txt`; Cursor settings symlinked from `home/dot_cursor/`
-
-### macOS-specific
-
-- **System settings** (`install/macos-settings.sh`) — Dock autohide, Finder extensions/path bar, fast key repeat, tap to click, PNG screenshots, Safari dev menu, iTerm2 prefs, Touch ID for sudo (works in tmux) with a one-auth-covers-all-terminals ticket policy
-- **Services** (`install/macos-services.sh`) — optional auto-start for Colima (rootless Docker), Ollama, and mlxserve; off by default (`DF_START_LOCAL_SERVICES=1` to enable). Docker CLI plugins always linked.
-- **Quick Actions** (`install/macos-quick-actions.sh`) — Finder right-click "Open in Cursor" and friends
-
-### Auth (opt-in)
-
-[`install/auth.sh`](setup/auth.md) is a guided service-registry helper that creates `~/.<service>.env` files (chmod 600) for **GitHub**, **Anthropic**, **OpenAI**, **Cloudflare**, and **HuggingFace** — plus a separate `gh auth login` flow for the Claude GitHub MCP. Sourced automatically by all install scripts and login shells. Run during bootstrap with `DF_DO_AUTH=1` or standalone anytime.
-
-### Home directories
-
-`install/dirs.sh` creates `~/dev`, `~/bones`, and `~/misc` (configurable via `DF_DIRS`). On systems with scratch space, these become symlinks directly under `$SCRATCH/` for fast local storage. See [Scratch space](setup/scratch.md).
-
----
-
-## PLAT isolation (optional)
-
-By default `$LOCAL_PLAT = $HOME/.local` and everything lives under a flat `~/.local/`. **PLAT isolation is opt-in** — set `DF_USE_PLAT=1` (or `use_plat = true` in chezmoi data) and `$LOCAL_PLAT` becomes `~/.local/$PLAT/`. The point: on a shared NFS home, each machine installs into its own PLAT directory; one home directory, many machines, no conflicts. Single-machine users get the simpler flat layout without the per-PLAT directory tax.
-
-```
-DF_USE_PLAT=0  (default, flat)        DF_USE_PLAT=1  (NFS-shared homes)
-─────────────────────────────         ───────────────────────────────────
-~/.local/                             ~/.local/
-├── bin/                              ├── plat_Darwin_arm64/
-│   ├── chezmoi                       │   ├── bin/{chezmoi,uv,claude}
-│   ├── uv                            │   ├── brew/        (Apple Silicon)
-│   └── claude                        │   ├── cargo/bin/   (arm64 binaries)
-├── brew/        (one prefix)         │   └── nvm/         (arm64 node)
-├── cargo/bin/   (host arch)          ├── plat_Linux_x86-64-v3/
-└── nvm/                              │   ├── brew/        (AVX2 glibc)
-                                      │   └── ...
-$_LOCAL_PLAT = ~/.local                └── plat_Linux_x86-64-v4/  (AVX-512)
-                                          └── ...
-
-                                      $_LOCAL_PLAT = ~/.local/$_PLAT
-                                      (set per-shell from CPU detection)
+```sh title="Edit → inspect → apply"
+"${EDITOR:-vi}" ~/dotfiles/home/dot_zshrc.tmpl
+chezmoi diff ~/.zshrc
+chezmoi apply ~/.zshrc
+exec zsh -l
 ```
 
-Capability detection still runs in flat mode — `.plat_env.sh` tunes compiler flags (`-march=x86-64-v3`, `RUSTFLAGS=-Ctarget-cpu=apple-m1`, etc.) for the host CPU even when directory isolation is off. See [PLAT isolation](setup/plat.md) for the decision matrix.
+The new shell loads the result. Edit sources under `home/` to retain changes across applies. Find other files in the [configuration map](/reference/managed-configuration/) or follow a [configuration recipe](/workflows/configuration-recipes/).
 
----
+## Use an agent
 
-## macOS vs Linux
+With Codex installed and signed in:
 
-| | macOS | Linux |
-| --- | --- | --- |
-| Packages | Homebrew at `/opt/homebrew` | Homebrew at `$LOCAL_PLAT/brew/` (custom prefix, bundled glibc) |
-| Rust | Homebrew `rustup` (code-signed for Sequoia) | `sh.rustup.rs` |
-| System settings | Dock, Finder, keyboard, trackpad, Safari, iTerm2 | -- |
-| Services | Colima (rootless Docker) | -- |
-| sudo required | Yes (Homebrew installer) | No |
-
----
-
-## Bootstrap modes
-
-```sh
-bootstrap.sh              # install (default) — full idempotent setup
-bootstrap.sh update       # git pull + chezmoi apply + refresh tools
-bootstrap.sh upgrade      # update + brew upgrade + cargo upgrade
+```sh title="Start a review session"
+cd ~/dotfiles
+codex -p review
 ```
 
-Any step can be skipped with `DF_DO_*=0` env vars. See [Bootstrap](setup/bootstrap.md) for the full list.
+```text title="Example prompt"
+Trace how DF_USE_PLAT changes the Node executable path.
+Show the source files and line references, then give me a command
+to inspect the result in my current shell. Do not change files.
+```
 
----
+The `review` profile is read-only. Expect source locations and an inspection command to run on the target machine.
 
-## Sections
+[Choose an agent](/agents/) · [Codex profiles](/agents/codex/) · [Instructions](/agents/instructions/) · [Workflow examples](/agents/domain-workflows/)
 
-**Setup**
+## Find tools and guides
 
-| Page | What it covers |
+| I need to… | Start here |
 | --- | --- |
-| [Bootstrap](setup/bootstrap.md) | System requirements, what gets installed, skip flags, modes |
-| [Managing dotfiles](setup/chezmoi.md) | chezmoi workflow, editing dotfiles, template variables, shared-home safety |
-| [Package management](setup/packages.md) | Adding tools via cargo, npm, pip, or Homebrew |
-| [PLAT isolation](setup/plat.md) | When to use it, layouts compared, decommissioning |
-| [Auth](setup/auth.md) | Service registry, env-file flow, gh-derive trick |
-| [Scratch space](setup/scratch.md) | Symlink topology for NFS-quota relief |
-| [Overlays](setup/overlays.md) | Private extension repos (`dotfiles-*/`) |
+| Find a tool or connection | [Packages](/reference/packages/) · [Skills](/reference/skills/) · [MCP servers](/reference/mcp/) |
+| Understand how it fits together | [Architecture](/architecture/overview/) · [Paths](/architecture/runtime-paths/) |
+| Configure my workspace | [Shell & editors](/workflows/shell-editor-terminal/) · [Environment variables](/reference/env-vars/) |
+| Use local models or resume work | [Local AI](/usage/local-llm/) · [Durable tasks](/agents/durable-work/) |
+| Add a feature | [Write the guide](/contributing/documentation/) · [Show it working](/contributing/demonstrations/) |
 
-**Usage**
+## Update or troubleshoot
 
-| Page | What it covers |
+| Command | Effect |
 | --- | --- |
-| [Day-to-day workflow](usage/updates.md) | Updating, adding packages, editing dotfiles |
-| [AeroSpace window management](usage/aerospace.md) | Tiling WM keymap (macOS) |
-| [Local AI coding](usage/local-llm.md) | Ollama, mlx-lm, opencode, pi setup |
-| [Troubleshooting](usage/troubleshooting.md) | Tools not found, PATH issues, build failures |
+| `~/dotfiles/bootstrap.sh update` | Pull repository changes and install missing tools |
+| `~/dotfiles/bootstrap.sh upgrade` | Update the repository and request package upgrades |
+| `bash ~/dotfiles/install/verify-path.sh` | Check executable locations and PATH ordering |
+| `bash ~/dotfiles/install/codex.sh check` | Check the managed Codex setup |
 
-**Reference**
-
-| Page | What it covers |
-| --- | --- |
-| [Env vars (`DF_*`)](reference/env-vars.md) | Complete table of every flag and behavior var |
-| [Bootstrap flow](reference/bootstrap-flow.md) | Step-by-step diagram of what `bootstrap.sh` does |
-
-**Infrastructure**
-
-| Page | What it covers |
-| --- | --- |
-| [Docs and hosting](infra/docs-and-hosting.md) | How this site is built, deployed, and managed |
+Search an error message or open [Troubleshooting](/troubleshooting/). See [Daily maintenance](/usage/updates/) for package and configuration updates.

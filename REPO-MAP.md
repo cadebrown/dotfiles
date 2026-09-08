@@ -11,7 +11,8 @@
 - [install/](/Users/cade/dotfiles/install): idempotent installers and machine setup scripts
 - [packages/](/Users/cade/dotfiles/packages): declarative package ownership across Brew, Cargo, npm, pip, and Claude-related lists
 - [tests/](/Users/cade/dotfiles/tests): Docker-based bats suite for bootstrap validation
-- [docs/](/Users/cade/dotfiles/docs): mdBook source for the docs site
+- [docs/](/Users/cade/dotfiles/docs): authoritative Markdown for the Astro/Starlight handbook
+- [site/](/Users/cade/dotfiles/site): Astro 7.3.2 / Starlight 0.42 renderer; generated staging is `site/src/content/docs/`, production output is `site/dist/`
 - [docs/usage/ai-workbench.md](/Users/cade/dotfiles/docs/usage/ai-workbench.md): operator guide for Codex profiles and browser, desktop, 3D, media, and long-running workflows
 - [infra/cloudflare/](/Users/cade/dotfiles/infra/cloudflare): OpenTofu for docs hosting
 
@@ -29,7 +30,7 @@
 - Add or change installer behavior: [install/](/Users/cade/dotfiles/install) plus [bootstrap.sh](/Users/cade/dotfiles/bootstrap.sh)
 - Add or move a package: [packages/](/Users/cade/dotfiles/packages)
 - Change deployed shell behavior: [home/](/Users/cade/dotfiles/home)
-- Change docs: [docs/](/Users/cade/dotfiles/docs), not `docs/book/`
+- Change handbook content: [docs/](/Users/cade/dotfiles/docs), then run `./tests/ci.sh docs`
 - Debug a machine or setup issue: [docs/usage/troubleshooting.md](/Users/cade/dotfiles/docs/usage/troubleshooting.md) (the FAQ)
 - Validate all local CI checks: [tests/ci.sh](/Users/cade/dotfiles/tests/ci.sh)
 - Run Docker bootstrap tests: [tests/run.sh](/Users/cade/dotfiles/tests/run.sh)
@@ -37,7 +38,7 @@
 
 ## Frequent Mistakes To Avoid
 
-- Editing generated files in `docs/book/`
+- Editing generated `site/src/content/docs/` or `site/dist/` instead of `docs/`
 - Editing deployed dotfiles in `~/` instead of sources in `home/`
 - Duplicating a tool across multiple package layers
 - Hardcoding machine-specific paths in chezmoi templates

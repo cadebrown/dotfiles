@@ -63,9 +63,9 @@ resource "cloudflare_pages_project" "site" {
   production_branch = var.pages_production_branch
 
   build_config = {
-    # build.sh fetches pinned prebuilt mdbook + mdbook-mermaid, then runs `mdbook build docs`
+    # build.sh stages docs into Astro and verifies the static artifact.
     build_command   = "bash infra/cloudflare/build.sh"
-    destination_dir = "docs/book"
+    destination_dir = "site/dist"
     root_dir        = ""
   }
 

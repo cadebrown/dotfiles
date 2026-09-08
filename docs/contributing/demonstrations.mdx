@@ -1,0 +1,116 @@
+---
+title: Demonstrate a feature
+description: Reproducible examples, real browser captures, compact media, and evidence that matches the claim.
+---
+
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Make the behavior inspectable
+
+A good feature page answers six questions:
+
+- **Use case:** what task does the setup make possible?
+- **Source:** which installer, package declaration, or managed configuration owns it?
+- **Example:** what exact command or interaction demonstrates it, with which prerequisites?
+- **Observation:** what should the reader see, and what was actually observed?
+- **Limits:** which services, accounts, hardware, or host checks remain outside the evidence?
+- **References:** where are the upstream manual and the local source of truth?
+
+Update the guide and `docs/_data/features.json` with the implementation. The repository instructions and PR template make those updates part of finishing a change. The docs gate catches missing routes, source links, and executable mappings; review still needs to assess whether the explanation and demonstration are useful.
+
+## Example: a browser feature
+
+The [setup configurator](/setup/choose-your-setup/) turns explicit choices into a reviewable shell command. It runs entirely in the browser; no installer is invoked by this page.
+
+<Steps>
+
+1. Open the configurator on its default **Core** profile. Confirm local-model tooling is disabled.
+2. Select **macOS → Full**, enable shared-home isolation and local-model tooling.
+3. Confirm the command contains `DF_PROFILE=full`, `DF_USE_PLAT=1`, and `DF_DO_LOCAL_LLM=1`. Use **Copy command** and check its feedback.
+4. Select **Linux**. Confirm local-model tooling becomes unchecked and disabled, and the command changes to `DF_DO_LOCAL_LLM=0`.
+
+</Steps>
+
+<figure class="demo-figure">
+  <img src="/media/setup-configurator.webp" width="1425" height="990" alt="Setup configurator with macOS, Full profile, platform isolation, and local-model tooling selected; the generated command shows the corresponding flags." loading="lazy" decoding="async" />
+  <figcaption>Actual local production preview on September 8, 2026. These controls and command changes were exercised; the screenshot does not establish a completed machine installation.</figcaption>
+</figure>
+
+## Search and narrow-screen evidence
+
+<Tabs>
+<TabItem label="Search">
+
+Searching for `PLAT` returned the isolation guide, runtime architecture, and individual troubleshooting diagnoses. Search is built with the handbook and served locally.
+
+<img src="/media/handbook-search.webp" width="1440" height="1000" alt="The handbook search dialog returns PLAT isolation, duplicate PATH diagnostics, migration guidance, and runtime architecture." loading="lazy" decoding="async" />
+
+</TabItem>
+<TabItem label="Mobile catalog">
+
+Filtering the package catalog for `blender` and `homebrew-cask` produced one matching declaration. An unmatched query produced an explicit empty state. At a 390-pixel browser viewport, the measured document width and scroll width were both 375 pixels after the scrollbar: no horizontal overflow.
+
+<img class="mobile-demo" src="/media/catalog-mobile.webp" width="375" height="1077" alt="Light-mode mobile package catalog showing Blender as a labeled record with manager, platform, profile, description, and source link." loading="lazy" decoding="async" />
+
+</TabItem>
+<TabItem label="Homepage">
+
+The homepage shows how package lists and configuration reach a machine. It then walks through installation, a configuration edit, and a read-only agent session, with commands and expected results.
+
+<img src="/media/handbook-home.webp" width="1425" height="990" alt="Dark-mode documentation homepage with package and configuration paths, an installation command, and links to setup guides." loading="lazy" decoding="async" />
+
+</TabItem>
+</Tabs>
+
+## Show configuration with context
+
+Name the file, highlight the setting that matters, and explain the effect. This excerpt from [Ghostty's managed source](https://github.com/cadebrown/dotfiles/blob/main/home/dot_config/ghostty/config) makes the clipboard policy visible:
+
+```ini title="home/dot_config/ghostty/config — excerpt" showLineNumbers {3-4}
+# Local selection and remote OSC 52 writes may update the clipboard.
+copy-on-select = clipboard
+clipboard-write = allow
+clipboard-read = ask
+```
+
+For longer examples, collapse supporting lines and keep the changed behavior visible. The block below is an **example evidence record**, not a report of an actual Ghostty test:
+
+```json title="Example evidence record" showLineNumbers collapse={2-6} {7-10}
+{
+  "feature": "terminal-clipboard",
+  "source": "home/dot_config/ghostty/config",
+  "environment": "record OS, architecture, and app versions",
+  "command": "record the exact command or interaction",
+  "capturedAt": "record the UTC timestamp",
+  "expected": "remote copy updates the local clipboard",
+  "observed": "record the actual result after testing",
+  "artifact": "record a relative artifact path",
+  "limitations": "record what this test did not establish"
+}
+```
+
+Title, line-number, marker, and collapse syntax comes from [Expressive Code](https://expressive-code.com/). Copying a code block keeps its underlying text; annotations are presentation.
+
+## Choose the right evidence
+
+| Change | Useful demonstration | Additional boundary |
+| --- | --- | --- |
+| Shell/PATH configuration | Fresh login shell, resolved executable, representative command | Existing terminals retain old environment |
+| Agent instruction or skill | Representative task plus resulting artifact and checks | One success does not establish general model quality |
+| MCP integration | Discover tool, invoke bounded operation, verify result | Declaration alone does not prove auth or permission |
+| Browser/desktop workflow | Before/after interaction, focused screenshot, reopen result | Build success does not prove UI behavior |
+| Game/media pipeline | Render, play, import, or reopen the editable artifact | Emulator/host output may differ from target hardware |
+| Performance change | Repeated samples, environment, command, raw values | Separate cold/warm runs and measured scope |
+
+## Media budget and reproduction
+
+Keep diagrams as accessible SVG. For screenshots, capture the actual interface, choose a focused viewport or crop, encode as WebP/AVIF, and inspect the encoded image. Do not manufacture a UI screenshot to stand in for a real test.
+
+```bash title="Encode a captured screenshot"
+cd site
+node scripts/encode-media.mjs artifacts/capture.png public/media/feature.webp
+```
+
+The encoder limits width to 1600 pixels without upscaling, uses WebP quality 88, and rejects an image over 350 KiB. Add its dimensions, description, route, capture conditions, and hash to [media.json](https://github.com/cadebrown/dotfiles/blob/main/docs/_data/media.json). The published examples here total roughly 213 KiB across four screenshots; individual pages load their own images lazily.
+
+Use [performance measurements](/contributing/performance/) for reproducible build data, and the [documentation authoring guide](/contributing/documentation/) for the canonical validation loop.

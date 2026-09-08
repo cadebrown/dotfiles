@@ -1,0 +1,25 @@
+---
+import catalog from '../data/catalog.json';
+const counts = new Map<string, number>();
+for (const item of catalog.packages) counts.set(item.manager, (counts.get(item.manager) ?? 0) + 1);
+const groups = [...counts].sort((a,b) => b[1] - a[1]);
+const maximum = groups[0]?.[1] ?? 1;
+---
+<figure class="catalog-chart">
+  <figcaption>Declared tools by ownership system <span>{catalog.packages.length} declarations · generated from repository manifests</span></figcaption>
+  <ul>{groups.map(([manager,count]) => <li><span class="bar-label">{manager}</span><span class="bar-track"><span class="bar" style={`width:${count / maximum * 100}%`}></span></span><span class="bar-count">{count}</span></li>)}</ul>
+  <p>Counts describe declarations, including plugins and extensions. They are not measurements of installed tools, disk use, execution speed, or distinct capabilities.</p>
+</figure>
+<style>
+  .catalog-chart { margin:1.5rem 0; padding:1.2rem; border:1px solid var(--sl-color-hairline-light); border-radius:.4rem; }
+  figcaption { font-size:1.1rem; font-weight:650; }
+  figcaption span { display:block; font: .75rem var(--sl-font-mono); color:var(--sl-color-gray-2); margin-top:.35rem; }
+  ul { list-style:none; padding:0; margin:1.3rem 0; display:grid; gap:.6rem; }
+  li { display:grid; grid-template-columns:9rem minmax(0,1fr) 2.5rem; gap:.8rem; align-items:center; margin:0; }
+  .bar-label,.bar-count { font-family:var(--sl-font-mono); font-size:.76rem; }
+  .bar-count { text-align:right; }
+  .bar-track { height:.7rem; border-radius:.15rem; background:var(--sl-color-bg-sidebar); }
+  .bar { display:block; height:100%; background:var(--sl-color-accent); border-radius:.15rem; }
+  p { color:var(--sl-color-gray-2); font-size:.88rem; }
+  @media(max-width:30rem) { li { grid-template-columns:7.7rem 1fr 2rem; gap:.4rem; } .bar-label { font-size:.69rem; } }
+</style>

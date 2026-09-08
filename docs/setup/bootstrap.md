@@ -1,284 +1,178 @@
 # Bootstrap a new machine
 
+Bootstrap applies managed files, installs the selected runtimes, then runs
+small selected-tool checks. Start from a checkout when you want an interactive
+name/email prompt or an auditable revision.
+
 ## One-liner
 
 ```sh
-DF_NAME="Your Name" DF_EMAIL="you@example.com" \
-  curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cadebrown/dotfiles/main/bootstrap.sh | \
+  DF_NAME="Your Name" DF_EMAIL="you@example.com" bash
 ```
 
-Runs fully unattended. `DF_NAME` / `DF_EMAIL` are needed here because piping the
-script into `bash` occupies stdin, leaving chezmoi no terminal to prompt on. The
-values are cached in `~/.config/chezmoi/chezmoi.toml`, so re-runs read from the
-cache and need nothing.
+Piping consumes stdin, so provide `DF_NAME` and `DF_EMAIL`; chezmoi caches them
+in `~/.config/chezmoi/chezmoi.toml` for later runs.
 
 ### Interactive (prompts for name + email)
-
-To be prompted instead of pre-seeding, run from a local clone in a real terminal —
-chezmoi then has a TTY to read from:
 
 ```sh
 git clone https://github.com/cadebrown/dotfiles ~/dotfiles
 ~/dotfiles/bootstrap.sh
 ```
 
----
+Expected result: a final selected-tool verification and, if applicable, a
+degradation summary to repair. It does not prove cloud credentials, GUI privacy
+grants, or running local services.
 
 ## Modes
 
 ```sh
-bootstrap.sh              # install (default) — full idempotent setup
-bootstrap.sh update       # git pull + chezmoi apply + refresh tools
-bootstrap.sh upgrade      # update + brew upgrade + cargo upgrade
+~/dotfiles/bootstrap.sh          # install
+~/dotfiles/bootstrap.sh update   # refresh a clean checkout; skips scratch setup
+~/dotfiles/bootstrap.sh upgrade  # update plus managed runtime upgrades
 ```
 
-**`update`** pulls the latest dotfiles, applies chezmoi, refreshes zsh plugins, and re-runs all install scripts (which skip already-installed tools). Skips scratch setup and repo cloning.
-
-**`upgrade`** does everything `update` does, plus enables Homebrew upgrades (`DF_BREW_UPGRADE=1`) and forces cargo-binstall to re-check for newer binaries.
-
----
+`upgrade` enables Homebrew upgrades; it does not update the operating system.
+`update` refuses a non-fast-forward pull. See [the lifecycle](/architecture/bootstrap-lifecycle/)
+for stage order and recovery behavior.
 
 ## macOS
 
 ### Requirements
 
-| Requirement | How to get it |
-|---|---|
-| macOS 13+ (Ventura or later) | — |
-| Xcode Command Line Tools | Homebrew prompts automatically, or: `xcode-select --install` |
-| Internet access | — |
+| Requirement | How to satisfy it |
+| --- | --- |
+| macOS 13+ | Ventura or later |
+| Xcode Command Line Tools | `xcode-select --install`, or Homebrew's prompt |
+| Internet access | required for package sources |
 
-Sudo is required for the Homebrew installer.
+Homebrew installation uses the system privilege flow.
 
 ### What gets installed
 
-Paths below use `$LOCAL_PLAT`, which is `$HOME/.local` by default and `$HOME/.local/$PLAT` when [PLAT isolation](plat.md) is enabled. `$ARCH_BIN` is `$LOCAL_PLAT/bin`.
+| Area | Managed result |
+| --- | --- |
+| Configuration | chezmoi applies `home/` templates and login profiles |
+| Packages | Homebrew packages/casks, uv, nvm, Rust, Go, Lean, TeX, and selected CLIs |
+| Agent tooling | Claude, Codex, MCP configuration, skills, optional memory and local-LLM tools |
+| Desktop integration | macOS settings, services, Cursor/VS Code, and optional Blender MCP |
 
-1. **chezmoi** → `$ARCH_BIN/chezmoi`
-2. **Dotfiles** applied via `chezmoi apply`
-   - Shell configs for both **zsh** (`.zprofile`) and **bash** (`.bash_profile`)
-   - Both shells do identical PLAT capability detection and PATH setup
-3. **oh-my-zsh** + plugins (pure prompt, autosuggestions, fast-syntax-highlighting, completions)
-4. **Homebrew** → `/opt/homebrew` (Apple Silicon) or `/usr/local` (Intel)
-   - All packages from `packages/Brewfile` — CLI tools, casks, macOS-only apps
-   - Includes `rustup` (Homebrew's code-signed build — required for macOS Sequoia+)
-5. **Services**: colima/ollama/mlxserve auto-start is opt-in (`DF_START_LOCAL_SERVICES=1`); off by default. At the default, colima/ollama are simply left alone, but mlxserve is stopped and `launchctl disable`d — launchd re-loads its plist at every login otherwise, so a hand-started mlxserve will not survive a bootstrap run. Docker CLI plugins are always linked.
-6. **macOS defaults**: Dock, Finder, keyboard, trackpad, screenshots, Safari, iTerm2 preferences
-7. **Python** via uv → plain `python` from `$PYTHON_ENV` with `packages/python.txt` (including SymPy), plus one isolated venv per CLI tool under `$LOCAL_PLAT/uv/tools/`; entrypoints land in `$ARCH_BIN`, and `DF_PROFILE=core` skips `pip-full.txt`
-8. **Node.js 24 LTS** via pinned nvm → `$LOCAL_PLAT/nvm/`
-   - Uses uv's Python for `node-gyp` fallbacks when an npm package has no prebuilt binary
-9. **Rust** toolchain → `$LOCAL_PLAT/rustup/` + `$LOCAL_PLAT/cargo/`
-    - Homebrew's `rustup` (code-signed), required on macOS Sequoia+ where the linker enforces `com.apple.provenance`
-    - `DF_PROFILE=core` keeps rustup and rust-analyzer but skips optional `cargo.txt` tools
-   - `cargo-binstall` downloads pre-built binaries from GitHub releases when available, falls back to source
-   - Cargo tools install to `$LOCAL_PLAT/cargo/bin/`
-10. **Go CLI tools** from `packages/go.txt` → `$ARCH_BIN` (Go itself comes from the Brewfile)
-11. **Lean 4** via elan → `$LOCAL_PLAT/elan/`
-    - Toolchains are arch-specific (~1.5 GB each), so `ELAN_HOME` is PLAT-isolated like rustup
-    - Installs and defaults a pinned toolchain; projects override via their own `lean-toolchain` file
-12. **TeX** — MacTeX comes from the Brewfile cask; this step verifies it and puts `/Library/TeX/texbin` on PATH
-13. **Claude Code** native binary → `$ARCH_BIN/claude` + plugins + MCP servers + overlay skills
-14. **Codex CLI** native binary → `$ARCH_BIN/codex`, plus managed config + hooks under `~/.codex/`
-15. **Cursor / VS Code** — settings symlinked from `home/dot_cursor/`; extensions installed from `packages/{cursor,vscode}-extensions.txt`
-16. **CMake toolchain files** → `$LOCAL_PLAT/cmake/toolchains/`
-    - Versioned files: `llvm-21.cmake`, `llvm-22.cmake`, `gcc-13.cmake`, `gcc-15.cmake`, plus shared `_brew.cmake`
-    - `~/.profile` sets `CMAKE_TOOLCHAIN_FILE` to the highest installed LLVM toolchain automatically
-17. **Local LLM tooling** — HuggingFace cache + binary checks
-    - Creates `$LOCAL_PLAT/.cache/huggingface` for mlx-lm weights
-    - Verifies ollama / mlx-lm / mlx-openai-server / opencode binaries
-18. **Agent memory stack** — cass session-history archive, ~/kb + qmd knowledge index; cass indexing stays manual
-19. **Agent skills** — installs `packages/agent-skills.txt` into the shared `~/.claude/skills` tree
-20. **Blender MCP** addon — installs `addon.py` into the active Blender profile and enables it
-21. **Auth** (opt-in: `DF_DO_AUTH=1`) — guided service-token setup; see [Auth](auth.md)
-22. **Overlays** — runs `bootstrap.sh` of any `dotfiles-*/` overlay alongside this repo; see [Overlays](overlays.md)
+Installers call the root `LOCAL_PLAT`; a managed login shell exposes the same
+root as `$_LOCAL_PLAT` (`~/.local` by default). Executables land in its `bin/`.
+`DF_START_LOCAL_SERVICES=1` opts in to starting Colima, Ollama,
+and mlxserve at login; otherwise start a needed service manually. See
+[package ownership](/architecture/package-ownership/) and the
+[macOS workflow](/workflows/macos-workstation/) for operational checks.
 
-Total time: ~2 minutes on subsequent runs (idempotent, mostly bottle pours); ~5–10 minutes on a fresh machine.
-
----
+| macOS-specific choice | Effect |
+| --- | --- |
+| Homebrew Rustup | code-signed toolchain path for current macOS linker rules |
+| `DF_PROFILE=core` | keeps Rustup/rust-analyzer but omits optional Cargo tools |
+| service default | Colima/Ollama are left manual; mlxserve is stopped/disabled so a hand-start does not survive bootstrap |
 
 ## Linux
 
 ### Requirements
 
 | Requirement | Notes |
-|---|---|
-| x86\_64 or aarch64 | — |
-| `git`, `curl`, and `python3` | Pre-installed on most systems; Python runs the Homebrew formula patch layer before uv is installed |
-| Internet access | — |
+| --- | --- |
+| x86_64 or aarch64 | supported host architectures |
+| `git`, `curl`, `python3` | normally preinstalled |
+| Internet access | required for package sources |
 
-No sudo is required. The public package-manager bootstrap needs no Docker or Podman; the NVIDIA overlay's default-on nv-pptx runner requires Docker (`DF_DO_NV_PPTX=0` skips it).
+No sudo is required. Homebrew installs under `$_LOCAL_PLAT/brew` in a managed
+login shell; Linux setup
+does not require Docker or Podman. An enabled NVIDIA overlay may have its own
+container requirement.
 
 ### What gets installed
 
-Paths use `$LOCAL_PLAT`, which is `$HOME/.local` by default (or `$HOME/.local/$PLAT` with [PLAT isolation](plat.md) enabled — recommended for shared NFS homes).
+The same configuration, language, agent, and optional-workflow layers as macOS,
+with rootless Linux Homebrew, TinyTeX, and Linux-specific package handling.
+Cursor and VS Code default off on Linux; set their gates only where the CLI is
+available. Inspect the exact owner in [package setup](/setup/packages/).
 
-1. **chezmoi** → `$ARCH_BIN/chezmoi` (`$ARCH_BIN` = `$LOCAL_PLAT/bin`)
-2. **Dotfiles** applied via `chezmoi apply`
-   - Shell configs for both **zsh** (`.zprofile`) and **bash** (`.bash_profile`)
-3. **oh-my-zsh** + plugins
-4. **Homebrew** → `$LOCAL_PLAT/brew/` (native install, no Docker/Podman needed)
-   - Installs Homebrew's own glibc 2.35 first — binaries are fully self-contained
-   - Most packages pour as precompiled bottles; glibc builds from source (~2 min) on first run
-   - Custom Python@3.14 patches applied automatically for Linux compatibility
-5. **Python** via uv → plain `python` from `$PYTHON_ENV` with `packages/python.txt` (including SymPy), plus per-CLI-tool venvs under `$LOCAL_PLAT/uv/tools/`; entrypoints land in `$ARCH_BIN`
-6. **Node.js** via nvm → `$LOCAL_PLAT/nvm/`
-   - Uses uv's Python for `node-gyp` fallbacks when an npm package has no prebuilt binary
-7. **Rust** via `sh.rustup.rs` → `$LOCAL_PLAT/rustup/` + `$LOCAL_PLAT/cargo/`
-   - `cargo-binstall` downloads pre-built binaries from GitHub releases when available, falls back to source
-8. **Go CLI tools** from `packages/go.txt` → `$ARCH_BIN`
-9. **Lean 4** via elan → `$LOCAL_PLAT/elan/` (pinned default toolchain; projects override via `lean-toolchain`)
-10. **Julia** via Juliaup, with release channels and depots under `$LOCAL_PLAT/julia/`
-11. **TeX** via TinyTeX → `$LOCAL_PLAT/tex/.TinyTeX`, with `tlmgr` `sys_bin` pointed at `$ARCH_BIN`
-    - ~200 MB base instead of multi-GB; missing packages install on demand with `tlmgr install <pkg>`
-12. **Quarto** via the macOS cask or a checksum-verified rootless Linux archive
-13. **Claude Code** native binary → `$ARCH_BIN/claude` + plugins + MCP servers
-14. **Codex CLI** native binary → `$ARCH_BIN/codex`
-15. **Cursor / VS Code** — extensions from `packages/{cursor,vscode}-extensions.txt`
-16. **CMake toolchain files** → `$LOCAL_PLAT/cmake/toolchains/` (`llvm-21/22.cmake`, `gcc-13/15.cmake`, `_brew.cmake`)
-    - `~/.profile` auto-sets `CMAKE_TOOLCHAIN_FILE` to the highest installed LLVM toolchain
-17. **Local LLM tooling** — HuggingFace cache + ollama/mlx-lm/mlx-openai-server/opencode binary checks
-18. **Agent memory stack** — cass session-history archive, ~/kb + qmd knowledge index; cass indexing stays manual
-19. **Agent skills** — installs `packages/agent-skills.txt` into the shared `~/.claude/skills` tree
-20. **Auth** (opt-in: `DF_DO_AUTH=1`) — guided token setup; see [Auth](auth.md)
-21. **Overlays** — runs `bootstrap.sh` of any `dotfiles-*/` overlay; see [Overlays](overlays.md)
-
-Total time: ~5 minutes on a fast connection.
-
----
+| Linux-specific choice | Effect |
+| --- | --- |
+| Homebrew | rootless native prefix; no container runtime required |
+| TeX | TinyTeX under the runtime root; missing packages install through `tlmgr` |
+| editors | Cursor/VS Code default off; selecting a missing CLI or extension fails bootstrap |
 
 ## Skipping steps
 
-Any step can be disabled with an environment variable:
+Pass `DF_DO_<AREA>=0` for an optional stage; `DF_DO_AUTH=1` opts into the token
+walk. A skipped stage is not an uninstall, and final verification skips the
+same selected check.
+
+| Gate | Default | Stage |
+| --- | --- | --- |
+| `DF_DO_SCRATCH`, `DF_DO_DIRS` | install: on; update/upgrade scratch: off | scratch links; home directories |
+| `DF_DO_PACKAGES`, `DF_DO_LLDB`, `DF_DO_QUARTO` | on | Homebrew/package bundle; debugger; Quarto |
+| `DF_DO_ZSH`, `DF_DO_NODE`, `DF_DO_RUST`, `DF_DO_PYTHON`, `DF_DO_GO` | on | shell plugins and language runtimes |
+| `DF_DO_JULIA`, `DF_DO_LEAN`, `DF_DO_LATEX` | on | Julia, Lean, TeX |
+| `DF_DO_CLAUDE`, `DF_DO_CODEX`, `DF_DO_OPENCODE` | on | coding-agent CLIs/configuration |
+| `DF_DO_CLAUDE_DESKTOP`, `DF_DO_CODEX_DESKTOP`, `DF_DO_LINEARMOUSE` | on, macOS | tracked desktop preferences |
+| `DF_DO_MACOS_SERVICES`, `DF_DO_MACOS_SETTINGS`, `DF_DO_MACOS_QUICK_ACTIONS` | on, macOS | services, system settings, Finder actions |
+| `DF_START_LOCAL_SERVICES` | off | start Colima, Ollama, mlxserve at login |
+| `DF_DO_CURSOR`, `DF_DO_VSCODE` | macOS: on; Linux: off | editor extension/settings integration |
+| `DF_DO_CMAKE`, `DF_DO_LOCAL_LLM`, `DF_DO_MEMORY`, `DF_DO_SKILLS` | on (`LOCAL_LLM`: full profile) | toolchains, model tooling, qmd/cass, skills |
+| `DF_DO_BLENDER_MCP` | macOS: on; Linux: off | Blender add-on |
+| `DF_DO_AUTH`, `DF_DO_OVERLAYS` | auth: off; overlays: on | token walk; sibling overlays |
+| `DF_USE_PLAT`, `DF_BREW_UPGRADE`, `DF_STRICT_UPGRADE` | off; brew off except upgrade; strict upgrade on | runtime layout and upgrade policy |
+| `DF_BREW_UPGRADE_CASKS`, `DF_BREW_UPGRADE_MAS` | `auto` | permit GUI/MAS upgrades only with a cached sudo ticket |
 
 ```sh
-DF_DO_SCRATCH=0              # skip scratch space symlink setup
-DF_DO_DIRS=0                 # skip home directory creation (~/dev, ~/bones, ~/misc)
-DF_DO_PACKAGES=0             # skip Homebrew + brew bundle
-DF_DO_LLDB=0                 # skip LLDB and lldb-dap
-DF_DO_MACOS_SERVICES=0       # skip colima service setup (macOS)
-DF_DO_MACOS_SETTINGS=0       # skip macOS settings (Dock, Finder, keyboard, etc.)
-DF_DO_MACOS_QUICK_ACTIONS=0  # skip Finder Quick Actions install (macOS)
-DF_DO_ZSH=0                  # skip oh-my-zsh
-DF_DO_NODE=0                 # skip nvm + Node.js + global npm packages
-DF_DO_RUST=0                 # skip rustup + cargo tools
-DF_DO_PYTHON=0               # skip uv + per-tool venvs
-DF_DO_GO=0                   # skip Go CLI tools from go.txt
-DF_DO_JULIA=0                # skip Julia release-channel management
-DF_DO_LEAN=0                 # skip the Lean 4 toolchain (elan + pinned toolchain)
-DF_DO_LATEX=0                # skip the TeX distribution (MacTeX verify / TinyTeX)
-DF_DO_QUARTO=0               # skip Quarto verification/install
-DF_DO_CLAUDE=0               # skip Claude Code install + plugins + MCP servers
-DF_DO_CODEX=0                # skip Codex CLI install
-DF_DO_CLAUDE_DESKTOP=0       # skip Claude Desktop tracked preferences (macOS)
-DF_DO_CODEX_DESKTOP=0        # skip Codex desktop app tracked preferences (macOS)
-DF_DO_LINEARMOUSE=0          # skip LinearMouse tracked settings (macOS)
-DF_DO_CURSOR=0               # skip Cursor (default 1 on macOS, 0 on Linux)
-DF_DO_VSCODE=0               # skip VS Code (default 1 on macOS, 0 on Linux)
-DF_DO_CMAKE=0                # skip CMake toolchain file deployment
-DF_DO_LOCAL_LLM=0            # skip local LLM setup (HuggingFace cache + binary checks)
-DF_DO_MEMORY=0               # skip the agent memory stack (cass + qmd + ~/kb)
-DF_DO_SKILLS=0               # skip agent skills from agent-skills.txt
-DF_DO_BLENDER_MCP=0          # skip Blender MCP addon install
-DF_DO_AUTH=1                 # run interactive API token setup (default 0)
-DF_DO_OVERLAYS=0             # skip all overlay bootstraps (dotfiles-*/bootstrap.sh)
-DF_USE_PLAT=1                # opt in to per-PLAT directory isolation (default 0; flat layout)
-DF_BREW_UPGRADE=0            # skip Homebrew upgrades (default except in upgrade mode)
-DF_STRICT_UPGRADE=0          # report stale tools without failing upgrade
+# narrow command-line machine
+DF_PROFILE=core DF_DO_AUTH=0 DF_DO_LOCAL_LLM=0 ./bootstrap.sh
+
+# configuration without common language/agent runtimes
+DF_DO_PACKAGES=0 DF_DO_ZSH=0 DF_DO_NODE=0 DF_DO_RUST=0 \
+DF_DO_PYTHON=0 DF_DO_CLAUDE=0 ./bootstrap.sh
 ```
 
-On Linux, Cursor and VS Code default off because a headless machine has no
-desktop CLI to configure. Set `DF_DO_CURSOR=1` or `DF_DO_VSCODE=1` explicitly
-on a Linux workstation or Remote-SSH host where that CLI is installed. Once
-selected, a missing CLI or extension is a bootstrap failure.
-
-The complete reference lives at [Env vars](../reference/env-vars.md).
-
-Example — dotfiles only, no runtimes:
-
-```sh
-DF_DO_PACKAGES=0 DF_DO_ZSH=0 DF_DO_NODE=0 \
-DF_DO_RUST=0 DF_DO_PYTHON=0 DF_DO_CLAUDE=0 \
-~/dotfiles/bootstrap.sh
-```
-
----
+`DF_PROFILE` is `core` or `full`; `core` defaults local-LLM setup off and
+`full` defaults it on. The complete, revision-matched comments are in [the
+`bootstrap.sh` header](../../bootstrap.sh) and [the environment-variable
+reference](/reference/env-vars/).
 
 ## Debug mode
-
-For verbose output with command timing:
 
 ```sh
 DF_DEBUG=1 ~/dotfiles/bootstrap.sh
 ```
 
-Shows `[dbug]` lines for every command executed by `run_logged`, including exit codes and elapsed time.
-
----
+This adds command and elapsed-time diagnostics. Keep the complete output when
+reporting a failed stage.
 
 ## Shared home directories (NFS/GPFS)
-
-If you share `$HOME` across multiple machines with different CPU architectures, **enable PLAT isolation**:
 
 ```sh
 DF_USE_PLAT=1 ~/dotfiles/bootstrap.sh
 ```
 
-(Or persist it in chezmoi data: `chezmoi edit ~/.config/chezmoi/chezmoi.toml` and set `use_plat = true`.)
-
-With PLAT on, each machine installs compiled tools to its own `~/.local/$PLAT/` directory:
-
-| Machine | PLAT | Where tools live |
-|---|---|---|
-| AVX-512 Linux (e.g. Ice Lake) | `plat_Linux_x86-64-v4` | `~/.local/plat_Linux_x86-64-v4/` |
-| AVX2 Linux (e.g. Haswell/Zen2) | `plat_Linux_x86-64-v3` | `~/.local/plat_Linux_x86-64-v3/` |
-| ARM Linux | `plat_Linux_aarch64` | `~/.local/plat_Linux_aarch64/` |
-| Apple Silicon | `plat_Darwin_arm64` | `~/.local/plat_Darwin_arm64/` |
-
-Text configs (dotfiles) are arch-neutral and shared freely across all machines. See [PLAT isolation](plat.md) for the deeper explanation, the decommission script, and the failure modes that PLAT exists to prevent.
+Use this only when one home is shared across incompatible CPU architectures.
+It places each machine's compiled state in `~/.local/$PLAT`; text configuration
+remains shared. [PLAT isolation](/setup/plat/) explains the layouts and safe
+decommissioning.
 
 ### Scratch space (large quota environments)
 
-If your home directory has a small quota (common on HPC NFS mounts), direct large directories to local scratch storage:
-
 ```sh
-DF_SCRATCH=/scratch/$USER \
-DF_NAME="Your Name" DF_EMAIL="you@example.com" \
-~/dotfiles/bootstrap.sh
+DF_SCRATCH=/scratch/$USER ~/dotfiles/bootstrap.sh
 ```
 
-This symlinks large directories to `$DF_SCRATCH/.paths/` before any tools are installed, so the multi-GB Homebrew prefix and caches never touch NFS.
-
-Default directories redirected to scratch (controlled by `DF_LINKS`):
-
-- `~/.local` — PLAT directories, Homebrew prefix, tool binaries
-- `~/.cache` — ccache, sccache, pip/uv cache
-- `~/.vscode` / `~/.vscode-server` — VS Code extensions and data
-- `~/.cursor` / `~/.cursor-server` — Cursor IDE data
-- `~/.nv` — NVIDIA shader and OptiX cache
-- `~/.npm` — npm cache
-- `~/.oh-my-zsh` / `~/.oh-my-zsh-custom` — oh-my-zsh and plugins
-
-Plus the heavy *unmanaged* entries of the two agent config dirs, which stay real directories themselves because chezmoi manages files inside them:
-
-- `~/.claude` (controlled by `DF_CLAUDE_LINKS`): `projects` (history + memory), `plugins`, `file-history`
-- `~/.codex` (controlled by `DF_CODEX_LINKS`): `sessions` (transcripts — usually the largest single directory on the machine), `cache`, `plugins`, `attachments`, `shell_snapshots`, `.tmp`, `tmp`, plus the loose `*.sqlite` databases
-
-`~/.codex` is skipped while any process holds a file there open — see [Scratch space](scratch.md#codex-specifics).
-
----
+Bootstrap links selected heavy state into `$DF_SCRATCH/.paths` before installs.
+`~/.claude` and `~/.codex` remain real chezmoi-managed directories; only their
+unmanaged heavy children move. See [scratch space](/setup/scratch/) before
+running it on an existing machine.
 
 ## Auth (API tokens)
 
-See the dedicated [Auth](auth.md) page for the full walkthrough. Quick reference:
-
 ```sh
-bash ~/dotfiles/install/auth.sh                  # walk every service interactively
-bash ~/dotfiles/install/auth.sh status           # show current state, no prompts
-bash ~/dotfiles/install/auth.sh huggingface      # set/update one service
-bash ~/dotfiles/install/auth.sh gh               # `gh auth login` (browser flow)
-
-# Or during bootstrap:
+bash ~/dotfiles/install/auth.sh status
 DF_DO_AUTH=1 ~/dotfiles/bootstrap.sh
 ```
 
-Covers **GitHub**, **Anthropic**, **OpenAI**, **Cloudflare**, **HuggingFace**, plus a separate `gh auth login` flow for the Claude GitHub MCP. Tokens land in `~/.<service>.env` files (chmod 600) and are auto-sourced by install scripts and login shells. Each prompt shows a `skip if:` hint — most users only set 1–2 of them.
+The guided registry stores opted-in values in owner-only env files. Read
+[auth](/setup/auth/) for service selection and file handling.

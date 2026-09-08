@@ -1,0 +1,65 @@
+---
+import pages from '../data/pages.json';
+const { sidebar, entry } = Astro.locals.starlightRoute;
+type Entry = (typeof sidebar)[number];
+type Crumb = { label: string; href?: string };
+function firstHref(entries: Entry[]): string | undefined {
+  const first = entries[0];
+  return first?.type === 'link' ? first.href : first ? firstHref(first.entries) : undefined;
+}
+function breadcrumbs(entries: Entry[], parents: Crumb[] = []): Crumb[] | undefined {
+  for (const item of entries) {
+    if (item.type === 'link' && item.isCurrent) return [...parents, { label: item.label }];
+    if (item.type === 'group') {
+      const found = breadcrumbs(item.entries, [...parents, { label: item.label, href: firstHref(item.entries) }]);
+      if (found) return found;
+    }
+  }
+}
+const page = pages.find((page) => page.route === Astro.url.pathname);
+const home = Astro.url.pathname === '/';
+const trail = home ? [] : breadcrumbs(sidebar) ?? [
+  ...(Astro.url.pathname.startsWith('/troubleshooting/') ? [{ label: 'Troubleshooting', href: '/troubleshooting/' }] : []),
+  { label: entry.data.title },
+];
+const source = page ? `https://github.com/cadebrown/dotfiles/blob/main/${page.source}` : undefined;
+---
+{!home && <nav aria-label="Breadcrumb" class="breadcrumbs" data-pagefind-ignore>
+  <ol><li><a href="/">Home</a></li>{trail.map((crumb) => <li>{crumb.href ? <a href={crumb.href}>{crumb.label}</a> : <span aria-current="page">{crumb.label}</span>}</li>)}</ol>
+</nav>}
+<slot />
+{page && <div class="page-links" data-pagefind-ignore>
+  <a href={source} title={`Read ${page.source} on GitHub`}>Page source <span aria-hidden="true">↗</span></a>
+  <button type="button" data-copy-page hidden>Copy link</button>
+  <span class="copy-status" role="status" aria-live="polite"></span>
+</div>}
+<script>
+  function setupPageLinks() {
+    const button = document.querySelector<HTMLButtonElement>('[data-copy-page]');
+    if (!button || button.dataset.ready) return;
+    button.dataset.ready = 'true';
+    button.hidden = false;
+    const status = button.parentElement!.querySelector<HTMLElement>('.copy-status')!;
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        status.textContent = 'Link copied';
+      } catch {
+        status.textContent = 'Copy the address from your browser.';
+      }
+    });
+  }
+  setupPageLinks();
+  document.addEventListener('astro:page-load', setupPageLinks);
+</script>
+<style>
+  .breadcrumbs { font-size: .875rem; color: var(--sl-color-gray-2); margin-bottom: .5rem; }
+  ol { display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem .55rem; padding: 0; margin: 0; list-style: none; }
+  li { display: flex; align-items: baseline; gap: .55rem; }
+  li + li::before { content: '/'; color: var(--sl-color-gray-3); }
+  a { color: var(--sl-color-text-accent); text-underline-offset: .2em; }
+  .page-links { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem 1rem; margin-top: .75rem; font-size: .875rem; }
+  button { border: 0; background: none; padding: .2rem 0; color: var(--sl-color-text-accent); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: .2em; }
+  button[hidden] { display: none; }
+  .copy-status { color: var(--sl-color-gray-2); }
+</style>

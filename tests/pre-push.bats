@@ -7,6 +7,7 @@ setup() {
     export GIT_COMMITTER_NAME=Test GIT_COMMITTER_EMAIL=test@example.com
     export HOOK_MARKER="$BATS_TEST_TMPDIR/validated"
     export HOOK_LOCATION="$BATS_TEST_TMPDIR/validation-location"
+    export HOOK_SETUP_MARKER="$BATS_TEST_TMPDIR/handbook-setup"
     fixture="$BATS_TEST_TMPDIR/checkout"
     remote="$BATS_TEST_TMPDIR/remote.git"
     git init -q --bare "$remote"
@@ -30,6 +31,35 @@ EOF
     bash "$fixture/tests/install-hooks.sh" >/dev/null
 }
 
+add_handbook_snapshot() {
+    mkdir -p "$fixture/site"
+    cat > "$fixture/site/package.json" <<'EOF'
+{"name":"fixture-handbook","private":true}
+EOF
+    cat > "$fixture/site/package-lock.json" <<'EOF'
+{"name":"fixture-handbook","lockfileVersion":3,"packages":{}}
+EOF
+}
+
+write_handbook_stubs() {
+    local stub_dir="$BATS_TEST_TMPDIR/handbook-bin"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/npm" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'npm|%s|%s\n' "$PWD" "$*" >> "$HOOK_SETUP_MARKER"
+mkdir -p node_modules
+EOF
+    cat > "$stub_dir/npx" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'npx|%s|%s|%s\n' "$PWD" "$PLAYWRIGHT_BROWSERS_PATH" "$*" >> "$HOOK_SETUP_MARKER"
+touch node_modules/.chromium-installed
+EOF
+    chmod +x "$stub_dir/npm" "$stub_dir/npx"
+    printf '%s\n' "$stub_dir"
+}
+
 @test "push gate validates the outgoing commit despite dirty working files" {
     local expected
     expected="$(git -C "$fixture" rev-parse HEAD)"
@@ -43,6 +73,59 @@ EOF
     physical_fixture="$(cd -P "$fixture" && pwd -P)"
     [[ "$(cat "$HOOK_LOCATION")" == "$physical_fixture/.ci-validation/"* ]]
     [ ! -d "$(cat "$HOOK_LOCATION")" ]
+}
+
+@test "a handbook lock provisions npm and Chromium inside the outgoing snapshot before CI" {
+    local stub_dir physical_fixture setup_log
+    add_handbook_snapshot
+    cat > "$fixture/tests/ci.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "$1" == full ]]
+cd "$(dirname "$0")/.."
+test -f site/node_modules/.chromium-installed
+printf 'ci|%s|%s\n' "$PWD" "$PLAYWRIGHT_BROWSERS_PATH" >> "$HOOK_SETUP_MARKER"
+EOF
+    chmod +x "$fixture/tests/ci.sh"
+    git -C "$fixture" add site tests/ci.sh
+    git -C "$fixture" commit -qm handbook
+    stub_dir="$(write_handbook_stubs)"
+    physical_fixture="$(cd -P "$fixture" && pwd -P)"
+
+    run env PATH="$stub_dir:$PATH" git -C "$fixture" push origin main
+    [ "$status" -eq 0 ]
+    setup_log="$(cat "$HOOK_SETUP_MARKER")"
+    [[ "$(sed -n '1p' "$HOOK_SETUP_MARKER")" == "npm|$physical_fixture/.ci-validation/"*"/repo/site|ci --ignore-scripts" ]]
+    [[ "$(sed -n '2p' "$HOOK_SETUP_MARKER")" == "npx|$physical_fixture/.ci-validation/"*"/repo/site|0|--no-install playwright install chromium" ]]
+    [[ "$(sed -n '3p' "$HOOK_SETUP_MARKER")" == "ci|$physical_fixture/.ci-validation/"*"/repo|0" ]]
+    [ "$(printf '%s\n' "$setup_log" | wc -l | tr -d ' ')" -eq 3 ]
+}
+
+@test "handbook setup failure blocks the outgoing commit before full CI" {
+    local stub_dir
+    add_handbook_snapshot
+    git -C "$fixture" add site
+    git -C "$fixture" commit -qm handbook
+    stub_dir="$BATS_TEST_TMPDIR/failing-handbook-bin"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/npm" <<'EOF'
+#!/usr/bin/env bash
+printf 'npm-failed|%s\n' "$PWD" >> "$HOOK_SETUP_MARKER"
+exit 42
+EOF
+    cat > "$stub_dir/npx" <<'EOF'
+#!/usr/bin/env bash
+printf 'npx-should-not-run\n' >> "$HOOK_SETUP_MARKER"
+exit 99
+EOF
+    chmod +x "$stub_dir/npm" "$stub_dir/npx"
+
+    run env PATH="$stub_dir:$PATH" git -C "$fixture" push origin main
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'handbook dependency setup failed'* ]]
+    [[ "$(cat "$HOOK_SETUP_MARKER")" == *'npm-failed|'* ]]
+    [[ "$(cat "$HOOK_SETUP_MARKER")" != *'npx-should-not-run'* ]]
+    ! git --git-dir="$remote" rev-parse --verify refs/heads/main
 }
 
 @test "dirty local repairs cannot hide a failing outgoing commit" {

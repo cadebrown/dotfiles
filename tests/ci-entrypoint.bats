@@ -8,13 +8,16 @@ setup() {
     CI_LOG="$BATS_TEST_TMPDIR/commands"
     export CI_LOG
     mkdir -p "$FIXTURE/tests" "$FIXTURE/install/plat/test" "$FIXTURE/home/dot_local/bin" \
-        "$FIXTURE/infra/cloudflare" "$FIXTURE/docs" "$FIXTURE/.github/workflows" "$FIXTURE/.githooks" "$BIN"
+        "$FIXTURE/infra/cloudflare" "$FIXTURE/docs" "$FIXTURE/site/node_modules" "$FIXTURE/.github/workflows" "$FIXTURE/.githooks" "$BIN"
     cp "$SOURCE_REPO/tests/ci.sh" "$FIXTURE/tests/ci.sh"
+    cp "$SOURCE_REPO/tests/docs.sh" "$FIXTURE/tests/docs.sh"
+    chmod +x "$FIXTURE/tests/docs.sh"
+    printf '{"name":"fixture"}\n' > "$FIXTURE/site/package.json"
     for script in .githooks/pre-push bootstrap.sh install/example.sh install/plat/test/.plat_env.sh home/dot_local/bin/executable_git-wt tests/run.sh; do
         printf '#!/usr/bin/env bash\nprintf "bootstrap\\n" >> "$CI_LOG"\n' > "$FIXTURE/$script"
         chmod +x "$FIXTURE/$script"
     done
-    for tool in shellcheck bats jq chezmoi zsh mdbook mdbook-mermaid gitleaks actionlint zizmor tofu docker; do
+    for tool in shellcheck bats jq chezmoi zsh npm gitleaks actionlint zizmor tofu docker; do
         cat > "$BIN/$tool" <<'SH'
 #!/bin/bash
 name="${0##*/}"
@@ -38,7 +41,7 @@ SH
 @test "CI help and invalid modes are explicit" {
     run /bin/bash "$FIXTURE/tests/ci.sh" --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"full"* && "$output" == *"infrastructure"* ]]
+    [[ "$output" == *"full"* && "$output" == *"docs"* && "$output" == *"infrastructure"* ]]
     run /bin/bash "$FIXTURE/tests/ci.sh" typo
     [ "$status" -eq 2 ]
     [[ "$output" == *"unknown mode: typo"* ]]
@@ -56,21 +59,30 @@ SH
     [ ! -e "$CI_LOG" ]
 }
 
+@test "CI docs mode explains missing handbook dependencies without installing them" {
+    rmdir "$FIXTURE/site/node_modules"
+    run -127 env PATH="$BIN:$PATH" /bin/bash "$FIXTURE/tests/ci.sh" docs
+    [ "$status" -eq 127 ]
+    [[ "$output" == *"dependencies are missing"* && "$output" == *"npm --prefix site ci --ignore-scripts"* ]]
+    [ ! -e "$CI_LOG" ]
+}
+
 @test "CI quality runs every stage from any directory and cleans fixture outputs" {
     cd "$BATS_TEST_TMPDIR"
     run env PATH="$BIN:$PATH" /bin/bash "$FIXTURE/tests/ci.sh" quality
     [ "$status" -eq 0 ]
-    for command in shellcheck bats mdbook gitleaks actionlint zizmor; do
+    for command in shellcheck bats npm gitleaks actionlint zizmor; do
         grep -q "^$command " "$CI_LOG"
     done
     grep -q 'install/plat/test/.plat_env.sh' "$CI_LOG"
     grep -q 'tests/ci.sh' "$CI_LOG"
     grep -q 'tests/ci-entrypoint.bats' "$CI_LOG"
-    grep -q 'mdbook build docs --dest-dir ' "$CI_LOG"
+    grep -q '^npm --prefix .*/site run check$' "$CI_LOG"
+    grep -q '^npm --prefix .*/site run verify$' "$CI_LOG"
     local fixture_home
     fixture_home="$(sed -n 's/^fixture-home //p' "$CI_LOG")"
     [ ! -e "$fixture_home" ]
-    [ ! -e "$FIXTURE/docs/book" ]
+    [ ! -e "$FIXTURE/site/dist" ]
 }
 
 @test "CI failure stops subsequent stages and preserves its exit status" {
@@ -78,7 +90,7 @@ SH
     [ "$status" -eq 23 ]
     grep -q '^shellcheck ' "$CI_LOG"
     ! grep -q '^bats ' "$CI_LOG"
-    ! grep -q '^mdbook ' "$CI_LOG"
+    ! grep -q '^npm ' "$CI_LOG"
 }
 
 @test "CI infrastructure isolates provider data and does not rewrite lockfiles" {
@@ -128,5 +140,5 @@ SH
     done
     grep -Eq '^[[:space:]]+run: ./tests/run.sh$' "$workflow"
     # Commands belong in ci.sh; inline copies would let local and hosted gates drift.
-    ! grep -Eq '^[[:space:]]+(shellcheck -|bats |mdbook build |tofu (fmt|init|validate))' "$workflow"
+    ! grep -Eq '^[[:space:]]+(shellcheck -|bats |npm --prefix site run (check|verify)|tofu (fmt|init|validate))' "$workflow"
 }

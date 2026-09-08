@@ -1,173 +1,111 @@
 # Managing dotfiles
 
-[chezmoi](https://chezmoi.io) manages the files in `home/` and applies them to `~/`, resolving templates along the way.
+[chezmoi](https://chezmoi.io) renders `home/` into the home directory. Edit the
+source, preview the rendered result, then apply; a rendered target is not the
+durable source of truth.
 
 ## Data flow
 
 ```mermaid
-sequenceDiagram
-    participant U as User
-    participant B as bootstrap.sh
-    participant CZ as chezmoi
-    participant T as ~/.config/chezmoi/<br/>chezmoi.toml
-    participant S as home/dot_X.tmpl<br/>(repo source)
-    participant H as ~/.X<br/>(target)
-    U->>B: run bootstrap.sh
-    B->>CZ: chezmoi init (first run only)
-    CZ->>U: prompt name + email (needs a TTY; skipped if DF_NAME / DF_EMAIL pre-set)
-    U-->>CZ: "Cade", "brown.cade@..."
-    CZ->>T: cache values
-    B->>CZ: chezmoi apply
-    CZ->>T: read .name, .email, .use_plat
-    CZ->>S: read template
-    Note over CZ: render Go template — {{ .name }} expands,<br/>{{ if eq .chezmoi.os "linux" }} branches, etc.
-    CZ->>H: write rendered file (overwrites!)
-    Note over H: never edit ~/.X directly —<br/>next apply overwrites it
+flowchart LR
+  S[home/dot_*.tmpl] --> C[chezmoi apply]
+  D[chezmoi.toml data] --> C
+  C --> H[managed files under HOME]
+  H --> R[new login or app runtime]
 ```
 
-Templates render at **apply time** using the values in `~/.config/chezmoi/chezmoi.toml`. The prompt only fires if a value is missing — re-runs read from cache.
+Templates render at apply time. Name, email, and setup choices are cached in
+`~/.config/chezmoi/chezmoi.toml`; bootstrap prompts only when required values
+are missing.
 
 ## The quick version
 
 ```sh
-chezmoi edit ~/.zshrc          # edit a dotfile (opens in $EDITOR, applies on save)
-chezmoi edit ~/.zprofile       # zsh login shell config
-chezmoi edit ~/.bash_profile   # bash login shell config (mirrors .zprofile)
-chezmoi apply                  # apply all pending changes
-chezmoi diff                   # preview what would change before applying
-chezmoi update                 # git pull + apply (sync from repo)
+chezmoi edit ~/.zshrc       # edit source only
+chezmoi edit ~/.zshrc --apply  # edit source, then apply after editor exit
+chezmoi diff                # inspect pending rendered changes
+chezmoi apply               # deploy all pending changes
+chezmoi update              # update source and apply
 ```
 
----
+After a login-profile change, open a new login shell (`exec zsh -l`) before
+judging runtime behavior.
 
 ## How files map
 
-Files in `home/` map to `~/` by chezmoi's naming rules:
-
 | Source | Target |
-|---|---|
+| --- | --- |
 | `home/dot_zshrc.tmpl` | `~/.zshrc` |
-| `home/dot_zprofile.tmpl` | `~/.zprofile` (zsh login shell) |
-| `home/dot_bash_profile.tmpl` | `~/.bash_profile` (bash login shell) |
-| `home/dot_config/git/ignore` | `~/.config/git/ignore` |
+| `home/dot_zprofile.tmpl` / `dot_bash_profile.tmpl` | login profiles |
+| `home/dot_config/...` | `~/.config/...` |
 | `home/dot_ssh/config.tmpl` | `~/.ssh/config` |
-| `home/dot_claude/CLAUDE.md` | `~/.claude/CLAUDE.md` |
-| `home/dot_codex/AGENTS.md` | `~/.codex/AGENTS.md` |
+| `home/dot_claude/`, `home/dot_codex/` | agent configuration |
 
-- `dot_` prefix → `.` in target
-- `.tmpl` suffix → rendered as a Go template before writing
-
----
+`dot_` maps to a leading dot and `.tmpl` means a Go template. Browse
+[`home/`](../../home/) for the complete source tree.
 
 ## Template variables
 
-Use these in any `.tmpl` file:
+| Variable | Meaning |
+| --- | --- |
+| `.name`, `.email` | first-bootstrap identity values |
+| `.use_plat` | shared-home runtime layout choice |
+| `.chezmoi.os` | stable operating-system branch |
+| `.chezmoi.username`, `.chezmoi.homeDir` | observed local identity/path |
 
-```text
-{{ .name }}              display name (prompted on first run)
-{{ .email }}             email (prompted on first run)
-{{ .use_plat }}          PLAT directory isolation flag (default false; see PLAT page)
-{{ .chezmoi.os }}        "darwin" or "linux"
-{{ .chezmoi.arch }}      "amd64" or "arm64"  ← do NOT use in shared-NFS templates
-{{ .chezmoi.username }}  system login name (auto-detected)
-{{ .chezmoi.homeDir }}   home directory path
-```
-
-Example — Linux-only alias:
-
-```
-{{ if eq .chezmoi.os "linux" -}}
-alias open='xdg-open'
-{{ end -}}
-```
-
----
+Use per-machine facts at shell runtime when the target file is shared. See
+[PLAT isolation](/setup/plat/) for the layout contract.
 
 ## Editing dotfiles
 
-**Via chezmoi** (recommended — auto-applies on save):
 ```sh
-chezmoi edit ~/.zshrc
-chezmoi edit ~/.zprofile       # zsh login shell
-chezmoi edit ~/.bash_profile   # bash login shell
-```
-
-**Directly in the repo** (then apply manually):
-```sh
-$EDITOR ~/dotfiles/home/dot_zshrc.tmpl
-$EDITOR ~/dotfiles/home/dot_zprofile.tmpl
-$EDITOR ~/dotfiles/home/dot_bash_profile.tmpl
+# direct source workflow
+${EDITOR:-vi} ~/dotfiles/home/dot_zshrc.tmpl
+chezmoi diff
 chezmoi apply
+exec zsh -l
 ```
 
-Never edit `~/.zshrc`, `~/.zprofile`, or `~/.bash_profile` directly — chezmoi will overwrite them on the next apply.
-
----
+`chezmoi edit ~/.zshrc --apply` is the target-based equivalent of this
+workflow; `--watch` applies each saved edit. Plain `chezmoi edit` changes only
+the source. Do not edit
+`~/.zshrc`, `.zprofile`, or `.bash_profile` directly: the next apply replaces
+the change.
 
 ## Shared home directory safety
 
-On a shared NFS home, all machines run `chezmoi apply` against the same target files. **Templates must render identically on every machine that shares the home** — otherwise machines overwrite each other on every apply.
-
-**Rule: never use `{{ .chezmoi.arch }}` or any per-machine value in a template.** Arch-specific logic belongs in shell runtime code instead:
+All machines sharing a home write the same target files. Do not render an
+architecture-specific template value into those files; evaluate it when the
+shell starts instead:
 
 ```sh
-# Good — evaluated at shell startup on each machine independently
+# stable template; runtime chooses the current machine
 export PATH="$HOME/.local/$(uname -m)-$(uname -s)/bin:$PATH"
 
-# Bad — baked into the file at chezmoi apply time; machines fight each other
-export PATH="$HOME/.local/{{ .chezmoi.arch }}-{{ .chezmoi.os }}/bin:$PATH"
+# unsafe in a shared target: each host rewrites a different value
+# export PATH="$HOME/.local/{{ .chezmoi.arch }}/bin:$PATH"
 ```
 
-The existing templates only branch on `{{ .chezmoi.os }}` (darwin vs linux), which is stable for all machines sharing a home.
-
----
+Existing templates may branch by OS where that is an intentional deployment
+boundary. Keep cross-host executable isolation in the runtime path helper.
 
 ## Multi-machine sync
 
-`chezmoi apply` only affects the machine it runs on. Each home is independent — macOS
-(`/Users/cadeb/`) and Linux NFS (`/home/cadeb/`) don't share target files.
-
-**Normal workflow — commit first, then sync remotes:**
-
 ```sh
-# 1. Edit and apply locally
-chezmoi edit ~/.ssh/config
-chezmoi apply
+# source machine: edit, preview, apply, then publish through normal Git workflow
+chezmoi diff && chezmoi apply
 
-# 2. Commit and push
-cd ~/dotfiles
-git add home/dot_ssh/config.tmpl
-git commit -m "ssh: describe what changed"
-git push
-
-# 3. On each remote — pull and apply
-ssh remote-host 'bash -l ~/dotfiles/bootstrap.sh update'
+# each other machine: refresh its own local target
+chezmoi update
 ```
 
-**If you applied locally without committing** (the wrong order), remotes are stale.
-Quick workaround while you clean it up:
-
-```sh
-# Render the template locally and copy the result over
-chezmoi cat ~/.ssh/config | ssh remote-host 'cat > ~/.ssh/config'
-```
-
-Then commit and push so the repo catches up.
-
----
+`chezmoi apply` affects only the machine where it runs. For a one-off render,
+use `chezmoi execute-template < source.tmpl` and copy the result deliberately.
 
 ## Files that other tools also write
 
-Some tracked files are mutated at runtime. chezmoi won't auto-apply — drift is intentional until you decide what to do:
-
-```sh
-chezmoi diff                          # see what changed
-chezmoi add ~/.claude/settings.json   # pull the live version back into the repo
-```
-
-Notable examples:
-- `~/.claude/settings.json` — updated by Claude Code when plugins are installed
-- `~/.codex/config.toml` — Codex appends project trust levels at runtime; managed with `create_` prefix so chezmoi writes it once and never overwrites
-
-Codex-specific note:
-- `~/.codex/AGENTS.md` and `~/.codex/rules/` are intentionally Codex-specific; skills are shared from `~/.claude/skills` via the `~/.agents/skills` symlink
+Treat these as managed/configuration boundaries: editor settings, agent config,
+and shell profiles may be linked or updated by their matching installer after
+chezmoi applies the source. Inspect `chezmoi diff` and the relevant installer
+before resolving a conflict by hand. See [configuration recipes](/workflows/configuration-recipes/)
+and [troubleshooting](/usage/troubleshooting/) for repeatable diagnosis.
