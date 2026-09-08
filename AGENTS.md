@@ -21,7 +21,9 @@ The repo is designed for:
 - Full bootstrap: `~/dotfiles/bootstrap.sh`
 - Update existing machine: `~/dotfiles/bootstrap.sh update`
 - Upgrade existing machine: `~/dotfiles/bootstrap.sh upgrade`
-- Run tests: `./tests/run.sh`
+- Full local CI validation: `./tests/ci.sh full`
+- Docker bootstrap tests only: `./tests/run.sh`
+- Enable this checkout's push gate: `./tests/install-hooks.sh`
 - Serve docs locally: `mdbook serve docs/ --open`
 - Preview dotfile changes: `chezmoi diff`
 
@@ -46,6 +48,9 @@ The repo is designed for:
 
 ## Validation
 
+- CI and local validation share `tests/ci.sh`; keep commands there rather than duplicating them in workflow YAML.
+- Keep the repository push gate enabled. It validates each outgoing commit in an isolated checkout; working-tree fixes and earlier test runs do not validate an uncorrected commit.
+- After an authorized push, verify the hosted CI result for that commit before reporting CI success. Local validation cannot establish another OS/architecture's result.
 - For bootstrap/install logic, prefer `./tests/run.sh`.
 - For docs-only changes, make sure the edited source is under `docs/`, not `docs/book/`.
 - For chezmoi-managed files, reason about both the source in `home/` and the deployed target path in `~/`.

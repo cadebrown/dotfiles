@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# dotfiles-managed-pre-push-v1
+set -euo pipefail
+repo_root="$(git rev-parse --show-toplevel)"
+exec /bin/bash "$repo_root/tests/pre-push.sh" "$@"

@@ -51,44 +51,8 @@ jobs:
       - name: Install shell test tools
         run: sudo apt-get update && sudo apt-get install -y bats zsh
 
-      - name: Check shell syntax
-        run: |
-          for script in bootstrap.sh install/*.sh home/dot_local/bin/executable_git-wt; do
-            bash -n "$script"
-          done
-
-      - name: Run ShellCheck
-        run: shellcheck -S warning bootstrap.sh install/*.sh install/plat/*/.plat_env.sh home/dot_local/bin/executable_git-wt
-
-      - name: Run fast Bats tests
-        env:
-          REPO: ${{ github.workspace }}
-        run: |
-          ln -s "$GITHUB_WORKSPACE" "$HOME/dotfiles"
-          bats \
-            tests/agents.bats \
-            tests/bootstrap-remote.bats \
-            tests/brew-glibc.bats \
-            tests/gwt.bats \
-            tests/lean.bats \
-            tests/mcp-emitters.bats \
-            tests/netrc.bats \
-            tests/platform-upgrade.bats \
-            tests/profiles.bats \
-            tests/rust-glibc-smoke.bats \
-            tests/toolchains.bats \
-            tests/verify-path.bats
-
-      - name: Build documentation
-        run: mdbook build docs
-
-      - name: Scan secrets
-        run: gitleaks git --no-banner --redact .
-
-      - name: Lint workflows
-        run: |
-          actionlint
-          zizmor --pedantic .github/workflows
+      - name: Run shared quality validation
+        run: ./tests/ci.sh quality
 
   macos-smoke:
     name: macOS smoke
@@ -102,21 +66,7 @@ jobs:
         run: brew install bats-core jq shellcheck
 
       - name: Check shell and platform contracts
-        env:
-          REPO: ${{ github.workspace }}
-        run: |
-          for script in bootstrap.sh install/*.sh home/dot_local/bin/executable_git-wt; do
-            bash -n "$script"
-          done
-          shellcheck -S warning bootstrap.sh install/*.sh install/plat/*/.plat_env.sh home/dot_local/bin/executable_git-wt
-          env PATH=/usr/bin:/bin:/usr/sbin:/sbin \
-            /bin/bash "$(brew --prefix bats-core)/bin/bats" \
-              tests/agents.bats \
-              tests/bootstrap-remote.bats \
-              tests/gwt.bats \
-              tests/mcp-emitters.bats \
-              tests/toolchains.bats \
-              tests/verify-path.bats
+        run: ./tests/ci.sh macos
 
   infrastructure:
     name: Infrastructure
@@ -130,17 +80,8 @@ jobs:
         with:
           tofu_version: 1.12.5
 
-      - name: Check formatting
-        working-directory: infra/cloudflare
-        run: tofu fmt -check
-
-      - name: Initialize without backend
-        working-directory: infra/cloudflare
-        run: tofu init -backend=false
-
-      - name: Validate configuration
-        working-directory: infra/cloudflare
-        run: tofu validate
+      - name: Validate infrastructure
+        run: ./tests/ci.sh infrastructure
 
   bootstrap:
     name: Bootstrap (${{ matrix.runner }})

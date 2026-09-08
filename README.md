@@ -190,7 +190,9 @@ Prefer cargo > npm > pip > Homebrew. Never install the same tool in two layers.
 ### Run tests
 
 ```sh
-./tests/run.sh    # Docker-based: builds Ubuntu 24.04 image, bootstraps, runs bats
+./tests/install-hooks.sh # Enable this checkout's commit validation before pushes
+./tests/ci.sh full       # All local CI checks, including Docker bootstrap
+./tests/run.sh           # Docker bootstrap suite only
 ```
 
 ### Work on docs

@@ -31,7 +31,9 @@
 - Change deployed shell behavior: [home/](/Users/cade/dotfiles/home)
 - Change docs: [docs/](/Users/cade/dotfiles/docs), not `docs/book/`
 - Debug a machine or setup issue: [docs/usage/troubleshooting.md](/Users/cade/dotfiles/docs/usage/troubleshooting.md) (the FAQ)
-- Validate setup changes: [tests/run.sh](/Users/cade/dotfiles/tests/run.sh)
+- Validate all local CI checks: [tests/ci.sh](/Users/cade/dotfiles/tests/ci.sh)
+- Run Docker bootstrap tests: [tests/run.sh](/Users/cade/dotfiles/tests/run.sh)
+- Enable commit validation before pushes: [tests/install-hooks.sh](/Users/cade/dotfiles/tests/install-hooks.sh)
 
 ## Frequent Mistakes To Avoid
 

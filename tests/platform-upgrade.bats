@@ -4,6 +4,25 @@ setup() {
     REPO="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
 }
 
+
+# These tests patch synthetic Linux Homebrew trees even on a macOS developer host.
+# Keep other uname queries native so only the intended OS gate is simulated.
+fixture_os() {
+    local fixture_bin="$BATS_TEST_TMPDIR/os-bin"
+    mkdir -p "$fixture_bin"
+    cat > "$fixture_bin/uname" <<'SH'
+#!/bin/sh
+if [ "$#" -eq 1 ] && [ "$1" = -s ]; then
+    printf '%s\n' "$DF_FIXTURE_OS"
+else
+    exec /usr/bin/uname "$@"
+fi
+SH
+    chmod +x "$fixture_bin/uname"
+    export DF_FIXTURE_OS="$1"
+    export PATH="$fixture_bin:$PATH"
+}
+
 @test "platform upgrade scripts parse" {
     bash -n "$REPO/bootstrap.sh"
     bash -n "$REPO/install/rust.sh"
@@ -131,6 +150,7 @@ setup() {
 }
 
 @test "Linux Homebrew environment patches follow the installed header opt keg" {
+    fixture_os Linux
     local fake_home="$BATS_TEST_TMPDIR/brew-env-patch-home"
     local env_dir="$fake_home/.local/brew/Homebrew/Library/Homebrew/extend/os/linux/extend/ENV"
     local super_rb="$env_dir/super.rb"
@@ -199,6 +219,7 @@ RUBY
 }
 
 @test "Linux formula patches migrate header paths from formula versions to opt kegs" {
+    fixture_os Linux
     local fake_home="$BATS_TEST_TMPDIR/brew-formula-header-migration-home"
     local spec script formula
     local -a specs=(
@@ -304,6 +325,7 @@ RUBY
 }
 
 @test "Linux Homebrew environment patches fail closed when upstream anchors move" {
+    fixture_os Linux
     local fake_home="$BATS_TEST_TMPDIR/brew-env-rotted-anchor-home"
     local env_dir="$fake_home/.local/brew/Homebrew/Library/Homebrew/extend/os/linux/extend/ENV"
     mkdir -p "$env_dir"
@@ -330,6 +352,7 @@ RUBY
 }
 
 @test "apache-serf formula passes kernel headers through SCons CPPFLAGS" {
+    fixture_os Linux
     grep -Fq 'patch-homebrew-apache-serf.sh' "$REPO/install/linux-packages.sh"
 
     local fake_home="$BATS_TEST_TMPDIR/apache-serf-patch-home"
@@ -440,6 +463,7 @@ RUBY
 }
 
 @test "Gecode formula patch disables CMake Gist and Qt atomically on Linux" {
+    fixture_os Linux
     local fake_home="$BATS_TEST_TMPDIR/gecode-cmake-patch-home"
     local formula="$fake_home/.local/brew/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/g/gecode.rb"
     mkdir -p "$(dirname "$formula")"
@@ -736,6 +760,7 @@ RUBY
 }
 
 @test "Ruby formula patch isolates the build runner from the previous keg" {
+    fixture_os Linux
     local fake_home="$BATS_TEST_TMPDIR/ruby-patch-home"
     local formula="$fake_home/.local/brew/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/r/ruby.rb"
     mkdir -p "$(dirname "$formula")"
@@ -869,6 +894,7 @@ RUBY
 }
 
 @test "OpenSSH formula patch accepts an already-normalized sshd_config" {
+    fixture_os Linux
     local fake_home="$BATS_TEST_TMPDIR/openssh-patch-home"
     local formula="$fake_home/.local/brew/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/o/openssh.rb"
     mkdir -p "$(dirname "$formula")"
@@ -925,4 +951,18 @@ RUBY
 @test "upgrade ends with a strict managed-toolchain audit" {
     grep -q 'audit-versions.sh" --strict' "$REPO/bootstrap.sh"
     grep -q 'DF_STRICT_UPGRADE:-1' "$REPO/bootstrap.sh"
+}
+
+@test "Linux Homebrew patchers leave Darwin fixtures untouched" {
+    fixture_os Darwin
+    local fake_home="$BATS_TEST_TMPDIR/darwin-home"
+    local patcher
+    mkdir -p "$fake_home/.local/brew"
+    printf 'sentinel\n' > "$fake_home/.local/brew/sentinel"
+    for patcher in "$REPO"/install/patch-homebrew-*.sh; do
+        run env HOME="$fake_home" DF_USE_PLAT=0 LC_ALL=C LANG=C bash "$patcher"
+        [ "$status" -eq 0 ]
+    done
+    [ "$(cat "$fake_home/.local/brew/sentinel")" = sentinel ]
+    [ "$(find "$fake_home/.local/brew" -type f | wc -l | tr -d ' ')" -eq 1 ]
 }

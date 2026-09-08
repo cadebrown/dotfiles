@@ -6,7 +6,9 @@ Instructions for the Docker-based bats suite under `tests/`.
 
 ## Test Entry Point
 
-- Canonical command: `./tests/run.sh`
+- Full local CI command: `./tests/ci.sh full`
+- Docker bootstrap suite: `./tests/run.sh`
+- Shared quality, macOS, and infrastructure commands live in `tests/ci.sh`; workflow jobs invoke those modes directly.
 
 ## Structure
 
@@ -19,6 +21,7 @@ Instructions for the Docker-based bats suite under `tests/`.
 
 - Prefer testing observable behavior over implementation details.
 - Keep tests aligned with the bootstrap contract rather than incidental log wording.
+- Test the push gate against temporary bare remotes, including committed failures hidden by dirty working-tree repairs. Never use the real remote for a negative test.
 - If changing bootstrap semantics, update the relevant bats expectations in the same change.
 
 ## Validation Guidance

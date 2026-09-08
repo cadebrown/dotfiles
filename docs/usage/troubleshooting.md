@@ -65,6 +65,8 @@ install/plat/*/.plat_env.sh home/dot_local/bin/executable_git-wt` from the repo.
 **Fix:** Mark only the dynamic import with `source=/dev/null` and lint every
 actual platform environment explicitly in both CI jobs. Keep the global lint
 severity unchanged; a passing bootstrap suite does not replace this check.
+The jobs now share `tests/ci.sh`; enable the [push gate](validation.md) so the
+same checks validate the outgoing commit before Git publishes it.
 
 ## Quality CI fails with `chezmoi: command not found`
 

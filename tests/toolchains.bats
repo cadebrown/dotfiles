@@ -12,7 +12,9 @@ setup() {
 }
 
 @test "version audit emits normalized machine-readable records" {
-    run bash "$REPO/install/audit-versions.sh"
+    managed_version_fixture
+    run env HOME="$fake_home" DF_USE_PLAT=0 PATH="$fixture_path" \
+        bash "$REPO/install/audit-versions.sh"
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e 'length >= 16' >/dev/null
@@ -21,11 +23,13 @@ setup() {
         has("policy") and has("installed") and has("status") and
         has("source") and has("platform"))' >/dev/null
     echo "$output" | jq -e 'all(.[].status; . == "current" or . == "outdated" or . == "missing")' >/dev/null
+    # Confirms Julia came from the fixture, never a host launcher/download path.
+    [ "$(grep -cx julia "$DF_VERSION_FIXTURE_LOG")" -eq 1 ]
 }
 
-@test "strict audit accepts patch releases newer than minimum floors" {
-    local fake_home="$BATS_TEST_TMPDIR/audit-home"
-    local stub_bin="$BATS_TEST_TMPDIR/audit-bin"
+managed_version_fixture() {
+    fake_home="$BATS_TEST_TMPDIR/audit-home"
+    stub_bin="$BATS_TEST_TMPDIR/audit-bin"
     local command
     mkdir -p "$fake_home/.local/nvm" "$stub_bin"
     printf '%s\n' 'nvm() { printf "0.40.7\\n"; }' \
@@ -33,6 +37,7 @@ setup() {
 
     cat > "$stub_bin/managed-version" <<'EOF'
 #!/usr/bin/env bash
+printf '%s\n' "${0##*/}" >> "$DF_VERSION_FIXTURE_LOG"
 case "${0##*/}" in
     rustup)  printf 'rustup 1.29.2\n' ;;
     rustc)   printf 'rustc 1.98.0 (test)\n' ;;
@@ -57,7 +62,24 @@ EOF
         ln -s managed-version "$stub_bin/$command"
     done
 
-    run env HOME="$fake_home" DF_USE_PLAT=0 PATH="$stub_bin:$PATH" \
+    # Only explicitly selected shell utilities are visible. A missing/new
+    # version stub must not fall through to a host manager that can install tools.
+    local utility utility_path
+    local utility_bin="$BATS_TEST_TMPDIR/audit-utilities"
+    mkdir -p "$utility_bin"
+    for utility in bash jq dirname uname tr sed head awk grep cat sort tail cut \
+        readlink sysctl getconf find date ls; do
+        utility_path="$(command -v "$utility" || true)"
+        if [[ "$utility_path" == /* ]]; then ln -s "$utility_path" "$utility_bin/$utility"; fi
+    done
+    fixture_path="$stub_bin:$utility_bin"
+    export DF_VERSION_FIXTURE_LOG="$BATS_TEST_TMPDIR/version-commands"
+}
+
+@test "strict audit accepts patch releases newer than minimum floors" {
+    managed_version_fixture
+
+    run env HOME="$fake_home" DF_USE_PLAT=0 PATH="$fixture_path" \
         bash "$REPO/install/audit-versions.sh" --strict
 
     [ "$status" -eq 0 ]
@@ -65,6 +87,27 @@ EOF
         .[] | select(.tool == "rustup" or .tool == "juliaup")
         | .policy == "minimum" and .status == "current"
     ' >/dev/null
+}
+
+@test "version schema fixture reports missing Julia without calling a host launcher" {
+    local host_bin="$BATS_TEST_TMPDIR/host-bin"
+    export DF_HOST_JULIA_MARKER="$BATS_TEST_TMPDIR/host-julia-called"
+    mkdir -p "$host_bin"
+    cat > "$host_bin/julia" <<'SH'
+#!/bin/sh
+printf 'unexpected host launcher\n' > "$DF_HOST_JULIA_MARKER"
+exit 99
+SH
+    chmod +x "$host_bin/julia"
+    export PATH="$host_bin:$PATH"
+    managed_version_fixture
+    rm "$stub_bin/julia"
+    run env HOME="$fake_home" DF_USE_PLAT=0 PATH="$fixture_path" \
+        bash "$REPO/install/audit-versions.sh"
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e 'any(.[]; .tool == "julia" and .status == "missing" and .installed == "")' >/dev/null
+    ! grep -qx julia "$DF_VERSION_FIXTURE_LOG"
+    [ ! -e "$DF_HOST_JULIA_MARKER" ]
 }
 
 @test "current managed version baselines are wired" {

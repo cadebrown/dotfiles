@@ -26,3 +26,6 @@ terraform.tfvars
 .vscode/settings.json
 .DS_Store
 *.swp
+
+# Isolated outgoing-commit validation checkouts (removed after each push).
+/.ci-validation/
