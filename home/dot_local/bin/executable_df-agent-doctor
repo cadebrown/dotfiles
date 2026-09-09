@@ -72,6 +72,7 @@ if _has jq; then
     if [[ "$(uname -s)" == "Darwin" ]]; then
         _check "Cursor hooks" _json_healthy "$HOME/.cursor/hooks.json"
         _check "Cursor MCP" _json_healthy "$HOME/.cursor/mcp.json"
+        _check "Cursor CLI config" _json_healthy "$HOME/.cursor/cli-config.json"
     fi
 fi
 if _has node; then
@@ -86,6 +87,9 @@ if [[ -x "$_repo/install/codex.sh" ]] && _has codex; then
 fi
 if [[ -x "$_repo/install/opencode.sh" ]] && _has opencode; then
     _check "OpenCode generated config" bash "$_repo/install/opencode.sh" check
+fi
+if [[ "$(uname -s)" == "Darwin" ]] && [[ -x "$_repo/install/cursor.sh" ]]; then
+    _check "Cursor harness" bash "$_repo/install/cursor.sh" check
 fi
 if [[ "$(uname -s)" == "Darwin" ]]; then
     _check "qmd LaunchAgent" launchctl print "gui/$(id -u)/dev.cade.qmd"

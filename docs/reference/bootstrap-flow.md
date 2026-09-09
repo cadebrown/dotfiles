@@ -80,7 +80,7 @@ flowchart TD
 | 6h | `install/claude.sh` | Download Claude Code; install plugins; register MCP servers; deploy overlay skills. | Atomic binary replacement. |
 | 6i | `install/codex.sh` | Sync private config, hooks, guards, prompt-free MCP servers, and run the healthcheck. | The healthcheck parses every profile and hook trust entry. |
 | 6j | desktop scripts | Merge tracked Claude/Codex Desktop and LinearMouse settings on macOS. | Preserve app-owned state. |
-| 6k | `install/cursor.sh` / `install/vscode.sh` | Sync Cursor MCP/settings and editor extensions. | Defaults on for macOS and off for Linux. When selected, the CLI and every declared extension must pass the final check. |
+| 6k | `install/cursor.sh` / `install/vscode.sh` | Sync Cursor MCP/settings/CLI merge/worker and editor extensions. | Defaults on for macOS and off for Linux. When selected, the CLI and every declared extension must pass the final check. The My Machines worker does not fail bootstrap on missing TCC. |
 | 6l | `install/cmake.sh` | Copy CMake toolchain files into `$LOCAL_PLAT/cmake/toolchains/`. | Always overwrites deployed copies. |
 
 ## Modes

@@ -7,6 +7,16 @@
 # cursor hooks script hash: {{ include "dot_cursor/hooks/executable_sync-dotfiles-cursor.sh.tmpl" | sha256sum }}
 # mcp-servers.txt hash: {{ include "../packages/mcp-servers.txt" | sha256sum }}
 # installer hash: {{ include "../install/cursor.sh" | sha256sum }}
+# cursor agents-common wrapper hash: {{ include ".chezmoitemplates/cursor-agents.md" | sha256sum }}
+# cursor AGENTS hash: {{ include "dot_cursor/AGENTS.md.tmpl" | sha256sum }}
+# cursor rules hash: {{ include "dot_cursor/rules/personal.mdc.tmpl" | sha256sum }}
+# cursor skills symlink hash: {{ include "dot_cursor/symlink_skills" | sha256sum }}
+# cursor cli-config seed hash: {{ include "dot_cursor/create_cli-config.json" | sha256sum }}
+# cursor worker wrapper hash: {{ include "dot_local/bin/executable_df-cursor-worker" | sha256sum }}
+# cursor worker plist hash: {{ include "Library/LaunchAgents/dev.cade.cursor-worker.plist.tmpl" | sha256sum }}
+{{- range glob (joinPath .chezmoi.sourceDir "dot_cursor/agents/*.md") }}
+# cursor agent hash: {{ . | include | sha256sum }} {{ . }}
+{{- end }}
 # overlay mcp hashes:
 {{- range glob (joinPath .chezmoi.workingTree "dotfiles-*/packages/mcp-servers.txt") }}
 #   {{ . | include | sha256sum }} {{ . }}

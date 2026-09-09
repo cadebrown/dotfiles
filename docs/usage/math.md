@@ -1,7 +1,7 @@
 # Research mathematics stack
 
-Verification-first mathematics tooling, implemented August 2026 across all
-four agent harnesses (Claude Code, Codex, opencode, pi). The organizing rule:
+Verification-first mathematics tooling, implemented August 2026 across
+Claude Code, Codex, Cursor, opencode, and pi. The organizing rule:
 a claim is proved only when the exact intended statement compiles in Lean with
 no `sorry` — everything else (CAS output, notebooks, numerics) is evidence.
 

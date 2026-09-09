@@ -12,6 +12,8 @@ setup() {
     bash -n "$REPO/install/codex.sh"
     bash -n "$REPO/install/agent-tools.sh"
     bash -n "$REPO/home/dot_local/bin/executable_df-agent-doctor"
+    bash -n "$REPO/home/dot_local/bin/executable_df-cursor-worker"
+    bash -n "$REPO/install/cursor.sh"
 }
 
 @test "agent declaration installers fail on incomplete reconciliation" {
@@ -138,6 +140,13 @@ setup() {
         "$REPO/home/dot_local/bin/executable_df-agent-doctor"
 }
 
+@test "agent doctor runs the Cursor harness check on Darwin" {
+    grep -Fq 'Cursor harness' \
+        "$REPO/home/dot_local/bin/executable_df-agent-doctor"
+    grep -Fq 'install/cursor.sh" check' \
+        "$REPO/home/dot_local/bin/executable_df-agent-doctor"
+}
+
 @test "zsh leaves tc to the system traffic-control command" {
     ! grep -Eq '^[[:space:]]*tc[[:space:]]*\(\)' "$REPO/home/dot_zshrc.tmpl"
 }
@@ -225,6 +234,22 @@ setup() {
     [[ -f "$REPO/home/dot_codex/agents/reviewer.toml" ]]
     [[ -f "$REPO/home/dot_claude/agents/researcher.md" ]]
     [[ -f "$REPO/home/dot_claude/agents/reviewer.md" ]]
+}
+
+@test "Cursor ships Composer 2.5 researcher reviewer verifier and debugger" {
+    local wrapper="$REPO/home/.chezmoitemplates/cursor-agents.md"
+    grep -q 'template "cursor-agents.md"' "$REPO/home/dot_cursor/AGENTS.md.tmpl"
+    grep -q 'alwaysApply: true' "$REPO/home/dot_cursor/rules/personal.mdc.tmpl"
+    grep -q 'template "agents-common.md"' "$wrapper"
+    grep -q 'template "voice-common.md"' "$wrapper"
+    grep -q 'composer-2.5' "$wrapper"
+    grep -q 'The Agent CLI and Explore default' "$wrapper"
+    grep -q 'df-cursor-worker' "$wrapper"
+    local agent
+    for agent in researcher reviewer verifier debugger; do
+        grep -q '^model: composer-2.5$' "$REPO/home/dot_cursor/agents/${agent}.md"
+    done
+    [[ "$(cat "$REPO/home/dot_cursor/symlink_skills")" == '../.claude/skills' ]]
 }
 
 @test "agent skill digest lock covers every declared skill" {

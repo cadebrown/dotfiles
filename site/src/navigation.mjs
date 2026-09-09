@@ -29,6 +29,7 @@ export const sidebar = [
     item('Choose an agent', 'agents'),
     item('Codex', 'agents/codex'),
     item('Claude Code', 'agents/claude'),
+    item('Cursor', 'agents/cursor'),
     item('OpenCode & Pi', 'agents/opencode-and-pi'),
     item('Instructions', 'agents/instructions'),
     item('Skills', 'agents/skills'),

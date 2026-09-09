@@ -430,6 +430,67 @@ If an open window still shows defaults after the native symlink resolves, run
 
 ---
 
+## Cursor computer use reports Ready: no, or screenshots never appear
+
+Symptom: `agent worker debug` shows a worker, but **Computer use Ready: no**
+and screenshot or click tasks fail. The My Machines worker may be loaded.
+
+Confirm:
+
+```sh
+launchctl print "gui/$(id -u)/dev.cade.cursor-worker"
+ls -d "$HOME/.cursor/cursor-computer-use/Cursor Computer Use.app"
+agent worker debug
+```
+
+Root cause: computer use is implemented by **Cursor Computer Use**
+(`co.anysphere.cursor-computer-use`), a helper installed on the first
+`--computer-use` start. Accessibility and Screen Recording must be granted to
+that app, not Terminal or Cursor.app. Sequoia and later may re-prompt Screen
+Recording. `agent worker debug` does not prove those grants. This repo does not
+write TCC.db.
+
+Only one worker daemon can own `~/.local/share/cursor-agent`. Cursor's in-app
+worker (often named like `church`) holds that lock without computer use.
+`df-cursor-worker` passes `--wait` so the LaunchAgent waits for that process
+instead of crash-looping. To take over with computer use, stop the in-app
+worker, then `bash ~/dotfiles/install/cursor.sh sync-worker`.
+
+**Fix:** open System Settings → Privacy & Security, grant Accessibility and
+Screen Recording to Cursor Computer Use, then rerun a screenshot task. If
+the helper app is missing, start the worker once (`bash ~/dotfiles/install/cursor.sh sync-worker`)
+so it can install, then grant TCC. To stop the worker:
+`DF_CURSOR_WORKER=0 bash ~/dotfiles/install/cursor.sh`.
+
+Cloud `/in-cloud` sessions use native VM computer use and dashboard MCP, not
+this Mac's helper app or `~/.cursor/mcp.json`.
+
+---
+
+## Cursor CLI default model reverts to Auto
+
+Symptom: `bash install/cursor.sh check` fails on `selectedModel` or
+`exploreSubagentModel`, or `jq -r .selectedModel.modelId ~/.cursor/cli-config.json`
+is `default` or empty after a Cursor or `agent` start. `permissions.allow` may
+shrink to `Shell(ls)`.
+
+Confirm:
+
+```sh
+jq '{selectedModel,exploreSubagentModel,hasChangedDefaultModel,permissions}' ~/.cursor/cli-config.json
+bash ~/dotfiles/install/cursor.sh check
+```
+
+Root cause: `~/.cursor/cli-config.json` is app-owned at runtime. The installer
+merge-pins Composer 2.5; the running app rewrites those keys. The IDE chat picker
+is a different store and does not follow `cli-config.json`.
+
+**Fix:** `bash ~/dotfiles/install/cursor.sh sync-cli`. For an already-open IDE
+chat, pick Composer 2.5 in the model dropdown. `agent --model composer-2.5`
+forces one CLI run regardless of the file.
+
+---
+
 ## Brew bundle fails: `No available formula … This command requires the tap`
 
 Symptom: `brew bundle` errors with `No available formula with the name

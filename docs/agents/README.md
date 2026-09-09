@@ -11,6 +11,7 @@ Use this guide to change or evaluate the managed stack. For day-to-day operation
 | --- | --- | --- |
 | [Codex](codex.md) | profile-led implementation, focused child roles, and managed MCP profiles | [`home/dot_codex/`](../../home/dot_codex/) |
 | [Claude Code](claude.md) | plugin/hook workflows and source-grounded or adversarial local roles | [`home/dot_claude/`](../../home/dot_claude/) |
+| [Cursor](cursor.md) | IDE/Agents Window, Composer 2.5 default, and self-hosted computer use | [`home/dot_cursor/`](../../home/dot_cursor/) |
 | [OpenCode](opencode-and-pi.md) | generated MCP namespaces and a constrained review agent | [`home/dot_config/opencode/`](../../home/dot_config/opencode/) |
 | [Pi](opencode-and-pi.md) | its rendered local-MLX or declared cloud-provider setup | [`home/dot_pi/agent/`](../../home/dot_pi/agent/) |
 

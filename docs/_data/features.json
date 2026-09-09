@@ -154,6 +154,35 @@
       "demo": "claude plugin list --json"
     },
     {
+      "id": "cursor-agent",
+      "title": "Cursor IDE and cloud agents",
+      "description": "Configures Cursor instructions, Composer 2.5 as the CLI and subagent default, skills, MCP, CLI merge, and the self-hosted computer-use worker.",
+      "page": "/agents/cursor/",
+      "sources": [
+        "home/.chezmoitemplates/cursor-agents.md",
+        "home/Library/LaunchAgents/dev.cade.cursor-worker.plist.tmpl",
+        "home/dot_config/cursor/keybindings.json",
+        "home/dot_config/cursor/settings.json",
+        "home/dot_cursor/AGENTS.md.tmpl",
+        "home/dot_cursor/agents/debugger.md",
+        "home/dot_cursor/agents/researcher.md",
+        "home/dot_cursor/agents/reviewer.md",
+        "home/dot_cursor/agents/verifier.md",
+        "home/dot_cursor/create_cli-config.json",
+        "home/dot_cursor/hooks.json",
+        "home/dot_cursor/hooks/executable_rtk-rewrite.sh",
+        "home/dot_cursor/hooks/executable_sync-dotfiles-cursor.sh.tmpl",
+        "home/dot_cursor/hooks/sync_dotfiles_cursor.py",
+        "home/dot_cursor/rules/personal.mdc.tmpl",
+        "home/dot_cursor/symlink_skills",
+        "home/dot_local/bin/executable_df-cursor-worker",
+        "home/run_onchange_cursor.sh.tmpl",
+        "install/cursor.sh",
+        "packages/cursor-extensions.txt"
+      ],
+      "demo": "bash install/cursor.sh check"
+    },
+    {
       "id": "opencode-and-pi",
       "title": "OpenCode and Pi",
       "description": "Configures managed provider defaults, MCP-scoped OpenCode agents, and thin local extensions.",
@@ -225,31 +254,21 @@
       "page": "/usage/ai-workbench/",
       "sources": [
         "home/dot_aerospace.toml",
-        "home/dot_config/cursor/keybindings.json",
-        "home/dot_config/cursor/settings.json",
         "home/dot_config/vscode/settings.json",
-        "home/dot_cursor/cli-config.json",
-        "home/dot_cursor/hooks.json",
-        "home/dot_cursor/hooks/executable_rtk-rewrite.sh",
-        "home/dot_cursor/hooks/executable_sync-dotfiles-cursor.sh.tmpl",
-        "home/dot_cursor/hooks/sync_dotfiles_cursor.py",
         "home/dot_iterm2/com.googlecode.iterm2.plist",
         "home/dot_local/bin/executable_macprof",
-        "home/run_onchange_cursor.sh.tmpl",
         "home/run_onchange_macos-quick-actions.sh.tmpl",
         "home/run_onchange_vscode.sh.tmpl",
         "install/claude-desktop.sh",
         "install/codex-desktop.sh",
-        "install/cursor.sh",
         "install/linearmouse.sh",
         "install/macos-quick-actions.sh",
         "install/macos-services.sh",
         "install/macos-settings.sh",
         "install/vscode.sh",
-        "packages/cursor-extensions.txt",
         "packages/vscode-extensions.txt"
       ],
-      "demo": "cursor --version"
+      "demo": "sed -n '1,80p' install/macos-settings.sh"
     },
     {
       "id": "local-ai",

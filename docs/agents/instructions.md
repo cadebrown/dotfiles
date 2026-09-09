@@ -23,9 +23,10 @@ A project `AGENTS.md` can add a test route without replacing the requested phase
 | Purpose | Source | Target | Apply |
 | --- | --- | --- | --- |
 | Shared engineering guidance | [`agents-common.md`](../../home/.chezmoitemplates/agents-common.md) | harness wrappers | `chezmoi apply` |
-| Shared voice | [`voice-common.md`](../../home/.chezmoitemplates/voice-common.md) | Codex/OpenCode/Pi directly; Claude output style | `chezmoi apply` |
+| Shared voice | [`voice-common.md`](../../home/.chezmoitemplates/voice-common.md) | Codex/OpenCode/Pi/Cursor directly; Claude output style | `chezmoi apply` |
 | Codex global guidance | [`AGENTS.md.tmpl`](../../home/dot_codex/AGENTS.md.tmpl) | `~/.codex/AGENTS.md` | `chezmoi apply ~/.codex/AGENTS.md` |
 | Claude global guidance | [`CLAUDE.md.tmpl`](../../home/dot_claude/CLAUDE.md.tmpl) | `~/.claude/CLAUDE.md` | `chezmoi apply ~/.claude/CLAUDE.md` |
+| Cursor global guidance | [`AGENTS.md.tmpl`](../../home/dot_cursor/AGENTS.md.tmpl), [`cursor-agents.md`](../../home/.chezmoitemplates/cursor-agents.md) | `~/.cursor/AGENTS.md`, `~/.cursor/rules/personal.mdc` | `chezmoi apply ~/.cursor/AGENTS.md` |
 | Codex roles/hooks | [`agents`](../../home/dot_codex/agents/), [`hooks.json`](../../home/dot_codex/hooks.json) | `~/.codex/agents/`, `~/.codex/hooks.json` | `bash install/codex.sh sync-config` |
 
 The Codex installer owns generated role files and scopes. Do not edit deployed `~/.codex/agents/*.toml`; see [`install/codex.sh`](../../install/codex.sh) and [`install/codex-config.py`](../../install/codex-config.py).

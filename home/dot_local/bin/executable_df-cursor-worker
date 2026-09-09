@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# One daemon per data dir. --wait blocks until another worker using
+# ~/.local/share/cursor-agent exits, then this process starts with computer use
+# instead of crash-looping against Cursor's in-app worker.
+set -euo pipefail
+
+if ! command -v agent >/dev/null 2>&1; then
+    printf '%s\n' 'df-cursor-worker: agent CLI missing (curl https://cursor.com/install -fsS | bash)' >&2
+    exit 1
+fi
+
+_name="${DF_CURSOR_WORKER_NAME:-$(hostname -s)}"
+_args=(worker --computer-use --wait --idle-release-timeout 0 --name "$_name")
+
+_add_dir() {
+    local _dir="$1"
+    [[ -n "$_dir" && -d "$_dir" ]] || return 0
+    _args+=(--worker-dir "$_dir")
+}
+
+# First --worker-dir is the assignment identity. Prefer the git checkout.
+_add_dir "${HOME}/dotfiles"
+_add_dir "$HOME"
+_add_dir "${HOME}/dev"
+if [[ -n "${DF_CURSOR_WORKER_DIRS:-}" ]]; then
+    IFS=':' read -r -a _extra <<< "$DF_CURSOR_WORKER_DIRS"
+    for _dir in "${_extra[@]}"; do
+        _add_dir "$_dir"
+    done
+fi
+
+_args+=(start)
+exec agent "${_args[@]}"

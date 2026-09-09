@@ -80,7 +80,8 @@
 #   DF_DO_MACOS_SETTINGS — set to 0 to skip macOS settings
 #   DF_DO_MACOS_QUICK_ACTIONS — set to 0 to skip Finder Quick Actions install
 #   DF_DO_AUTH          — set to 1 to run interactive API token setup
-#   DF_DO_CURSOR        — set to 0 to skip Cursor settings sync
+#   DF_DO_CURSOR        — set to 0 to skip Cursor settings, MCP, CLI merge, and worker
+#   DF_CURSOR_WORKER    — set to 0 to skip the My Machines computer-use LaunchAgent (macOS)
 #   DF_DO_VSCODE        — set to 0 to skip VS Code extension install
 #   DF_DO_CMAKE         — set to 0 to skip CMake toolchain file install
 #   DF_DO_LOCAL_LLM     — set to 0 to skip local LLM tooling setup

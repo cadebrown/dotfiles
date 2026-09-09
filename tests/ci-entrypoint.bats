@@ -13,7 +13,7 @@ setup() {
     cp "$SOURCE_REPO/tests/docs.sh" "$FIXTURE/tests/docs.sh"
     chmod +x "$FIXTURE/tests/docs.sh"
     printf '{"name":"fixture"}\n' > "$FIXTURE/site/package.json"
-    for script in .githooks/pre-push bootstrap.sh install/example.sh install/plat/test/.plat_env.sh home/dot_local/bin/executable_git-wt tests/run.sh; do
+    for script in .githooks/pre-push bootstrap.sh install/example.sh install/plat/test/.plat_env.sh home/dot_local/bin/executable_git-wt home/dot_local/bin/executable_df-cursor-worker tests/run.sh; do
         printf '#!/usr/bin/env bash\nprintf "bootstrap\\n" >> "$CI_LOG"\n' > "$FIXTURE/$script"
         chmod +x "$FIXTURE/$script"
     done

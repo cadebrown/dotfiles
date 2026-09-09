@@ -1,0 +1,59 @@
+{{/*
+LaunchAgent: Cursor My Machines worker with computer use.
+
+The wrapper computes hostname and extra --worker-dir values at runtime so
+this template stays identical on shared NFS homes. Loaded by install/cursor.sh
+on Darwin when DF_CURSOR_WORKER is not 0. KeepAlive restarts crashes, not a
+clean exit. The wrapper passes --wait so a second daemon does not fight
+Cursor's in-app worker for ~/.local/share/cursor-agent.
+
+Computer use needs a signed-in Aqua session plus Accessibility and Screen
+Recording for Cursor Computer Use (co.anysphere.cursor-computer-use), not
+Terminal or Cursor.app. To stop:
+  launchctl bootout gui/$(id -u)/dev.cade.cursor-worker
+  DF_CURSOR_WORKER=0 bash ~/dotfiles/install/cursor.sh
+*/ -}}
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTD/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>dev.cade.cursor-worker</string>
+
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>exec df-cursor-worker</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>{{ .chezmoi.homeDir }}</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/cursor-worker/stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/share/cursor-worker/stderr.log</string>
+
+    <key>ProcessType</key>
+    <string>Interactive</string>
+</dict>
+</plist>

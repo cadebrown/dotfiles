@@ -1,6 +1,6 @@
 # Agent guidance
 
-Four different AI coding tools (Claude Code, Codex, opencode, pi) each
+Four CLI harnesses (Claude Code, Codex, opencode, pi) plus Cursor each
 expect their own AGENTS.md / CLAUDE.md file. Most of the
 content is the same — user background, communication style, engineering
 principles, tool preferences. The differences are the per-tool addenda
@@ -35,7 +35,7 @@ Working preferences for <tool>. Shared guidance lives in the partial;
 `home/.chezmoitemplates/voice-common.md` holds tone/communication and
 estimate conventions — deliberately split out of `agents-common.md` so it can
 load at different levels per tool: Claude gets it via the `cade` output style
-(system-prompt level), while the Codex/opencode/pi wrappers include it
+(system-prompt level), while the Codex/opencode/pi/Cursor wrappers include it
 directly next to `agents-common.md`. Keeping it out of `agents-common.md`
 means Claude never loads the voice guidance twice.
 
@@ -53,11 +53,13 @@ not require starting a prover. The [math guide](math.md) documents tool routing.
 |---|---|---|
 | Claude Code | `home/dot_claude/CLAUDE.md.tmpl` | `~/.claude/CLAUDE.md` |
 | Codex | `home/dot_codex/AGENTS.md.tmpl` | `~/.codex/AGENTS.md` |
+| Cursor | `home/dot_cursor/AGENTS.md.tmpl` | `~/.cursor/AGENTS.md` (plus always-apply `~/.cursor/rules/personal.mdc`) |
 | opencode | `home/dot_config/opencode/AGENTS.md.tmpl` | `~/.config/opencode/AGENTS.md` |
 | pi | `home/dot_pi/agent/AGENTS.md.tmpl` | `~/.pi/agent/AGENTS.md` |
 
-All four render through the same partial — edit `agents-common.md` once and
-`chezmoi apply` propagates everywhere.
+All five render through the same `agents-common.md` partial — edit that once and
+`chezmoi apply` propagates everywhere. Cursor also includes `voice-common.md` in
+the wrapper (Claude still uses the `cade` output style for voice).
 
 ## Adding a new tool
 
@@ -109,10 +111,11 @@ global file — write project-specific guidance there, not in the partial.
 ## Skills (shared across tools)
 
 Skills live in one place: `home/dot_claude/skills/` → deployed to
-`~/.claude/skills`. A chezmoi-managed symlink `~/.agents/skills` →
-`~/.claude/skills` exposes the same tree to Codex, opencode, and pi (all
-three scan `~/.agents/skills`; opencode also reads `~/.claude/skills`
-directly). One SKILL.md edit propagates to every tool on `chezmoi apply`.
+`~/.claude/skills`. Chezmoi-managed symlinks expose the same tree to Codex,
+opencode, pi (`~/.agents/skills`), and Cursor (`~/.cursor/skills`). One SKILL.md
+edit propagates to every tool on `chezmoi apply`. Cloud Cursor skill sync only
+copies `~/.cursor/skills`; turn on Sync Skills for Cloud Agents in Settings when
+a Cloud run needs that tree.
 
 Installer-managed skills are declared in `packages/agent-skills.txt`; Codex
 plugins are declared separately in `packages/codex-plugins.txt`. Run
@@ -126,7 +129,9 @@ The committed digest remains the review/audit baseline. Read-only `check`
 continues to exit nonzero for drift from that baseline.
 
 Claude has `researcher` and `reviewer` specialists under its managed `agents/`
-directory. Codex has the focused roles below. Global instructions authorize
+directory. Cursor has `researcher`, `reviewer`, `verifier`, and `debugger`
+under `~/.cursor/agents/`, all pinned to Composer 2.5. Codex has the focused
+roles below. Global instructions authorize
 bounded delegation while keeping overlapping edits in one agent. Codex allows
 up to six concurrent direct children; focused efficiency roles disable their
 own agents. The configured `max_depth = 1` is a V1 fallback, not a V2 nesting
@@ -135,7 +140,8 @@ guarantee for other roles.
 `install/agent-tools.sh` deploys `df-agent-doctor` into `$ARCH_BIN` on every
 platform. The command checks the declared tool surface, skill registry, Codex
 plugins/config, qmd, cass, the managed Python/SymPy environment, and the live qmd
-LaunchAgent on macOS. When `dotfiles-nvidia` is present, it also runs the
+LaunchAgent on macOS. On Darwin it also runs `bash install/cursor.sh check`. When
+`dotfiles-nvidia` is present, it also runs the
 overlay's final runtime verifier, including ComputeLab and internal MCP tools.
 
 ## Codex delegation
@@ -178,6 +184,16 @@ Terra `explorer`, `researcher`, `patcher`, and `verifier` start with 4,000 and
 starting choices for bounded assignments, not hard execution or spend caps, and
 they do not guarantee savings. Validate them with observed correctness, usage,
 artifacts, and parent rework on representative tasks.
+
+## Cursor delegation
+
+Custom Cursor agents live in `home/dot_cursor/agents/` and pin Composer 2.5.
+The Agent CLI default is the same model (`selectedModel.modelId` via
+`install/cursor.sh`). Use `researcher` for live primary-source questions, `reviewer` after
+implementation, `verifier` to confirm claimed work, and `debugger` for a
+failing reproduction. Built-in Explore, Bash, and Browser stay product-owned.
+Computer-use routing and Cloud caveats live in
+[`docs/agents/cursor.md`](../agents/cursor.md).
 
 The `coder` contract is deliberately narrower than `patcher`. "Replace these
 three deprecated keys using this exact mapping in these named fixture files,
@@ -309,7 +325,7 @@ Three layers, set up by `install/memory.sh` (bootstrap step 6.6, `DF_DO_MEMORY`)
 |---|---|---|---|
 | L1 auto-memory | `~/.claude/projects/<proj>/memory/` (markdown) | loaded each session; also indexed by qmd | no (per-machine) |
 | L2 knowledge base | `~/kb` git repo (markdown) | qmd — hybrid BM25 + local GGUF embeddings + rerank, MCP daemon on `localhost:8181` | yes (git remote) |
-| L3 session history | every agent's transcripts (Claude Code, Codex, opencode, pi) | cass — hybrid BM25 + native MiniLM embeddings, CLI/`history-search` skill | no (per-machine) |
+| L3 session history | every agent's transcripts (Claude Code, Codex, Cursor, opencode, pi) | cass — hybrid BM25 + native MiniLM embeddings, CLI/`history-search` skill | no (per-machine) |
 
 Both stores are local (`~/.cache/qmd`, `~/.cass` — on scratch when configured);
 only `~/kb` and the dotfiles repo sync across machines. qmd's index is fully

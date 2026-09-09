@@ -59,7 +59,8 @@ EOF
         "$FAKE_HOME/.pi/agent/settings.json" \
         "$FAKE_HOME/.pi/agent/models.json" \
         "$FAKE_HOME/.cursor/hooks.json" \
-        "$FAKE_HOME/.cursor/mcp.json"; do
+        "$FAKE_HOME/.cursor/mcp.json" \
+        "$FAKE_HOME/.cursor/cli-config.json"; do
         printf '{}\n' > "$json"
     done
 }

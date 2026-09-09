@@ -22,10 +22,11 @@ paths:
 
 # Agent harnesses, MCP, skills, memory
 
-Four CLI harnesses (Claude Code, Codex, opencode, pi) share one declarative config
-layer: `packages/mcp-servers.txt` (servers), `packages/agent-skills.txt` (skills →
-shared `~/.claude/skills` tree), `packages/claude-plugins.txt` (Claude plugins),
-and chezmoi-managed guidance files built from shared partials.
+Four CLI harnesses (Claude Code, Codex, opencode, pi) plus Cursor share one
+declarative config layer: `packages/mcp-servers.txt` (servers),
+`packages/agent-skills.txt` (skills → shared `~/.claude/skills` tree;
+`~/.cursor/skills` and `~/.agents/skills` symlink there), `packages/claude-plugins.txt`
+(Claude plugins), and chezmoi-managed guidance files built from shared partials.
 
 - **Plugins are mirrored in THREE places** — `packages/claude-plugins.txt`,
   `_MARKETPLACES` in `install/claude.sh` (third-party marketplaces only), and
@@ -260,3 +261,23 @@ and chezmoi-managed guidance files built from shared partials.
 - **Skill dirs are installer-managed** — `skills-sync.sh` rows install via
   `npx skills add` into `~/.claude/skills/`; never add chezmoi sources for those
   dirs (one writer per skill dir; vendored skills live in `home/dot_claude/`).
+- **Cursor CLI config is merge-only** — `home/dot_cursor/create_cli-config.json`
+  is write-once. `install/cursor.sh` merges `Shell(*)`, Composer 2.5 as
+  `selectedModel` / `model.modelId` / `exploreSubagentModel`, and
+  `hasChangedDefaultModel=true` into the live `~/.cursor/cli-config.json`.
+  Do not restore a fully managed `cli-config.json`; it clobbers sandbox,
+  attribution, extra `model` object fields, and `authInfo`. The running Cursor
+  app may rewrite `selectedModel`, `exploreSubagentModel`, and `permissions`
+  after merge — re-run `bash install/cursor.sh sync-cli`. The IDE chat picker is
+  app storage, not `settings.json`. Cloud `/in-cloud` MCP comes from
+  cursor.com/agents, not `mcp.json`. User hooks do not run on Cloud VMs.
+- **Cursor Computer Use is a separate signed app** — My Machines
+  `--computer-use` installs `~/.cursor/cursor-computer-use/Cursor Computer Use.app`
+  (`co.anysphere.cursor-computer-use`). Grant Accessibility + Screen Recording to
+  **that** app, not Terminal or Cursor.app. Do not script TCC/SIP. The LaunchAgent
+  uses `--idle-release-timeout 0 --wait` and a runtime hostname so NFS templates stay
+  identical and a second daemon does not fight Cursor's in-app worker for
+  `~/.local/share/cursor-agent`. `agent worker debug` does not prove TCC grants.
+- **Cursor custom agents pin Composer 2.5** — `home/dot_cursor/agents/`
+  (researcher, reviewer, verifier, debugger). Do not recreate built-in Explore,
+  Bash, or Browser. Do not port Codex `~/.codex/agents/*.toml`.

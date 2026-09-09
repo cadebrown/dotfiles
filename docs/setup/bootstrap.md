@@ -115,7 +115,7 @@ same selected check.
 | `DF_DO_CLAUDE_DESKTOP`, `DF_DO_CODEX_DESKTOP`, `DF_DO_LINEARMOUSE` | on, macOS | tracked desktop preferences |
 | `DF_DO_MACOS_SERVICES`, `DF_DO_MACOS_SETTINGS`, `DF_DO_MACOS_QUICK_ACTIONS` | on, macOS | services, system settings, Finder actions |
 | `DF_START_LOCAL_SERVICES` | off | start Colima, Ollama, mlxserve at login |
-| `DF_DO_CURSOR`, `DF_DO_VSCODE` | macOS: on; Linux: off | editor extension/settings integration |
+| `DF_DO_CURSOR`, `DF_DO_VSCODE` | macOS: on; Linux: off | editor extension/settings integration; Cursor also merges CLI config and loads the My Machines worker |
 | `DF_DO_CMAKE`, `DF_DO_LOCAL_LLM`, `DF_DO_MEMORY`, `DF_DO_SKILLS` | on (`LOCAL_LLM`: full profile) | toolchains, model tooling, qmd/cass, skills |
 | `DF_DO_BLENDER_MCP` | macOS: on; Linux: off | Blender add-on |
 | `DF_DO_AUTH`, `DF_DO_OVERLAYS` | auth: off; overlays: on | token walk; sibling overlays |

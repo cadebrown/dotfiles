@@ -23,7 +23,7 @@ Read the selected skill fully. Keep project conventions in project instructions 
 Use `find-skills` when asking whether a capability exists. If the name/source is known, inspect it with:
 
 ```bash
-rg --files ~/.claude/skills ~/dotfiles/home/dot_claude/skills
+rg --files ~/.claude/skills ~/.cursor/skills ~/dotfiles/home/dot_claude/skills
 ```
 
 Do not create a broadly named skill for a one-off selector or project-local source list. A reusable skill needs a stable input/output contract.

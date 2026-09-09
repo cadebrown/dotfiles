@@ -8,7 +8,7 @@ description: Test rendered configuration, task outcomes, and routing claims with
 | Assertion | Check | Does not prove |
 | --- | --- | --- |
 | Source renders | render/apply and inspect target | harness loaded it |
-| Client accepts config | `bash install/codex.sh check` and focused tests | endpoint reachability or task quality |
+| Client accepts config | `bash install/codex.sh check`, `bash install/cursor.sh check`, and focused tests | endpoint reachability or task quality |
 | Task behavior improved | representative artifact + independent verifier | general gain from one sample |
 | Role routed | observed model/effort and inventory | lower total cost or universal correctness |
 | MCP action available | fresh-session inventory + harmless call | broader authentication or write authority |
@@ -18,6 +18,7 @@ description: Test rendered configuration, task outcomes, and routing claims with
 ```bash
 bash install/codex.sh sync-config
 bash install/codex.sh check
+bash install/cursor.sh check
 bash install/skills-sync.sh check
 ```
 

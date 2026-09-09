@@ -23,6 +23,9 @@ Complete reference for `DF_*` variables and the tool-standard ones this repo car
 | `DF_BREW_UPGRADE_CASKS` | `auto` | Upgrade greedy casks only when sudo is already cached; set `0` to skip or run `sudo -v`/set `1` to permit prompts. |
 | `DF_STRICT_UPGRADE` | `1` | Run `install/audit-versions.sh --strict` after `bootstrap.sh upgrade`; set `0` for a report-only audit. |
 | `DF_MCP_PROFILES` | (unset) | Colon/comma/space-separated opt-in MCP profiles such as `research-scite`, `biomed`, or `publish`. Core servers are always rendered. |
+| `DF_CURSOR_WORKER` | `1` when Cursor setup runs on macOS | `0` bootouts and disables the My Machines computer-use LaunchAgent. |
+| `DF_CURSOR_WORKER_NAME` | `hostname -s` | My Machines worker name. Runtime-only so NFS templates stay identical. |
+| `DF_CURSOR_WORKER_DIRS` | empty | Extra colon-separated `--worker-dir` paths for `df-cursor-worker`. |
 | `DF_DEBUG` | `0` | Set to `1` for verbose `[dbug]` output with timing info on every `run_logged` command. |
 | `DF_FORCE` | `0` | Used by `install/plat-decommission.sh` to skip the deletion confirmation prompt. |
 | `DF_CARGO_STRATEGIES` | (unset) | Override `cargo binstall --strategies`. E.g. `compile` to skip GitHub release fetchers (useful behind a VPN). |
@@ -71,7 +74,7 @@ Set a flag to `0` to skip it.
 | `DF_DO_CLAUDE_DESKTOP` | 6 | Claude Desktop tracked preferences (macOS) |
 | `DF_DO_CODEX_DESKTOP` | 6 | Codex desktop app tracked preferences (macOS) |
 | `DF_DO_LINEARMOUSE` | 6 | LinearMouse tracked settings (macOS) |
-| `DF_DO_CURSOR` | 6 | Cursor settings symlinks + extensions. Defaults to `1` on macOS and `0` on Linux; set `1` explicitly when a Linux Cursor CLI is installed. |
+| `DF_DO_CURSOR` | 6 | Cursor settings, MCP, CLI merge, extensions, and My Machines worker. Defaults to `1` on macOS and `0` on Linux; set `1` explicitly when a Linux Cursor CLI is installed. |
 | `DF_DO_VSCODE` | 6 | VS Code settings + extensions. Defaults to `1` on macOS and `0` on Linux; set `1` explicitly when a Linux `code` CLI is installed. |
 | `DF_DO_CMAKE` | 6 | CMake toolchain file deployment |
 | `DF_DO_LOCAL_LLM` | 6.5 | Local LLM tooling (HuggingFace cache + binary checks). Defaults to `0` for `DF_PROFILE=core`, `1` for `full`; explicit overrides are retained. |

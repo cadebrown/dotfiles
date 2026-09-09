@@ -27,8 +27,8 @@ These are non-negotiable and shape every decision in the repo:
 |---|---|---|
 | Dotfile sources | `home/` | chezmoi templates → applied to `~/` |
 | Package lists | `packages/` | `Brewfile`, `cargo.txt`, `pip.txt`, `npm.txt`, `go.txt`, `mlx-models.txt`, `mcp-servers.txt`, `agent-skills.txt`, `claude-*.txt` |
-| Agent skills | `home/dot_claude/skills/` | Single source → `~/.claude/skills`; `~/.agents/skills` symlinks there (read by Codex/opencode/pi) |
-| Shared template partials | `home/.chezmoitemplates/` | `agents-common.md` (engineering norms), `voice-common.md` (tone/estimates), `math-common.md` (verification-first research-math norms + tool routing), shared by Claude/Codex/opencode/pi guidance files |
+| Agent skills | `home/dot_claude/skills/` | Single source → `~/.claude/skills`; `~/.agents/skills` and `~/.cursor/skills` symlink there |
+| Shared template partials | `home/.chezmoitemplates/` | `agents-common.md` (engineering norms), `voice-common.md` (tone/estimates), `math-common.md` (verification-first research-math norms + tool routing), `cursor-agents.md` (Cursor wrapper). Shared by Claude/Codex/opencode/pi/Cursor. |
 | Install scripts | `install/` | Each sources `_lib.sh`, each is idempotent |
 | Path vars + helpers | `install/_lib.sh` | **Read this first** — defines `PLAT`, `LOCAL_PLAT`, all tool paths, logging |
 | PLAT detection | `install/plat/` | `.plat_check.sh` (capability test) + `.plat_env.sh` (compiler flags) per target |

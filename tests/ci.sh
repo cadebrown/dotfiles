@@ -52,7 +52,7 @@ make_tmp() {
 shell_checks() {
     require bash shellcheck
     local script
-    local scripts=(.githooks/pre-push bootstrap.sh install/*.sh install/plat/*/.plat_env.sh home/dot_local/bin/executable_git-wt)
+    local scripts=(.githooks/pre-push bootstrap.sh install/*.sh install/plat/*/.plat_env.sh home/dot_local/bin/executable_git-wt home/dot_local/bin/executable_df-cursor-worker)
     # Helpers without a Bash shebang are checked through their callers.
     for script in tests/*.sh; do
         if [[ "$(head -n 1 "$script")" == '#!/usr/bin/env bash' || "$(head -n 1 "$script")" == '#!/bin/bash' ]]; then
@@ -72,11 +72,13 @@ fast_checks() {
     printf '==> Fast Bats tests\n'
     HOME="$ci_tmp/fast-home" bats \
         tests/agents.bats \
+        tests/agent-doctor.bats \
         tests/bootstrap-remote.bats \
         tests/brew-glibc.bats \
         tests/ci-entrypoint.bats \
         tests/compiler-cache.bats \
         tests/cursor-extensions.bats \
+        tests/cursor-harness.bats \
         tests/fish.bats \
         tests/gwt.bats \
         tests/lean.bats \

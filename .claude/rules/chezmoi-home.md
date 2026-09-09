@@ -17,15 +17,18 @@ must render identically on every machine** — otherwise machines overwrite each
 `home/.chezmoitemplates/` holds reusable template fragments:
 
 - `agents-common.md` — engineering norms (how-I-work, no-shortcut-fixes, tool
-  preferences, git) shared across all four tools' guidance files.
+  preferences, git) shared across Claude, Codex, opencode, pi, and Cursor
+  guidance files.
 - `voice-common.md` — tone/communication + estimate conventions. Single source
   for "how output should read". Claude loads it via the `cade` output style
   (`home/dot_claude/output-styles/cade.md.tmpl`, system-prompt level); Codex,
-  opencode, and pi include it directly in their always-on file. It is
+  opencode, pi, and Cursor include it directly in their always-on file. It is
   deliberately **not** in `agents-common.md`, so Claude doesn't load voice twice.
 - `math-common.md` — research-mathematics norms: the Lean proof gate, evidence
   tiers (CAS/numeric output is evidence, never proof), and tool routing to the
-  lean-lsp/asta/arxiv/mathlas MCPs. Included by all four guidance files.
+  lean-lsp/asta/arxiv/mathlas MCPs. Included by all five guidance files.
+- `cursor-agents.md` — Cursor wrapper around voice + agents-common plus
+  computer-use routing, Composer 2.5 CLI/subagent default, and Cloud vs home caveats.
 - `locale-env.sh` — the OS-branched locale block (macOS: LANG+LC_ALL; Linux:
   LOCPATH → `unset LC_ALL` → LANG). Included by BOTH login profiles AND both
   interactive rc files — embedded terminals (VS Code/Cursor Remote-SSH) spawn

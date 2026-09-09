@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# install/cursor.sh - symlink Cursor settings from chezmoi-managed source + install extensions
+# install/cursor.sh - Cursor harness: MCP, settings links, extensions, CLI merge, worker
 #
 # Subcommands:
-#   install (default)      — symlink settings + install extensions from cursor-extensions.txt
+#   install (default)      — settings links, MCP, CLI merge, extensions, My Machines worker
 #   sync-extensions|sync   — union Cursor's installed extensions back into cursor-extensions.txt
+#   sync-mcp               — rewrite ~/.cursor/mcp.json from packages/mcp-servers.txt
+#   sync-cli               — merge Shell(*), Composer 2.5 default, exploreSubagentModel
+#   sync-worker            — load or unload the My Machines computer-use LaunchAgent
+#   check                  — file + worker contracts (does not start a one-shot worker)
 #
 # Settings source of truth: ~/.config/cursor/{settings,keybindings}.json
 # (deployed by chezmoi from home/dot_config/cursor/)
@@ -19,10 +23,18 @@
 # home/dot_config/cursor/
 # in the repo; commit when ready.
 #
+# ~/.cursor/cli-config.json is write-once (chezmoi create_) plus this merge.
+# Do not replace the live file: it holds sandbox, attribution, and authInfo.
+# The merge pins selectedModel / model.modelId / exploreSubagentModel to
+# composer-2.5 (standard, not Fast) and unique-appends Shell(*).
+#
 # Hooks prepend ~/.local/bin, plat bins, and Homebrew to PATH — Dock-launched Cursor
 # otherwise often misses chezmoi/cursor CLI.
 #
 # The Cursor application itself is managed via Brewfile (cask "cursor").
+# The agent CLI (curl https://cursor.com/install) is required for My Machines.
+# Computer use is granted in System Settings to Cursor Computer Use.app, not
+# scripted into TCC.db.
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
@@ -127,6 +139,177 @@ _sync_cursor_mcp() {
     fi
 }
 
+# Merge managed keys into the live CLI config without clobbering runtime state.
+# Managed: Shell(*), Composer 2.5 selectedModel/model.modelId, exploreSubagentModel.
+_sync_cursor_cli_config() {
+    has jq || { log_warn "jq not found — Cursor CLI config cannot be merged"; return 1; }
+    log_section "Cursor CLI config"
+
+    local _out="$HOME/.cursor/cli-config.json"
+    local _existing='{}' _tmp
+    local _model=composer-2.5
+    if [[ -f "$_out" ]]; then
+        _existing="$(jq -ce . "$_out" 2>/dev/null)" || _existing='{}'
+    fi
+
+    _tmp="$(mktemp)"
+    jq -n --argjson existing "$_existing" --arg model "$_model" '
+        (if ($existing | type) == "object" then $existing else {} end)
+        | .permissions = (.permissions // {})
+        | .permissions.allow = (
+            ((.permissions.allow | if type == "array" then . else [] end)
+             + ["Shell(*)"]) | unique)
+        | .permissions.deny = (
+            .permissions.deny | if type == "array" then . else [] end)
+        | .exploreSubagentModel = $model
+        | .hasChangedDefaultModel = true
+        | .selectedModel = (
+            (if (.selectedModel | type) == "object" then .selectedModel else {} end)
+            | .modelId = $model
+            | .parameters = [{id: "fast", value: "false"}]
+          )
+        | .model = (
+            (if (.model | type) == "object" then .model else {} end)
+            | .modelId = $model
+            | if has("displayModelId") then .displayModelId = $model else . end
+          )
+    ' > "$_tmp" || { log_warn "Cursor CLI config merge failed"; rm -f "$_tmp"; return 1; }
+
+    ensure_dir "$HOME/.cursor"
+    if [[ -f "$_out" ]] && cmp -s "$_tmp" "$_out"; then
+        log_okay "Cursor CLI config unchanged → $_out"
+        rm -f "$_tmp"
+    else
+        mv "$_tmp" "$_out"
+        log_okay "Merged Cursor CLI config → $_out"
+    fi
+}
+
+_cursor_worker_wanted() {
+    [[ "$OS" == "darwin" ]] || return 1
+    [[ "${DF_CURSOR_WORKER:-1}" != "0" ]]
+}
+
+_cursor_computer_use_hint() {
+    local _app="$HOME/.cursor/cursor-computer-use/Cursor Computer Use.app"
+    if [[ ! -d "$_app" ]]; then
+        log_warn "Cursor Computer Use.app is not installed yet — the first My Machines start installs it. Grant Accessibility and Screen Recording to that helper (bundle co.anysphere.cursor-computer-use), not Terminal or Cursor.app."
+        return 0
+    fi
+    log_info "Cursor Computer Use.app is present. If screenshots fail, grant Accessibility and Screen Recording to Cursor Computer Use in System Settings → Privacy & Security."
+}
+
+_ensure_cursor_worker() {
+    [[ "$OS" == "darwin" ]] || return 0
+
+    local _label=dev.cade.cursor-worker
+    local _plist _domain
+    _plist="$HOME/Library/LaunchAgents/${_label}.plist"
+    _domain="gui/$(id -u)"
+
+    if ! _cursor_worker_wanted; then
+        if launchctl print "$_domain/$_label" >/dev/null 2>&1; then
+            launchctl bootout "$_domain/$_label" >/dev/null 2>&1 || true
+        fi
+        launchctl disable "$_domain/$_label" 2>/dev/null || true
+        log_okay "Cursor worker auto-start disabled (DF_CURSOR_WORKER=0)"
+        return 0
+    fi
+
+    ensure_dir "$HOME/.local/share/cursor-worker"
+
+    if [[ ! -f "$_plist" ]]; then
+        log_warn "${_label}.plist missing — run chezmoi apply"
+        return 0
+    fi
+    if ! has agent; then
+        log_warn "agent CLI missing — skip My Machines worker (curl https://cursor.com/install -fsS | bash)"
+        return 0
+    fi
+    if [[ ! -x "$HOME/.local/bin/df-cursor-worker" ]] && ! has df-cursor-worker; then
+        log_warn "df-cursor-worker missing — run chezmoi apply"
+        return 0
+    fi
+
+    launchctl enable "$_domain/$_label" 2>/dev/null || true
+    if launchctl print "$_domain/$_label" >/dev/null 2>&1; then
+        if launchctl kickstart -k "$_domain/$_label" 2>/dev/null; then
+            log_okay "restarted $_label"
+        else
+            log_okay "$_label already loaded"
+        fi
+    elif launchctl bootstrap "$_domain" "$_plist" 2>/dev/null; then
+        log_okay "loaded $_label"
+    else
+        log_warn "could not load $_label (launchctl bootstrap failed) — grant Aqua session access and retry"
+    fi
+    _cursor_computer_use_hint
+}
+
+_cursor_check() {
+    local _fail=0 _dir="$HOME/.cursor"
+    log_section "Cursor harness check"
+
+    _cursor_req() {
+        local _name="$1"
+        shift
+        if "$@" >/dev/null 2>&1; then
+            log_okay "$_name"
+        else
+            log_warn "missing $_name"
+            _fail=$((_fail + 1))
+        fi
+    }
+
+    _cursor_req "hooks.json" jq -e . "$_dir/hooks.json"
+    if [[ -f "$_dir/mcp.json" ]]; then
+        _cursor_req "mcp.json" jq -e . "$_dir/mcp.json"
+    else
+        log_warn "mcp.json missing — run bash install/cursor.sh sync-mcp"
+        _fail=$((_fail + 1))
+    fi
+    _cursor_req "AGENTS.md" test -s "$_dir/AGENTS.md"
+    _cursor_req "AGENTS.md includes shared prefs" grep -q 'Reason from first principles' "$_dir/AGENTS.md"
+    _cursor_req "rules/personal.mdc" test -s "$_dir/rules/personal.mdc"
+    _cursor_req "alwaysApply rule" grep -q 'alwaysApply: true' "$_dir/rules/personal.mdc"
+    local _agent
+    for _agent in researcher reviewer verifier debugger; do
+        _cursor_req "agent $_agent" grep -q 'model: composer-2.5' "$_dir/agents/${_agent}.md"
+    done
+    _cursor_req "skills symlink" test -L "$_dir/skills"
+    _cursor_req "skills → ~/.claude/skills" \
+        grep -q 'claude/skills' <<<"$(readlink "$_dir/skills" 2>/dev/null || true)"
+    _cursor_req "cli-config Shell(*)" \
+        jq -e '.permissions.allow | any(. == "Shell(*)")' "$_dir/cli-config.json"
+    _cursor_req "cli-config exploreSubagentModel" \
+        jq -e '.exploreSubagentModel == "composer-2.5"' "$_dir/cli-config.json"
+    _cursor_req "cli-config selectedModel" \
+        jq -e '.selectedModel.modelId == "composer-2.5"' "$_dir/cli-config.json"
+    _cursor_req "cli-config default model" \
+        jq -e '.model.modelId == "composer-2.5"' "$_dir/cli-config.json"
+    _cursor_req "cli-config hasChangedDefaultModel" \
+        jq -e '.hasChangedDefaultModel == true' "$_dir/cli-config.json"
+
+    if _cursor_worker_wanted; then
+        _cursor_req "worker plist" test -f "$HOME/Library/LaunchAgents/dev.cade.cursor-worker.plist"
+        _cursor_req "df-cursor-worker" \
+            bash -c 'command -v df-cursor-worker >/dev/null || test -x "$HOME/.local/bin/df-cursor-worker"'
+        _cursor_req "agent CLI" has agent
+        _cursor_req "worker LaunchAgent loaded" \
+            bash -c 'launchctl print "gui/$(id -u)/dev.cade.cursor-worker" >/dev/null'
+        if [[ ! -d "$HOME/.cursor/cursor-computer-use/Cursor Computer Use.app" ]]; then
+            log_warn "Cursor Computer Use.app not installed yet (first worker start installs it; TCC is a human grant)"
+        fi
+    fi
+
+    if (( _fail != 0 )); then
+        log_warn "Cursor harness check failed ($_fail)"
+        return 1
+    fi
+    log_okay "Cursor harness check passed"
+    return 0
+}
+
 # Source-guard: tests/mcp-emitters.bats sources this file for _sync_cursor_mcp
 # — everything below only runs when executed directly.
 [[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
@@ -198,16 +381,32 @@ if [[ "$_CMD" == "sync-mcp" ]]; then
     exit 0
 fi
 
+if [[ "$_CMD" == "sync-cli" ]]; then
+    _sync_cursor_cli_config
+    exit 0
+fi
+
+if [[ "$_CMD" == "sync-worker" ]]; then
+    _ensure_cursor_worker
+    exit 0
+fi
+
+if [[ "$_CMD" == "check" ]]; then
+    _cursor_check
+    exit $?
+fi
+
 if [[ "$_CMD" != "install" ]]; then
-    die "Usage: cursor.sh [install|sync-extensions|sync-mcp]"
+    die "Usage: cursor.sh [install|sync-extensions|sync-mcp|sync-cli|sync-worker|check]"
 fi
 
 has cursor || die "cursor CLI not found — set DF_DO_CURSOR=0 on machines without Cursor"
 
 log_section "Cursor"
 
-### MCP servers (independent of the cursor binary) ###
+### MCP servers and CLI merge (independent of the cursor binary) ###
 _sync_cursor_mcp
+_sync_cursor_cli_config
 
 ### Settings symlinks ###
 
@@ -319,3 +518,6 @@ while IFS= read -r line; do
     fi
 done < "$EXT_TXT"
 (( _missing == 0 )) || die "Cursor is missing $_missing declared extension(s) after installation"
+
+### My Machines worker (macOS; does not fail bootstrap on TCC) ###
+_ensure_cursor_worker
