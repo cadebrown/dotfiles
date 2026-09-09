@@ -973,6 +973,41 @@ refuses an existing file but exits successfully.
 
 ---
 
+## Cursor skills remain a directory instead of the shared symlink
+
+Symptom: `readlink ~/.cursor/skills` prints nothing, Cursor has a separate
+skill tree, or `chezmoi apply` cannot replace `~/.cursor/skills` with its managed
+link.
+
+Root cause: an older Cursor installation created `~/.cursor/skills` as a real
+directory before this repository made it a symlink to `~/.claude/skills`. The
+pre-chezmoi ownership migration preserves that directory as an adjacent backup,
+copies only top-level entries that do not already exist in the shared tree, and
+does not overwrite a shared collision.
+
+Confirm the current shape without changing it:
+
+```sh
+test -d ~/.cursor/skills && ! test -L ~/.cursor/skills && echo 'real directory'
+readlink ~/.cursor/skills
+```
+
+**Fix:** run the migration, then rerun bootstrap so it records its chezmoi
+source and creates the managed link:
+
+```sh
+bash ~/dotfiles/install/skills-sync.sh adopt
+~/dotfiles/bootstrap.sh update
+readlink ~/.cursor/skills
+```
+
+The last command should print `../.claude/skills`. The original complete tree
+remains at `~/.cursor/skills.pre-chezmoi-*`; inspect it before deleting anything.
+For a name collision, the shared `~/.claude/skills/<name>` stays authoritative and
+the Cursor version remains only in that backup.
+
+---
+
 ## `GLIBC_x.y not found` from a Homebrew binary (Linux)
 
 Symptom: a brew-installed binary refuses to start, blaming Homebrew's own libc:

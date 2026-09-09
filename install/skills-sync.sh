@@ -101,6 +101,63 @@ _adopt_vendored_skills() {
     done
 }
 
+_adopt_cursor_skills() {
+    local _cursor_skills="$HOME/.cursor/skills" _backup _candidate _suffix=0
+    local _entry _name _destination _stage _staged_entry
+
+    # Chezmoi owns ~/.cursor/skills as a symlink to the shared Claude tree. A
+    # pre-existing real directory must move aside before apply; renaming it in
+    # ~/.cursor keeps the operation on one filesystem and preserves the full
+    # original tree even if a later copy cannot complete.
+    [[ -d "$_cursor_skills" && ! -L "$_cursor_skills" ]] || return 0
+
+    _candidate="${_cursor_skills}.pre-chezmoi-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+    while [[ -e "$_candidate" || -L "$_candidate" ]]; do
+        (( _suffix++ )) || true
+        _candidate="${_cursor_skills}.pre-chezmoi-$(date -u +%Y%m%dT%H%M%SZ)-$$-$_suffix"
+    done
+    mv "$_cursor_skills" "$_candidate"
+    _backup="$_candidate"
+    log_okay "  archived prior Cursor skills directory in $_backup"
+
+    mkdir -p "$_SKILLS_DIR"
+    shopt -s dotglob nullglob
+    for _entry in "$_backup"/*; do
+        _name="$(basename "$_entry")"
+        _destination="$_SKILLS_DIR/$_name"
+        if [[ -e "$_destination" || -L "$_destination" ]]; then
+            log_warn "  Cursor skill entry $_name conflicts with shared skills; retained only in $_backup"
+            continue
+        fi
+
+        # Stage each entry on the shared tree's filesystem. A failed copy must
+        # never look like a completed destination on a later rerun.
+        if ! _stage="$(mktemp -d "$_SKILLS_DIR/.cursor-skills-adopt.XXXXXX")"; then
+            log_fail "Could not create a staging directory for Cursor skill entry $_name"
+            mv "$_backup" "$_cursor_skills" || die "Could not restore Cursor skills from $_backup"
+            die "Cursor skill migration aborted; original directory restored"
+        fi
+        _staged_entry="$_stage/$_name"
+        if ! cp -pR "$_entry" "$_stage/"; then
+            # This is exclusively our temporary copy, so make it removable
+            # without changing permissions on the preserved original backup.
+            chmod -R u+w "$_stage" 2>/dev/null || true
+            rm -rf "$_stage" || true
+            mv "$_backup" "$_cursor_skills" || die "Could not restore Cursor skills from $_backup"
+            die "Could not migrate Cursor skill entry $_name; original directory restored"
+        fi
+        if ! mv "$_staged_entry" "$_destination"; then
+            chmod -R u+w "$_stage" 2>/dev/null || true
+            rm -rf "$_stage" || true
+            mv "$_backup" "$_cursor_skills" || die "Could not restore Cursor skills from $_backup"
+            die "Could not finalize Cursor skill entry $_name; original directory restored"
+        fi
+        rmdir "$_stage" || log_warn "could not remove Cursor skill staging directory $_stage"
+        log_okay "  migrated Cursor skill entry $_name into $_SKILLS_DIR"
+    done
+    shopt -u dotglob nullglob
+}
+
 _legacy_skill_links() {
     local _link _target _name
     for _link in "$HOME/.pi/agent/skills/"*; do
@@ -237,7 +294,11 @@ _check_registry() {
 case "$_mode" in
     check) _check_registry; exit $? ;;
     lock) _write_digest_lock; exit 0 ;;
-    adopt) _adopt_vendored_skills; exit 0 ;;
+    adopt)
+        _adopt_vendored_skills
+        _adopt_cursor_skills
+        exit 0
+        ;;
 esac
 
 has npx || die "npx not found — install/node.sh must complete before agent skill sync"

@@ -55,6 +55,18 @@ EOF
     chmod 755 "$STUB_BIN/npx"
 }
 
+teardown() {
+    chmod -R u+w "$BATS_TEST_TMPDIR" 2>/dev/null || true
+}
+
+mode_of() {
+    if stat -c '%a' "$1" >/dev/null 2>&1; then
+        stat -c '%a' "$1"
+    else
+        stat -f '%Lp' "$1"
+    fi
+}
+
 tree_hash() {
     local skill_dir="$1" hash_tmp
     hash_tmp="$(mktemp -d)"
@@ -129,6 +141,81 @@ EOF
     [ -L "$FAKE_HOME/.pi/agent/skills/personal" ]
     run bash -c 'compgen -G "$1/.local/state/dotfiles/skill-backups/*/pi-links/retired"' _ "$FAKE_HOME"
     [ "$status" -eq 0 ]
+}
+
+@test "adopt migrates unique read-only Cursor skill content and leaves its path for chezmoi" {
+    mkdir -p "$FAKE_HOME/.cursor/skills/local/nested"
+    printf 'read-only nested content\n' > "$FAKE_HOME/.cursor/skills/local/nested/README.md"
+    chmod 0555 "$FAKE_HOME/.cursor/skills/local/nested"
+    chmod 0444 "$FAKE_HOME/.cursor/skills/local/nested/README.md"
+
+    run env HOME="$FAKE_HOME" DF_USE_PLAT=0 PATH="$STUB_BIN:$PATH" \
+        bash "$FIXTURE/install/skills-sync.sh" adopt
+    [ "$status" -eq 0 ]
+    [ ! -e "$FAKE_HOME/.cursor/skills" ]
+    grep -Fxq 'read-only nested content' "$FAKE_HOME/.claude/skills/local/nested/README.md"
+    [ "$(mode_of "$FAKE_HOME/.claude/skills/local/nested")" = 555 ]
+    [ "$(mode_of "$FAKE_HOME/.claude/skills/local/nested/README.md")" = 444 ]
+    run bash -c 'compgen -G "$1/.cursor/skills.pre-chezmoi-*/local/nested/README.md"' _ "$FAKE_HOME"
+    [ "$status" -eq 0 ]
+
+    run env HOME="$FAKE_HOME" DF_USE_PLAT=0 PATH="$STUB_BIN:$PATH" \
+        bash "$FIXTURE/install/skills-sync.sh" adopt
+    [ "$status" -eq 0 ]
+    [ ! -e "$FAKE_HOME/.cursor/skills" ]
+}
+
+@test "adopt retains a complete Cursor backup and never overwrites shared skill collisions" {
+    mkdir -p "$FAKE_HOME/.cursor/skills/collision" "$FAKE_HOME/.cursor/skills/unique" \
+        "$FAKE_HOME/.claude/skills/collision"
+    printf 'Cursor version\n' > "$FAKE_HOME/.cursor/skills/collision/SKILL.md"
+    printf 'unique Cursor skill\n' > "$FAKE_HOME/.cursor/skills/unique/SKILL.md"
+    printf 'shared version\n' > "$FAKE_HOME/.claude/skills/collision/SKILL.md"
+
+    run env HOME="$FAKE_HOME" DF_USE_PLAT=0 PATH="$STUB_BIN:$PATH" \
+        bash "$FIXTURE/install/skills-sync.sh" adopt
+    [ "$status" -eq 0 ]
+    grep -Fxq 'shared version' "$FAKE_HOME/.claude/skills/collision/SKILL.md"
+    grep -Fxq 'unique Cursor skill' "$FAKE_HOME/.claude/skills/unique/SKILL.md"
+    [[ "$output" == *"Cursor skill entry collision conflicts with shared skills"* ]]
+    local backup
+    backup="$(dirname "$(printf '%s\n' "$FAKE_HOME"/.cursor/skills.pre-chezmoi-*/collision/SKILL.md)")"
+    grep -Fxq 'Cursor version' "$backup/SKILL.md"
+    grep -Fxq 'unique Cursor skill' "$(dirname "$backup")/unique/SKILL.md"
+}
+
+@test "adopt restores Cursor skills after a failed staged copy and retries cleanly" {
+    mkdir -p "$FAKE_HOME/.cursor/skills/unique"
+    printf 'original Cursor skill\n' > "$FAKE_HOME/.cursor/skills/unique/SKILL.md"
+    cat > "$STUB_BIN/cp" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+source_path="${@: -2:1}"
+destination_path="${@: -1}"
+if [[ "$source_path" == *"/.cursor/skills.pre-chezmoi-"*/unique ]] \
+    && [[ ! -e "$CP_FAILURE_MARKER" ]]; then
+    : > "$CP_FAILURE_MARKER"
+    mkdir -p "$destination_path/unique"
+    printf 'partial staged copy\n' > "$destination_path/unique/SKILL.md"
+    exit 1
+fi
+exec /bin/cp "$@"
+EOF
+    chmod 755 "$STUB_BIN/cp"
+
+    run env HOME="$FAKE_HOME" DF_USE_PLAT=0 CP_FAILURE_MARKER="$BATS_TEST_TMPDIR/cp-failed" \
+        PATH="$STUB_BIN:$PATH" bash "$FIXTURE/install/skills-sync.sh" adopt
+    [ "$status" -ne 0 ]
+    grep -Fxq 'original Cursor skill' "$FAKE_HOME/.cursor/skills/unique/SKILL.md"
+    [ ! -e "$FAKE_HOME/.claude/skills/unique" ]
+    run bash -c 'compgen -G "$1/.claude/skills/.cursor-skills-adopt.*"' _ "$FAKE_HOME"
+    [ "$status" -ne 0 ]
+
+    run env HOME="$FAKE_HOME" DF_USE_PLAT=0 CP_FAILURE_MARKER="$BATS_TEST_TMPDIR/cp-failed" \
+        PATH="$STUB_BIN:$PATH" bash "$FIXTURE/install/skills-sync.sh" adopt
+    [ "$status" -eq 0 ]
+    [ ! -e "$FAKE_HOME/.cursor/skills" ]
+    grep -Fxq 'original Cursor skill' "$FAKE_HOME/.claude/skills/unique/SKILL.md"
 }
 
 @test "sync adopts vendored skills without overwriting their installed contents" {
