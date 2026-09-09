@@ -30,10 +30,16 @@ search, mail, audio, GitLab, and Google integrations. Use `auth.sh help` or
 | --- | --- | --- |
 | GitHub API/rate limits | `github` or `gh` | public, low-volume work is enough |
 | Provider SDK/API mode | the named provider | using the provider's interactive login only |
+| Gemini API and Live | `gemini` | only using Gemini CLI with Google login |
+| Gemini CLI Google login | `gemini-cli` | only using the Developer API |
+| Google auth inventory | `google-status` | read-only; useful before choosing a project |
 | Deployment, MCP, or project service | the named service | that workflow is not selected |
 
 `gh auth login` stores its credential in the system keychain or secret service;
 it is separate from `~/.github.env` and is used by the GitHub MCP flow.
+
+See [Gemini and Google APIs](/usage/google-ai/) for separate CLI, Developer API,
+Vertex/ADC, and Workspace paths, SDK packages, Live probes, quotas and pricing.
 
 ## How tokens get loaded
 

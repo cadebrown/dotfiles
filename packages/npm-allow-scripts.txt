@@ -19,3 +19,7 @@ protobufjs
 opencode-ai
 esbuild
 agent-browser
+@googleworkspace/cli
+
+# Gemini CLI credential storage: copies package-shipped platform prebuilds.
+@github/keytar

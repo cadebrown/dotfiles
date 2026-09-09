@@ -1,5 +1,43 @@
 # Troubleshooting
 
+## Google status reports the wrong quota project
+
+**Symptom.** gcloud's selected project differs from the project charged or
+checked for quota by a client library or Cloud MCP call.
+
+**Cause.** `gcloud config get-value project` is the CLI resource default, while
+ADC contains its own `quota_project_id`. Earlier auth status output incorrectly
+labeled the CLI default as the ADC quota project. Environment overrides can
+select another quota project or another credential file entirely.
+
+**Confirm.** Run `bash ~/dotfiles/install/auth.sh google-status`. Compare
+`gcloud-project`, `adc-quota-project`, and the override labels without dumping
+the full credential JSON.
+
+**Fix.** Update the checkout and use the corrected status command. Change ADC
+only when the intended project is known, with
+`gcloud auth application-default set-quota-project YOUR_PROJECT_ID`. Do not
+change the CLI project merely to make the two labels agree. See
+[Gemini and Google APIs](/usage/google-ai/).
+
+## Gemini discovery works but a model request fails
+
+**Symptom.** `df-gemini models` lists a model, but generation or Live fails.
+
+**Cause.** Discovery access does not establish generation quota, model
+availability, billing, or region access. A 429 can mean an exhausted or zero
+project quota; a 503 indicates temporary service unavailability. Google-account
+Pro status does not establish paid Developer API access.
+
+**Confirm.** Check the same project's [AI Studio rate-limit page](https://aistudio.google.com/rate-limit)
+and `bash ~/dotfiles/install/auth.sh google-status`. The probe returns failure
+and a safe error class/status without exposing its key or WebSocket URL.
+
+**Fix.** For a 503, retry with backoff. For quota/billing failures, select a
+model with available quota or deliberately configure paid billing. Do not
+create extra API keys expecting more quota: project keys share the same pool.
+See the [Google API guide](/usage/google-ai/).
+
 ## Fish reports a missing old PLAT `env.fish`
 
 **Symptom:** Fish starts with `source: No such file or directory` naming an

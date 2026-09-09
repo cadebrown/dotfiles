@@ -124,6 +124,10 @@ log_info "Preparing the refreshable Google MCP transport"
 UV_CACHE_DIR="${UV_CACHE_DIR:-$LOCAL_PLAT/uv/cache}" \
     run_logged "$_uv" run --locked --script "$DF_ROOT/install/google-mcp.py" --check-runtime
 
+log_info "Preparing the Gemini Developer API and Live SDK probe"
+UV_CACHE_DIR="${UV_CACHE_DIR:-$LOCAL_PLAT/uv/cache}" \
+    run_logged "$_uv" run --locked --script "$DF_ROOT/install/gemini-api.py" --check-runtime
+
 ### CLI tools ###
 #
 # Each selected tool is installed via `uv tool install`, giving it an

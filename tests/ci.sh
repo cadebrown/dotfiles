@@ -81,6 +81,7 @@ fast_checks() {
         tests/cursor-harness.bats \
         tests/fish.bats \
         tests/gwt.bats \
+        tests/google-auth.bats \
         tests/lean.bats \
         tests/mcp-emitters.bats \
         tests/netrc.bats \

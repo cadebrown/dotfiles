@@ -225,7 +225,7 @@
     {
       "id": "authentication",
       "title": "Authentication",
-      "description": "Sets up managed service credentials and authentication helpers.",
+      "description": "Sets up managed service credentials, including separate Gemini CLI, Developer API/Live, Vertex ADC, and Workspace consent paths.",
       "page": "/setup/auth/",
       "sources": [
         "home/.chezmoitemplates/opencode-credentials.sh",
@@ -371,6 +371,18 @@
         "home/dot_config/fish/conf.d/uv.env.fish"
       ],
       "demo": "sed -n '1,160p' home/dot_zshrc.tmpl"
+    },
+    {
+      "id": "google-ai",
+      "title": "Gemini and Google APIs",
+      "description": "Installs Gemini and Workspace CLIs, separates Google auth paths, and provides a locked Developer API and Live audio probe.",
+      "page": "/usage/google-ai/",
+      "sources": [
+        "install/gemini-api.py",
+        "install/gemini-api.py.lock",
+        "home/dot_local/bin/executable_df-gemini"
+      ],
+      "demo": "df-gemini --check-runtime"
     }
   ]
 }

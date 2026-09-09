@@ -26,6 +26,13 @@
 # OpenCode releases reach npm directly; share the managed Node LTS runtime.
 opencode-ai
 
+# Gemini coding assistant. Google login quota is separate from Developer API billing.
+@google/gemini-cli
+
+# Workspace CLI (Google-hosted community project, pre-1.0): hold API/auth behavior.
+# Its reviewed postinstall downloads and verifies a version-matched native binary.
+@googleworkspace/cli@0.22.5
+
 # JavaScript package manager used by workspace-based web projects. Install it
 # directly rather than letting Corepack and npm compete for the same shim.
 pnpm

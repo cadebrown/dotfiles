@@ -48,6 +48,7 @@ export const sidebar = [
     item('Durable task commands', 'usage/durable-tasks'),
     item('WebMCP', 'usage/webmcp'),
     item('Google Cloud MCP', 'usage/google-cloud-mcp'),
+    item('Gemini & Google APIs', 'usage/google-ai'),
     item('Creative work', 'usage/creative-workflows'),
     item('Game development', 'usage/gamedev'),
     item('Mathematics', 'usage/math'),

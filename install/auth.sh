@@ -10,6 +10,9 @@
 #   bash auth.sh status           # print current state and exit
 #   bash auth.sh <service>        # set up just one (e.g. `auth.sh huggingface`)
 #   bash auth.sh google           # ADC login for official Google Cloud MCP servers
+#   bash auth.sh gemini-cli       # launch Gemini CLI login (Google account)
+#   bash auth.sh google-status    # focused, non-secret Google/Gemini state
+#   bash auth.sh vertex           # ADC login for Vertex AI (optional API enable)
 #   bash auth.sh workspace        # set Workspace MCP OAuth client (community server)
 #   bash auth.sh gh               # run `gh auth login` (browser flow)
 #   bash auth.sh gcloud           # run `gcloud auth login` (browser flow)
@@ -38,6 +41,7 @@ _SERVICE_DEFS=(
     "github|GITHUB_TOKEN|.github.env|GitHub PAT (cargo-binstall, Homebrew rate limits, gh fallback)|https://github.com/settings/tokens|fine-grained no-permission (rate limits only) OR repo (private clones)|you don't bulk-binstall from GitHub releases — or press G to derive from \`gh auth token\`"
     "anthropic|ANTHROPIC_API_KEY|.anthropic.env|Anthropic API key (Claude Code w/o Pro, agent SDKs)|https://console.anthropic.com/settings/keys|—|you only use Claude via Pro / Claude Code OAuth"
     "openai|OPENAI_API_KEY|.openai.env|OpenAI API key (Codex CLI, agent SDKs)|https://platform.openai.com/api-keys|—|you only use Codex via ChatGPT login (most users)"
+    "gemini|GEMINI_API_KEY|.gemini.env|Gemini Developer API key (Gemini API, including Live)|https://aistudio.google.com/apikey|Gemini Developer API key|you use Gemini CLI Login with Google or Vertex AI ADC instead"
     "cloudflare|CLOUDFLARE_API_TOKEN|.cloudflare.env|Cloudflare API token (OpenTofu in infra/, Pages, R2, MCP via API)|https://dash.cloudflare.com/profile/api-tokens|Edit zone DNS + Pages:Edit + R2:Edit (per project)|you don't deploy infra/ via OpenTofu (Cloudflare MCP can use OAuth instead)"
     "huggingface|HF_TOKEN|.huggingface.env|HuggingFace token (mlx-lm gated models, transformers)|https://huggingface.co/settings/tokens|read|you don't pull gated models or private repos"
     "context7|CONTEXT7_API_KEY|.context7.env|Context7 API key (MCP library-docs lookups at higher rate limits)|https://context7.com/dashboard|—|you're fine with anonymous rate limits"
@@ -182,7 +186,7 @@ _status() {
             printf "  %-12s ${_DIM}not logged in${_RESET}  ${_DIM}\`bash %s gcloud\` to set up${_RESET}\n" "gcloud" "$0"
         fi
     else
-        printf "  %-12s ${_DIM}gcloud not installed${_RESET}  ${_DIM}(brew install --cask google-cloud-sdk)${_RESET}\n" "gcloud"
+        printf "  %-12s ${_DIM}gcloud not installed${_RESET}  ${_DIM}(brew install --cask gcloud-cli)${_RESET}\n" "gcloud"
     fi
 
     _github_mcp_token_status
@@ -193,14 +197,145 @@ _status() {
 # (auth=gcloud helpers do exactly this at connection time.) Degrades quietly.
 _google_mcp_token_status() {
     has gcloud || return
-    local proj
+    local quota_project=""
     if gcloud auth application-default print-access-token >/dev/null 2>&1; then
-        proj="${GOOGLE_CLOUD_PROJECT:-$(gcloud config get-value project 2>/dev/null || true)}"
-        [[ "$proj" == "(unset)" ]] && proj=""
-        printf "  %-12s ${_GREEN}live${_RESET}         ${_DIM}ADC mints MCP tokens%s${_RESET}\n" \
-            "google-mcp" "${proj:+ — quota project $proj}"
+        # `gcloud ... print-access-token` reads gcloud's own ADC, while the
+        # Python MCP relay can instead honor GOOGLE_APPLICATION_CREDENTIALS.
+        # Keep the two observations distinct rather than claiming the CLI's
+        # selected project is the relay's quota project.
+        quota_project="$(_google_adc_quota_project)"
+        printf "  %-12s ${_GREEN}live${_RESET}         ${_DIM}gcloud ADC refresh works%s${_RESET}\n" \
+            "google-mcp" "${quota_project:+ — selected SDK ADC quota project $quota_project}"
+        if [[ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
+            printf '  %-12s %s\n' "google-mcp" 'Relay credential override is not validated by this gcloud refresh check.'
+        fi
     else
         printf "  %-12s ${_DIM}no ADC${_RESET}       ${_DIM}run \`bash %s google\` to authenticate Google MCP servers${_RESET}\n" "google-mcp" "$0"
+    fi
+}
+
+_google_adc_file() {
+    # Application Default Credentials use this explicit file when present;
+    # otherwise gcloud's configuration directory owns the standard location.
+    if [[ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
+        printf '%s\n' "$GOOGLE_APPLICATION_CREDENTIALS"
+    elif [[ -n "${CLOUDSDK_CONFIG:-}" ]]; then
+        printf '%s/application_default_credentials.json\n' "$CLOUDSDK_CONFIG"
+    else
+        printf '%s/.config/gcloud/application_default_credentials.json\n' "$HOME"
+    fi
+}
+
+_google_adc_quota_project() {
+    # SDK quota configuration: override, then the selected ADC file.
+    # The MCP transport additionally has its own resource-project fallback.
+    # Print only a project ID, never credentials or a credential-file path.
+    if [[ -n "${GOOGLE_CLOUD_QUOTA_PROJECT:-}" ]]; then
+        printf '%s\n' "$GOOGLE_CLOUD_QUOTA_PROJECT"
+        return 0
+    fi
+    local adc_file
+    adc_file="$(_google_adc_file)"
+    if [[ -r "$adc_file" ]] && has jq; then
+        jq -r '.quota_project_id // empty' "$adc_file" 2>/dev/null || true
+    fi
+}
+
+_google_status() {
+    # This intentionally reports local configuration only. It does not mint
+    # tokens, inspect credential contents beyond quota_project_id, or change
+    # an auth/cache file.
+    printf '%s\n' "${_BOLD}Google and Gemini status (local, non-secret):${_RESET}"
+
+    local gemini_key gemini_file_key google_key
+    gemini_key="${GEMINI_API_KEY:-}"
+    gemini_file_key="$(_token_in_file "$HOME/.gemini.env" GEMINI_API_KEY)"
+    google_key="${GOOGLE_API_KEY:-}"
+    if [[ -n "$gemini_file_key" ]]; then
+        printf "  %-16s ${_GREEN}configured${_RESET} ${_DIM}~/.gemini.env contains GEMINI_API_KEY${_RESET}\n" "gemini-api"
+    elif [[ -n "$gemini_key" ]]; then
+        printf "  %-16s ${_GREEN}configured${_RESET} ${_DIM}GEMINI_API_KEY is supplied by the environment${_RESET}\n" "gemini-api"
+    else
+        printf "  %-16s ${_DIM}not configured${_RESET} ${_DIM}GEMINI_API_KEY is absent from the environment and ~/.gemini.env${_RESET}\n" "gemini-api"
+    fi
+    if [[ -n "$google_key" ]]; then
+        printf "  %-16s ${_YELLOW}precedence warning${_RESET} ${_DIM}GOOGLE_API_KEY is set and takes precedence over GEMINI_API_KEY for Gemini tooling${_RESET}\n" "gemini-api"
+    fi
+
+    if has gemini; then
+        local selected_type settings_file oauth_cache
+        settings_file="$HOME/.gemini/settings.json"
+        oauth_cache="$HOME/.gemini/oauth_creds.json"
+        selected_type=""
+        if [[ -r "$settings_file" ]] && has jq; then
+            selected_type="$(jq -r '.security.auth.selectedType // empty' "$settings_file" 2>/dev/null || true)"
+        fi
+        case "$selected_type" in
+            oauth-personal|gemini-api-key|USE_VERTEX_AI|COMPUTE_ADC)
+                printf "  %-16s ${_YELLOW}unverified local state${_RESET} ${_DIM}installed; settings select %s${_RESET}\n" \
+                    "gemini-cli" "$selected_type"
+                ;;
+            "")
+                if [[ -f "$oauth_cache" ]]; then
+                    printf "  %-16s ${_YELLOW}unverified local state${_RESET} ${_DIM}installed; oauth_creds.json is present but no selected auth type is readable${_RESET}\n" "gemini-cli"
+                elif [[ -r "$settings_file" ]] && ! has jq; then
+                    printf "  %-16s ${_YELLOW}unverified local state${_RESET} ${_DIM}installed; settings exist but jq is unavailable${_RESET}\n" "gemini-cli"
+                else
+                    printf "  %-16s ${_YELLOW}unverified local state${_RESET} ${_DIM}installed; no selected auth type or oauth_creds.json found${_RESET}\n" "gemini-cli"
+                fi
+                ;;
+            *)
+                printf "  %-16s ${_YELLOW}unverified local state${_RESET} ${_DIM}installed; settings select an unrecognized auth type${_RESET}\n" "gemini-cli"
+                ;;
+        esac
+    else
+        printf "  %-16s ${_DIM}not installed${_RESET} ${_DIM}install the Gemini CLI before Login with Google${_RESET}\n" "gemini-cli"
+    fi
+
+    if has gcloud; then
+        local account project
+        account="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -1)"
+        project="$(gcloud config get-value project 2>/dev/null || true)"
+        [[ "$project" == "(unset)" ]] && project=""
+        printf "  %-16s %s ${_DIM}gcloud active identity (CLI state)${_RESET}\n" "gcloud-identity" "${account:-not selected}"
+        printf "  %-16s %s ${_DIM}gcloud configured project (CLI state)${_RESET}\n" "gcloud-project" "${project:-not selected}"
+    else
+        printf "  %-16s ${_DIM}gcloud not installed (brew install --cask gcloud-cli)${_RESET}\n" "gcloud"
+    fi
+
+    if has gws; then
+        printf "  %-16s ${_YELLOW}unverified local state${_RESET} ${_DIM}installed; credential state is not inspected${_RESET}\n" "workspace-cli"
+    else
+        printf "  %-16s ${_DIM}not installed${_RESET}\n" "workspace-cli"
+    fi
+
+    local adc_file quota_project source
+    adc_file="$(_google_adc_file)"
+    if [[ -n "${GOOGLE_CLOUD_QUOTA_PROJECT:-}" ]]; then
+        printf "  %-16s %s ${_DIM}GOOGLE_CLOUD_QUOTA_PROJECT override (effective for this shell)${_RESET}\n" \
+            "adc-quota-project" "$GOOGLE_CLOUD_QUOTA_PROJECT"
+    elif [[ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
+        source="GOOGLE_APPLICATION_CREDENTIALS override"
+        if [[ -r "$adc_file" ]] && has jq; then
+            quota_project="$(_google_adc_quota_project)"
+            printf "  %-16s %s ${_DIM}%s; credential-file local state${_RESET}\n" \
+                "adc-quota-project" "${quota_project:-not set}" "$source"
+        elif [[ -r "$adc_file" ]]; then
+            printf "  %-16s ${_YELLOW}unverified${_RESET} ${_DIM}%s; install jq to inspect quota_project_id${_RESET}\n" \
+                "adc-quota-project" "$source"
+        else
+            printf "  %-16s ${_DIM}unavailable${_RESET} ${_DIM}%s is not readable${_RESET}\n" \
+                "adc-quota-project" "$source"
+        fi
+    elif [[ -r "$adc_file" ]] && has jq; then
+        quota_project="$(_google_adc_quota_project)"
+        printf "  %-16s %s ${_DIM}ADC credential-file local state${_RESET}\n" \
+            "adc-quota-project" "${quota_project:-not set}"
+    elif [[ -r "$adc_file" ]]; then
+        printf "  %-16s ${_YELLOW}unverified${_RESET} ${_DIM}ADC file is present; install jq to inspect quota_project_id${_RESET}\n" \
+            "adc-quota-project"
+    else
+        printf "  %-16s ${_DIM}not found${_RESET} ${_DIM}no readable ADC credential file${_RESET}\n" "adc-quota-project"
     fi
 }
 
@@ -265,9 +400,9 @@ _prompt_token_for() {
                 ;;
             u|U)
                 printf "  New %s (input hidden): " "$var"
-                stty -echo 2>/dev/null
+                stty -echo 2>/dev/null || true
                 read -r new_value || new_value=""
-                stty echo 2>/dev/null
+                stty echo 2>/dev/null || true
                 printf '\n'
                 if [[ -z "$new_value" ]]; then
                     log_warn "No value entered — keeping existing"
@@ -299,9 +434,9 @@ _prompt_token_for() {
     else
         printf "  Enter %s (input hidden, or Enter to skip): " "$var"
     fi
-    stty -echo 2>/dev/null
+    stty -echo 2>/dev/null || true
     read -r new_value || new_value=""
-    stty echo 2>/dev/null
+    stty echo 2>/dev/null || true
     printf '\n'
     if [[ -z "$new_value" ]]; then
         log_info "Skipped $var"
@@ -362,7 +497,7 @@ _gcloud_login() {
     # Distinct from the Workspace MCP creds above — that's an OAuth client for
     # Gmail/Drive/Calendar; this is your gcloud user identity for GCP itself.
     if ! has gcloud; then
-        log_warn "gcloud not installed (brew install --cask google-cloud-sdk) — skipping"
+        log_warn "gcloud not installed (brew install --cask gcloud-cli) — skipping"
         return 0
     fi
     if gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | grep -q .; then
@@ -393,7 +528,7 @@ _google_adc_login() {
     # setup and no "app is blocked". Workspace (Gmail/Drive/Calendar) is handled
     # separately by the community server — `bash auth.sh workspace`.
     if ! has gcloud; then
-        log_warn "gcloud not installed (brew install --cask google-cloud-sdk) — skipping"
+        log_warn "gcloud not installed (brew install --cask gcloud-cli) — skipping"
         log_info "  The Cloud MCP servers in mcp-servers.txt need ADC; install gcloud first."
         return 0
     fi
@@ -427,7 +562,7 @@ _google_adc_login() {
                 if gcloud services enable $apis --project "$proj"; then
                     log_okay "Enabled: $apis"
                 else
-                    log_warn "Some APIs failed to enable (Workspace MCP APIs need Preview Program enrollment)"
+                    log_warn "Some Cloud MCP APIs failed to enable; inspect project permissions and service status."
                 fi
                 ;;
             *) log_info "Skipped API enable. Later: gcloud services enable $apis" ;;
@@ -436,7 +571,74 @@ _google_adc_login() {
         log_warn "No quota project — Cloud MCP calls may 403 'user project required'."
         log_info "  Later: gcloud auth application-default set-quota-project <ID>"
     fi
-    log_okay "Google MCP auth ready. Relaunch Claude/Codex to pick up the credentials."
+    log_okay "Google MCP ADC login completed. API availability depends on the selected quota project and enabled services."
+}
+
+_gemini_cli_login() {
+    if ! has gemini; then
+        log_warn "Gemini CLI not installed — skipping"
+        return 0
+    fi
+    if [[ -n "${GEMINI_API_KEY:-}${GOOGLE_API_KEY:-}${GOOGLE_GENAI_USE_VERTEXAI:-}" ]]; then
+        log_warn "Launching without inherited Gemini API/Vertex settings so Login with Google is offered; use \`/auth\` inside Gemini to change an existing selection."
+    fi
+    log_info "Launching the installed \`gemini\` CLI. Select \"Login with Google\"."
+    log_info "To change an existing Gemini CLI login later, run \`/auth\` inside Gemini."
+    env -u GEMINI_API_KEY -u GOOGLE_API_KEY -u GOOGLE_GENAI_USE_VERTEXAI gemini
+}
+
+_workspace_cli_login() {
+    if ! has gws; then
+        log_warn "gws Workspace CLI not installed — skipping"
+        return 0
+    fi
+
+    # _lib.sh has already sourced ~/.google.env. Use those shell values rather
+    # than reparsing %q-serialized exports, which would corrupt valid secrets.
+    local client_id="${GOOGLE_OAUTH_CLIENT_ID:-}" client_secret="${GOOGLE_OAUTH_CLIENT_SECRET:-}"
+    if [[ -z "$client_id" || -z "$client_secret" ]]; then
+        log_warn "Workspace OAuth client is not configured in ~/.google.env."
+        log_info "Run \`bash $0 workspace\` to save an existing Desktop OAuth client, or use the manual Google Cloud Console path."
+        log_info "\`gws auth setup\` can create Cloud state, so this command does not run it automatically."
+        return 0
+    fi
+    log_info "Launching read-only gws login for Drive, Gmail, and Calendar."
+    GOOGLE_WORKSPACE_CLI_CLIENT_ID="$client_id" \
+        GOOGLE_WORKSPACE_CLI_CLIENT_SECRET="$client_secret" \
+        gws auth login --readonly -s drive,gmail,calendar
+}
+
+_vertex_adc_login() {
+    if ! has gcloud; then
+        log_warn "gcloud not installed (brew install --cask gcloud-cli) — skipping"
+        return 0
+    fi
+    log_info "ADC login for Vertex AI. This does not set GOOGLE_GENAI_USE_VERTEXAI globally."
+    gcloud auth application-default login || { log_fail "Vertex AI ADC login failed"; return 1; }
+
+    local project yn
+    project="$(gcloud config get-value project 2>/dev/null || true)"
+    [[ "$project" == "(unset)" ]] && project=""
+    if [[ -z "$project" ]]; then
+        printf "  No default gcloud project set. Enter a Vertex AI project ID (or Enter to skip API enable): "
+        read -r project || project=""
+    fi
+    if [[ -z "$project" ]]; then
+        log_info "Skipped Vertex AI API enable. Later: gcloud services enable aiplatform.googleapis.com --project <ID>"
+        return 0
+    fi
+    printf "  Enable aiplatform.googleapis.com on %s now? [y/N] " "$project"
+    read -r yn || yn=""
+    case "${yn:-n}" in
+        y|Y)
+            if gcloud services enable aiplatform.googleapis.com --project "$project"; then
+                log_okay "Enabled aiplatform.googleapis.com on $project"
+            else
+                log_warn "Vertex AI API enable failed; inspect project permissions and service status."
+            fi
+            ;;
+        *) log_info "Skipped Vertex AI API enable. Later: gcloud services enable aiplatform.googleapis.com --project $project" ;;
+    esac
 }
 
 _find_service_row() {
@@ -483,7 +685,20 @@ _walk_all() {
             *) log_info "Skipped gcloud login (later: \`bash $0 gcloud\`)" ;;
         esac
     else
-        log_info "gcloud not installed (brew install --cask google-cloud-sdk) — skipping"
+        log_info "gcloud not installed (brew install --cask gcloud-cli) — skipping"
+    fi
+
+    printf "\n${_BOLD}Gemini CLI (Google login)${_RESET}\n"
+    printf "  ${_DIM}Uses the installed Gemini CLI's Login with Google flow; no API key is needed for that flow.${_RESET}\n"
+    if has gemini; then
+        printf "  Run \`gemini\` login now? [y/N] "
+        read -r yn || yn=""
+        case "${yn:-n}" in
+            y|Y) _gemini_cli_login ;;
+            *) log_info "Skipped Gemini CLI login (later: \`bash $0 gemini-cli\`)" ;;
+        esac
+    else
+        log_info "Gemini CLI not installed — skipping"
     fi
 
     _print_summary
@@ -492,10 +707,25 @@ _walk_all() {
 ### Dispatch ###
 
 _mode="${1:-walk}"
+# The focused Google commands are valid alongside token services, e.g.
+# `auth.sh google-status gemini-cli`.  Route multi-argument invocations through
+# the common dispatcher instead of treating the first special command as a
+# terminal mode.
+if (( $# > 1 )); then
+    case "$_mode" in
+        google-status|gemini-cli|vertex|workspace-cli|workspace|google|gcloud|gcloud-cli|gh|github-cli)
+            _mode="__multi__"
+            ;;
+    esac
+fi
 case "$_mode" in
     status)
         log_section "API token status"
         _status
+        ;;
+    google-status)
+        log_section "Google and Gemini status"
+        _google_status
         ;;
     walk|"")
         log_section "API token setup"
@@ -516,6 +746,18 @@ case "$_mode" in
         log_section "Google MCP auth (ADC for official Google/Cloud servers)"
         _google_adc_login "${2:-}"
         ;;
+    gemini-cli)
+        log_section "Gemini CLI login"
+        _gemini_cli_login
+        ;;
+    vertex)
+        log_section "Vertex AI auth (ADC)"
+        _vertex_adc_login
+        ;;
+    workspace-cli)
+        log_section "Workspace CLI login (read-only)"
+        _workspace_cli_login
+        ;;
     workspace)
         # Community Workspace MCP server creds: walk both client vars (→ ~/.google.env).
         log_section "Workspace MCP OAuth client (community full-write server)"
@@ -528,13 +770,17 @@ case "$_mode" in
         _gcloud_login
         ;;
     -h|--help|help)
-        printf 'Usage: %s [walk|status|gh|gcloud|google|workspace|<service>]\n\n' "$0"
+        printf 'Usage: %s [walk|status|google-status|gh|gcloud|google|gemini-cli|vertex|workspace|workspace-cli|<service>]\n\n' "$0"
         printf 'Services:\n'
         for row in "${_SERVICE_DEFS[@]}"; do
             printf '  %-12s %s\n' "$(_field "$row" 1)" "$(_field "$row" 4)"
         done
         printf '  %-12s %s\n' "google" 'ADC login for official Google Cloud MCP servers (+ enable APIs)'
+        printf '  %-12s %s\n' "google-status" 'Report focused Gemini, Gemini CLI, gcloud, and ADC local state'
+        printf '  %-12s %s\n' "gemini-cli" 'Launch installed Gemini CLI; choose Login with Google'
+        printf '  %-12s %s\n' "vertex" 'ADC login for Vertex AI (+ optional aiplatform.googleapis.com enable)'
         printf '  %-12s %s\n' "workspace" 'Set Workspace MCP OAuth client (id+secret) for the community server'
+        printf '  %-12s %s\n' "workspace-cli" 'Run read-only gws login using the existing Workspace OAuth client'
         printf '  %-12s %s\n' "gh" 'Run `gh auth login` (browser flow)'
         printf '  %-12s %s\n' "gcloud" 'Run `gcloud auth login` (browser flow + optional ADC)'
         ;;
@@ -552,8 +798,30 @@ case "$_mode" in
                     _gcloud_login
                     ;;
                 google)
-                    log_section "Google MCP auth (ADC for official Workspace + Cloud servers)"
+                    log_section "Google MCP auth (ADC for official Cloud servers)"
                     _google_adc_login
+                    ;;
+                google-status)
+                    log_section "Google and Gemini status"
+                    _google_status
+                    ;;
+                gemini-cli)
+                    log_section "Gemini CLI login"
+                    _gemini_cli_login
+                    ;;
+                vertex)
+                    log_section "Vertex AI auth (ADC)"
+                    _vertex_adc_login
+                    ;;
+                workspace)
+                    log_section "Workspace MCP OAuth client (community full-write server)"
+                    for _grow in workspace-id workspace-secret; do
+                        if row="$(_find_service_row "$_grow")"; then _prompt_token_for "$row"; fi
+                    done
+                    ;;
+                workspace-cli)
+                    log_section "Workspace CLI login (read-only)"
+                    _workspace_cli_login
                     ;;
                 *)
                     if row="$(_find_service_row "$_svc")"; then
