@@ -111,5 +111,8 @@
   "claudeCode.initialPermissionMode": "bypassPermissions",
   "remote.autoForwardPortsSource": "hybrid",
   "workbench.sideBar.location": "right",
-  "workbench.preferredDarkColorTheme": "SynthWave '84"
+  "workbench.preferredDarkColorTheme": "SynthWave '84",
+  "cursor.composer.conversationDensity": "compact-ungrouped",
+  "cursor.composer.codeBlockWordWrap": true,
+  "cursor.composer.queueMessageDefaultBehavior": "steer"
 }
