@@ -26,6 +26,9 @@
 #                             #   - claude plugin marketplace update + plugin update
 #                             #   - npx skills update + self-installer skills (-f)
 #                             #   - MLX models (pull any new mlx-models.txt entries)
+#                             #   - scratch.sh rerun (reclaims state files that an
+#                             #     app's own upgrade/migration silently unlinked
+#                             #     from scratch back onto the small NFS home)
 #                             # Always re-downloaded regardless of mode:
 #                             #   Claude Code, Codex CLI, cass (vs GitHub latest)
 #                             # Intentionally HELD (warned loudly, never silent):
@@ -109,8 +112,16 @@ if [[ "$DF_MODE" == "upgrade" ]]; then
 fi
 export DF_BREW_UPGRADE
 
-# update/upgrade skip scratch setup and repo clone
-if [[ "$DF_MODE" != "install" ]]; then
+# `update` skips scratch setup (lightweight: git pull + chezmoi apply, no
+# package upgrades, nothing new to reconcile). `upgrade` does NOT skip it:
+# npm/cargo/etc. upgrades happen in that mode, and some of those tools replace
+# a scratch-symlinked state file by unlink+recreate during their own internal
+# migrations (observed with Codex's *.sqlite — see "Home directory is near
+# quota" in docs/usage/troubleshooting.md) rather than writing in place. That
+# silently turns a scratch symlink back into a real file on ~; only rerunning
+# scratch.sh detects and relinks it. Since upgrade already re-walks every
+# other install step, it's the natural point to also catch this drift.
+if [[ "$DF_MODE" == "update" ]]; then
     DF_DO_SCRATCH="${DF_DO_SCRATCH:-0}"
 fi
 

@@ -39,7 +39,7 @@ Each script sources `_lib.sh`, is idempotent, and has a `DF_DO_*` flag in `boots
 | `memory.sh` | Agent memory stack: cass binary (GitHub release, checksum-verified) + session-history index, ~/kb knowledge repo, qmd collections + embeddings, memory daemons | qmd MCP daemon on localhost:8181 (LaunchAgent dev.cade.qmd on macOS, lazy-start on Linux); cass watch daemon likewise. `reindex` mode forces re-embedding. Indexes under ~/.cache (scratch), never synced; ~/kb is git-synced. |
 | `auth.sh` | Guided API token setup with service registry | Creates `~/.{service}.env` files (chmod 600). Built-in token services: GitHub, Anthropic, OpenAI, Cloudflare, HuggingFace, Tavily, Exa, Firecrawl, Context7, WolframAlpha. Interactive logins (not env files): `gh auth login`, `gcloud auth login`, and `google` (= `gcloud auth application-default login` with the union of MCP scopes + optional `gcloud services enable` of the MCP-backing APIs — authenticates Google's official remote MCP servers). Run `bash auth.sh status` for state, `bash auth.sh <service>` for a single one. Add a token service by appending to `_SERVICE_DEFS`; an interactive login gets its own function + dispatch case. |
 | `dirs.sh` | Creates `~/dev`, `~/bones`, `~/misc` | Symlinks to scratch when available |
-| `scratch.sh` | Symlinks `~/.local`, `~/.cache`, etc. to scratch space | NFS quota relief. `~/.claude` and `~/.codex` are chezmoi-owned real dirs — only their unmanaged entries move, via `DF_CLAUDE_LINKS` / `DF_CODEX_LINKS`. Codex's loose `*.sqlite` files are linked individually and only while Codex is stopped. |
+| `scratch.sh` | Symlinks `~/.local`, `~/.cache`, etc. to scratch space | NFS quota relief. `~/.claude` and `~/.codex` are chezmoi-owned real dirs — only their unmanaged entries move, via `DF_CLAUDE_LINKS` / `DF_CODEX_LINKS`. Codex's loose `*.sqlite` files are linked individually and only while Codex is stopped. Reruns on every `bootstrap.sh upgrade` (not just `install`) — see gotcha below. |
 | `verify-path.sh` | Diagnostic: arch check, library check, duplicates, stale symlinks | Not called by bootstrap |
 | `patch-homebrew-*.sh` | Per-formula/toolchain patches for Homebrew on Linux | See `.claude/rules/homebrew.md` for the full patch catalog and the underlying build failures |
 
@@ -197,6 +197,19 @@ re-runs the install script.
   place; nvm has no self-update command). When adding an install script, an
   idempotency guard needs a matching `DF_MODE=upgrade` answer, or upgrade mode
   silently freezes that tool.
+- **A scratch symlink can silently revert to a real file — not just from `chezmoi
+  apply`.** The chezmoi-managed-directory case above is one cause; an app's own
+  internal schema migration is another. Codex takes a pre-migration backup into
+  `~/.codex/db-backups/` and then replaces its live `.sqlite` files by
+  unlink+create rather than an in-place write, which deletes whatever symlink
+  `scratch.sh` had put there and materializes a fresh real file directly on the
+  small NFS home — confirmed by matching file ctimes to `db-backups/` snapshot
+  timestamps to the millisecond. This happens on Codex's own version/schema
+  bumps, invisibly, with no warning. `scratch.sh` only detects and relinks it
+  the *next time it runs* — which is why `bootstrap.sh upgrade` (the mode that
+  actually upgrades `@openai/codex` via npm) no longer skips `DF_DO_SCRATCH` by
+  default; `update` still does, since it performs no package upgrades. See
+  "Home directory is near quota" in `docs/usage/troubleshooting.md`.
 - **cargo-binstall gnu prebuilts can outrun the host glibc** — GitHub's ubuntu-latest
   runners moved to 24.04 (glibc 2.39), so upstream gnu release binaries refuse to load
   on older hosts (Ubuntu 22.04 = 2.35 broke atuin/xan/yazi, July 2026). Homebrew's

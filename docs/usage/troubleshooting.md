@@ -2141,3 +2141,43 @@ explicit unset operations. Python should report `False`, with bytecode under
 `~/.cache/python/pycache`. A process launched directly by an old IDE can still
 inherit old values until that IDE restarts. An explicit `python -B` remains a
 command-specific bypass. See [compiler-cache migration](compiler-caching.md#managed-configuration).
+
+---
+
+## Home directory is near quota despite `install/scratch.sh` running
+
+Symptom: `df -H ~` reports the home filesystem close to full even though
+`.local`, `.cache`, and the other `DF_LINKS` entries are already symlinked to
+scratch space, and disk-dependent tools (e.g. an MCP server's cache doctor
+check) start failing on free-space thresholds.
+
+Root cause: `install/scratch.sh` only migrates a fixed, named list of
+cache-shaped directories (`DF_LINKS`, plus `DF_CLAUDE_LINKS`/`DF_CODEX_LINKS`
+one level under the chezmoi-managed `~/.claude`/`~/.codex`). Two other classes
+of growth are not covered automatically:
+
+1. **Ad hoc project/output directories** created directly under `~` (build
+   trees, bug-repro dumps, scratch clones) — `install/dirs.sh` already
+   provisions `~/dev`, `~/bones`, and `~/misc` as scratch-backed symlinks for
+   exactly this, but nothing enforces using them; a directory created as
+   `~/<name>` instead of `~/misc/<name>` sits on the small quota indefinitely.
+2. **New subdirectories an app adds after the `DF_CODEX_LINKS`/`DF_CONFIG_LINKS`
+   default list was written** — e.g. Codex's `db-backups/` (pre-migration
+   SQLite schema-upgrade snapshots) grew unnoticed under `~/.codex` for
+   months because the migration list only knew about `backups/`, a
+   similarly-named but different directory.
+
+**Confirm:** `du -sh --exclude=.local -- ~/.[!.]* ~/* 2>/dev/null | sort -rh | head -20`
+to find what's actually large; for a chezmoi-managed dir like `~/.claude` or
+`~/.codex`, run `du -sh ~/.codex/* ~/.codex/.[!.]*` one level down, since the
+directory itself can't be a symlink (see the "never symlink a chezmoi-managed
+directory" gotcha in `.claude/rules/install-scripts.md`).
+
+**Fix:** for case 1, move the stray directory under `~/misc/<name>` (or
+`~/dev`, `~/bones`) and update anything that referenced the old path; going
+forward, create new project/output directories there directly rather than in
+`~`. For case 2, add the missing subdir name to the relevant `_DEFAULT_*_LINKS`
+list in `install/scratch.sh` and rerun it — Codex/Claude Code must not be
+running at the time, since `scratch.sh` refuses to migrate `~/.codex` while a
+process holds its files open (a live app-server can otherwise keep writing to
+an unlinked inode across the migration).

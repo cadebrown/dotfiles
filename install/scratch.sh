@@ -24,7 +24,9 @@
 #     └── .codex/                ← heavy *unmanaged* subdirs + SQLite state of ~/.codex
 #         ├── sessions/          ← symlinked from ~/.codex/sessions (transcripts, the bulk)
 #         ├── generated_images/  ← symlinked from ~/.codex/generated_images (per-session PNGs)
-#         ├── cache/ plugins/ attachments/ shell_snapshots/ log/ backups/ .tmp/ tmp/
+#         ├── cache/ plugins/ attachments/ shell_snapshots/ log/ backups/ db-backups/ .tmp/ tmp/
+#         │                        (db-backups holds pre-migration SQLite snapshots Codex
+#         │                        keeps on schema upgrades — can grow to hundreds of MB)
 #         └── *.sqlite           ← symlinked from ~/.codex/*.sqlite (logs/state/goals)
 #
 # Which top-level dirs are migrated is controlled by DF_LINKS (colon-separated);
@@ -321,7 +323,7 @@ DF_CLAUDE_LINKS="${DF_CLAUDE_LINKS-$_DEFAULT_CLAUDE_LINKS}"
 unset _DEFAULT_CLAUDE_LINKS
 link_managed_subdirs "$HOME/.claude" "$DF_CLAUDE_LINKS"
 
-_DEFAULT_CODEX_LINKS="sessions:generated_images:cache:plugins:attachments:shell_snapshots:log:backups:.tmp:tmp"
+_DEFAULT_CODEX_LINKS="sessions:generated_images:cache:plugins:attachments:shell_snapshots:log:backups:db-backups:.tmp:tmp"
 DF_CODEX_LINKS="${DF_CODEX_LINKS-$_DEFAULT_CODEX_LINKS}"
 unset _DEFAULT_CODEX_LINKS
 
