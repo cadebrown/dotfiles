@@ -72,11 +72,12 @@ setup() {
 }
 
 @test "rendered Linux login profiles start qmd without indexing the CASS archive" {
-    local test_home shell_name source_file rendered
+    local test_home shell_name source_file rendered attempt
     test_home="$BATS_TEST_TMPDIR/home"
     mkdir -p "$test_home/.local/bin"
     cat > "$test_home/.local/bin/qmd" <<'EOF'
 #!/bin/sh
+sleep 0.1
 printf '%s\n' "$*" >> "$HOME/qmd-calls"
 EOF
     cat > "$test_home/.local/bin/cass" <<'EOF'
@@ -99,10 +100,20 @@ EOF
             --override-data '{"chezmoi":{"os":"linux"},"use_plat":false}' \
             execute-template --file "$REPO/home/$source_file" > "$rendered"
         run env HOME="$test_home" SSH_AUTH_SOCK=already_running \
-            "$shell_name" -f -c 'source "$1"; wait' _ "$rendered"
+            "$shell_name" -f -c 'source "$1"' _ "$rendered"
         [ "$status" -eq 0 ]
         [ ! -e "$test_home/cass-calls" ]
     done
+    # The profiles detach qmd inside a subshell; the sourcing shell cannot wait
+    # for that grandchild. Wait for its observable output with a bounded deadline.
+    for ((attempt = 0; attempt < 50; attempt++)); do
+        if [[ -f "$test_home/qmd-calls" ]] && \
+            [[ "$(wc -l < "$test_home/qmd-calls" | tr -d ' ')" -ge 2 ]]; then
+            break
+        fi
+        sleep 0.1
+    done
     [ "$(wc -l < "$test_home/qmd-calls" | tr -d " ")" -eq 2 ]
     [ "$(sort -u "$test_home/qmd-calls")" = 'mcp --http --daemon' ]
+    [ ! -e "$test_home/cass-calls" ]
 }

@@ -2217,6 +2217,24 @@ command-specific bypass. See [compiler-cache migration](compiler-caching.md#mana
 
 ---
 
+## Login-profile fixture intermittently misses QMD startup
+
+Symptom: the push gate fails the QMD call-count assertion in `tests/profiles.bats`,
+but rerunning the focused test passes.
+
+Root cause: login profiles detach QMD inside a subshell. A later `wait` in the
+sourcing shell cannot join that grandchild, so the fixture can inspect its log
+before the fake QMD process writes it.
+
+**Confirm:** run `bats --filter 'rendered Linux login profiles' tests/profiles.bats`.
+The fixture uses a fake home and fake QMD; it does not start the real service.
+
+**Fix:** update to the fixture that polls for both recorded startup calls with a
+bounded deadline, then checks their exact arguments and the absence of CASS calls.
+Keep the push gate enabled; changing the real QMD startup behavior is unnecessary.
+
+---
+
 ## Home directory is near quota despite `install/scratch.sh` running
 
 Symptom: `df -H ~` reports the home filesystem close to full even though
