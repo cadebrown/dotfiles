@@ -76,6 +76,7 @@ fast_checks() {
         tests/brew-glibc.bats \
         tests/ci-entrypoint.bats \
         tests/compiler-cache.bats \
+        tests/cursor-extensions.bats \
         tests/fish.bats \
         tests/gwt.bats \
         tests/lean.bats \
@@ -86,6 +87,7 @@ fast_checks() {
         tests/pre-push.bats \
         tests/profiles.bats \
         tests/rust-glibc-smoke.bats \
+        tests/skills-sync.bats \
         tests/toolchains.bats \
         tests/verify-path.bats
 }

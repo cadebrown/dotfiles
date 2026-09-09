@@ -6,8 +6,10 @@ setup() {
     TEST_REPO="$BATS_TEST_TMPDIR/repo"
     FAKE_BIN="$BATS_TEST_TMPDIR/bin"
 
-    mkdir -p "$TEST_HOME" "$TEST_REPO/install" "$TEST_REPO/packages" "$FAKE_BIN"
+    mkdir -p "$TEST_HOME" "$TEST_REPO/install" "$TEST_REPO/packages" \
+        "$TEST_REPO/home/.chezmoitemplates" "$FAKE_BIN"
     cp "$REPO_ROOT/install/_lib.sh" "$REPO_ROOT/install/_runtime-paths.sh" "$REPO_ROOT/install/cursor.sh" "$TEST_REPO/install/"
+    cp "$REPO_ROOT/home/.chezmoitemplates/compiler-cache.sh" "$TEST_REPO/home/.chezmoitemplates/"
 
     cat > "$TEST_REPO/packages/cursor-extensions.txt" <<'EOF'
 # Cursor extensions
