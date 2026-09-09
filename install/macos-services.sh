@@ -6,9 +6,9 @@
 # login, and none of the three are needed for day-to-day work. Set
 # DF_START_LOCAL_SERVICES=1 to restore auto-start on bootstrap. Manual control
 # stays available regardless: `colima start`, `ollama serve`, `mlxserve`.
-# colima/ollama are skip-only when the flag is off (brew services state is
-# already persistent); mlxserve is actively booted out and disabled, because
-# launchd auto-loads its plist from ~/Library/LaunchAgents at every login.
+# All three are actively stopped when the flag is off: brew services state and
+# the launchd plist in ~/Library/LaunchAgents both survive a bootstrap, so
+# merely skipping the start would let an earlier opt-in keep running forever.
 # The docker CLI-plugin symlinks below always run (so a manual `colima start`
 # gives a working `docker compose` / `docker buildx`).
 # Re-running is safe: all steps are idempotent.
@@ -204,6 +204,14 @@ if has colima; then
 fi
 
 if [[ "$DF_START_LOCAL_SERVICES" != "1" ]]; then
+    # A brew services registration outlives the bootstrap, so skipping the start
+    # is not enough: an earlier opt-in would keep the VM (~3.7GB resident) up at
+    # every login. Deregister actively, mirroring the mlxserve branch below.
+    if has colima && brew services list 2>/dev/null | grep -q '^colima.*started'; then
+        log_info "Stopping colima service (DF_START_LOCAL_SERVICES=0)"
+        run_logged colima stop || true
+        run_logged brew services stop colima || log_warn "could not stop colima service"
+    fi
     log_okay "colima auto-start disabled (DF_START_LOCAL_SERVICES=0) — 'colima start' to run manually"
 elif has colima; then
     if brew services list | grep -q '^colima.*started'; then
@@ -227,6 +235,10 @@ unset -f _set_colima_ssh_config_false _configure_colima_ssh
 
 _reconcile_ollama_owner || die "Ollama ownership reconciliation failed"
 if [[ "$DF_START_LOCAL_SERVICES" != "1" ]]; then
+    if has brew && brew services list 2>/dev/null | grep -q '^ollama.*started'; then
+        log_info "Stopping ollama service (DF_START_LOCAL_SERVICES=0)"
+        run_logged brew services stop ollama || log_warn "could not stop ollama service"
+    fi
     log_okay "ollama auto-start disabled (DF_START_LOCAL_SERVICES=0) — 'ollama serve' to run manually"
 else
     _start_ollama_formula || die "could not start the declared Ollama service"
