@@ -1,6 +1,7 @@
 # gcc-13.cmake — Homebrew GCC 13 toolchain. Set via CMAKE_TOOLCHAIN_FILE.
 
 include("${CMAKE_CURRENT_LIST_DIR}/_brew.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/_cache.cmake")
 
 if(NOT EXISTS "${_brew}/bin/gcc-13")
     message(WARNING "gcc-13.cmake: gcc-13 not found in ${_brew}/bin — toolchain inactive")

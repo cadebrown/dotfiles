@@ -1,6 +1,7 @@
 # gcc-15.cmake — Homebrew GCC 15 toolchain. Set via CMAKE_TOOLCHAIN_FILE.
 
 include("${CMAKE_CURRENT_LIST_DIR}/_brew.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/_cache.cmake")
 
 if(NOT EXISTS "${_brew}/bin/gcc-15")
     message(WARNING "gcc-15.cmake: gcc-15 not found in ${_brew}/bin — toolchain inactive")

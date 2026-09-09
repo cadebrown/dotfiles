@@ -5,14 +5,14 @@
 # (on macOS 16 pre-release, the SDK version comes back as 26.x which breaks
 # vendored C++ sources that include standard headers like <cwctype>).
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-15.0}"
-export CFLAGS="${CFLAGS:--march=armv8.5-a -O2}"
+export CFLAGS="${CFLAGS:--march=armv8.5-a}"
 # Don't inject Apple's SDK c++/v1 into CXXFLAGS — Apple's libc++ headers
 # don't compose with Homebrew clang (FP_NORMAL/FP_SUBNORMAL come out
 # undeclared via <math.h>). Homebrew clang has its own bundled libc++ at
 # $(brew --prefix llvm)/include/c++/v1 in its default search path; AppleClang
 # finds Apple's libc++ on its own via the SDK. Either way, no -I needed here.
-export CXXFLAGS="${CXXFLAGS:--march=armv8.5-a -O2}"
+export CXXFLAGS="${CXXFLAGS:--march=armv8.5-a}"
 export RUSTFLAGS="${RUSTFLAGS:--C target-cpu=apple-m1}"
 # HOMEBREW_OPTFLAGS is not used on macOS (bottles are pre-built for arm64)
-export CMAKE_C_FLAGS="${CMAKE_C_FLAGS:--march=armv8.5-a -O2}"
-export CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS:--march=armv8.5-a -O2}"
+export CMAKE_C_FLAGS="${CMAKE_C_FLAGS:--march=armv8.5-a}"
+export CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS:--march=armv8.5-a}"

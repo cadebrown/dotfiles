@@ -3,6 +3,7 @@ import test from 'node:test';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { sourceUrl } from './catalog.mjs';
 import { verifyBootstrapSnippet, verifySite } from './verify.mjs';
 
 const body = '<nav aria-label="Main"><a href="/">Fixture page</a></nav><main><h1 id="_top">Fixture page</h1><p>This is deliberately substantial rendered fixture content used to verify a documentation artifact without running Astro for every assertion.</p></main>';
@@ -48,6 +49,13 @@ async function withFixture(run) {
 function failures(report, check) {
   return report.failures.filter((failure) => failure.check === check).map((failure) => failure.message);
 }
+
+test('encodes spaces in catalog source URLs while preserving path separators and line anchors', () => {
+  assert.equal(
+    sourceUrl('home/Library/Application Support/Mozilla.sccache/symlink_config', 12),
+    'https://github.com/cadebrown/dotfiles/blob/main/home/Library/Application%20Support/Mozilla.sccache/symlink_config#L12',
+  );
+});
 
 test('accepts a complete minimal rendered documentation artifact', async () => {
   await withFixture(async ({ repo, site, output }) => {

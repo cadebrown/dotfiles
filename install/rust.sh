@@ -195,11 +195,11 @@ export PATH="$CARGO_HOME/bin:$PATH"
 # RUSTC_WRAPPER (set by the shell profiles + _lib.sh) only reaches processes
 # that inherit it — a bare cron/CI job or non-login shell running `cargo build`
 # misses it. $CARGO_HOME/config.toml is read by cargo itself, everywhere, so it
-# closes that gap. CARGO_HOME is per-machine (scratch), NOT shared across the NFS
-# fleet, so this can't break another machine; guarded on sccache being present
-# (Brewfile installs it earlier). sccache passes incremental (dev) builds
-# straight through, so the only builds it caches are the clean/release ones that
-# benefit. We never clobber a hand-written config.
+# closes that gap. Guard on sccache being present (Brewfile installs it earlier).
+# Eligible dependencies can hit even in development builds; incremental rustc
+# invocations pass through. Explicit CARGO_INCREMENTAL=1 is rejected by sccache
+# 0.17, so bypass with RUSTC_WRAPPER= for that workflow. See the cache handbook.
+# We never clobber a hand-written config.
 if has sccache; then
     _cargo_cfg="$CARGO_HOME/config.toml"
     _cargo_marker="# managed by install/rust.sh — sccache rustc-wrapper"

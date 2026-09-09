@@ -34,17 +34,26 @@
     {
       "id": "core-toolchains",
       "title": "Core toolchains",
-      "description": "Installs shell, package-manager, language, compiler, and documentation toolchains.",
+      "description": "Installs shell, language, compiler, documentation, and workflow-validation tools, with a 250 GiB sccache policy, native build launchers, Python bytecode caching, and Gradle task caching.",
       "page": "/setup/packages/",
       "sources": [
         "home/dot_bash_profile.tmpl",
         "home/dot_zprofile.tmpl",
+        "home/.chezmoitemplates/compiler-cache.sh",
+        "home/dot_config/sccache/config.tmpl",
+        "home/Library/Application Support/Mozilla.sccache/symlink_config",
+        "home/dot_gradle/gradle.properties",
         "home/run_onchange_brew.sh.tmpl",
         "home/run_onchange_cargo.sh.tmpl",
         "home/run_onchange_go.sh.tmpl",
         "home/run_onchange_python.sh.tmpl",
         "install/brew-shell.sh",
         "install/cmake.sh",
+        "install/cmake/toolchains/_cache.cmake",
+        "install/cmake/toolchains/gcc-13.cmake",
+        "install/cmake/toolchains/gcc-15.cmake",
+        "install/cmake/toolchains/llvm-21.cmake",
+        "install/cmake/toolchains/llvm-22.cmake",
         "install/go.sh",
         "install/homebrew.sh",
         "install/julia.sh",
@@ -322,7 +331,7 @@
     {
       "id": "shell-and-terminal",
       "title": "Shell and terminal runtime",
-      "description": "Applies portable shell startup, terminal, editor, Git, and command-line preferences.",
+      "description": "Applies Bash, Zsh, and Fish startup, terminal, editor, Git, and command-line preferences.",
       "page": "/workflows/shell-editor-terminal/",
       "sources": [
         "home/.chezmoitemplates/locale-env.sh",
@@ -337,7 +346,10 @@
         "home/dot_profile.tmpl",
         "home/dot_pythonrc",
         "home/dot_tmux.conf",
-        "home/dot_zshrc.tmpl"
+        "home/dot_zshrc.tmpl",
+        "home/dot_config/fish/conf.d/00-dotfiles-env.fish",
+        "home/dot_config/fish/conf.d/dotfiles-env-bridge.bash.tmpl",
+        "home/dot_config/fish/conf.d/uv.env.fish"
       ],
       "demo": "sed -n '1,160p' home/dot_zshrc.tmpl"
     }

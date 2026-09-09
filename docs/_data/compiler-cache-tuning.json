@@ -1,0 +1,477 @@
+{
+  "schema": 1,
+  "observedAtUtc": "2026-09-09T00:57:14Z",
+  "environment": {
+    "sccache": "sccache 0.17.0",
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01);binary: rustc;commit-hash: 48a229ceaefd4985c50990b14116b6d856af0985;commit-date: 2026-09-01;host: aarch64-apple-darwin;release: 1.98.1;LLVM version: 22.1.8;"
+  },
+  "scope": "macOS arm64 local fixtures; no universal fastest-build claim",
+  "liveCache": {
+    "cache_location": "Local disk: \"/Users/cade/.cache/sccache\"",
+    "max_cache_size": 268435456000,
+    "use_preprocessor_cache_mode": true,
+    "version": "0.17.0"
+  },
+  "clientSideMode": {
+    "samples": [
+      {
+        "case": "server-c-cold",
+        "seconds": 0.13477087,
+        "exitStatus": 0
+      },
+      {
+        "case": "server-c-warm-1",
+        "seconds": 0.019497871,
+        "exitStatus": 0
+      },
+      {
+        "case": "server-c-warm-2",
+        "seconds": 0.019158125,
+        "exitStatus": 0
+      },
+      {
+        "case": "server-c-warm-3",
+        "seconds": 0.017873049,
+        "exitStatus": 0
+      },
+      {
+        "case": "server-c-warm-4",
+        "seconds": 0.017863989,
+        "exitStatus": 0
+      },
+      {
+        "case": "server-c-header-change",
+        "seconds": 0.08126092,
+        "exitStatus": 0
+      },
+      {
+        "case": "server-cpp-cold",
+        "seconds": 0.122138977,
+        "exitStatus": 0
+      },
+      {
+        "case": "server-cpp-warm-1",
+        "seconds": 0.050957918,
+        "exitStatus": 0
+      },
+      {
+        "case": "server-cpp-warm-2",
+        "seconds": 0.0211761,
+        "exitStatus": 0
+      },
+      {
+        "case": "server-cpp-warm-3",
+        "seconds": 0.021831036,
+        "exitStatus": 0
+      },
+      {
+        "case": "server-cpp-warm-4",
+        "seconds": 0.020766973,
+        "exitStatus": 0
+      },
+      {
+        "case": "server-cpp-header-change",
+        "seconds": 0.097288132,
+        "exitStatus": 0
+      },
+      {
+        "case": "server-cargo-dev",
+        "seconds": 1.315449953,
+        "exitStatus": 0
+      },
+      {
+        "case": "server-cargo-release-cold",
+        "seconds": 0.504675865,
+        "exitStatus": 0
+      },
+      {
+        "case": "server-cargo-release-warm",
+        "seconds": 0.437285185,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-c-cold",
+        "seconds": 0.111048937,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-c-warm-1",
+        "seconds": 0.048832893,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-c-warm-2",
+        "seconds": 0.046846151,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-c-warm-3",
+        "seconds": 0.047219992,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-c-warm-4",
+        "seconds": 0.046174049,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-c-header-change",
+        "seconds": 0.110193014,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-cpp-cold",
+        "seconds": 0.122451067,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-cpp-warm-1",
+        "seconds": 0.058897018,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-cpp-warm-2",
+        "seconds": 0.076063871,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-cpp-warm-3",
+        "seconds": 0.074461937,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-cpp-warm-4",
+        "seconds": 0.065778017,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-cpp-header-change",
+        "seconds": 0.134273052,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-cargo-dev",
+        "seconds": 2.42513895,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-cargo-release-cold",
+        "seconds": 2.58179307,
+        "exitStatus": 0
+      },
+      {
+        "case": "client-cargo-release-warm",
+        "seconds": 2.444581985,
+        "exitStatus": 0
+      }
+    ],
+    "order": "server then client; four warm C/C++ samples each; Cargo timings single samples",
+    "decision": "keep server mode; client mode passed correctness probes but was slower here",
+    "stats": {
+      "server": {
+        "cache_hits": {
+          "counts": {
+            "C/C++": 8,
+            "Rust": 1
+          },
+          "adv_counts": {
+            "rust": 1,
+            "c [clang]": 4,
+            "c++ [clang]": 4
+          }
+        },
+        "cache_misses": {
+          "counts": {
+            "C/C++": 4,
+            "Rust": 1
+          },
+          "adv_counts": {
+            "c++ [clang]": 2,
+            "rust": 1,
+            "c [clang]": 2
+          }
+        },
+        "not_cached": {
+          "missing input": 12,
+          "-": 3,
+          "incremental": 1
+        },
+        "compile_fails": 0
+      },
+      "client": {
+        "cache_hits": {
+          "counts": {
+            "Rust": 1,
+            "C/C++": 8
+          },
+          "adv_counts": {
+            "c [clang]": 4,
+            "c++ [clang]": 4,
+            "rust": 1
+          }
+        },
+        "cache_misses": {
+          "counts": {
+            "C/C++": 4,
+            "Rust": 1
+          },
+          "adv_counts": {
+            "c++ [clang]": 2,
+            "c [clang]": 2,
+            "rust": 1
+          }
+        },
+        "not_cached": {
+          "-": 3,
+          "incremental": 1,
+          "missing input": 12
+        },
+        "compile_fails": 0
+      }
+    }
+  },
+  "integrations": {
+    "scope": "isolated temporary HOME and dedicated SCCACHE_SERVER_UDS; no existing server stopped",
+    "temporary_root": "/tmp/dotfiles-build-integration.Tq2ubA",
+    "native_config": {
+      "path": "/tmp/dotfiles-build-integration.Tq2ubA/home/Library/Application Support/Mozilla.sccache/config",
+      "target": "/tmp/dotfiles-build-integration.Tq2ubA/home/.config/sccache/config",
+      "is_symlink": true,
+      "size_bytes": 268435456000,
+      "cache_location": "Local disk: \"/tmp/dotfiles-build-integration.Tq2ubA/home/.cache/sccache\"",
+      "use_preprocessor_cache_mode": true
+    },
+    "cmake": {
+      "cold_output": "12\\n",
+      "warm_output": "12\\n",
+      "changed_header_output": "20\\n",
+      "cold_hits": {},
+      "warm_hits": {
+        "C/C++": 5
+      },
+      "changed_hits": {
+        "C/C++": 6
+      },
+      "launcher_cache_entries": "inspect CMakeCache.txt"
+    },
+    "meson": {
+      "cold_hits": {
+        "C/C++": 6
+      },
+      "warm_hits": {
+        "C/C++": 9
+      },
+      "autodetect_log_sccache_matches": "4",
+      "explicit_CC_log_sccache_matches": ""
+    },
+    "raw_make": {
+      "cold_hits": {
+        "C/C++": 9
+      },
+      "warm_hits": {
+        "C/C++": 10
+      },
+      "recipe": "CC=\"/opt/homebrew/bin/sccache /usr/bin/clang\" make"
+    },
+    "logs": "temporary probe log retained at temporary_root/probe.log until temp cleanup; server stopped by EXIT trap"
+  },
+  "pythonBytecode": {
+    "version": "CPython 3.13 via uv",
+    "result": 42,
+    "pycacheWritten": true,
+    "rawEvidence": "/tmp/df-pycache.5CxTY9/result.txt"
+  },
+  "limitations": [
+    "Linux, CUDA and HIP runtime were not exercised",
+    "Gradle defaults were reviewed against documentation but no Gradle project build was run",
+    "Tiny fixtures do not determine fastest settings for large projects",
+    "Live existing cache contents were retained; size is a limit not a reservation"
+  ],
+  "environmentSweep": {
+    "observedAtUtc": "2026-09-09T01:20:18.951464+00:00",
+    "scope": "Selected cache environment variables only; repository runtime/install/package settings and deployed user configs. No exhaustive project configuration audit.",
+    "inheritedBefore": {
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "SCCACHE_CACHE_SIZE": "74G",
+      "SCCACHE_DIR": "/Users/cade/.cache/sccache",
+      "CCACHE_SLOPPINESS": "file_stat_matches,time_macros",
+      "CCACHE_HARDLINK": "1",
+      "USE_CCACHE": "ON",
+      "RUSTC_WRAPPER": "sccache",
+      "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+      "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
+      "CMAKE_CUDA_COMPILER_LAUNCHER": "ccache",
+      "GOCACHE": "/Users/cade/.local/go-build",
+      "JULIA_DEPOT_PATH": "/Users/cade/.local/julia/depot"
+    },
+    "afterSharedProfile": {
+      "PYTHONDONTWRITEBYTECODE": null,
+      "PYTHONPYCACHEPREFIX": "/Users/cade/.cache/python/pycache",
+      "PYTHONOPTIMIZE": null,
+      "UV_NO_CACHE": null,
+      "UV_CACHE_DIR": null,
+      "PIP_NO_CACHE_DIR": null,
+      "PIP_CACHE_DIR": null,
+      "PIP_CONFIG_FILE": null,
+      "UV_CONFIG_FILE": null,
+      "SCCACHE_DISABLE": null,
+      "SCCACHE_RECACHE": null,
+      "SCCACHE_DIRECT": null,
+      "SCCACHE_CACHE_SIZE": null,
+      "SCCACHE_DIR": null,
+      "SCCACHE_CONF": "/Users/cade/.config/sccache/config",
+      "CCACHE_DISABLE": null,
+      "CCACHE_READONLY": null,
+      "CCACHE_READONLY_DIRECT": null,
+      "CCACHE_RECACHE": null,
+      "CCACHE_SLOPPINESS": null,
+      "CCACHE_HARDLINK": null,
+      "USE_CCACHE": null,
+      "CARGO_INCREMENTAL": null,
+      "CARGO_BUILD_INCREMENTAL": null,
+      "CARGO_PROFILE_DEV_INCREMENTAL": null,
+      "CARGO_PROFILE_RELEASE_INCREMENTAL": null,
+      "RUSTC_WRAPPER": "sccache",
+      "RUSTC_WORKSPACE_WRAPPER": null,
+      "CMAKE_C_COMPILER_LAUNCHER": "sccache",
+      "CMAKE_CXX_COMPILER_LAUNCHER": "sccache",
+      "CMAKE_CUDA_COMPILER_LAUNCHER": "sccache",
+      "CMAKE_HIP_COMPILER_LAUNCHER": "sccache",
+      "CMAKE_OBJC_COMPILER_LAUNCHER": "sccache",
+      "CMAKE_OBJCXX_COMPILER_LAUNCHER": "sccache",
+      "GOCACHE": "/Users/cade/.local/go-build",
+      "GOMODCACHE": null,
+      "ZIG_GLOBAL_CACHE_DIR": null,
+      "ZIG_LOCAL_CACHE_DIR": null,
+      "JULIA_DEPOT_PATH": "/Users/cade/.local/julia/depot",
+      "CUDA_CACHE_DISABLE": null,
+      "CUDA_CACHE_PATH": null,
+      "CUDA_CACHE_MAXSIZE": null,
+      "TORCHINDUCTOR_FORCE_DISABLE_CACHES": null,
+      "TORCHINDUCTOR_FX_GRAPH_CACHE": null,
+      "TORCHINDUCTOR_AUTOGRAD_CACHE": null,
+      "TORCHINDUCTOR_CACHE_DIR": null,
+      "TRITON_CACHE_DIR": null,
+      "npm_config_cache": null,
+      "NPM_CONFIG_CACHE": null,
+      "NUGET_PACKAGES": null,
+      "NUGET_HTTP_CACHE_PATH": null,
+      "GRADLE_USER_HOME": null
+    },
+    "bashZshFishAgree": true,
+    "pythonBytecode": {
+      "version": "3.13.14 (main, Jul 23 2026, 14:48:16) [Clang 22.1.3 ]",
+      "first": {
+        "answer": 42,
+        "prefix": "/Users/cade/.cache/python/pycache",
+        "disabled": false,
+        "cached": "/Users/cade/.cache/python/pycache/private/var/folders/vw/dfz65vvd78n17m0mty_gr1ww0000gn/T/dotfiles-python-bytecode.6il4jgnk/cache_probe.cpython-313.pyc",
+        "exists": true,
+        "mtime": 1788916818967736436
+      },
+      "second": {
+        "answer": 42,
+        "prefix": "/Users/cade/.cache/python/pycache",
+        "disabled": false,
+        "cached": "/Users/cade/.cache/python/pycache/private/var/folders/vw/dfz65vvd78n17m0mty_gr1ww0000gn/T/dotfiles-python-bytecode.6il4jgnk/cache_probe.cpython-313.pyc",
+        "exists": true,
+        "mtime": 1788916818967736436
+      },
+      "reusedUnchangedBytecode": true
+    },
+    "nativeCacheReadbacks": {
+      "uv": "/Users/cade/.cache/uv",
+      "pip": "/Users/cade/Library/Caches/pip",
+      "npm": "/Users/cade/.npm",
+      "goBuild": "/Users/cade/.local/go-build",
+      "goModules": "/Users/cade/.local/go/pkg/mod",
+      "zig": "/Users/cade/.cache/zig",
+      "julia": {
+        "depot": "/Users/cade/.local/julia/depot",
+        "compiled_modules": 1,
+        "pkgimages": 1
+      },
+      "gradle": {
+        "caching": true,
+        "daemon": true,
+        "parallel": true,
+        "projectBuildTested": false
+      }
+    },
+    "limitations": [
+      "Existing parent processes retain old environment until restarted; sourcing the shared profile fixes descendant build environments.",
+      "Absent GPU/framework disable variables do not establish runtime cache use in those frameworks."
+    ],
+    "fullBashZshLoginEnvironmentsAgree": true,
+    "buildFlagAudit": {
+      "GOFLAGS": {
+        "present": false,
+        "cacheBypassTokens": []
+      },
+      "GODEBUG": {
+        "present": false,
+        "cacheBypassTokens": []
+      },
+      "RUSTFLAGS": {
+        "present": true,
+        "cacheBypassTokens": []
+      },
+      "CARGO_ENCODED_RUSTFLAGS": {
+        "present": false,
+        "cacheBypassTokens": []
+      },
+      "GRADLE_OPTS": {
+        "present": false,
+        "cacheBypassTokens": []
+      },
+      "JAVA_OPTS": {
+        "present": false,
+        "cacheBypassTokens": []
+      },
+      "JAVA_TOOL_OPTIONS": {
+        "present": false,
+        "cacheBypassTokens": []
+      },
+      "_JAVA_OPTIONS": {
+        "present": false,
+        "cacheBypassTokens": []
+      },
+      "MAVEN_OPTS": {
+        "present": false,
+        "cacheBypassTokens": []
+      },
+      "CFLAGS": {
+        "present": true,
+        "cacheBypassTokens": []
+      },
+      "CXXFLAGS": {
+        "present": true,
+        "cacheBypassTokens": []
+      },
+      "NVCC_PREPEND_FLAGS": {
+        "present": false,
+        "cacheBypassTokens": []
+      },
+      "NVCC_APPEND_FLAGS": {
+        "present": false,
+        "cacheBypassTokens": []
+      },
+      "PYTHONWARNINGS": {
+        "present": false,
+        "cacheBypassTokens": []
+      }
+    }
+  },
+  "finalDaemonReadback": {
+    "observedAtUtc": "2026-09-09T01:25:54.060745+00:00",
+    "beforeRestartMaxBytes": 79456894976,
+    "afterRestart": {
+      "cache_location": "Local disk: \"/Users/cade/.cache/sccache\"",
+      "max_cache_size": 268435456000,
+      "use_preprocessor_cache_mode": true,
+      "version": "0.17.0"
+    },
+    "reason": "A daemon restart had inherited the old 74 GiB environment. No active cargo/rustc processes were observed before a quiet restart under the corrected profile.",
+    "remainingAction": "Restart old IDE/agent parent processes to retire their inherited cache environment for direct child launches."
+  }
+}

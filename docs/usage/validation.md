@@ -5,6 +5,23 @@ documentation, secrets, workflow linting, macOS smoke, and infrastructure checks
 also need to pass. Their commands live in `tests/ci.sh`, which both local checks
 and GitHub Actions invoke.
 
+`actionlint` checks GitHub Actions workflow structure, expressions, and embedded
+shell commands (through ShellCheck). Homebrew owns both tools in
+[`packages/Brewfile`](../../packages/Brewfile) on macOS and Linux; normal
+bootstrap reconciles them. To install just the missing workflow checker on an
+already configured Homebrew host, run:
+
+```sh
+brew install actionlint
+actionlint
+```
+
+Run the second command from this checkout. Exit zero with no diagnostics means
+the local workflow checks passed; it does not execute the workflows or validate
+hosted credentials and runner availability. The isolated GitHub Quality job
+installs its own pinned version. See [actionlint's checks](https://github.com/rhysd/actionlint)
+and the [Homebrew formula](https://formulae.brew.sh/formula/actionlint).
+
 ```sh
 ./tests/ci.sh full           # complete local gate
 ./tests/ci.sh quality        # shell, fixtures, docs, secrets, workflow lint

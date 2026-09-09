@@ -171,11 +171,21 @@ compiler.
 CUDA is overlay-specific. Enable the overlay and select its documented CMake
 toolchain only on a host with the required NVIDIA driver and toolkit.
 
-### Compiler caching (ccache / sccache)
+### Compiler caching (sccache)
 
-The profiles configure cache directories and size bounds under the local/scratch
-layout. Caches improve rebuilds but are disposable derived state; a cache hit
-does not validate compiler correctness.
+The managed Brewfile installs `sccache` through rootless Homebrew. A shared
+profile/install helper and the GCC/LLVM toolchains select it for supported
+CMake languages and as the default Rust wrapper. A native configuration gives
+shell and non-login builds a 250 GiB local cache limit. Caches are disposable local derived
+state; a cache hit does not validate compiler correctness.
+
+Read [compiler caching](../usage/compiler-caching.md) for the configuration,
+runnable overrides, CMake reconfiguration for existing trees, NFS-local storage
+check, limits, and upstream references. The old ccache package and its existing
+on-disk cache are not removed automatically.
+
+See [build performance](../usage/build-performance.md) for per-language defaults,
+incremental-build choices, native cache boundaries, and measured tuning results.
 
 ### openssh from Homebrew
 
@@ -186,7 +196,8 @@ for the managed SSH policy.
 ### Source files
 
 The authoritative compiler inputs are [`install/cmake.sh`](../../install/cmake.sh),
-[`home/dot_profile.tmpl`](../../home/dot_profile.tmpl), and the files in
+the shared [`compiler-cache.sh`](../../home/.chezmoitemplates/compiler-cache.sh),
+[`install/_lib.sh`](../../install/_lib.sh), and the files in
 [`install/cmake/toolchains/`](../../install/cmake/toolchains/).
 
 ## Updating all packages

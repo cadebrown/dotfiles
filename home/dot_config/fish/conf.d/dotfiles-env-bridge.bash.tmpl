@@ -1,0 +1,129 @@
+#!/bin/bash
+# Emit the managed login environment as NUL-delimited name/value pairs for
+# Fish.  Keep this deliberately narrower than .bash_profile: login profiles
+# also start services and load interactive shell machinery that Fish must not
+# inherit.
+
+{{ template "plat-detect.sh" . }}
+
+{{- $use_plat := false -}}
+{{- if hasKey . "use_plat" -}}{{ $use_plat = .use_plat }}{{- end -}}
+export DF_USE_PLAT={{ if $use_plat }}1{{ else }}0{{ end }}
+
+_df_local_root="$HOME/.local"
+if [[ -L "$_df_local_root" ]]; then
+    _df_local_root="$(cd "$_df_local_root" && pwd -P)"
+fi
+
+if [[ "$DF_USE_PLAT" == 1 ]]; then
+    if [[ -z "$_PLAT_DETECTED" ]]; then
+        printf '%s\n' 'ERROR: use_plat=true but no matching plat spec — run ~/dotfiles/bootstrap.sh' >&2
+        exit 1
+    fi
+    export _PLAT="$_PLAT_DETECTED"
+    export _LOCAL_PLAT="$_df_local_root/$_PLAT"
+else
+    export _PLAT="$_PLAT_DETECTED"
+    export _LOCAL_PLAT="$_df_local_root"
+fi
+unset _PLAT_DETECTED _df_local_root
+
+if [[ -n "$_PLAT" ]]; then
+    _df_plat_env="$HOME/dotfiles/install/plat/$_PLAT/.plat_env.sh"
+    if [[ -r "$_df_plat_env" ]]; then
+        # shellcheck source=/dev/null
+        source "$_df_plat_env"
+    fi
+    unset _df_plat_env
+fi
+
+{{ if eq .chezmoi.os "darwin" -}}
+if [[ -x "$HOME/.homebrew/bin/brew" ]]; then
+    eval "$("$HOME/.homebrew/bin/brew" shellenv bash 2>/dev/null)"
+elif [[ -x /opt/homebrew/bin/brew ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv bash 2>/dev/null)"
+elif [[ -x /usr/local/bin/brew ]]; then
+    eval "$(/usr/local/bin/brew shellenv bash 2>/dev/null)"
+fi
+{{ else -}}
+if [[ -x "$_LOCAL_PLAT/brew/bin/brew" ]]; then
+    eval "$("$_LOCAL_PLAT/brew/bin/brew" shellenv bash 2>/dev/null)"
+fi
+{{ end -}}
+
+export NVM_DIR="$_LOCAL_PLAT/nvm"
+{{ template "nvm-default.sh" . }}
+
+export RUSTUP_HOME="$_LOCAL_PLAT/rustup"
+export CARGO_HOME="$_LOCAL_PLAT/cargo"
+export ELAN_HOME="$_LOCAL_PLAT/elan"
+export JULIAUP_DEPOT_PATH="$_LOCAL_PLAT/julia/juliaup"
+export JULIA_DEPOT_PATH="$_LOCAL_PLAT/julia/depot"
+export GOPATH="$_LOCAL_PLAT/go"
+export GOBIN="$_LOCAL_PLAT/bin"
+export GOCACHE="$_LOCAL_PLAT/go-build"
+export UV_TOOL_BIN_DIR="$_LOCAL_PLAT/bin"
+export UV_TOOL_DIR="$_LOCAL_PLAT/uv/tools"
+export UV_PYTHON_INSTALL_DIR="$_LOCAL_PLAT/uv/python"
+export PYTHON_ENV="$_LOCAL_PLAT/python"
+export CONAN_HOME="$_LOCAL_PLAT/conan2"
+
+# Default nvm Node must win over Homebrew's Node.  Cargo/elan and the managed
+# local root remain ahead of inherited system paths.
+PATH="$_LOCAL_PLAT/bin:$HOME/.local/bin:$PATH"
+PATH="$CARGO_HOME/bin:$PATH"
+PATH="$ELAN_HOME/bin:$PATH"
+[[ -n "$_nvm_default_dir" ]] && PATH="$_nvm_default_dir/bin:$PATH"
+{{ if eq .chezmoi.os "linux" -}}
+if [[ -d "${HOMEBREW_PREFIX:-}/opt/binutils/bin" ]]; then
+    PATH="$HOMEBREW_PREFIX/opt/binutils/bin:$PATH"
+fi
+{{ end -}}
+{{ if eq .chezmoi.os "darwin" -}}
+[[ -d /Library/TeX/texbin ]] && PATH="$PATH:/Library/TeX/texbin"
+{{ end -}}
+export PATH
+unset _nvm_default_dir
+
+# This partial is shared by the Bash and Zsh profiles.  Its locale exports are
+# useful in Fish too, including noninteractive login sessions.
+{{ template "locale-env.sh" . }}
+
+# .profile contains shared build defaults, but no login hooks, agents, or
+# credential files. Preserve its exported guard across nested shells so
+# additive flags such as LDFLAGS are not appended again on each Fish startup.
+if [[ -r "$HOME/.profile" ]]; then
+    # shellcheck source=/dev/null
+    source "$HOME/.profile"
+fi
+
+# Fish imports only these explicit values.  NUL framing preserves spaces and
+# newlines without evaluating shell syntax or exposing unrelated environment
+# variables from the parent process.
+for _df_name in \
+    PATH DF_USE_PLAT _PLAT _LOCAL_PLAT _PROFILE_SOURCED _DF_CACHE_POLICY_VERSION \
+    HOMEBREW_PREFIX HOMEBREW_CELLAR HOMEBREW_REPOSITORY HOMEBREW_NO_AUTO_UPDATE HOMEBREW_NO_INSTALL_FROM_API HOMEBREW_OPTFLAGS \
+    NVM_DIR RUSTUP_HOME CARGO_HOME ELAN_HOME JULIAUP_DEPOT_PATH JULIA_DEPOT_PATH GOPATH GOBIN GOCACHE \
+    UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR PYTHON_ENV CONAN_HOME \
+    EDITOR LESS PAGER MANPAGER BAT_THEME BAT_STYLE RIPGREP_CONFIG_PATH \
+    CMAKE_EXPORT_COMPILE_COMMANDS CMAKE_COLOR_DIAGNOSTICS CMAKE_GENERATOR CMAKE_BUILD_PARALLEL_LEVEL CLICOLOR_FORCE \
+    CC CXX AR RANLIB NM CMAKE_TOOLCHAIN_FILE LDFLAGS CUDA_PATH CUDAToolkit_ROOT \
+    CMAKE_C_COMPILER_LAUNCHER CMAKE_CXX_COMPILER_LAUNCHER CMAKE_CUDA_COMPILER_LAUNCHER \
+    CMAKE_HIP_COMPILER_LAUNCHER CMAKE_OBJC_COMPILER_LAUNCHER CMAKE_OBJCXX_COMPILER_LAUNCHER \
+    RUSTC_WRAPPER SCCACHE_CONF SCCACHE_DIR SCCACHE_CACHE_SIZE RUST_BACKTRACE CARGO_NET_GIT_FETCH_WITH_CLI \
+    PYTHONDONTWRITEBYTECODE PYTHONPYCACHEPREFIX PYTHONFAULTHANDLER PYTHONSTARTUP CFLAGS CXXFLAGS RUSTFLAGS \
+    LANG LC_ALL LC_CTYPE LOCPATH; do
+    if [[ -n "${!_df_name+x}" ]]; then
+        printf '%s\0%s\0' "$_df_name" "${!_df_name}"
+    fi
+done
+# Reflect removals as well as exports: an inherited Fish environment must not
+# retain the old disabled bytecode cache or the retired compiler-cache policy.
+for _df_name in PYTHONDONTWRITEBYTECODE USE_CCACHE CCACHE_DIR CCACHE_BASEDIR \
+    CCACHE_COMPILERCHECK CCACHE_SLOPPINESS CCACHE_HARDLINK CCACHE_MAXSIZE \
+    SCCACHE_DIR SCCACHE_CACHE_SIZE; do
+    if [[ -z "${!_df_name+x}" ]]; then
+        printf '__dotfiles_unset\0%s\0' "$_df_name"
+    fi
+done
+unset _df_name

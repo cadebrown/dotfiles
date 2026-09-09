@@ -187,16 +187,12 @@ ELAN_HOME="$LOCAL_PLAT/elan"
 JULIAUP_DEPOT_PATH="$LOCAL_PLAT/julia/juliaup"
 JULIA_DEPOT_PATH="$LOCAL_PLAT/julia/depot"
 
-# Compiler cache for INSTALL-TIME builds. The shell profiles export these for
-# interactive shells, but install scripts run in bootstrap's non-login bash
-# (and possibly cron/CI) which never sources a profile — so without this,
-# install-time cargo builds (rust.sh, the cass source build) silently miss the
-# sccache cache. Guard on sccache being present (Brewfile installs it at step 4,
-# before rust/memory at step 6). Same SCCACHE_DIR as the profile → one shared
-# cache on scratch. `:-` respects an inherited value / user override.
-if command -v sccache >/dev/null 2>&1; then
-    export RUSTC_WRAPPER="${RUSTC_WRAPPER:-sccache}"
-    export SCCACHE_DIR="${SCCACHE_DIR:-$HOME/.cache/sccache}"
+# Use the same compiler-cache defaults as the rendered login profile.
+# The piped bootstrap's pre-clone phase has only the downloaded install helpers
+# and performs no compilation. Its full-repository re-source enables caching.
+if [[ "${DF_DEFER_PLAT_REQUIRE:-0}" != "1" ]]; then
+    # shellcheck source=home/.chezmoitemplates/compiler-cache.sh
+    source "$DF_ROOT/home/.chezmoitemplates/compiler-cache.sh"
 fi
 
 # Scratch space for NFS homes with small quotas.

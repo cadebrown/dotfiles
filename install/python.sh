@@ -15,6 +15,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 log_section "Python (uv)"
 
+# Shell PATH is owned by chezmoi, including Fish. The standalone installer
+# otherwise writes uv.env.fish with a fixed install path that survives PLAT moves.
+export UV_NO_MODIFY_PATH=1
+
 ### uv ###
 
 # Check the install location ($ARCH_BIN/uv), NOT just `has uv`. A stray

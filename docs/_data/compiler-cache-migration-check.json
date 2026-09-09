@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "observedAtUtc": "2026-09-09T00:46:23Z",
+  "scope": "isolated local probe only; no existing sccache daemon or cache was stopped, deleted, or configured",
+  "environment": {
+    "host": "macOS arm64",
+    "sccache": "0.17.0",
+    "ccache": "4.14",
+    "appleClang": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "homebrewClang": "Homebrew clang version 23.1.0",
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "rustcPath": "/Users/cade/.local/rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc",
+    "availableCompilers": [
+      "/usr/bin/clang",
+      "/opt/homebrew/opt/llvm/bin/clang"
+    ],
+    "baseEnvironment": "env -i HOME=/tmp/compiler-cache-native-probe/home PATH=/opt/homebrew/bin:/Users/cade/.local/cargo/bin:/usr/bin:/bin:/usr/sbin:/sbin SCCACHE_DIR=/tmp/compiler-cache-native-probe/cache SCCACHE_CONF=/tmp/compiler-cache-native-probe/sccache-empty.conf SCCACHE_SERVER_UDS=/tmp/scp.sock",
+    "isolation": {
+      "sccacheConfig": "empty /tmp/compiler-cache-native-probe/sccache-empty.conf",
+      "sccacheCache": "/tmp/compiler-cache-native-probe/cache",
+      "sccacheSocket": "/tmp/scp.sock",
+      "probeArtifacts": "/tmp/compiler-cache-native-probe"
+    }
+  },
+  "commands": [
+    "sccache --version; ccache --version; /usr/bin/clang --version; /opt/homebrew/opt/llvm/bin/clang --version; rustup which rustc",
+    "env -i ... SCCACHE_SERVER_UDS=/tmp/scp.sock sccache --start-server",
+    "env -i ... cmake -S /tmp/compiler-cache-native-probe -B /tmp/compiler-cache-native-probe/build -G Ninja -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++",
+    "env -i ... ninja -C /tmp/compiler-cache-native-probe/build -v; delete only probe .o files; repeat ninja; edit shared value.h from 7 to 11; delete only probe .o files; repeat ninja",
+    "env -i ... RUSTC_WRAPPER=/opt/homebrew/bin/sccache CARGO_TARGET_DIR=/tmp/compiler-cache-native-probe/cargo-target-repeat cargo build --release --manifest-path /tmp/compiler-cache-native-probe/cargo-probe/Cargo.toml; delete only that target subtree; repeat with the same target path",
+    "Three rounds in alternating tool order: env -i ... ccache|sccache /opt/homebrew/opt/llvm/bin/clang++ -std=c++20 -O2 -c /tmp/compiler-cache-native-probe/bench.cpp -o <isolated-output>; delete only that output; repeat. Each round used a fresh cache directory; each sccache round used and stopped a distinct /tmp socket."
+  ],
+  "nativeCmakeNinja": {
+    "fixture": "C and C++ executable with both translation units including shared value.h; CMake compiler launchers set to sccache",
+    "exitStatuses": {
+      "configure": 0,
+      "coldBuild": 0,
+      "coldExecutable": 0,
+      "warmBuildAfterObjectDeletion": 0,
+      "warmExecutable": 0,
+      "headerChangedBuild": 0,
+      "headerChangedExecutable": 0
+    },
+    "executableOutputs": {
+      "cold": "21",
+      "warm": "21",
+      "afterHeaderChange": "33"
+    },
+    "timingSeconds": {
+      "cold": 0.50,
+      "warm": 0.10,
+      "afterHeaderChange": 0.37
+    },
+    "sccacheStatsAfterHeaderChange": {
+      "compileRequests": 6,
+      "compileRequestsExecuted": 6,
+      "cxxHits": 2,
+      "cxxMisses": 4,
+      "cacheErrors": 0,
+      "compilationFailures": 0
+    },
+    "result": "pass: sccache launchers built C and C++; removed-object rebuild produced two C/C++ cache hits; shared-header change rebuilt and changed the executable result"
+  },
+  "rustRlib": {
+    "fixture": "tiny dependency-free Cargo release library using rustup rustc and RUSTC_WRAPPER=sccache; release preserves Cargo's default nonincremental behavior",
+    "exitStatuses": {
+      "cold": 0,
+      "warmAfterDeletingOnlyTargetSubtree": 0,
+      "isolatedServerStop": 0
+    },
+    "timingSeconds": {
+      "cold": 0.268123,
+      "warm": 0.230943
+    },
+    "sccacheStats": {
+      "afterCold": { "rustMisses": 3, "rustHits": 0, "executed": 3 },
+      "afterWarm": { "rustMisses": 3, "rustHits": 1, "executed": 4 }
+    },
+    "result": "pass: rebuilding the same deleted isolated Cargo target subtree added one Rust cache hit after a cold release build",
+    "correctedInvocationDiagnostics": "The earlier direct rustc probe used '--edition 2021' as separate arguments and output reuse; sccache classified it non-cacheable. A previous read-only successful probe used Cargo-shaped equals-style flags. This check used actual Cargo wiring. Separate cold and warm target directory paths produced misses, so the acceptance rebuild intentionally reused the same path after deleting only its subtree."
+  },
+  "sameFixtureMicrobenchmark": {
+    "fixture": "same small C++20 STL/template source, Homebrew clang 23.1.0; three fresh-cache rounds with alternating tool order and high-resolution wall timing",
+    "rounds": [
+      { "round": 1, "order": ["sccache", "ccache"], "ccache": { "cold": 0.451716, "warm": 0.036360, "hits": 1, "misses": 1 }, "sccache": { "cold": 0.397537, "warm": 0.019682, "hits": 1, "misses": 1, "serverStopExit": 0 } },
+      { "round": 2, "order": ["ccache", "sccache"], "ccache": { "cold": 0.410978, "warm": 0.017620, "hits": 1, "misses": 1 }, "sccache": { "cold": 0.446169, "warm": 0.020602, "hits": 1, "misses": 1, "serverStopExit": 0 } },
+      { "round": 3, "order": ["sccache", "ccache"], "ccache": { "cold": 0.406970, "warm": 0.016235, "hits": 1, "misses": 1 }, "sccache": { "cold": 0.477361, "warm": 0.022823, "hits": 1, "misses": 1, "serverStopExit": 0 } }
+    ],
+    "medianTimingSeconds": {
+      "ccacheCold": 0.410978,
+      "ccacheWarm": 0.017620,
+      "sccacheCold": 0.446169,
+      "sccacheWarm": 0.020602
+    },
+    "interpretation": "microbenchmark only: on this small macOS fixture, three-round medians favor ccache modestly for both cold and warm compiles. This is not a universal performance claim."
+  },
+  "limits": [
+    "No content mutation with restored mtime was run.",
+    "Linux and CUDA support were unavailable in this macOS-local probe and were not tested.",
+    "The direct-rustc invocation diagnostics were superseded by the successful actual Cargo release rebuild; they remain recorded to avoid repeating the malformed shape."
+  ],
+  "rawArtifacts": "/tmp/compiler-cache-native-probe/*.log, *.time, *stats*.txt, and built executable/rlib outputs"
+}

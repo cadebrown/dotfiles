@@ -1,0 +1,284 @@
+{
+  "observed_at_utc": "2026-09-09T00:26:59Z",
+  "local_date": "2026-09-08",
+  "platform": "macOS 26.6.2 / arm64",
+  "scope": "Existing local cache counters, not a matched performance benchmark. No cache configuration changed.",
+  "versions": {
+    "ccache": "4.14",
+    "sccache": "0.17.0"
+  },
+  "commands": [
+    "ccache --show-config",
+    "ccache --print-stats --format=json",
+    "sccache --show-stats --stats-format=json",
+    "env CARGO_INCREMENTAL=1 sccache rustc --version"
+  ],
+  "ccache": {
+    "config": {
+      "compiler_check": "content",
+      "sloppiness": "file_stat_matches,time_macros",
+      "hard_link": true,
+      "file_clone": false,
+      "compression": true,
+      "base_dir": "$HOME",
+      "max_size_env": "74G"
+    },
+    "stats": {
+      "autoconf_test": 0,
+      "bad_compiler_arguments": 0,
+      "bad_input_file": 0,
+      "bad_output_file": 0,
+      "cache_miss": 74,
+      "cache_size_kibibyte": 16820,
+      "called_for_link": 0,
+      "called_for_preprocessing": 0,
+      "cleanups_performed": 0,
+      "compile_failed": 5,
+      "compiler_check_failed": 0,
+      "compiler_produced_empty_output": 0,
+      "compiler_produced_no_output": 0,
+      "compiler_produced_stdout": 0,
+      "could_not_find_compiler": 0,
+      "could_not_use_modules": 0,
+      "could_not_use_precompiled_header": 0,
+      "direct_cache_hit": 34,
+      "direct_cache_miss": 82,
+      "disabled": 0,
+      "error_hashing_extra_file": 0,
+      "files_in_cache": 223,
+      "internal_error": 0,
+      "local_storage_hit": 37,
+      "local_storage_miss": 74,
+      "local_storage_read_hit": 73,
+      "local_storage_read_miss": 159,
+      "local_storage_write": 151,
+      "max_cache_size_kibibyte": 72265625,
+      "max_files_in_cache": 0,
+      "missing_cache_file": 0,
+      "modified_input_file": 0,
+      "multiple_source_files": 0,
+      "no_input_file": 0,
+      "output_to_stdout": 0,
+      "preprocessed_cache_hit": 3,
+      "preprocessed_cache_miss": 79,
+      "preprocessor_error": 0,
+      "recache": 0,
+      "remote_storage_error": 0,
+      "remote_storage_hit": 0,
+      "remote_storage_miss": 0,
+      "remote_storage_read_hit": 0,
+      "remote_storage_read_miss": 0,
+      "remote_storage_timeout": 0,
+      "remote_storage_write": 0,
+      "stats_updated_timestamp": 1788846491,
+      "stats_zeroed_timestamp": 0,
+      "unsupported_code_directive": 0,
+      "unsupported_compiler_option": 0,
+      "unsupported_environment_variable": 0,
+      "unsupported_source_encoding": 0,
+      "unsupported_source_language": 0
+    }
+  },
+  "sccache": {
+    "location": "$HOME/.cache/sccache",
+    "size_bytes": 26137379218,
+    "max_size_bytes": 79456894976,
+    "rust_hits": 252,
+    "rust_misses": 946,
+    "uncacheable_reasons": {
+      "missing input": 105,
+      "crate-type": 309,
+      "-o": 6,
+      "-": 133,
+      "incremental": 40
+    },
+    "explicit_incremental_probe": {
+      "exit_status": 1,
+      "stderr_or_stdout": "sccache: incremental compilation is prohibited: Unset CARGO_INCREMENTAL to continue."
+    }
+  },
+  "probes": {
+    "observed_at_utc": "2026-09-09T00:31:49.645Z",
+    "ccache": {
+      "isolation": "env -i; dedicated temporary cache and configuration; /usr/bin/clang",
+      "source": "const char *build_stamp = __TIME__;",
+      "config": {
+        "compiler_check": "content",
+        "sloppiness": "time_macros",
+        "hard_link": true,
+        "compression": true
+      },
+      "first_timestamp": "20:28:48",
+      "cached_timestamp": "20:28:48",
+      "fresh_timestamp": "20:28:50",
+      "object_link_count": 2,
+      "stats": {
+        "autoconf_test": 0,
+        "bad_compiler_arguments": 0,
+        "bad_input_file": 0,
+        "bad_output_file": 0,
+        "cache_miss": 1,
+        "cache_size_kibibyte": 12,
+        "called_for_link": 0,
+        "called_for_preprocessing": 0,
+        "cleanups_performed": 0,
+        "compile_failed": 0,
+        "compiler_check_failed": 0,
+        "compiler_produced_empty_output": 0,
+        "compiler_produced_no_output": 0,
+        "compiler_produced_stdout": 0,
+        "could_not_find_compiler": 0,
+        "could_not_use_modules": 0,
+        "could_not_use_precompiled_header": 0,
+        "direct_cache_hit": 1,
+        "direct_cache_miss": 1,
+        "disabled": 0,
+        "error_hashing_extra_file": 0,
+        "files_in_cache": 3,
+        "internal_error": 0,
+        "local_storage_hit": 1,
+        "local_storage_miss": 1,
+        "local_storage_read_hit": 2,
+        "local_storage_read_miss": 2,
+        "local_storage_write": 2,
+        "max_cache_size_kibibyte": 5242880,
+        "max_files_in_cache": 0,
+        "missing_cache_file": 0,
+        "modified_input_file": 0,
+        "multiple_source_files": 0,
+        "no_input_file": 0,
+        "output_to_stdout": 0,
+        "preprocessed_cache_hit": 0,
+        "preprocessed_cache_miss": 1,
+        "preprocessor_error": 0,
+        "recache": 0,
+        "remote_storage_error": 0,
+        "remote_storage_hit": 0,
+        "remote_storage_miss": 0,
+        "remote_storage_read_hit": 0,
+        "remote_storage_read_miss": 0,
+        "remote_storage_timeout": 0,
+        "remote_storage_write": 0,
+        "stats_updated_timestamp": 1788913730,
+        "stats_zeroed_timestamp": 0,
+        "unsupported_code_directive": 0,
+        "unsupported_compiler_option": 0,
+        "unsupported_environment_variable": 0,
+        "unsupported_source_encoding": 0,
+        "unsupported_source_language": 0
+      }
+    },
+    "sccache": {
+      "isolation": "env -i; dedicated temporary config/cache and unique Unix socket; stopped only probe server afterward",
+      "source": "pub fn answer() -> u32 { 42 }",
+      "rustc_arguments": [
+        "--crate-name",
+        "cache_probe",
+        "--crate-type",
+        "rlib",
+        "--emit=metadata,dep-info",
+        "--out-dir",
+        "<temporary-output>",
+        "<temporary-lib.rs>"
+      ],
+      "first": {
+        "compile_requests": 1,
+        "requests_unsupported_compiler": 0,
+        "requests_not_compile": 0,
+        "requests_not_cacheable": 0,
+        "requests_executed": 1,
+        "cache_errors": {
+          "counts": {},
+          "adv_counts": {}
+        },
+        "cache_hits": {
+          "counts": {},
+          "adv_counts": {}
+        },
+        "cache_misses": {
+          "counts": {
+            "Rust": 1
+          },
+          "adv_counts": {
+            "rust": 1
+          }
+        },
+        "cache_timeouts": 0,
+        "cache_read_errors": 0,
+        "non_cacheable_compilations": 0,
+        "forced_recaches": 0,
+        "cache_write_errors": 0,
+        "cache_writes": 1,
+        "cache_write_duration": {
+          "secs": 0,
+          "nanos": 257583
+        },
+        "cache_read_hit_duration": {
+          "secs": 0,
+          "nanos": 0
+        },
+        "compilations": 1,
+        "compiler_write_duration": {
+          "secs": 0,
+          "nanos": 20677250
+        },
+        "compile_fails": 0,
+        "not_cached": {},
+        "dist_compiles": {},
+        "dist_errors": 0,
+        "multi_level": null
+      },
+      "second": {
+        "compile_requests": 2,
+        "requests_unsupported_compiler": 0,
+        "requests_not_compile": 0,
+        "requests_not_cacheable": 0,
+        "requests_executed": 2,
+        "cache_errors": {
+          "counts": {},
+          "adv_counts": {}
+        },
+        "cache_hits": {
+          "counts": {
+            "Rust": 1
+          },
+          "adv_counts": {
+            "rust": 1
+          }
+        },
+        "cache_misses": {
+          "counts": {
+            "Rust": 1
+          },
+          "adv_counts": {
+            "rust": 1
+          }
+        },
+        "cache_timeouts": 0,
+        "cache_read_errors": 0,
+        "non_cacheable_compilations": 0,
+        "forced_recaches": 0,
+        "cache_write_errors": 0,
+        "cache_writes": 1,
+        "cache_write_duration": {
+          "secs": 0,
+          "nanos": 257583
+        },
+        "cache_read_hit_duration": {
+          "secs": 0,
+          "nanos": 220250
+        },
+        "compilations": 1,
+        "compiler_write_duration": {
+          "secs": 0,
+          "nanos": 20677250
+        },
+        "compile_fails": 0,
+        "not_cached": {},
+        "dist_compiles": {},
+        "dist_errors": 0,
+        "multi_level": null
+      }
+    }
+  }
+}

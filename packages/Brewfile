@@ -116,6 +116,7 @@ brew "ninja"
 brew "meson"
 brew "shfmt"     # shell formatter; keeps Bash/Zsh install scripts mechanically checkable
 brew "shellcheck" # shell linter used by the repository's validation suite
+brew "actionlint" # GitHub Actions workflow checker required by tests/ci.sh
 brew "gcc"
 brew "gcc@13"
 brew "gcc@15"
@@ -134,8 +135,7 @@ if OS.linux?
   # — and every nvcc blob compile — with it.
   brew "binutils"
 end
-brew "ccache"  # C/C++ compiler cache
-brew "sccache" # compiler cache with Rust support (RUSTC_WRAPPER)
+brew "sccache" # shared C/C++/CUDA and Rust compiler cache
 # bacon: background cargo check/clippy/test on save (successor to cargo-watch).
 # Brewfile, not cargo.txt — it publishes no prebuilt GitHub release binaries,
 # and cargo.txt entries must binstall without source compilation.

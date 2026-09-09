@@ -17,7 +17,7 @@ setup() {
         printf '#!/usr/bin/env bash\nprintf "bootstrap\\n" >> "$CI_LOG"\n' > "$FIXTURE/$script"
         chmod +x "$FIXTURE/$script"
     done
-    for tool in shellcheck bats jq chezmoi zsh npm gitleaks actionlint zizmor tofu docker; do
+    for tool in shellcheck bats jq chezmoi zsh fish cmake npm gitleaks actionlint zizmor tofu docker; do
         cat > "$BIN/$tool" <<'SH'
 #!/bin/bash
 name="${0##*/}"

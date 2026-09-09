@@ -1,5 +1,25 @@
 # Troubleshooting
 
+## Fish reports a missing old PLAT `env.fish`
+
+**Symptom:** Fish starts with `source: No such file or directory` naming an
+`env.fish` under an old `~/.local/plat_*/bin` directory.
+
+**Root cause:** uv's standalone installer wrote
+`~/.config/fish/conf.d/uv.env.fish` with the installation's fixed path. Changing
+the runtime layout did not update that snippet; Fish runs `conf.d` files even
+for noninteractive commands.
+
+**Confirm:** inspect `~/.config/fish/conf.d/uv.env.fish`, then run
+`fish -lc 'command -s uv; printf "%s\n" $_LOCAL_PLAT'`.
+
+**Fix:** update the managed Fish files with
+`chezmoi apply --exclude=scripts ~/.config/fish/conf.d` and open Fish again.
+The managed environment resolves the runtime root at startup and replaces the
+legacy uv snippet with an empty ownership marker. The Python installer now
+uses `UV_NO_MODIFY_PATH=1` to prevent future standalone installations from
+rewriting shell startup. See [Fish setup](../workflows/shell-editor-terminal.md#use-fish-with-the-managed-tools).
+
 ## Docker bootstrap build reports invalid Ubuntu package signatures
 
 **Symptom:** `./tests/run.sh` fails during `apt-get update` with
@@ -2043,3 +2063,22 @@ run after their caches were warm.
 declaration now names the command the dotfiles actually require with `entry=`.
 The installer validates only those commands, uses a 30-second Python CLI bound,
 and reports the exact package and command when validation fails.
+
+---
+
+## Python bytecode caching stays disabled after updating dotfiles
+
+Symptom: `uv run --offline python -c 'import sys; print(sys.dont_write_bytecode)'`
+prints `True`, or a terminal still exports `CMAKE_CXX_COMPILER_LAUNCHER=ccache`.
+
+Root cause: a long-lived terminal, IDE, or agent inherited the former
+`PYTHONDONTWRITEBYTECODE=1` and compiler-cache policy. Editing the profile cannot
+change an already-running parent process, and the old `_PROFILE_SOURCED` guard
+could prevent a nested shell from refreshing it.
+
+**Fix:** apply the managed dotfiles, then run `. ~/.profile` in Bash/Zsh or start
+a new Fish shell. Cache policy now refreshes before the guard, and Fish imports
+explicit unset operations. Python should report `False`, with bytecode under
+`~/.cache/python/pycache`. A process launched directly by an old IDE can still
+inherit old values until that IDE restarts. An explicit `python -B` remains a
+command-specific bypass. See [compiler-cache migration](compiler-caching.md#managed-configuration).

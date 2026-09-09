@@ -65,7 +65,7 @@ shell_checks() {
 }
 
 fast_checks() {
-    require bats bash jq chezmoi zsh
+    require bats bash jq chezmoi zsh fish cmake
     make_tmp
     mkdir -p "$ci_tmp/fast-home"
     ln -s "$REPO" "$ci_tmp/fast-home/dotfiles"
@@ -75,10 +75,13 @@ fast_checks() {
         tests/bootstrap-remote.bats \
         tests/brew-glibc.bats \
         tests/ci-entrypoint.bats \
+        tests/compiler-cache.bats \
+        tests/fish.bats \
         tests/gwt.bats \
         tests/lean.bats \
         tests/mcp-emitters.bats \
         tests/netrc.bats \
+        tests/native-build-defaults.bats \
         tests/platform-upgrade.bats \
         tests/pre-push.bats \
         tests/profiles.bats \

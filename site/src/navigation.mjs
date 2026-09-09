@@ -39,6 +39,8 @@ export const sidebar = [
     item('Check agent health', 'agents/validation'),
   ]),
   section('Tool guides', [
+    item('Compiler caches', 'usage/compiler-caching'),
+    item('Build performance', 'usage/build-performance'),
     item('AI workbench', 'usage/ai-workbench'),
     item('Browser sessions', 'usage/browser-sessions'),
     item('Local models', 'usage/local-llm'),

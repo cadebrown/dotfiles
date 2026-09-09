@@ -8,7 +8,9 @@ ENV DF_EMAIL="test@example.com"
 RUN apt-get update && apt-get install -y \
     bc \
     curl \
+    cmake \
     file \
+    fish \
     git \
     jq \
     python3 \

@@ -30,6 +30,47 @@ EDITOR=vim, PAGER=less, and RIPGREP_CONFIG_PATH=$HOME/.config/ripgrep/ripgreprc 
 
 Use rg --debug --files 2>&1 | sed -n '1,40p' when a file is unexpectedly absent. Its output explains glob decisions without changing files; project .ignore or .rgignore still changes results.
 
+## Use Fish with the managed tools
+
+Fish is owned by the [Brewfile](../../packages/Brewfile) on macOS and Linux.
+Upgrade an existing installation with `brew upgrade fish`. Chezmoi manages
+[the Fish startup snippet](../../home/dot_config/fish/conf.d/00-dotfiles-env.fish)
+and its [environment bridge](../../home/dot_config/fish/conf.d/dotfiles-env-bridge.bash.tmpl).
+They reuse the platform and nvm-default resolvers used by Bash and Zsh. Fish
+receives the selected flat or PLAT runtime paths, Homebrew environment, and
+common program/build defaults through NUL-delimited values, without evaluating
+those values as Fish code.
+
+```sh
+chezmoi diff --recursive ~/.config/fish/conf.d
+chezmoi apply --exclude=scripts ~/.config/fish/conf.d
+fish -lc 'command -s fish node cargo uv; printf "%s\n" $_LOCAL_PLAT'
+fish
+```
+
+The expected result is a clean startup and commands resolving to the installed
+managed runtimes. The active Node follows nvm's `default` alias. An inherited
+Python virtual environment retains priority. Interactive Fish enables installed
+direnv, zoxide, fzf, and Atuin hooks, with Atuin taking the Ctrl-R binding after
+fzf. Personal `~/.config/fish/config.fish`, universal variables, and Fish's
+default prompt remain user-owned. Starting `fish` does not change the account's
+login shell.
+
+The bridge does not source Bash's login profile, start services or ssh-agent,
+or read private `~/.<name>.env` credentials. Exported credentials are inherited
+from the parent; Fish-specific functions and private setup belong in
+`config.fish`. Bash/Zsh aliases and runtime-switch functions are not translated.
+The [uv installer](../../install/python.sh) sets `UV_NO_MODIFY_PATH=1` so
+chezmoi remains the shell PATH owner. A managed, empty `uv.env.fish` replaces
+the old installer snippet that could retain a deleted PLAT path. See
+[Fish startup documentation](https://fishshell.com/docs/current/language.html#configuration-files)
+and [uv's shell modification option](https://docs.astral.sh/uv/reference/installer/#disabling-shell-modifications).
+
+Validate configuration changes with `BASH_COMPAT=50 ./tests/ci.sh fast`, which
+includes actual Fish startup fixtures for both runtime layouts; the Docker
+suite also runs those fixtures on Linux. A local fixture pass does not establish
+a live remote machine's installation.
+
 ## Use interactive search deliberately
 
 Zsh loads direnv, while Bash runs direnv hook bash; entering a directory can therefore export values from that directory's .envrc. Review an unfamiliar .envrc before approving it. fzf uses fd --type f --hidden --follow --exclude .git where fd exists, so Ctrl-T and rg --files have deliberately different scopes. Atuin initializes after fzf because both provide Ctrl-R; a working Atuin replaces fzf's history binding.

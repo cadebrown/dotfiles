@@ -2,6 +2,7 @@
 # Set via CMAKE_TOOLCHAIN_FILE (~/.profile auto-sets when brew LLVM is present).
 
 include("${CMAKE_CURRENT_LIST_DIR}/_brew.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/_cache.cmake")
 
 set(_llvm "${_brew}/opt/llvm@22")
 if(NOT IS_DIRECTORY "${_llvm}/bin")
@@ -17,8 +18,8 @@ set(CMAKE_CXX_COMPILER "${_llvm}/bin/clang++"     CACHE FILEPATH "")
 set(CMAKE_AR           "${_llvm}/bin/llvm-ar"     CACHE FILEPATH "")
 set(CMAKE_RANLIB       "${_llvm}/bin/llvm-ranlib" CACHE FILEPATH "")
 
-# Linux: prefer mold > lld. macOS uses Apple's ld (mold/lld don't do Mach-O;
-# Apple's new ld in Xcode 15+ is already the fastest Mach-O linker).
+# Linux: prefer mold > lld. macOS uses Apple's ld; its linker remains the
+# selected default for this toolchain even though lld supports Mach-O.
 # --disable-new-dtags forces DT_RPATH > DT_RUNPATH so brew libs win at runtime.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     if(EXISTS "${_brew}/bin/mold")

@@ -13,7 +13,7 @@ const packageManagers = new Map([
 ]);
 
 const markdownEscape = (value = '') => String(value).replaceAll('|', '\\|').replaceAll('\n', ' ');
-const sourceUrl = (source, line) => `${repositoryUrl}${source}${line ? `#L${line}` : ''}`;
+export const sourceUrl = (source, line) => `${repositoryUrl}${source.split('/').map(encodeURIComponent).join('/')}${line ? `#L${line}` : ''}`;
 const htmlEscape = (value) => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 const entryLink = (record) => `<a id="${record.anchor}" class="catalog-entry" href="#${record.anchor}"><code>${htmlEscape(record.name)}</code></a>`;
 function anchorRecords(records, prefix) {
