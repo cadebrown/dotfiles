@@ -32,10 +32,18 @@ class DurableTaskTest(unittest.TestCase):
         self.environment_patch.stop()
         self.temporary.cleanup()
 
-    def command(self, *args, payload=None, expected=0, environment=None):
-        result = subprocess.run([sys.executable, str(SCRIPT), *args], cwd=self.workspace,
-                                env=environment or self.environment, input=json.dumps(payload) if payload is not None else None,
-                                capture_output=True, text=True, timeout=5, check=False)
+    def command(self, *args, payload=None, expected=0, environment=None, retry_busy=False):
+        deadline = time.monotonic() + 5
+        while True:
+            result = subprocess.run([sys.executable, str(SCRIPT), *args], cwd=self.workspace,
+                                    env=environment or self.environment, input=json.dumps(payload) if payload is not None else None,
+                                    capture_output=True, text=True, timeout=5, check=False)
+            if (retry_busy and result.returncode == 1
+                    and result.stderr.strip() == "df-task: task checkpoint is busy; retry the command"
+                    and time.monotonic() < deadline):
+                time.sleep(0.01)
+                continue
+            break
         self.assertEqual(result.returncode, expected, result.stderr)
         return result
 
@@ -105,12 +113,20 @@ class DurableTaskTest(unittest.TestCase):
 
     def test_concurrent_checkpoints_keep_every_registered_artifact(self):
         def add_artifact(index):
-            return self.command("checkpoint", "--artifact", f"result-{index}.txt")
+            return self.command("checkpoint", "--artifact", f"result-{index}.txt", retry_busy=True)
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             list(executor.map(add_artifact, range(16)))
-        self.assertEqual(len(self.record()["artifacts"]), 16)
+        self.assertCountEqual(self.record()["artifacts"],
+                              [str(self.workspace / f"result-{index}.txt") for index in range(16)])
         self.assertEqual(stat.S_IMODE(self.state.stat().st_mode), 0o700)
         self.assertEqual(stat.S_IMODE((self.state / "session-123.json").stat().st_mode), 0o600)
+
+    def test_contended_cli_returns_busy_and_succeeds_after_lock_release(self):
+        with MODULE.transaction("session-123"):
+            result = self.command("checkpoint", "--artifact", "after-lock.txt", expected=1)
+            self.assertEqual(result.stderr.strip(), "df-task: task checkpoint is busy; retry the command")
+        self.command("checkpoint", "--artifact", "after-lock.txt")
+        self.assertEqual(self.record()["artifacts"], [str(self.workspace / "after-lock.txt")])
 
     def test_failed_atomic_replace_preserves_previous_checkpoint(self):
         self.command("checkpoint", "--note", "last valid checkpoint")

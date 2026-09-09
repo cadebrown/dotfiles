@@ -6,6 +6,13 @@ setup() {
     FAKE_HOME="$BATS_TEST_TMPDIR/home"
     STUB_BIN="$BATS_TEST_TMPDIR/bin"
     CALLS="$BATS_TEST_TMPDIR/npx-calls"
+    # Hosted runners export XDG paths independently of HOME. Keep chezmoi's
+    # config and state inside the same disposable home as the bootstrap fixture.
+    export XDG_CONFIG_HOME="$FAKE_HOME/.config"
+    export XDG_DATA_HOME="$FAKE_HOME/.local/share"
+    # This fixture models the default ~/.agents receipt layout, not the
+    # alternative XDG_STATE_HOME/skills layout supported by skills-sync.
+    unset XDG_STATE_HOME
 
     mkdir -p "$FIXTURE/install" "$FIXTURE/packages" "$FIXTURE/home/.chezmoitemplates" \
         "$FAKE_HOME/.claude/skills/example" "$FAKE_HOME/.agents" "$STUB_BIN"
