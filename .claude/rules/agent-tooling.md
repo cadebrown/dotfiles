@@ -262,14 +262,12 @@ declarative config layer: `packages/mcp-servers.txt` (servers),
   `npx skills add` into `~/.claude/skills/`; never add chezmoi sources for those
   dirs (one writer per skill dir; vendored skills live in `home/dot_claude/`).
 - **Cursor CLI config is merge-only** — `home/dot_cursor/create_cli-config.json`
-  is write-once. `install/cursor.sh` merges `Shell(*)`, Composer 2.5 as
-  `selectedModel` / `model.modelId` / `exploreSubagentModel`, and
-  `hasChangedDefaultModel=true` into the live `~/.cursor/cli-config.json`.
-  Do not restore a fully managed `cli-config.json`; it clobbers sandbox,
-  attribution, extra `model` object fields, and `authInfo`. The running Cursor
-  app may rewrite `selectedModel`, `exploreSubagentModel`, and `permissions`
-  after merge — re-run `bash install/cursor.sh sync-cli`. The IDE chat picker is
-  app storage, not `settings.json`. Cloud `/in-cloud` MCP comes from
+  is write-once. `install/cursor.sh` merges `Shell(*)` and
+  `exploreSubagentModel=composer-2.5` into the live `~/.cursor/cli-config.json`.
+  Do not restore a fully managed `cli-config.json`; it clobbers sandbox, parent
+  model, attribution, and `authInfo`. The running Cursor app may rewrite
+  `exploreSubagentModel` and `permissions` after merge — re-run
+  `bash install/cursor.sh sync-cli`. Cloud `/in-cloud` MCP comes from
   cursor.com/agents, not `mcp.json`. User hooks do not run on Cloud VMs.
 - **Cursor Computer Use is a separate signed app** — My Machines
   `--computer-use` installs `~/.cursor/cursor-computer-use/Cursor Computer Use.app`

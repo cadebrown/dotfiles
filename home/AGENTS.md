@@ -21,7 +21,7 @@ Files here are the source of truth. The deployed files in `~/` are outputs.
 - [home/dot_zprofile.tmpl](/Users/cade/dotfiles/home/dot_zprofile.tmpl) and [home/dot_bash_profile.tmpl](/Users/cade/dotfiles/home/dot_bash_profile.tmpl): login environment and PATH setup
 - [home/dot_claude/](/Users/cade/dotfiles/home/dot_claude): Claude-specific config and hooks
 - [home/dot_codex/](/Users/cade/dotfiles/home/dot_codex): Codex-specific config, skills, and rules
-- [home/dot_cursor/](/Users/cade/dotfiles/home/dot_cursor): Cursor instructions, Composer 2.5 default, hooks, and CLI seed
+- [home/dot_cursor/](/Users/cade/dotfiles/home/dot_cursor): Cursor instructions, Composer 2.5 agents, hooks, and CLI seed
 
 ## Validation
 

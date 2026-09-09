@@ -37,8 +37,8 @@ That change applies to the generated harness configuration. Keep it scoped to a
 real project need and rerun without `DF_MCP_PROFILES` to restore the core-only
 baseline for new activation. Claude Code, OpenCode, and Cursor retain optional
 registry MCPs already activated there; profile selection controls which new
-ones a sync adds. Cursor's own harness (instructions, Composer 2.5 as the
-CLI and subagent default, and the My Machines worker) is documented in
+ones a sync adds. Cursor's own harness (instructions, Composer 2.5 subagents,
+and the My Machines worker) is documented in
 [Cursor](../agents/cursor.md). The registry is
 [`packages/mcp-servers.txt`](../../packages/mcp-servers.txt).
 

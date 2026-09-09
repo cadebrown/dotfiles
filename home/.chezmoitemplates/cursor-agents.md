@@ -7,8 +7,8 @@
 
 ## Cursor
 
-The Agent CLI and Explore default to `composer-2.5` (standard, not Fast).
-Custom subagents live in `~/.cursor/agents/` and pin the same model. Delegate
+Custom subagents live in `~/.cursor/agents/` and pin `composer-2.5`. Explore
+defaults to the same model. Delegate
 `researcher` for live primary-source questions, `reviewer` after
 implementation, `verifier` to check claimed work, and `debugger` for a
 failing reproduction. Built-in Explore, Bash, and Browser stay product-owned;

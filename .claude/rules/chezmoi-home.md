@@ -28,7 +28,7 @@ must render identically on every machine** — otherwise machines overwrite each
   tiers (CAS/numeric output is evidence, never proof), and tool routing to the
   lean-lsp/asta/arxiv/mathlas MCPs. Included by all five guidance files.
 - `cursor-agents.md` — Cursor wrapper around voice + agents-common plus
-  computer-use routing, Composer 2.5 CLI/subagent default, and Cloud vs home caveats.
+  computer-use routing, Composer 2.5 agents, and Cloud vs home caveats.
 - `locale-env.sh` — the OS-branched locale block (macOS: LANG+LC_ALL; Linux:
   LOCPATH → `unset LC_ALL` → LANG). Included by BOTH login profiles AND both
   interactive rc files — embedded terminals (VS Code/Cursor Remote-SSH) spawn

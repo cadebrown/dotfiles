@@ -243,7 +243,7 @@ setup() {
     grep -q 'template "agents-common.md"' "$wrapper"
     grep -q 'template "voice-common.md"' "$wrapper"
     grep -q 'composer-2.5' "$wrapper"
-    grep -q 'The Agent CLI and Explore default' "$wrapper"
+    grep -q 'Explore' "$wrapper"
     grep -q 'df-cursor-worker' "$wrapper"
     local agent
     for agent in researcher reviewer verifier debugger; do

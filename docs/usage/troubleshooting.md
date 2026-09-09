@@ -469,25 +469,23 @@ this Mac's helper app or `~/.cursor/mcp.json`.
 
 ## Cursor CLI default model reverts to Auto
 
-Symptom: `bash install/cursor.sh check` fails on `selectedModel` or
-`exploreSubagentModel`, or `jq -r .selectedModel.modelId ~/.cursor/cli-config.json`
-is `default` or empty after a Cursor or `agent` start. `permissions.allow` may
-shrink to `Shell(ls)`.
+Symptom: `bash install/cursor.sh check` fails on `exploreSubagentModel`, or
+`jq -r .exploreSubagentModel ~/.cursor/cli-config.json` is `default` after a
+Cursor or `agent` start. `permissions.allow` may shrink to `Shell(ls)`.
 
 Confirm:
 
 ```sh
-jq '{selectedModel,exploreSubagentModel,hasChangedDefaultModel,permissions}' ~/.cursor/cli-config.json
+jq '{exploreSubagentModel,permissions}' ~/.cursor/cli-config.json
 bash ~/dotfiles/install/cursor.sh check
 ```
 
 Root cause: `~/.cursor/cli-config.json` is app-owned at runtime. The installer
-merge-pins Composer 2.5; the running app rewrites those keys. The IDE chat picker
-is a different store and does not follow `cli-config.json`.
+merge-pins Explore to Composer 2.5 and unique-appends `Shell(*)`; the running app
+rewrites those keys. Parent `selectedModel` is intentionally left alone.
 
-**Fix:** `bash ~/dotfiles/install/cursor.sh sync-cli`. For an already-open IDE
-chat, pick Composer 2.5 in the model dropdown. `agent --model composer-2.5`
-forces one CLI run regardless of the file.
+**Fix:** `bash ~/dotfiles/install/cursor.sh sync-cli`. That restores Explore and
+`Shell(*)` without changing the parent chat picker.
 
 ---
 

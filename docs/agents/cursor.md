@@ -16,7 +16,7 @@ Configure the Cursor IDE, Agents Window, CLI, and self-hosted My Machines worker
 | Skills | [`symlink_skills`](../../home/dot_cursor/symlink_skills) → `~/.claude/skills` | `readlink ~/.cursor/skills` |
 | MCP (this Mac) | [`mcp-servers.txt`](../../packages/mcp-servers.txt) via [`cursor.sh`](../../install/cursor.sh) | `jq . ~/.cursor/mcp.json` |
 | MCP (Cloud / Autopilot) | [cursor.com/agents](https://cursor.com/agents) | Cloud session inventory |
-| CLI default + permissions | [`create_cli-config.json`](../../home/dot_cursor/create_cli-config.json) + installer merge | `jq '{model,selectedModel,exploreSubagentModel,permissions}' ~/.cursor/cli-config.json` |
+| CLI permissions + Explore model | [`create_cli-config.json`](../../home/dot_cursor/create_cli-config.json) + installer merge | `jq '{exploreSubagentModel,permissions}' ~/.cursor/cli-config.json` |
 | My Machines worker | [`df-cursor-worker`](../../home/dot_local/bin/executable_df-cursor-worker), [`dev.cade.cursor-worker.plist.tmpl`](../../home/Library/LaunchAgents/dev.cade.cursor-worker.plist.tmpl) | `agent worker debug`; `launchctl print gui/$(id -u)/dev.cade.cursor-worker` |
 
 Project `AGENTS.md` still owns repository build, test, and deployment work. Cursor captures settings edits instead of blocking them with the chezmoi guard.
@@ -29,19 +29,13 @@ Prerequisite: macOS with Cursor installed, `chezmoi apply` completed, and the `a
 bash ~/dotfiles/install/cursor.sh check
 ```
 
-Expected result: hooks, MCP, `AGENTS.md`, the always-apply rule, Composer 2.5 agents, the skills symlink, `Shell(*)`, `exploreSubagentModel`, and `selectedModel.modelId` / `model.modelId` all pass as `composer-2.5`. On Darwin with `DF_CURSOR_WORKER` not `0`, the LaunchAgent is loaded. The check does not prove Accessibility or Screen Recording grants, and it does not change this IDE chat's model picker.
+Expected result: hooks, MCP, `AGENTS.md`, the always-apply rule, Composer 2.5 agents, the skills symlink, `Shell(*)`, and `exploreSubagentModel` all pass. On Darwin with `DF_CURSOR_WORKER` not `0`, the LaunchAgent is loaded. The check does not prove Accessibility or Screen Recording grants, and it does not change the parent chat's model picker.
 
 `df-agent-doctor` runs this check on Darwin.
 
-## Default to Composer 2.5
-
-The Agent CLI default is `composer-2.5` (standard, not Fast). `install/cursor.sh` pins `selectedModel.modelId`, `model.modelId`, `hasChangedDefaultModel`, and `exploreSubagentModel` on every merge. `agent --list-models` must list that id for the signed-in account.
-
-The IDE chat picker is **not** a `settings.json` key. It lives in Cursor app storage. An already-open chat keeps the model it started with. Pick **Composer 2.5** once in the model dropdown for new IDE chats; that is the accept step for this window.
-
 ## Delegate on Composer 2.5
 
-Custom agents in `~/.cursor/agents/` pin `model: composer-2.5`. Built-in Explore, Bash, and Browser stay product-owned; do not recreate them.
+Custom agents in `~/.cursor/agents/` pin `model: composer-2.5`. Built-in Explore uses the same id via `exploreSubagentModel`. Bash and Browser stay product-owned; do not recreate them. The parent chat and CLI `selectedModel` stay runtime — pick whatever you want in the picker.
 
 | Agent | Use | Limit |
 | --- | --- | --- |
@@ -93,11 +87,10 @@ Optional runtime env (not baked into chezmoi templates):
 
 ## CLI config merge
 
-`home/dot_cursor/create_cli-config.json` is write-once. `install/cursor.sh` then merges `Shell(*)`, Composer 2.5 as the selected/default model, and `exploreSubagentModel: composer-2.5` into the live `~/.cursor/cli-config.json`, preserving sandbox, attribution, extra `model` object fields, and `authInfo`. A fully managed file would clobber those keys on the next `chezmoi apply`. The running Cursor app may rewrite `selectedModel` and `permissions` after merge — re-run `bash install/cursor.sh sync-cli`.
+`home/dot_cursor/create_cli-config.json` is write-once. `install/cursor.sh` then merges `Shell(*)` and `exploreSubagentModel: composer-2.5` into the live `~/.cursor/cli-config.json`, preserving sandbox, parent `model` / `selectedModel`, attribution, and `authInfo`. A fully managed file would clobber those keys on the next `chezmoi apply`. The running Cursor app may rewrite `exploreSubagentModel` and `permissions` after merge — re-run `bash install/cursor.sh sync-cli`.
 
 ## Limits
 
-- The IDE model picker is app storage, not `settings.json`. This open chat does not switch until you pick Composer 2.5.
 - Cloud `/in-cloud` and `/autopilot` sessions use dashboard MCP, not this repo's `mcp.json`.
 - User Rules duplicate the local `AGENTS.md` so Cloud gets prefs; keep the body under 20000 characters.
 - `agent worker debug` does not prove TCC grants. A screenshot task that fails with Computer use Ready: no needs a human grant to **Cursor Computer Use**.

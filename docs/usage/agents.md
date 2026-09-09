@@ -188,8 +188,7 @@ artifacts, and parent rework on representative tasks.
 ## Cursor delegation
 
 Custom Cursor agents live in `home/dot_cursor/agents/` and pin Composer 2.5.
-The Agent CLI default is the same model (`selectedModel.modelId` via
-`install/cursor.sh`). Use `researcher` for live primary-source questions, `reviewer` after
+Explore uses the same model via `exploreSubagentModel`. Use `researcher` for live primary-source questions, `reviewer` after
 implementation, `verifier` to confirm claimed work, and `debugger` for a
 failing reproduction. Built-in Explore, Bash, and Browser stay product-owned.
 Computer-use routing and Cloud caveats live in

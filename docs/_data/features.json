@@ -156,7 +156,7 @@
     {
       "id": "cursor-agent",
       "title": "Cursor IDE and cloud agents",
-      "description": "Configures Cursor instructions, Composer 2.5 as the CLI and subagent default, skills, MCP, CLI merge, and the self-hosted computer-use worker.",
+      "description": "Configures Cursor instructions, Composer 2.5 subagents, skills, MCP, CLI merge, and the self-hosted computer-use worker.",
       "page": "/agents/cursor/",
       "sources": [
         "home/.chezmoitemplates/cursor-agents.md",

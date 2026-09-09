@@ -5,7 +5,7 @@
 #   install (default)      — settings links, MCP, CLI merge, extensions, My Machines worker
 #   sync-extensions|sync   — union Cursor's installed extensions back into cursor-extensions.txt
 #   sync-mcp               — rewrite ~/.cursor/mcp.json from packages/mcp-servers.txt
-#   sync-cli               — merge Shell(*), Composer 2.5 default, exploreSubagentModel
+#   sync-cli               — merge Shell(*) + exploreSubagentModel into ~/.cursor/cli-config.json
 #   sync-worker            — load or unload the My Machines computer-use LaunchAgent
 #   check                  — file + worker contracts (does not start a one-shot worker)
 #
@@ -24,9 +24,8 @@
 # in the repo; commit when ready.
 #
 # ~/.cursor/cli-config.json is write-once (chezmoi create_) plus this merge.
-# Do not replace the live file: it holds sandbox, attribution, and authInfo.
-# The merge pins selectedModel / model.modelId / exploreSubagentModel to
-# composer-2.5 (standard, not Fast) and unique-appends Shell(*).
+# Do not replace the live file: it holds sandbox, model, attribution, and authInfo.
+# The merge unique-appends Shell(*) and pins exploreSubagentModel to composer-2.5.
 #
 # Hooks prepend ~/.local/bin, plat bins, and Homebrew to PATH — Dock-launched Cursor
 # otherwise often misses chezmoi/cursor CLI.
@@ -140,20 +139,19 @@ _sync_cursor_mcp() {
 }
 
 # Merge managed keys into the live CLI config without clobbering runtime state.
-# Managed: Shell(*), Composer 2.5 selectedModel/model.modelId, exploreSubagentModel.
+# Managed: Shell(*), exploreSubagentModel=composer-2.5. Parent selectedModel is runtime.
 _sync_cursor_cli_config() {
     has jq || { log_warn "jq not found — Cursor CLI config cannot be merged"; return 1; }
     log_section "Cursor CLI config"
 
     local _out="$HOME/.cursor/cli-config.json"
     local _existing='{}' _tmp
-    local _model=composer-2.5
     if [[ -f "$_out" ]]; then
         _existing="$(jq -ce . "$_out" 2>/dev/null)" || _existing='{}'
     fi
 
     _tmp="$(mktemp)"
-    jq -n --argjson existing "$_existing" --arg model "$_model" '
+    jq -n --argjson existing "$_existing" '
         (if ($existing | type) == "object" then $existing else {} end)
         | .permissions = (.permissions // {})
         | .permissions.allow = (
@@ -161,18 +159,7 @@ _sync_cursor_cli_config() {
              + ["Shell(*)"]) | unique)
         | .permissions.deny = (
             .permissions.deny | if type == "array" then . else [] end)
-        | .exploreSubagentModel = $model
-        | .hasChangedDefaultModel = true
-        | .selectedModel = (
-            (if (.selectedModel | type) == "object" then .selectedModel else {} end)
-            | .modelId = $model
-            | .parameters = [{id: "fast", value: "false"}]
-          )
-        | .model = (
-            (if (.model | type) == "object" then .model else {} end)
-            | .modelId = $model
-            | if has("displayModelId") then .displayModelId = $model else . end
-          )
+        | .exploreSubagentModel = "composer-2.5"
     ' > "$_tmp" || { log_warn "Cursor CLI config merge failed"; rm -f "$_tmp"; return 1; }
 
     ensure_dir "$HOME/.cursor"
@@ -283,12 +270,6 @@ _cursor_check() {
         jq -e '.permissions.allow | any(. == "Shell(*)")' "$_dir/cli-config.json"
     _cursor_req "cli-config exploreSubagentModel" \
         jq -e '.exploreSubagentModel == "composer-2.5"' "$_dir/cli-config.json"
-    _cursor_req "cli-config selectedModel" \
-        jq -e '.selectedModel.modelId == "composer-2.5"' "$_dir/cli-config.json"
-    _cursor_req "cli-config default model" \
-        jq -e '.model.modelId == "composer-2.5"' "$_dir/cli-config.json"
-    _cursor_req "cli-config hasChangedDefaultModel" \
-        jq -e '.hasChangedDefaultModel == true' "$_dir/cli-config.json"
 
     if _cursor_worker_wanted; then
         _cursor_req "worker plist" test -f "$HOME/Library/LaunchAgents/dev.cade.cursor-worker.plist"

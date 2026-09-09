@@ -5,18 +5,5 @@
     ],
     "deny": []
   },
-  "exploreSubagentModel": "composer-2.5",
-  "hasChangedDefaultModel": true,
-  "selectedModel": {
-    "modelId": "composer-2.5",
-    "parameters": [
-      {
-        "id": "fast",
-        "value": "false"
-      }
-    ]
-  },
-  "model": {
-    "modelId": "composer-2.5"
-  }
+  "exploreSubagentModel": "composer-2.5"
 }
