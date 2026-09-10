@@ -74,7 +74,7 @@ jobs:
           persist-credentials: false
 
       - name: Install test tools
-        run: brew install bats-core jq shellcheck
+        run: brew install bats-core chezmoi jq shellcheck
 
       - name: Check shell and platform contracts
         run: ./tests/ci.sh macos

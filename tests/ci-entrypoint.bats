@@ -134,6 +134,7 @@ SH
 
 @test "hosted CI delegates validation to the shared local entrypoints" {
     local workflow="$SOURCE_REPO/.github/workflows/ci.yml"
+    grep -Eq 'run: brew install .*chezmoi' "$workflow"
     local mode
     for mode in quality macos infrastructure; do
         grep -Eq "^[[:space:]]+run: ./tests/ci.sh $mode$" "$workflow"
