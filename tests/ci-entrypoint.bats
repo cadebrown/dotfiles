@@ -74,6 +74,7 @@ SH
     for command in shellcheck bats npm gitleaks actionlint zizmor; do
         grep -q "^$command " "$CI_LOG"
     done
+    grep -q '^gitleaks git --log-opts=HEAD --no-banner --redact \.$' "$CI_LOG"
     grep -q 'install/plat/test/.plat_env.sh' "$CI_LOG"
     grep -q 'tests/ci.sh' "$CI_LOG"
     grep -q 'tests/ci-entrypoint.bats' "$CI_LOG"
@@ -91,6 +92,39 @@ SH
     grep -q '^shellcheck ' "$CI_LOG"
     ! grep -q '^bats ' "$CI_LOG"
     ! grep -q '^npm ' "$CI_LOG"
+}
+
+@test "secret scan scopes refs but still detects removed ancestor content" {
+    command -v gitleaks >/dev/null || skip 'Gitleaks is not installed in this environment'
+    local scanner scan_repo
+    scanner="$(command -v gitleaks)"
+    scan_repo="$BATS_TEST_TMPDIR/scan-repo"
+    git init -q --initial-branch=main "$scan_repo"
+    git -C "$scan_repo" config user.name Fixture
+    git -C "$scan_repo" config user.email fixture@example.invalid
+    cat > "$BATS_TEST_TMPDIR/scope.toml" <<'TOML'
+[[rules]]
+id = "fixture-history-marker"
+description = "Synthetic marker for ancestry coverage"
+regex = '''fixture-history-marker'''
+TOML
+    printf 'clean\n' > "$scan_repo/README"
+    git -C "$scan_repo" add README
+    git -C "$scan_repo" commit -qm clean
+    git -C "$scan_repo" checkout -qb checkpoint
+    printf 'fixture-history-marker\n' > "$scan_repo/marker"
+    git -C "$scan_repo" add marker
+    git -C "$scan_repo" commit -qm checkpoint
+    git -C "$scan_repo" checkout -q main
+    run "$scanner" git --config "$BATS_TEST_TMPDIR/scope.toml" --log-opts=HEAD --no-banner --redact "$scan_repo"
+    [ "$status" -eq 0 ]
+    run "$scanner" git --config "$BATS_TEST_TMPDIR/scope.toml" --log-opts=--all --no-banner --redact "$scan_repo"
+    [ "$status" -eq 1 ]
+    git -C "$scan_repo" merge -q --ff-only checkpoint
+    git -C "$scan_repo" rm -q marker
+    git -C "$scan_repo" commit -qm removed
+    run "$scanner" git --config "$BATS_TEST_TMPDIR/scope.toml" --log-opts=HEAD --no-banner --redact "$scan_repo"
+    [ "$status" -eq 1 ]
 }
 
 @test "CI infrastructure isolates provider data and does not rewrite lockfiles" {

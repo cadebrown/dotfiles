@@ -111,7 +111,8 @@ quality_checks() {
     fast_checks
     docs_checks
     printf '==> Secrets and workflow lint\n'
-    gitleaks git --no-banner --redact .
+    # Inspect the complete ancestry being validated, not unrelated local refs.
+    gitleaks git --log-opts=HEAD --no-banner --redact .
     actionlint
     zizmor --pedantic .github/workflows
 }

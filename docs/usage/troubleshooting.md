@@ -181,6 +181,23 @@ severity unchanged; a passing bootstrap suite does not replace this check.
 The jobs now share `tests/ci.sh`; enable the [push gate](validation.md) so the
 same checks validate the outgoing commit before Git publishes it.
 
+## Local secret scanning reports files outside the outgoing branch
+
+**Symptom:** The local push gate reports archived transcript paths that do not
+exist in the outgoing branch, while hosted CI sees no corresponding files.
+
+**Root cause:** Gitleaks defaults to scanning all local refs. An independent
+validation clone can also contain unrelated checkpoint branches; tool names in
+those transcripts can resemble credential formats.
+
+**Confirm:** Inspect the redacted finding's commit and run
+`git for-each-ref --contains COMMIT --format='%(refname)'`. Do not print raw
+matches or assume every finding is a false positive.
+
+**Fix:** The shared quality command uses `gitleaks git --log-opts=HEAD` to scan
+the outgoing commit and its full history. It does not bypass secret checks or
+ignore credentials removed from earlier commits in that history.
+
 ## Quality CI fails with `chezmoi: command not found`
 
 **Symptom:** The fast Bats profile-rendering test exits 127, while the Docker

@@ -57,6 +57,9 @@ needs this installation too.
 Normal `git push` now validates every distinct outgoing commit in an independent
 temporary clone with its history. It calls that commit's `tests/ci.sh full` and
 blocks the entire push if validation fails or the entrypoint is missing.
+Secret scanning covers `HEAD` and its complete ancestry, including credentials
+removed in later commits. Unrelated local branches are not part of that snapshot;
+they are scanned separately if pushed.
 Clones live under the ignored `.ci-validation/` directory so Docker uses the
 same shared host mount as the original checkout; each clone is removed on exit.
 Uncommitted fixes cannot conceal committed failures; unrelated working changes
