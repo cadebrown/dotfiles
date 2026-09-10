@@ -17,7 +17,7 @@ setup() {
         printf '#!/usr/bin/env bash\nprintf "bootstrap\\n" >> "$CI_LOG"\n' > "$FIXTURE/$script"
         chmod +x "$FIXTURE/$script"
     done
-    for tool in shellcheck bats jq chezmoi zsh fish cmake npm gitleaks actionlint zizmor tofu docker; do
+    for tool in shellcheck bats jq chezmoi zsh fish cmake uv npm gitleaks actionlint zizmor tofu docker; do
         cat > "$BIN/$tool" <<'SH'
 #!/bin/bash
 name="${0##*/}"
@@ -64,6 +64,18 @@ SH
     run -127 env PATH="$BIN:$PATH" /bin/bash "$FIXTURE/tests/ci.sh" docs
     [ "$status" -eq 127 ]
     [[ "$output" == *"dependencies are missing"* && "$output" == *"npm --prefix site ci --ignore-scripts"* ]]
+    [ ! -e "$CI_LOG" ]
+}
+
+@test "fast CI rejects missing uv before running runtime or backup tests" {
+    local minimal="$BATS_TEST_TMPDIR/fast-minimal" tool
+    mkdir "$minimal"
+    ln -s /usr/bin/dirname "$minimal/dirname"
+    ln -s /bin/bash "$minimal/bash"
+    for tool in bats jq chezmoi zsh fish cmake; do ln -s "$BIN/$tool" "$minimal/$tool"; done
+    run -127 env PATH="$minimal" /bin/bash "$FIXTURE/tests/ci.sh" fast
+    [ "$status" -eq 127 ]
+    [[ "$output" == *"requires missing tool: uv"* ]]
     [ ! -e "$CI_LOG" ]
 }
 
@@ -169,6 +181,7 @@ TOML
 @test "hosted CI delegates validation to the shared local entrypoints" {
     local workflow="$SOURCE_REPO/.github/workflows/ci.yml"
     grep -Eq 'run: brew install .*chezmoi' "$workflow"
+    grep -Eq '^[[:space:]]+uv(@[^[:space:]]+)?$' "$workflow"
     local mode
     for mode in quality macos infrastructure; do
         grep -Eq "^[[:space:]]+run: ./tests/ci.sh $mode$" "$workflow"

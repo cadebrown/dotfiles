@@ -65,7 +65,7 @@ shell_checks() {
 }
 
 fast_checks() {
-    require bats bash jq chezmoi zsh fish cmake
+    require bats bash jq chezmoi zsh fish cmake uv
     make_tmp
     mkdir -p "$ci_tmp/fast-home"
     ln -s "$REPO" "$ci_tmp/fast-home/dotfiles"

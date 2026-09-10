@@ -198,6 +198,22 @@ matches or assume every finding is a false positive.
 the outgoing commit and its full history. It does not bypass secret checks or
 ignore credentials removed from earlier commits in that history.
 
+## Hosted Codex runtime and backup tests fail while local tests pass
+
+**Symptom:** Several Codex runtime tests fail together, and the history/backup
+tests report `uv` exiting 127 on the hosted Quality runner.
+
+**Root cause:** These tests use uv to run Python validation. It was present on
+the developer machine and installed by Docker bootstrap, but absent from the
+separately provisioned hosted Quality environment.
+
+**Confirm:** Check for `Command not found` on `uv run` in the Bats warnings.
+The fast test entrypoint now requires uv before it starts any fixtures.
+
+**Fix:** Provision uv through the existing SHA-pinned validation-tool action.
+Its manifest pins uv's version with the action revision. Keep the dependency
+check and real runtime/backup tests enabled.
+
 ## Quality CI fails with `chezmoi: command not found`
 
 **Symptom:** The fast Bats profile-rendering test exits 127, while the Docker

@@ -37,6 +37,7 @@ jobs:
         uses: taiki-e/install-action@b6b84cf49ebfe0176417bdce007c624f0db37f20 # v2.86.2
         with:
           tool: |
+            uv
             zizmor@1.29.0
 
       - name: Install Go validation tools
