@@ -67,7 +67,7 @@ EOF
     local utility utility_path
     local utility_bin="$BATS_TEST_TMPDIR/audit-utilities"
     mkdir -p "$utility_bin"
-    for utility in bash jq dirname uname tr sed head awk grep cat sort tail cut \
+    for utility in bash jq dirname uname hostname tr sed head awk grep cat sort tail cut \
         readlink sysctl getconf find date ls; do
         utility_path="$(command -v "$utility" || true)"
         if [[ "$utility_path" == /* ]]; then ln -s "$utility_path" "$utility_bin/$utility"; fi

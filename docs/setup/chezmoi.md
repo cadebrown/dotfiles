@@ -49,7 +49,6 @@ judging runtime behavior.
 | Variable | Meaning |
 | --- | --- |
 | `.name`, `.email` | first-bootstrap identity values |
-| `.use_plat` | shared-home runtime layout choice |
 | `.chezmoi.os` | stable operating-system branch |
 | `.chezmoi.username`, `.chezmoi.homeDir` | observed local identity/path |
 
@@ -88,6 +87,63 @@ export PATH="$HOME/.local/$(uname -m)-$(uname -s)/bin:$PATH"
 
 Existing templates may branch by OS where that is an intentional deployment
 boundary. Keep cross-host executable isolation in the runtime path helper.
+
+## Host configuration
+
+Store machine-dependent inputs separately from shared rendered files. Bootstrap,
+login shells, Fish, and agent launchers use the same runtime resolver; applying
+dotfiles on one machine must not select the platform for every shared-home host.
+
+```text
+defaults → dotfiles-*/hosts/<hostname>.env → local override → invocation env
+                              │
+                   resolve at process startup
+                    ├─ DF_TOOLS_ROOT + PLAT → binaries
+                    └─ DF_STATE_ROOT/codex → local Codex state
+```
+
+Run the guided configurator on the machine being configured:
+
+```sh
+bash ~/dotfiles/install/host.sh configure
+bash ~/dotfiles/install/host.sh show
+```
+
+It stores local overrides in `~/.config/dotfiles/hosts/<hostname>.env`, using
+the exact output of `hostname`, not an SSH alias. The format is data-only
+`KEY=value`, not shell code. Use absolute paths without shell substitutions.
+At the root-directory prompts, Enter keeps the displayed default and `-`
+clears it. Unattended setup never waits for a prompt. To include the wizard in
+an interactive first bootstrap, set `DF_HOST_CONFIGURE=1`; an existing local
+host file is not replaced automatically.
+After changing an existing host policy, start a fresh login (a new SSH connection
+on a remote host). A nested shell inherits exported `DF_*` and `CODEX_HOME`
+values, which intentionally take precedence over files.
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `DF_PROFILE` | `full` | `core` or `full` package selection |
+| `DF_USE_PLAT` | `0` | architecture-separated tools |
+| `DF_PLAT` | `auto` | compatible platform detection or explicit specification |
+| `DF_TOOLS_ROOT` | `~/.local` | base directory before the optional PLAT suffix |
+| `DF_STATE_ROOT` | unset | persistent host-local state; Codex uses its `codex` child |
+| supported `DF_DO_*` flags | bootstrap defaults | optional installer selection |
+
+An ordinary local-home machine needs no host file. Shared homes need an explicit
+local state root for Codex; there is no automatic fallback to NFS or temporary
+storage. `CODEX_HOME` remains an explicit launch override.
+
+Keep internal presets in a private [overlay](overlays.md), under
+`hosts/<hostname>.env`. Local overrides need not be committed. Neither file
+should contain credentials. The public resolver has no employer-specific paths.
+Use `DF_TOOLS_ROOT` directly rather than repointing a shared `~/.local` symlink.
+`DF_SCRATCH` remains bulk storage and does not imply filesystem locality.
+
+Sources: [`install/_host-config.sh`](../../install/_host-config.sh),
+[`install/host.sh`](../../install/host.sh), and
+[`install/_runtime-paths.sh`](../../install/_runtime-paths.sh). This complements
+[chezmoi's per-machine setup](https://www.chezmoi.io/user-guide/setup/) with
+runtime resolution for files shared by multiple machines.
 
 ## Multi-machine sync
 

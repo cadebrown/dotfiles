@@ -47,9 +47,9 @@ without one.
 ## Enabling PLAT isolation
 
 ```sh
-# persistent chezmoi setting
-chezmoi edit ~/.config/chezmoi/chezmoi.toml  # set use_plat = true
-chezmoi apply
+# persistent per-host setting: choose PLAT isolation in guided setup
+bash ~/dotfiles/install/host.sh configure
+bash ~/dotfiles/install/host.sh show
 exec zsh -l
 
 # or one bootstrap invocation
@@ -57,6 +57,12 @@ DF_USE_PLAT=1 ~/dotfiles/bootstrap.sh
 ```
 
 The environment parser accepts `1`, `true`, `yes`, or `on`.
+
+PLAT is resolved at startup, not rendered from shared chezmoi data. See
+[host configuration](chezmoi.md#host-configuration) for private overlay presets,
+local overrides, and an explicit tools root. PLAT distinguishes compatible
+binary targets, not hosts: same-PLAT machines still need separate local
+SQLite databases and runtime sockets.
 
 ## Disabling / migrating off PLAT
 

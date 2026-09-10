@@ -3,7 +3,7 @@
     {
       "id": "bootstrap",
       "title": "Bootstrap orchestration",
-      "description": "Coordinates install, update, and upgrade flows with declared phases.",
+      "description": "Coordinates install, update, and upgrade with runtime host presets, local overrides, and platform-aware tools and state paths.",
       "page": "/setup/bootstrap/",
       "sources": [
         "bootstrap.sh",
@@ -13,6 +13,8 @@
         "home/.chezmoitemplates/plat-detect.sh",
         "install/_lib.sh",
         "install/_runtime-paths.sh",
+        "install/_host-config.sh",
+        "install/host.sh",
         "install/agent-runtime.sh",
         "install/dirs.sh",
         "install/plat/plat_Darwin_arm64/.plat_check.sh",
@@ -81,7 +83,7 @@
     {
       "id": "agent-stack",
       "title": "Codex agent stack",
-      "description": "Configures Codex profiles, focused roles, skills, and agent health checks.",
+      "description": "Configures Codex profiles and roles, host-local state, non-login shell launch policy, verified full backups, and copy-only history migration.",
       "page": "/agents/codex/",
       "sources": [
         "home/.chezmoiignore",
@@ -107,7 +109,6 @@
         "home/dot_codex/themes/minty-terminal.tmTheme",
         "home/dot_codex/themes/neon-noir.tmTheme",
         "home/dot_codex/themes/sunburst-candy.tmTheme",
-        "home/dot_config/dotfiles/agent-layout.tmpl",
         "home/dot_local/bin/executable_df-agent-doctor",
         "home/dot_local/bin/executable_df-chezmoi-guard",
         "home/dot_local/bin/executable_plugin-eval",
@@ -117,6 +118,10 @@
         "home/run_onchange_skills.sh.tmpl",
         "install/agent-tools.sh",
         "install/codex-config.py",
+        "install/codex-runtime.sh",
+        "install/codex-history.py",
+        "install/codex-backup.py",
+        "home/.chezmoitemplates/codex-launch.sh",
         "install/codex.sh",
         "install/skills-sync.sh",
         "packages/agent-skills.lock.json",

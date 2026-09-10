@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.codex/rtk-rewrite.sh",
+            "command": "~/.local/bin/df-rtk-rewrite",
             "timeout": 10,
             "statusMessage": "rtk rewrite"
           }

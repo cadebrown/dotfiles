@@ -81,6 +81,12 @@ trap '_on_error $LINENO' ERR
 DF_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DF_PACKAGES="$DF_ROOT/packages"
 
+# Resolve machine-local policy before profile, platform, or path derivation.
+# Host files are parsed as data by this shared Bash/Zsh-safe resolver.
+# shellcheck source=install/_host-config.sh
+source "$DF_ROOT/install/_host-config.sh"
+_host_config_resolve "$DF_ROOT" || die "Host configuration could not be resolved"
+
 DF_PROFILE="${DF_PROFILE:-full}"
 case "$DF_PROFILE" in
     core|full) ;;
@@ -123,16 +129,14 @@ ARCH="$(uname -m)"
 # Using aarch64 everywhere avoids per-OS conditionals in install scripts.
 [[ "$ARCH" == "arm64" ]] && ARCH="aarch64"
 
-# Normalize DF_USE_PLAT: accept 1/true/yes/on as enabled (matches the chezmoi
-# template, which writes use_plat=true|false). Without this, `DF_USE_PLAT=true`
-# would silently render profiles PLAT-on while install scripts go flat.
+# Normalize the same DF_USE_PLAT boolean inputs used by runtime login profiles.
 # shellcheck source=install/_runtime-paths.sh
 source "$DF_ROOT/install/_runtime-paths.sh"
 _normalize_plat_layout
 
 # Install-time capability flags are useful even in flat mode. Runtime
 # launchers use the same detection only when they need PLAT isolation.
-_detect_plat "$DF_ROOT"
+_detect_plat "$DF_ROOT" || die "DF_PLAT=${DF_PLAT:-auto} is not supported by this host"
 if [[ -n "$PLAT" && -f "$DF_ROOT/install/plat/$PLAT/.plat_env.sh" ]]; then
     # Selected at runtime; CI lints every platform environment separately.
     # shellcheck source=/dev/null
@@ -224,12 +228,13 @@ SCRATCH="${DF_SCRATCH:-}"
 PATHS="${SCRATCH:+$SCRATCH/.paths}"
 export DF_SCRATCH DF_SCRATCH_LINK SCRATCH PATHS
 
-export OS ARCH DF_ROOT DF_PACKAGES DF_PROFILE DF_USE_PLAT \
+export OS ARCH DF_ROOT DF_PACKAGES DF_PROFILE DF_USE_PLAT DF_PLAT \
        PLAT LOCAL_PLAT ARCH_BIN RUSTUP_HOME CARGO_HOME CARGO_TARGET_DIR \
        UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR PYTHON_ENV \
        NVM_DIR CONAN_HOME \
        GOPATH GOBIN GOCACHE \
        ELAN_HOME JULIAUP_DEPOT_PATH JULIA_DEPOT_PATH
+if [[ "$DF_TOOLS_ROOT_EXPLICIT" == 1 ]]; then export DF_TOOLS_ROOT DF_TOOLS_ROOT_EXPLICIT; fi
 
 # resolve_nvm_default_bin — print the bin directory selected by nvm's default
 # alias. install/node.sh keeps that alias on the supported LTS major; resolving

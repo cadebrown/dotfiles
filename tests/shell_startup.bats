@@ -3,7 +3,14 @@
 setup() {
     REPO="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     test_home="$BATS_TEST_TMPDIR/home with spaces"
-    mkdir -p "$test_home/.local/nvm/alias/lts"
+    mkdir -p "$test_home/.local/nvm/alias/lts" "$test_home/dotfiles/install"
+    cp "$REPO/install/_host-config.sh" "$REPO/install/_runtime-paths.sh" "$test_home/dotfiles/install/"
+}
+
+write_host_policy() {
+    mkdir -p "$test_home/.config/dotfiles/hosts"
+    printf 'DF_USE_PLAT=%s\nDF_PLAT=%s\n' "$1" "${2:-auto}" \
+        > "$test_home/.config/dotfiles/hosts/$(hostname).env"
 }
 
 run_partial() {
@@ -80,12 +87,13 @@ printf '%s\n' "$*" >> "$HOME/brew-calls"
 printf 'export HOMEBREW_PREFIX="%s/.homebrew"\n' "$HOME"
 EOF
     chmod +x "$test_home/.homebrew/bin/brew"
+    write_host_policy 0
     for shell_name in bash zsh; do
         local source_file=dot_bash_profile.tmpl
         [[ "$shell_name" == zsh ]] && source_file=dot_zprofile.tmpl
         local rendered="$BATS_TEST_TMPDIR/$shell_name-profile"
         chezmoi --source "$REPO/home" \
-            --override-data '{"chezmoi":{"os":"darwin"},"use_plat":false}' \
+            --override-data '{"chezmoi":{"os":"darwin"}}' \
             execute-template --file "$REPO/home/$source_file" > "$rendered"
         run env -i HOME="$test_home" PATH=/usr/bin:/bin SSH_AUTH_SOCK=fixture \
             "$(command -v "$shell_name")" -c 'source "$1"; [[ "$PROFILE_FIXTURE" == loaded && "$CREDENTIAL_FIXTURE" == fresh && "$NVM_DIR" == "$HOME/.local/nvm" && "$HOMEBREW_PREFIX" == "$HOME/.homebrew" && "$PATH" == *"/v24.10.1/bin"* ]]' _ "$rendered"
@@ -107,12 +115,13 @@ EOF
     printf 'exit 0\n' > "$test_home/dotfiles/install/plat/$spec/.plat_check.sh"
     printf 'export SPEC_FIXTURE=current\n' > "$test_home/dotfiles/install/plat/$spec/.plat_env.sh"
     : > "$test_home/.profile"
+    write_host_policy 1 "$spec"
     for shell_name in bash zsh; do
         local source_file=dot_bash_profile.tmpl
         [[ "$shell_name" == zsh ]] && source_file=dot_zprofile.tmpl
         local rendered="$BATS_TEST_TMPDIR/$shell_name-profile"
         chezmoi --source "$REPO/home" \
-            --override-data '{"chezmoi":{"os":"darwin"},"use_plat":true}' \
+            --override-data '{"chezmoi":{"os":"darwin"}}' \
             execute-template --file "$REPO/home/$source_file" > "$rendered"
         run env -i HOME="$test_home" PATH=/usr/bin:/bin SSH_AUTH_SOCK=fixture \
             "$(command -v "$shell_name")" -c 'OSTYPE=linux-gnu; source "$1"; [[ "$DF_USE_PLAT" == 1 && "$SPEC_FIXTURE" == current && "$_LOCAL_PLAT" == "$2/plat_Linux_fixture" && "$PATH" == *"/v24.10.1/bin"* ]]' _ "$rendered" "$storage"

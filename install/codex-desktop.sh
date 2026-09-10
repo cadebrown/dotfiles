@@ -9,7 +9,7 @@
 #                     This is how you backprop in-app preference changes.
 #
 # Tracked source (committed): install/codex-desktop/codex-global-state.json
-# Live state (app-owned):     ~/.codex/.codex-global-state.json
+# Live state (app-owned):     ${CODEX_HOME:-$HOME/.codex}/.codex-global-state.json
 #
 # WHY an ALLOWLIST (the opposite of install/claude-desktop.sh's blocklist):
 # this file is mostly transient or SENSITIVE — literal prompt history, cloud
@@ -28,11 +28,15 @@
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+# shellcheck source=install/codex-runtime.sh
+source "$DF_ROOT/install/codex-runtime.sh"
 
 [[ "$OS" == "darwin" ]] || { log_info "Not macOS — Codex desktop app is macOS-only, skipping"; exit 0; }
 
+codex_runtime_prepare
+
 _SRC="$DF_ROOT/install/codex-desktop/codex-global-state.json"
-_LIVE="$HOME/.codex/.codex-global-state.json"
+_LIVE="${CODEX_HOME:-$HOME/.codex}/.codex-global-state.json"
 
 # Allowlist extractor: emit ONLY known-portable preference keys, omitting any
 # that are absent (no null injection). Top-level appearance/workflow prefs plus

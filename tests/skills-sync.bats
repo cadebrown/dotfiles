@@ -18,6 +18,7 @@ setup() {
         "$FAKE_HOME/.claude/skills/example" "$FAKE_HOME/.agents" "$STUB_BIN"
     cp "$REPO/install/_lib.sh" "$FIXTURE/install/_lib.sh"
     cp "$REPO/install/_runtime-paths.sh" "$FIXTURE/install/_runtime-paths.sh"
+    cp "$REPO/install/_host-config.sh" "$FIXTURE/install/_host-config.sh"
     cp "$REPO/home/.chezmoitemplates/compiler-cache.sh" "$FIXTURE/home/.chezmoitemplates/"
     cp "$REPO/install/skills-sync.sh" "$FIXTURE/install/skills-sync.sh"
     printf 'example npx owner/repo example\n' > "$FIXTURE/packages/agent-skills.txt"

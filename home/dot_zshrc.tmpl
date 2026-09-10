@@ -145,9 +145,9 @@ alias codexr='codex -p review'
 # codex launch, not per shell startup); caller-provided values win.
 #   GH_TOKEN          → GitHub MCP (bearer_token_env_var)
 # Google Cloud MCPs refresh ADC credentials inside df-google-mcp.
+{{ template "codex-launch.sh" . }}
 codex() {
-    GH_TOKEN="${GH_TOKEN:-$(command gh auth token 2>/dev/null)}" \
-        command codex "$@"
+    _codex_with_host_env "$@"
 }
 
 # OpenCode consumes the same GitHub MCP credentials as Codex and starts

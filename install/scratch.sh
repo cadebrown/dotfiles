@@ -21,39 +21,26 @@
 #     │   ├── projects/          ← symlinked from ~/.claude/projects (history + memory)
 #     │   ├── plugins/           ← symlinked from ~/.claude/plugins
 #     │   └── file-history/      ← symlinked from ~/.claude/file-history
-#     └── .codex/                ← heavy *unmanaged* subdirs + SQLite state of ~/.codex
-#         ├── sessions/          ← symlinked from ~/.codex/sessions (transcripts, the bulk)
-#         ├── generated_images/  ← symlinked from ~/.codex/generated_images (per-session PNGs)
-#         ├── cache/ plugins/ attachments/ shell_snapshots/ log/ backups/ db-backups/ .tmp/ tmp/
-#         │                        (db-backups holds pre-migration SQLite snapshots Codex
-#         │                        keeps on schema upgrades — can grow to hundreds of MB)
-#         └── *.sqlite           ← symlinked from ~/.codex/*.sqlite (logs/state/goals)
 #
 # Which top-level dirs are migrated is controlled by DF_LINKS (colon-separated);
-# ~/.claude and ~/.codex subdirs by DF_CLAUDE_LINKS / DF_CODEX_LINKS.
-# Defaults: see _DEFAULT_LINKS / _DEFAULT_CLAUDE_LINKS / _DEFAULT_CODEX_LINKS below.
+# ~/.claude subdirs by DF_CLAUDE_LINKS. Defaults are below.
 #
 # Note on ~/kb: on scratch, each machine has its OWN kb working copy — the
 # git remote (not NFS) is the sync mechanism, which is the designed model
 # (memory.sh prompts for a remote). Git on NFS is slow and lock-prone, and
 # kb sits next to the qmd index reads, so local disk is the right home.
 # Note: ~/.config is NOT migrated — chezmoi manages files inside it as a real directory.
-# Note: ~/.claude and ~/.codex are NEVER symlinked — chezmoi manages files inside them
-#   (settings.json, skills/, config.toml, AGENTS.md, hooks, profiles, themes) as REAL
-#   directories, so a symlinked ~/.claude or ~/.codex gets clobbered on `chezmoi apply`
+# Note: ~/.claude is NEVER symlinked — chezmoi manages files inside it
+#   (settings.json, skills/, config.toml, hooks) as a REAL directory, so a
+#   symlinked ~/.claude gets clobbered on `chezmoi apply`
 #   (replaced with a real dir holding only the managed files, orphaning history on
 #   scratch). Instead we migrate the heavy *unmanaged* entries one level down, which
 #   chezmoi never touches. Tradeoff: like ~/.local and ~/.cache, these become
 #   per-machine — conversation history and auto-memory under projects/<proj>/memory/
 #   stop syncing across the NFS fleet (~/kb, git-synced, stays the cross-machine layer).
 #   Drop `projects` from DF_CLAUDE_LINKS to keep history on NFS and offload only caches.
-# Note on CODEX_HOME: Codex does expose one, but it relocates the WHOLE tree, including
-#   the chezmoi-managed config — and any Codex launched without the var set (IDE
-#   extension, cron, non-interactive ssh) silently starts a second, unconfigured
-#   ~/.codex. Subdir symlinks need no env var and hold in every launch context.
-# Note on ~/.codex/memories: markdown memory (MEMORY.md, memory_summary.md) stays on
-#   NFS so it follows you across the fleet; only its SQLite index moves to scratch,
-#   matching how qmd/cass indexes are already treated as per-machine.
+# Codex is deliberately absent: its entire runtime is host-local and managed by
+# install/codex.sh. Scratch must not relocate, symlink, or migrate Codex state.
 #
 # All variables are defined in _lib.sh:
 #   SCRATCH          — absolute path to scratch root (empty if not configured)
@@ -63,9 +50,6 @@
 #   DF_LINKS         — colon-separated top-level dirs to migrate (override above defaults)
 #   DF_CONFIG_LINKS  — colon-separated ~/.config subdir names to migrate
 #   DF_CLAUDE_LINKS  — colon-separated ~/.claude subdir names to migrate
-#   DF_CODEX_LINKS   — colon-separated ~/.codex subdir names to migrate (empty = skip;
-#                      its loose *.sqlite files ride along, and the whole ~/.codex
-#                      migration is skipped while any process holds a file there open)
 #
 # Safe to re-run: skips directories that are already correctly symlinked.
 # No-op when no scratch space is detected.
@@ -184,74 +168,9 @@ link_to_scratch() {
     log_okay "Linked: $home_path → $scratch_target"
 }
 
-# link_file_to_scratch HOME_FILE PATHS_NAME
-#   Single-file variant of link_to_scratch, for SQLite databases sitting loose in a
-#   chezmoi-managed directory. SQLite canonicalizes the database path before deriving
-#   the "-wal"/"-shm" sibling names, so linking just the .sqlite file puts the whole
-#   write-ahead log on scratch too — but any EXISTING siblings must travel with it,
-#   or the next open finds a database newer than its log.
-link_file_to_scratch() {
-    local home_file="$1"
-    local scratch_target="$PATHS/$2"
-    local target_dir sib sibs=()
-
-    if [[ -L "$home_file" ]]; then
-        if [[ "$(readlink -f "$home_file")" == "$(readlink -f "$scratch_target")" ]]; then
-            log_okay "Already linked: $home_file → $scratch_target"
-        else
-            log_warn "$home_file is a symlink to $(readlink -f "$home_file"), not $scratch_target — skipping"
-        fi
-        return 0
-    fi
-
-    # Gone from $HOME but present on scratch — a crash or a Codex self-repair dropped
-    # the symlink. Restore it rather than leaving the migrated database stranded.
-    if [[ ! -e "$home_file" ]]; then
-        [[ -f "$scratch_target" ]] || return 0
-        ln -sfn "$scratch_target" "$home_file"
-        log_okay "Relinked: $home_file → $scratch_target"
-        return 0
-    fi
-
-    [[ -f "$home_file" ]] || return 0
-
-    for sib in "$home_file" "$home_file-wal" "$home_file-shm"; do
-        [[ -f "$sib" ]] && sibs+=("$sib")
-    done
-
-    target_dir="$(dirname "$scratch_target")"
-    ensure_dir "$target_dir"
-    for sib in "${sibs[@]}"; do
-        if ! cp -p "$sib" "$target_dir/$(basename "$sib")"; then
-            log_fail "Copy of $sib → $target_dir failed — leaving $home_file in place"
-            return 1
-        fi
-    done
-    rm -f "${sibs[@]}"
-    ln -sfn "$scratch_target" "$home_file"
-    log_okay "Linked: $home_file → $scratch_target"
-}
-
-# _codex_in_use
-#   True while any process holds a file under ~/.codex open. A cross-filesystem move is
-#   copy-then-unlink, so such a process would go on writing to the unlinked inode and
-#   lose those commits — fatal for the SQLite databases, lossy for a live transcript.
-#
-#   Deliberately NOT "is codex running": Codex leaves an app-server daemon resident for
-#   days with every file closed, so a process check would refuse forever on a machine
-#   that is in fact safe to migrate. Falls back to that coarser test only where /proc
-#   is unavailable, which scratch space (Linux-only in practice) never hits.
-_codex_in_use() {
-    if [[ -d /proc/self/fd ]]; then
-        [[ -n "$(find /proc/[0-9]*/fd -lname "$HOME/.codex/*" -print -quit 2>/dev/null)" ]]
-    else
-        command -v pgrep &>/dev/null && pgrep -x codex &>/dev/null
-    fi
-}
-
 # link_managed_subdirs HOME_DIR LINKS
-#   Offload the heavy *unmanaged* entries of a chezmoi-managed directory (~/.claude,
-#   ~/.codex). See the header note: chezmoi owns files inside these as real dirs, so
+#   Offload heavy unmanaged entries of a chezmoi-managed directory. Chezmoi owns
+#   files inside these as real dirs, so
 #   the dir itself must stay real. One level down is safe — neither source is an
 #   exact_ dir and .chezmoiremove never lists these subdirs, so chezmoi leaves the
 #   symlinks alone. Targets nest under $PATHS/<dirname>/<sub>.
@@ -278,7 +197,7 @@ log_info "Paths:   $PATHS"
 # (cli-config.json, hooks/, hooks.json), so `chezmoi apply` replaces any symlink
 # here with a real dir and orphans whatever was migrated — 304 MB sat unused on
 # scratch while Cursor wrote to the home copy (Aug 2026). Same rule as
-# ~/.claude / ~/.codex; ~/.cursor-server is unmanaged and stays.
+# ~/.claude; ~/.cursor-server is unmanaged and stays.
 #
 # These cache-shaped entries are the ones that actually fill a small home
 # volume. TinyTeX is absent because install/latex.sh now keeps its compiled tree
@@ -295,8 +214,7 @@ for _home_path in "${_link_paths[@]}"; do
 done
 unset _link_paths _home_path _name
 
-# ~/.config, ~/.claude and ~/.codex — migrate the heavy *unmanaged* entries, never
-# the dirs themselves. See the header note and link_managed_subdirs.
+# ~/.config and ~/.claude — migrate heavy unmanaged entries, never the dirs.
 # Set-but-empty means "migrate nothing here" — hence ${VAR-default}, not ${VAR:-default}.
 
 # ~/.config/Code is VS Code's user data — workspaceStorage and CachedData, 285 MB
@@ -322,36 +240,5 @@ _DEFAULT_CLAUDE_LINKS="projects:plugins:file-history"
 DF_CLAUDE_LINKS="${DF_CLAUDE_LINKS-$_DEFAULT_CLAUDE_LINKS}"
 unset _DEFAULT_CLAUDE_LINKS
 link_managed_subdirs "$HOME/.claude" "$DF_CLAUDE_LINKS"
-
-_DEFAULT_CODEX_LINKS="sessions:generated_images:cache:plugins:attachments:shell_snapshots:log:backups:db-backups:.tmp:tmp"
-DF_CODEX_LINKS="${DF_CODEX_LINKS-$_DEFAULT_CODEX_LINKS}"
-unset _DEFAULT_CODEX_LINKS
-
-if [[ -n "$DF_CODEX_LINKS" ]] && _codex_in_use; then
-    log_warn "A process is holding ~/.codex open — skipping its migration"
-    log_warn "  quit Codex (its app-server too), then rerun: bash install/scratch.sh"
-elif [[ -n "$DF_CODEX_LINKS" ]]; then
-    link_managed_subdirs "$HOME/.codex" "$DF_CODEX_LINKS"
-
-    # Loose SQLite state (logs_N/state_N/goals_N/memories_N.sqlite) is the hottest-
-    # written part of the tree and the largest after sessions/. The version suffix
-    # bumps with Codex's schema, so match by glob: a new generation is born on NFS
-    # and migrates on the next run.
-    #
-    # Both sides of the glob: $HOME finds databases still to migrate, scratch finds
-    # ones whose symlink went missing (a crash, or a Codex self-repair). _seen keeps
-    # a database present in both from being logged twice.
-    if [[ ! -L "$HOME/.codex" ]]; then
-        _seen=""
-        for _db in "$HOME"/.codex/*.sqlite "$PATHS"/.codex/*.sqlite; do
-            [[ -e "$_db" ]] || continue
-            _name="$(basename "$_db")"
-            [[ "$_seen" == *":$_name:"* ]] && continue
-            _seen="$_seen:$_name:"
-            link_file_to_scratch "$HOME/.codex/$_name" ".codex/$_name"
-        done
-        unset _db _name _seen
-    fi
-fi
 
 log_okay "Scratch space setup complete"

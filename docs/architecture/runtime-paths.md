@@ -53,12 +53,18 @@ command -v cargo node python lean
 bash ~/dotfiles/install/verify-path.sh
 ```
 
-`DF_SCRATCH` can redirect large writable directories to local storage. The
+`DF_SCRATCH` can redirect large writable directories to bulk storage. The
 scratch installer copies, verifies entries, and only then replaces a real
 directory with a symlink
 ([source](https://github.com/cadebrown/dotfiles/blob/main/install/scratch.sh#L128)).
 It intentionally keeps managed `~/.claude` and `~/.codex` directories real and
-moves selected unmanaged subdirectories instead
+moves selected unmanaged Claude subdirectories instead
 ([source](https://github.com/cadebrown/dotfiles/blob/main/install/scratch.sh#L38)).
 See [PLAT setup](/setup/plat/) and [scratch setup](/setup/scratch/) before
 enabling either feature on a populated home.
+
+Machine-specific inputs come from [host configuration](/setup/chezmoi/#host-configuration).
+`DF_TOOLS_ROOT` overrides the tool base before PLAT is appended.
+`DF_STATE_ROOT` is a separate persistent host-local root, currently consumed
+by Codex as `CODEX_HOME=$DF_STATE_ROOT/codex`. Tools can be shared by compatible
+machines; WAL databases, locks, and daemon sockets cannot.

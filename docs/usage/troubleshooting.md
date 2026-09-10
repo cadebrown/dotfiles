@@ -1383,9 +1383,10 @@ chezmoi managed | grep -x '.codex'          # non-empty ⇒ chezmoi owns this pa
 stat -c '%n %y' ~/.codex ~/scratch/.codex   # scratch frozen, home current
 ```
 
-**Fix:** don't symlink the directory. Run `bash install/scratch.sh`, which redirects
-the heavy *unmanaged* entries one level down (`sessions`, `cache`, `plugins`,
-`*.sqlite`, …) where chezmoi never looks. See
+**Fix:** don't symlink the managed directory. For Codex on a shared home,
+configure a host-local runtime and run `bash install/codex.sh sync-runtime`.
+The scratch installer no longer moves Codex children or SQLite files. For
+Claude, it still supports selected unmanaged children. See
 [Scratch space](../setup/scratch.md#codex-specifics).
 
 Then reconcile the orphaned copy by hand — the script won't touch it, because it
@@ -1393,11 +1394,49 @@ cannot tell your stale data from a deliberate second install:
 
 ```sh
 du -sh ~/scratch/.codex                     # what was orphaned
-rm -rf ~/scratch/.codex                     # once you've confirmed nothing is wanted
 ```
 
-Setting `CODEX_HOME` instead does not help here, and makes things worse — see
-[Why not CODEX_HOME?](../setup/scratch.md#why-not-codex_home).
+The supported `CODEX_HOME` boundary now includes managed-configuration sync;
+see [Codex host-local state](../agents/codex.md#host-local-state).
+
+## SSH works but the remote Codex desktop cannot initialize its database
+
+**Symptom:** ordinary SSH succeeds, while app-server startup fails with a
+damaged-database recovery error and `Cross-device link (os error 18)`.
+
+**Root cause:** individually symlinked SQLite files and their recovery directory
+can cross filesystem boundaries. Separately, placing WAL databases on NFS
+allows incompatible multi-host access. Moving them to another NFS export does
+not solve that problem. A clean SQLite integrity check does not establish safe
+WAL locking or successful recovery renames.
+
+**Confirm on Linux:** inspect the actual filesystem and link targets, not the
+directory names. Avoid printing authentication files.
+
+```sh
+findmnt -T ~/.codex -o TARGET,FSTYPE
+readlink -f ~/.codex/state_5.sqlite
+readlink -f ~/.codex/db-backups
+tail -n 30 ~/.codex/app-server-control/app-server.log
+```
+
+**Fix:** stop writers and make a full verified backup of both the legacy root
+and any existing destination first, using `codex.sh backup SOURCE DESTINATION`
+as described in [host-local state](../agents/codex.md#host-local-state). Select
+persistent host-local state with `install/host.sh configure`, run
+`bash install/codex.sh sync-runtime`, and reconnect the desktop's SSH
+connection. Verify its daemon received the new `CODEX_HOME` and that its Unix
+socket and databases are local. Keep the old shared tree for explicit history
+recovery. Do not delete a database merely because startup called it damaged,
+and do not symlink `app-server-control`: the native Unix listener requires a
+real directory. See [host-local state](../agents/codex.md#host-local-state).
+
+If the error still names `~/.codex` after the desktop is working locally, inspect
+the failing launcher's environment. An old terminal/tmux shell may retain the
+previous `codex()` function, and non-login shells never read login profiles.
+Current Bash/Zsh wrappers resolve host policy lazily; reload the shell once
+after deployment (`exec zsh -l` or `exec bash -l`). A new desktop process using
+the local root does not prove an old terminal inherited that same environment.
 
 ---
 

@@ -175,9 +175,9 @@ alias codexr='codex -p review'      # Sol, read-only permissions
 # codex launcher — MCP credentials resolved at launch (bearer_token_env_var /
 # env_http_headers in config.toml; tokens never land on disk).
 # GH_TOKEN supplies GitHub MCP; df-google-mcp refreshes Google Cloud ADC itself.
+{{ template "codex-launch.sh" . }}
 codex() {
-    GH_TOKEN="${GH_TOKEN:-$(command gh auth token 2>/dev/null)}" \
-        command codex "$@"
+    _codex_with_host_env "$@"
 }
 
 # OpenCode consumes the same GitHub MCP credentials as Codex and starts

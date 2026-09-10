@@ -116,8 +116,7 @@ export DF_BREW_UPGRADE
 # package upgrades, nothing new to reconcile). `upgrade` does NOT skip it:
 # npm/cargo/etc. upgrades happen in that mode, and some of those tools replace
 # a scratch-symlinked state file by unlink+recreate during their own internal
-# migrations (observed with Codex's *.sqlite — see "Home directory is near
-# quota" in docs/usage/troubleshooting.md) rather than writing in place. That
+# migrations rather than writing in place. That
 # silently turns a scratch symlink back into a real file on ~; only rerunning
 # scratch.sh detects and relinks it. Since upgrade already re-walks every
 # other install step, it's the natural point to also catch this drift.
@@ -149,7 +148,7 @@ else
     # Preserve the library's install/ layout for its shared path helper and
     # any pre-clone installers fetched below.
     mkdir -p "$_BOOTSTRAP_TMP/install"
-    for _bootstrap_library in _lib.sh _runtime-paths.sh; do
+    for _bootstrap_library in _lib.sh _runtime-paths.sh _host-config.sh; do
         curl -fsSL "https://raw.githubusercontent.com/${DF_REPO}/main/install/$_bootstrap_library" \
             -o "$_BOOTSTRAP_TMP/install/$_bootstrap_library"
     done
@@ -345,6 +344,13 @@ fi
 # shellcheck source=install/_lib.sh
 source "$DF_INSTALL_DIR/_lib.sh"
 DF_INSTALL_DIR="$DF_ROOT/install"
+
+# An interactive operator may opt into creating this host's data-only policy.
+# Headless bootstrap never prompts or writes a host configuration.
+if [[ "${DF_HOST_CONFIG_PRESENT:-0}" == 0 && -t 0 && -t 1 && "${DF_HOST_CONFIGURE:-0}" == 1 ]]; then
+    bash "$DF_INSTALL_DIR/host.sh" configure
+    source "$DF_INSTALL_DIR/_lib.sh"
+fi
 
 ### 0.6 — authoritative platform paths ###
 # The real _lib.sh source above performs PLAT detection and derives every

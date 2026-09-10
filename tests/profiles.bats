@@ -75,6 +75,8 @@ setup() {
     local test_home shell_name source_file rendered attempt
     test_home="$BATS_TEST_TMPDIR/home"
     mkdir -p "$test_home/.local/bin"
+    ln -s "$REPO" "$test_home/dotfiles"
+    : > "$test_home/.profile"
     cat > "$test_home/.local/bin/qmd" <<'EOF'
 #!/bin/sh
 sleep 0.1
@@ -99,7 +101,8 @@ EOF
         chezmoi --source "$REPO/home" \
             --override-data '{"chezmoi":{"os":"linux"},"use_plat":false}' \
             execute-template --file "$REPO/home/$source_file" > "$rendered"
-        run env HOME="$test_home" SSH_AUTH_SOCK=already_running \
+        run env -u DF_TOOLS_ROOT -u DF_STATE_ROOT -u CODEX_HOME \
+            HOME="$test_home" DF_USE_PLAT=0 DF_PLAT=auto SSH_AUTH_SOCK=already_running \
             "$shell_name" -f -c 'source "$1"' _ "$rendered"
         [ "$status" -eq 0 ]
         [ ! -e "$test_home/cass-calls" ]

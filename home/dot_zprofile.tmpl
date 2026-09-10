@@ -1,8 +1,3 @@
-{{/* use_plat may be absent on existing installs whose chezmoi.toml predates the
-     prompt — treat missing as false (the new default). Set $use_plat once here
-     so the rest of the template can reference it without the hasKey ceremony. */ -}}
-{{- $use_plat := false -}}
-{{- if hasKey . "use_plat" -}}{{ $use_plat = .use_plat }}{{- end -}}
 # .zprofile - ZSH login shell configuration
 
 ### PLATFORM ###
@@ -13,16 +8,8 @@
 # .plat_check.sh, picks the first that exits 0, then sources .plat_env.sh
 # (CFLAGS, RUSTFLAGS, HOMEBREW_OPTFLAGS, etc.).
 #
+# Host policy is resolved at login, not rendered into this shared-home file.
 # _LOCAL_PLAT is the install root for compiled tools.
-{{ if $use_plat -}}
-# use_plat=true: per-PLAT isolation enabled — _LOCAL_PLAT=$HOME/.local/$_PLAT.
-#   For NFS shared homes across architectures (each machine installs into its
-#   own dir, none of them clobber each other).
-{{- else -}}
-# use_plat=false: flat layout — _LOCAL_PLAT=$HOME/.local. Single-machine setup.
-#   Set up via chezmoi data; flip with `chezmoi edit ~/.config/chezmoi/chezmoi.toml`
-#   (use_plat = true) and re-apply.
-{{- end }}
 
 # Deduplicate PATH entries immediately — must be set before any PATH modification.
 # Cursor IDE (and similar tools) open login shells that inherit the server's PATH,
@@ -31,43 +18,19 @@
 # collapse duplicates rather than accumulate them.
 typeset -U path
 
-# Capability detection (no env-var side effects — those happen below in the
-# parent shell so they actually propagate).
-{{ template "plat-detect.sh" . }}
-
-# Source the matching .plat_env.sh in the parent shell so its exports stick.
-if [[ -n "$_PLAT_DETECTED" ]]; then
-    _plat_env_sh="$HOME/dotfiles/install/plat/$_PLAT_DETECTED/.plat_env.sh"
-    [[ -f "$_plat_env_sh" ]] && source "$_plat_env_sh"
-    unset _plat_env_sh
+_df_root="$HOME/dotfiles"
+if [[ -f "$_df_root/install/_host-config.sh" ]]; then
+    source "$_df_root/install/_host-config.sh"
+    _host_config_resolve "$_df_root" || return 1
+    source "$_df_root/install/_runtime-paths.sh"
+    _normalize_plat_layout
+    _detect_plat "$_df_root" || { echo "ERROR: DF_PLAT=$DF_PLAT is not supported by this host" >&2; return 1; }
+    if [[ -n "$PLAT" && -f "$_df_root/install/plat/$PLAT/.plat_env.sh" ]]; then source "$_df_root/install/plat/$PLAT/.plat_env.sh"; fi
+    if [[ "$DF_USE_PLAT" == 1 && -z "$PLAT" ]]; then echo "ERROR: DF_USE_PLAT=1 but no matching plat spec — run ~/dotfiles/bootstrap.sh" >&2; return 1; fi
+    _resolve_local_plat
+    export _PLAT="$PLAT" _LOCAL_PLAT="$LOCAL_PLAT"
 fi
-export _PLAT="$_PLAT_DETECTED"
-unset _PLAT_DETECTED
-
-# Propagate use_plat to child processes (bootstrap.sh, install/*.sh) so they
-# don't silently fall back to flat mode. chezmoi data is the source of truth;
-# install/_lib.sh reads DF_USE_PLAT env var (defaults to 0 if unset).
-export DF_USE_PLAT={{ if $use_plat }}1{{ else }}0{{ end }}
-
-# Resolve symlinks so all PATH entries use the same physical path.
-# This prevents duplicate entries when ~/.local is a symlink to scratch space.
-_local_root="$HOME/.local"
-if [[ -L "$_local_root" ]]; then
-    _local_root="$(readlink -f "$_local_root")"
-fi
-{{ if $use_plat -}}
-# Per-PLAT isolation: spec must have matched. Continuing with _PLAT empty would
-# silently corrupt all tool paths.
-if [[ -z "$_PLAT" ]]; then
-    echo "ERROR: use_plat=true but no matching plat spec — run ~/dotfiles/bootstrap.sh" >&2
-    return 1
-fi
-export _LOCAL_PLAT="$_local_root/$_PLAT"
-{{- else -}}
-# Flat layout: missing PLAT spec is fine, _LOCAL_PLAT is just $HOME/.local.
-export _LOCAL_PLAT="$_local_root"
-{{- end }}
-unset _local_root
+unset _df_root
 
 ### GENERAL ###
 
@@ -105,13 +68,7 @@ fi
 ### PLAT PATHS ###
 # These go after Homebrew so installed tools take priority.
 
-{{ if $use_plat -}}
-# PLAT-isolated bin first, then arch-neutral ~/.local/bin for shell scripts.
 path=("$_LOCAL_PLAT/bin" "$HOME/.local/bin" $path)
-{{- else -}}
-# Flat layout: $_LOCAL_PLAT/bin == $HOME/.local/bin, only one entry needed.
-path=("$HOME/.local/bin" $path)
-{{- end }}
 
 {{ if eq .chezmoi.os "linux" -}}
 # Prefer brew binutils on Linux — system assembler (gas) may be too old for newer

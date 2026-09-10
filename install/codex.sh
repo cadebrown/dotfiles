@@ -27,13 +27,18 @@
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+# shellcheck source=install/codex-runtime.sh
+source "$DF_ROOT/install/codex-runtime.sh"
 
 _usage() {
     cat <<'EOF'
-Usage: codex.sh [install|sync-config|check|upgrade]
+Usage: codex.sh [install|sync-runtime|sync-config|backup SOURCE DESTINATION|import-history SOURCE|check|upgrade]
 
   install      Verify codex is on PATH (npm-installed via packages/npm.txt)
-  sync-config  Sync managed ~/.codex config/hooks while preserving runtime blocks
+  sync-runtime Prepare and validate the host-local Codex runtime only
+  sync-config  Sync managed Codex config/hooks while preserving runtime blocks
+  backup SOURCE DESTINATION  Full verified backup to a new directory; stop writers first
+  import-history SOURCE  Copy validated legacy transcripts into this host runtime
   check        Validate codex binary/config/rules
   upgrade      Run sync-config + check (default)
 EOF
@@ -41,7 +46,7 @@ EOF
 
 _mode="${1:-upgrade}"
 case "$_mode" in
-    install|sync-config|check|upgrade) ;;
+    install|sync-runtime|sync-config|backup|import-history|check|upgrade) ;;
     -h|--help|help) _usage; exit 0 ;;
     *) _usage; die "Unknown mode: $_mode" ;;
 esac
@@ -379,7 +384,9 @@ _emit_mcp_blocks_to() {
 # when it is byte-identical to the retired managed content — any deviation
 # means Codex appended runtime approvals, which we must not destroy.
 _evict_legacy_rules() {
-    local _legacy="$HOME/.codex/rules/default.rules" _hash
+    local _root _legacy _hash
+    _root="${CODEX_HOME:-$HOME/.codex}"
+    _legacy="$_root/rules/default.rules"
     # sha256 of the retired content (git show <pre-move>:home/dot_codex/rules/default.rules)
     local _retired="42873ce7d512934850fc072d26e180e5e21c2cd324ef5d8b4edd9d162db95e46"
     [[ -f "$_legacy" ]] || return 0
@@ -392,17 +399,50 @@ _evict_legacy_rules() {
     fi
 }
 
+_sync_runtime_assets() {
+    local _root _src _profile _theme _tmp
+    _root="${CODEX_HOME:-$HOME/.codex}"
+    _src="$DF_ROOT/home/dot_codex"
+    _codex_runtime_assert_existing_dir "$_root"
+    for _theme in rules themes agents; do
+        if [[ -e "$_root/$_theme" || -L "$_root/$_theme" ]]; then
+            _codex_runtime_assert_existing_dir "$_root/$_theme"
+        else
+            umask 077; mkdir "$_root/$_theme"; chmod 700 "$_root/$_theme"
+        fi
+    done
+
+    # AGENTS.md is a chezmoi template, but the native app requires rendered
+    # instructions in its host-local runtime. Do not reuse a shared-home copy.
+    has chezmoi || die "chezmoi is required to render Codex AGENTS.md"
+    [[ ! -L "$_root/AGENTS.md" ]] || die "Refusing to replace symlinked Codex AGENTS.md"
+    _tmp="$(mktemp "$_root/.AGENTS.md.XXXXXX")"
+    chezmoi -S "$DF_ROOT/home" execute-template --file "$_src/AGENTS.md.tmpl" > "$_tmp"
+    chmod 600 "$_tmp"
+    mv "$_tmp" "$_root/AGENTS.md"
+    install -m 644 "$_src/rules/dotfiles.rules" "$_root/rules/dotfiles.rules"
+    for _profile in "$_src"/*.config.toml; do
+        [[ -f "$_profile" ]] || continue
+        install -m 600 "$_profile" "$_root/$(basename "$_profile")"
+    done
+    for _theme in "$_src/themes"/*; do
+        [[ -f "$_theme" ]] || continue
+        install -m 644 "$_theme" "$_root/themes/$(basename "$_theme")"
+    done
+}
+
 _sync_config() {
     local _tmpl _dest _tmp _managed _mcp _registry _skill
     local -a _merge_args=()
     log_section "Codex Config Sync"
 
     _tmpl="$DF_ROOT/home/dot_codex/create_private_config.toml"
-    _dest="$HOME/.codex/config.toml"
+    _dest="${CODEX_HOME:-$HOME/.codex}/config.toml"
 
     [[ -f "$_tmpl" ]] || die "Missing managed config template: $_tmpl"
     has uv || die "uv is required for safe Codex TOML sync (run install/python.sh)"
-    ensure_dir "$HOME/.codex"
+    ensure_dir "${CODEX_HOME:-$HOME/.codex}"
+    _sync_runtime_assets
 
     _evict_legacy_rules
 
@@ -428,11 +468,11 @@ _sync_config() {
     fi
     uv run --quiet "$DF_ROOT/install/codex-config.py" \
         --managed "$_managed" --current "$_dest" --output "$_dest" \
-        --registry "$_registry" --ownership "$HOME/.codex/.dotfiles-mcp-ownership.json" \
-        --profiles-dir "$HOME/.codex" \
+        --registry "$_registry" --ownership "${CODEX_HOME:-$HOME/.codex}/.dotfiles-mcp-ownership.json" \
+        --profiles-dir "${CODEX_HOME:-$HOME/.codex}" \
         --agent-sources "$DF_ROOT/home/dot_codex/agents" \
         --agent-scopes "$DF_PACKAGES/codex-agent-tools.json" \
-        --agents-dir "$HOME/.codex/agents" "${_merge_args[@]}"
+        --agents-dir "${CODEX_HOME:-$HOME/.codex}/agents" "${_merge_args[@]+"${_merge_args[@]}"}"
     log_okay "Synced Codex defaults, MCP profiles, and agents; preserved model choices and runtime integrations"
 }
 
@@ -442,7 +482,7 @@ _sync_hooks() {
     log_section "Codex Hooks Sync"
 
     _hooks_src="$DF_ROOT/home/dot_codex/hooks.json"
-    _hooks_dest="$HOME/.codex/hooks.json"
+    _hooks_dest="${CODEX_HOME:-$HOME/.codex}/hooks.json"
     _guard_src="$DF_ROOT/home/dot_local/bin/executable_df-chezmoi-guard"
     _guard_dest="$HOME/.local/bin/df-chezmoi-guard"
 
@@ -450,24 +490,22 @@ _sync_hooks() {
     [[ -f "$_guard_src" ]] || die "Missing chezmoi guard hook: $_guard_src"
     has jq || die "jq is required to sync all managed Codex lifecycle hooks"
 
-    ensure_dir "$HOME/.codex"
+    ensure_dir "${CODEX_HOME:-$HOME/.codex}"
     ensure_dir "$HOME/.local/bin"
     ensure_dir "$HOME/.local/lib/dotfiles"
     ensure_dir "$HOME/.config/dotfiles"
-    if [[ ! -f "$HOME/.config/dotfiles/agent-layout" ]]; then
-        printf '%s\n' "$DF_USE_PLAT" > "$HOME/.config/dotfiles/agent-layout"
-    fi
 
     install -m 644 "$_hooks_src" "$_hooks_dest"
     install -m 755 "$_guard_src" "$_guard_dest"
+    install -m 755 "$DF_ROOT/home/dot_codex/executable_rtk-rewrite.sh" "$HOME/.local/bin/df-rtk-rewrite"
     install -m 755 "$DF_ROOT/home/dot_local/bin/executable_df-task" "$HOME/.local/bin/df-task"
     install -m 644 "$DF_ROOT/home/dot_local/lib/dotfiles/df_task.py" "$HOME/.local/lib/dotfiles/df_task.py"
 
     # Codex trust identities include the event and both array indices.
     while IFS=$'\t' read -r _event_name _event_key _g _h; do
-        _hook_key="$HOME/.codex/hooks.json:${_event_key}:${_g}:${_h}"
+        _hook_key="${CODEX_HOME:-$HOME/.codex}/hooks.json:${_event_key}:${_g}:${_h}"
         _hook_hash="$(_managed_hook_hash "$_hooks_dest" "$_event_name" "$_event_key" "$_g" "$_h")"
-        _trust_hook "$HOME/.codex/config.toml" "$_hook_key" "$_hook_hash"
+        _trust_hook "${CODEX_HOME:-$HOME/.codex}/config.toml" "$_hook_key" "$_hook_hash"
         log_okay "Trusted Codex hook $_event_name [$_g:$_h]"
     done < <(jq -r '
         .hooks | to_entries[] | .key as $event | .value | to_entries[] as $group
@@ -582,14 +620,14 @@ _toml_section_key_matches() {
 }
 
 _check_setup() {
-    local _config _rules _hooks _guard _profile _pfile _guard_rc _hook_hash
+    local _config _rules _hooks _guard _profile _pfile _guard_rc _hook_hash _runtime_guard_rc
     local _want_model _mcp_name
     local _g _h _event_name _event_key _hook_key
     log_section "Codex Healthcheck"
 
-    _config="$HOME/.codex/config.toml"
-    _rules="$HOME/.codex/rules/dotfiles.rules"
-    _hooks="$HOME/.codex/hooks.json"
+    _config="${CODEX_HOME:-$HOME/.codex}/config.toml"
+    _rules="${CODEX_HOME:-$HOME/.codex}/rules/dotfiles.rules"
+    _hooks="${CODEX_HOME:-$HOME/.codex}/hooks.json"
     _guard="$HOME/.local/bin/df-chezmoi-guard"
 
     has codex || die "codex binary not found on PATH"
@@ -645,7 +683,7 @@ _check_setup() {
     [[ -x "$HOME/.local/bin/df-task" && -f "$HOME/.local/lib/dotfiles/df_task.py" ]] \
         || die "Missing durable task checkpoint helper"
     while IFS=$'\t' read -r _event_name _event_key _g _h; do
-        _hook_key="$HOME/.codex/hooks.json:${_event_key}:${_g}:${_h}"
+        _hook_key="${CODEX_HOME:-$HOME/.codex}/hooks.json:${_event_key}:${_g}:${_h}"
         _hook_hash="$(_managed_hook_hash "$_hooks" "$_event_name" "$_event_key" "$_g" "$_h")"
         _toml_section_key_matches "$_config" "[hooks.state.\"$_hook_key\"]" \
             trusted_hash "$_hook_hash" \
@@ -659,7 +697,7 @@ _check_setup() {
     codex debug prompt-input "healthcheck" >/dev/null \
         || die "Codex config parse failed for default profile"
     # Profiles: every ~/.codex/<name>.config.toml overlay must parse.
-    for _pfile in "$HOME"/.codex/*.config.toml; do
+    for _pfile in "${CODEX_HOME:-$HOME/.codex}"/*.config.toml; do
         [[ -e "$_pfile" ]] || continue
         _profile="$(basename "$_pfile" .config.toml)"
         codex --profile "$_profile" debug prompt-input "healthcheck" >/dev/null \
@@ -681,6 +719,14 @@ _check_setup() {
     set -e
     [[ "$_guard_rc" == 2 ]] || die "chezmoi guard did not block managed Codex config"
 
+    set +e
+    printf '{"tool_input":{"file_path":"%s"}}\n' "$_config" \
+        | env CODEX_HOME="${CODEX_HOME:-$HOME/.codex}" PATH="$ARCH_BIN:$PATH" "$_guard" >/dev/null 2>&1
+    _runtime_guard_rc=$?
+    set -e
+    [[ "$_runtime_guard_rc" == 2 ]] \
+        || die "chezmoi guard did not block generated Codex runtime config: $_config"
+
     log_okay "Codex healthcheck passed"
 }
 
@@ -689,19 +735,44 @@ _check_setup() {
 [[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0
 
 case "$_mode" in
+    backup)
+        [[ -n "${2:-}" && -n "${3:-}" && -z "${4:-}" ]] \
+            || die "Usage: codex.sh backup SOURCE DESTINATION"
+        has uv || die "uv is required to back up Codex history (run install/python.sh)"
+        # Do not prepare/repair the source: even unreadable SQLite bytes belong
+        # in the backup before any migration or runtime validation can mutate it.
+        uv run --quiet "$DF_ROOT/install/codex-backup.py" \
+            --source "codex=$2" --destination "$3"
+        ;;
     install)
         _verify_codex_present
         ;;
+    sync-runtime)
+        codex_runtime_prepare
+        _sync_config
+        _sync_hooks
+        ;;
     sync-config)
+        codex_runtime_prepare
         _sync_config
         _sync_hooks
         _sync_plugins
         ;;
+    import-history)
+        [[ -n "${2:-}" && -z "${3:-}" ]] \
+            || die "Usage: codex.sh import-history SOURCE"
+        codex_runtime_prepare
+        has uv || die "uv is required to import Codex history (run install/python.sh)"
+        uv run --quiet "$DF_ROOT/install/codex-history.py" \
+            --source "$2" --destination "${CODEX_HOME:-$HOME/.codex}"
+        ;;
     check)
+        codex_runtime_prepare
         _check_setup
         ;;
     upgrade)
         _verify_codex_present || die "codex not installed — run install/node.sh first"
+        codex_runtime_prepare
         _sync_config
         _sync_hooks
         _sync_plugins

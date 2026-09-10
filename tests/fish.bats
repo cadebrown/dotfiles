@@ -12,8 +12,10 @@ setup() {
 
 render_bridge() {
     local use_plat="$1"
+    mkdir -p "$TEST_HOME/.config/dotfiles/hosts"
+    printf 'DF_USE_PLAT=%s\n' "$use_plat" > "$TEST_HOME/.config/dotfiles/hosts/$(hostname).env"
     chezmoi --source "$REPO/home" \
-        --override-data "{\"chezmoi\":{\"os\":\"linux\"},\"use_plat\":$use_plat}" \
+        --override-data '{"chezmoi":{"os":"linux"}}' \
         execute-template --file "$REPO/home/dot_config/fish/conf.d/dotfiles-env-bridge.bash.tmpl" \
         > "$TEST_HOME/.config/fish/conf.d/dotfiles-env-bridge.bash"
     chmod +x "$TEST_HOME/.config/fish/conf.d/dotfiles-env-bridge.bash"

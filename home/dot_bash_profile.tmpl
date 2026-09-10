@@ -1,44 +1,24 @@
-{{/* See dot_zprofile.tmpl for the rationale on this guard. */ -}}
-{{- $use_plat := false -}}
-{{- if hasKey . "use_plat" -}}{{ $use_plat = .use_plat }}{{- end -}}
 # .bash_profile - Bash login shell configuration
 # For bash-specific interactive config, use ~/.bashrc
 # This file mirrors the structure of ~/.zprofile for consistency
 
 ### PLATFORM ###
 
-# Mirrors .zprofile — see that file for detailed comments on _PLAT, _LOCAL_PLAT,
-# and the use_plat / DF_USE_PLAT toggle. Runs first so PATH is fully built
+# Mirrors .zprofile — host policy is resolved at runtime. Runs first so PATH is fully built
 # before the zsh handoff below.
-{{ template "plat-detect.sh" . }}
-
-# Source the matching .plat_env.sh in the parent shell so its exports stick.
-if [[ -n "$_PLAT_DETECTED" ]]; then
-    _plat_env_sh="$HOME/dotfiles/install/plat/$_PLAT_DETECTED/.plat_env.sh"
-    [[ -f "$_plat_env_sh" ]] && source "$_plat_env_sh"
-    unset _plat_env_sh
+_df_root="$HOME/dotfiles"
+if [[ -f "$_df_root/install/_host-config.sh" ]]; then
+    source "$_df_root/install/_host-config.sh"
+    _host_config_resolve "$_df_root" || return 1
+    source "$_df_root/install/_runtime-paths.sh"
+    _normalize_plat_layout
+    _detect_plat "$_df_root" || { echo "ERROR: DF_PLAT=$DF_PLAT is not supported by this host" >&2; return 1; }
+    if [[ -n "$PLAT" && -f "$_df_root/install/plat/$PLAT/.plat_env.sh" ]]; then source "$_df_root/install/plat/$PLAT/.plat_env.sh"; fi
+    if [[ "$DF_USE_PLAT" == 1 && -z "$PLAT" ]]; then echo "ERROR: DF_USE_PLAT=1 but no matching plat spec — run ~/dotfiles/bootstrap.sh" >&2; return 1; fi
+    _resolve_local_plat
+    export _PLAT="$PLAT" _LOCAL_PLAT="$LOCAL_PLAT"
 fi
-export _PLAT="$_PLAT_DETECTED"
-unset _PLAT_DETECTED
-
-# Propagate use_plat to child processes (bootstrap.sh, install/*.sh) — see
-# dot_zprofile.tmpl for rationale. chezmoi data is the source of truth.
-export DF_USE_PLAT={{ if $use_plat }}1{{ else }}0{{ end }}
-
-_local_root="$HOME/.local"
-if [[ -L "$_local_root" ]]; then
-    _local_root="$(readlink -f "$_local_root")"
-fi
-{{ if $use_plat -}}
-if [[ -z "$_PLAT" ]]; then
-    echo "ERROR: use_plat=true but no matching plat spec — run ~/dotfiles/bootstrap.sh" >&2
-    return 1
-fi
-export _LOCAL_PLAT="$_local_root/$_PLAT"
-{{- else -}}
-export _LOCAL_PLAT="$_local_root"
-{{- end }}
-unset _local_root
+unset _df_root
 
 ### HOMEBREW (early — needed so zsh handoff finds the right zsh) ###
 # Name the shell explicitly so brew does not spawn ps to discover its parent.
@@ -87,11 +67,7 @@ if [[ -z "$ZSH_VERSION" ]]; then
 fi
 
 # Reached only when staying in bash (no tty or zsh unavailable).
-{{ if $use_plat -}}
 export PATH="$_LOCAL_PLAT/bin:$HOME/.local/bin:$PATH"
-{{- else -}}
-export PATH="$HOME/.local/bin:$PATH"
-{{- end }}
 
 ### GENERAL ###
 

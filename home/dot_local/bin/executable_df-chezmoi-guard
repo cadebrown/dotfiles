@@ -45,6 +45,30 @@ emit_candidates() {
     done < <(printf '%s' "$candidates" | jq -j '.[] | . + "\u0000"')
 }
 
+# Codex's host-local runtime is outside chezmoi's destination, but install/
+# codex.sh projects this bounded configuration subset from home/dot_codex.
+# Do not block auth, transcripts, SQLite, queues, or arbitrary runtime state.
+runtime_managed_blocks() {
+    local runtime_root source_root file source
+    runtime_root="$(resolve_path "${CODEX_HOME:-$HOME/.codex}"; printf '.')"
+    runtime_root="${runtime_root%.}"
+    source_root="${DF_DOTFILES_REPO:-$HOME/dotfiles}/home/dot_codex"
+    while IFS= read -r -d '' file; do
+        source=""
+        case "$file" in
+            "$runtime_root/config.toml") source="$source_root/create_private_config.toml" ;;
+            "$runtime_root/hooks.json") source="$source_root/hooks.json" ;;
+            "$runtime_root/AGENTS.md") source="$source_root/AGENTS.md.tmpl" ;;
+            "$runtime_root"/*.config.toml) source="$source_root/${file##*/}" ;;
+            "$runtime_root/agents/"*) source="$source_root/agents/${file#"$runtime_root/agents/"}" ;;
+            "$runtime_root/rules/"*) source="$source_root/rules/${file#"$runtime_root/rules/"}" ;;
+            "$runtime_root/themes/"*) source="$source_root/themes/${file#"$runtime_root/themes/"}" ;;
+        esac
+        [[ -n "$source" && -f "$source" ]] || continue
+        printf 'Blocked: %s is generated from dotfiles.\nEdit the source: %s\n(then run '\''bash install/codex.sh sync-runtime'\'')\n' "$file" "$source"
+    done < <(emit_candidates)
+}
+
 # Parse once and retain JSON encoding until the NUL-delimited pipe: filenames
 # from Edit/Write may contain newlines, and shell command substitution drops NULs.
 candidates="$(jq -c '
@@ -95,6 +119,8 @@ blocked="$(printf '%s' "$ownership" | jq -r --arg physical_root "$physical_root"
     | . as $file | $managed[$file] // empty
     | "Blocked: \($file) is managed by chezmoi.\nEdit the source: \(.sourceAbsolute)\n(then run '\''chezmoi apply'\'' to deploy)"
 ')" || exit 0
+runtime_blocked="$(runtime_managed_blocks)" || exit 0
+[[ -z "$runtime_blocked" ]] || blocked="${blocked}${blocked:+$'\n'}${runtime_blocked}"
 if [[ -n "$blocked" ]]; then
     printf '%s\n' "$blocked" >&2
     exit 2

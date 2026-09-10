@@ -8,7 +8,8 @@ setup() {
     for directory in install home packages; do
         ln -s "$REPO/$directory" "$FAKE_REPO/$directory"
     done
-    MARKER="$FAKE_HOME/.config/dotfiles/agent-layout"
+    HOST_FILE="$FAKE_HOME/.config/dotfiles/hosts/$(hostname).env"
+    mkdir -p "${HOST_FILE%/*}"
     FLAT="$FAKE_HOME/.local"
     ISOLATED="$(env -i HOME="$FAKE_HOME" PATH=/usr/bin:/bin DF_USE_PLAT=1 \
         /bin/bash -es -- "$FAKE_REPO" <<'SH'
@@ -17,6 +18,8 @@ printf '%s' "$LOCAL_PLAT"
 SH
     )"
 }
+
+set_host_layout() { printf 'DF_USE_PLAT=%s\n' "$1" > "$HOST_FILE"; }
 
 write_runtimes() {
     local directory="$1" executable
@@ -64,21 +67,19 @@ check_launchers() {
     [ "${lines[4]}" = "arg=fixture-task" ]
 }
 
-@test "minimal GUI environment deploys and launches flat runtimes from persisted layout" {
-    printf '0\n' > "$MARKER"
+@test "minimal GUI environment deploys and launches flat runtimes from host policy" {
+    set_host_layout 0
     write_runtimes "$FLAT"
     install_helpers
-    [ "$(cat "$MARKER")" = 0 ]
     check_launchers "$FLAT" "$FLAT/uv/cache"
     install_helpers
     check_launchers "$FLAT" "$FLAT/uv/cache"
 }
 
 @test "minimal GUI environment deploys and launches PLAT runtimes without flat uv" {
-    printf '1\n' > "$MARKER"
+    set_host_layout 1
     write_runtimes "$ISOLATED"
     install_helpers
-    [ "$(cat "$MARKER")" = 1 ]
     [ ! -e "$FLAT/bin/uv" ]
     [ -x "$ISOLATED/bin/df-google-mcp" ]
     [ -x "$ISOLATED/bin/df-task" ]
@@ -87,44 +88,37 @@ check_launchers() {
     check_launchers "$ISOLATED" "$ISOLATED/uv/cache"
 }
 
-@test "explicit layout overrides persisted state for installer and launched runtimes" {
+@test "explicit layout overrides host policy for installer and launched runtimes" {
     write_runtimes "$FLAT"
     write_runtimes "$ISOLATED"
-    printf '0\n' > "$MARKER"
+    set_host_layout 0
     install_helpers DF_USE_PLAT=1
-    [ "$(cat "$MARKER")" = 1 ]
-    printf '0\n' > "$MARKER"
     check_launchers "$ISOLATED" "$ISOLATED/uv/cache" DF_USE_PLAT=1
-    printf '1\n' > "$MARKER"
     check_launchers "$FLAT" "$FLAT/uv/cache" DF_USE_PLAT=0
     install_helpers DF_USE_PLAT=0
-    [ "$(cat "$MARKER")" = 0 ]
 }
 
-@test "absent layout marker preserves flat default and explicit cache directory" {
+@test "absent host policy preserves flat default and explicit cache directory" {
     write_runtimes "$FLAT"
     install_helpers
-    [ "$(cat "$MARKER")" = 0 ]
-    rm "$MARKER"
     check_launchers "$FLAT" "$FLAT/uv/cache"
     check_launchers "$FLAT" "$FAKE_HOME/custom-cache" UV_CACHE_DIR="$FAKE_HOME/custom-cache"
 }
 
-@test "layout marker accepts a final digit without a newline" {
-    printf 1 > "$MARKER"
+@test "host policy accepts a final digit without a newline" {
+    printf 'DF_USE_PLAT=1' > "$HOST_FILE"
     write_runtimes "$ISOLATED"
     install_helpers
-    printf 1 > "$MARKER"
     check_launchers "$ISOLATED" "$ISOLATED/uv/cache"
 }
 
-@test "malformed layout stops installer and launchers before a runtime executes" {
+@test "malformed host policy stops installer and launchers before a runtime executes" {
     write_runtimes "$FLAT"
     write_runtimes "$ISOLATED"
     install_helpers
     local value command
     for value in 'broken' '' $'1\nbroken'; do
-        printf '%s\n' "$value" > "$MARKER"
+        printf 'DF_USE_PLAT=%s\n' "$value" > "$HOST_FILE"
         for command in "$FAKE_REPO/install/agent-tools.sh" \
                 "$FAKE_HOME/.local/bin/df-google-mcp" "$FAKE_HOME/.local/bin/df-task"; do
             run env -i HOME="$FAKE_HOME" PATH=/usr/bin:/bin DF_DOTFILES_REPO="$FAKE_REPO" \
@@ -132,7 +126,7 @@ check_launchers() {
             printf '%s\n' "$output"
             [ "$status" -ne 0 ]
             [[ "$output" != *runtime=* ]]
-            [ "$(cat "$MARKER")" = "$value" ]
+            [[ "$(cat "$HOST_FILE")" == *"$value"* ]]
         done
     done
 }
@@ -151,7 +145,7 @@ check_launchers() {
 printf 'git=%s\ncflags=%s\nrustflags=%s\npath=%s\n' "${GIT_CONFIG_GLOBAL:-unset}" "${CFLAGS:-unset}" "${RUSTFLAGS:-unset}" "$PATH"
 printf 'arg=%s\n' "$@"
 SH
-        printf '%s\n' "$layout" > "$MARKER"
+        set_host_layout "$layout"
         run env -i HOME="$FAKE_HOME" PATH=/usr/bin:/bin DF_DOTFILES_REPO="$FAKE_REPO" \
             GIT_CONFIG_GLOBAL="$FAKE_HOME/custom-git-config" \
             "$FAKE_HOME/.local/bin/df-task" checkpoint --note 'literal $PATH and spaces'
@@ -215,7 +209,7 @@ SH
 @test "runtime requires a matching host specification only in PLAT layout" {
     local minimal_repo="$BATS_TEST_TMPDIR/minimal"
     mkdir -p "$minimal_repo/install"
-    cp "$REPO/install/agent-runtime.sh" "$REPO/install/_runtime-paths.sh" "$minimal_repo/install/"
+    cp "$REPO/install/agent-runtime.sh" "$REPO/install/_runtime-paths.sh" "$REPO/install/_host-config.sh" "$minimal_repo/install/"
     run env -i HOME="$FAKE_HOME" PATH=/usr/bin:/bin DF_USE_PLAT=0 \
         /bin/bash -ec 'source "$1/install/agent-runtime.sh" --runtime-only; printf "%s" "$PYTHON_ENV"' fixture "$minimal_repo"
     [ "$status" -eq 0 ]

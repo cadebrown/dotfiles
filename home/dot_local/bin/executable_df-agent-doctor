@@ -10,6 +10,7 @@ fi
 set -uo pipefail
 
 _repo="${DF_DOTFILES_REPO:-$HOME/dotfiles}"
+_codex_home="${CODEX_HOME:-$HOME/.codex}"
 _fail=0
 
 _check() {
@@ -65,7 +66,7 @@ if _has jq; then
     _check "MCP registry" _mcp_registry_healthy
     _check "Claude settings" _json_healthy "$HOME/.claude/settings.json"
     _check "Claude MCP state" _json_healthy "$HOME/.claude.json"
-    _check "Codex hooks" _json_healthy "$HOME/.codex/hooks.json"
+    _check "Codex hooks" _json_healthy "$_codex_home/hooks.json"
     _check "OpenCode config" _json_healthy "$HOME/.config/opencode/opencode.json"
     _check "Pi settings" _json_healthy "$HOME/.pi/agent/settings.json"
     _check "Pi models" _json_healthy "$HOME/.pi/agent/models.json"

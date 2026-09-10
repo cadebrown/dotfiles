@@ -45,11 +45,11 @@ ADC is read. The launcher supports flat and PLAT-isolated installations and does
 not require a login shell. Its uv cache lives under `$LOCAL_PLAT/uv/cache` unless
 `UV_CACHE_DIR` is explicitly set, so PLAT-isolated hosts do not share script
 environments containing architecture-specific extensions.
-When `DF_USE_PLAT` is absent from a GUI app's environment, the launcher reads
-`~/.config/dotfiles/agent-layout`, maintained by chezmoi and the helper installer.
-An explicit `DF_USE_PLAT` value takes precedence; an absent marker retains the
-flat default. This keeps Dock-launched agents on the configured runtime paths
-without sourcing interactive shell profiles.
+The launcher resolves [per-host configuration](/setup/chezmoi/#host-configuration)
+at startup, including private overlay presets and hostname-specific local
+overrides. Explicit invocation values take precedence; an unconfigured machine
+retains the flat default. This keeps GUI-launched agents on the same runtime
+paths as login shells without sourcing interactive shell profiles.
 
 ADC resolution follows `google.auth.default`, including an explicit
 `GOOGLE_APPLICATION_CREDENTIALS` file when supplied. Existing ADC from

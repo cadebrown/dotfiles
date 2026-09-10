@@ -1,3 +1,119 @@
+# Mac verification and Git synchronization — September 10
+
+The Mac uses the normal flat tools layout and its existing real ~/.codex on
+local APFS. Native database integrity, rollout/index parity, authentication,
+provider HTTP/WebSocket connectivity, managed configuration, and desktop task
+reads pass. No Mac history migration is needed. The updated Bash/Zsh login and
+launch paths plus Fish environment bridge were applied with scripts excluded;
+previous shell files and chezmoi configuration are backed up locally. Shell
+rendering has no remaining drift. CLI 0.154.0's terminal diagnostic passes with
+an actual terminal configuration; optional Defender-exclusion and update-probe
+warnings are not database/startup failures.
+
+Git synchronization scope is the public dotfiles repository and its independent
+private NVIDIA overlay, including their one shared remote checkout. Before
+publication, both local main branches matched origin/main with no committed
+divergence. Preserve unrelated Claude-default and MCP OAuth edits and the remote
+overlay's unrelated doc/test.json. Publish the generic host/Codex repair and
+private host presets as separate conventional commits; keep the public push
+gate enabled and verify each hosted revision before declaring it current.
+
+# Full-backup migration follow-up — September 10
+
+User explicitly requested full history backups and reported SQLite code 26 plus
+EXDEV at the legacy shared path. Current desktop processes were already local;
+non-login Bash/Zsh wrappers still used the old environment-only launch. Added a
+shared lazy launcher that re-resolves invocation policy while preserving explicit
+CODEX_HOME overrides, including after a prior login resolution. Existing shells
+need a one-time reload; npm-owned binaries are unchanged.
+
+Full copy-only backups now include symlink referent bytes, raw SQLite/WAL/SHM,
+configuration/auth, all history, and artifacts. SHA-256 copies plus a final
+source inventory check gate completion; topology and original metadata are
+recorded, private modes enforced, and incomplete snapshots are marked clearly.
+The CLI backup mode never prepares or repairs the source. Three verified full
+backups total 28,627,693,676 bytes and 23,838 files. Local runtime snapshots were
+made with bounded writer suspension, then archived off-host and verified again
+file-by-file. Private locations and archive checksums are in the deployment's
+BACKUPS.md. The initial slower shared-storage attempt remains explicitly marked
+incomplete; no originals were deleted.
+
+Both stopped desktop backends received 111 missing portable files (140,584,354
+bytes each): prompt history, attachments, generated images, and visualizations.
+All 1,984 existing transcript/index files per host were preserved. Backends were
+restarted with their original launch command/environment. The desktop-owned
+processes are not managed by the separate Codex daemon CLI; its stop command
+refused without changing state. Native desktop task reads succeed on both hosts,
+and real non-login shells reach their local socket with CLI/server version
+0.153.4. Full histories and raw original databases remain intact.
+
+Follow-up validation complete: launcher tests, backup and portable importer
+checks, shell checks, the final 271-case fast suite, docs, and the final 484-case
+clean rootless Linux suite all pass (exit 0). An earlier Linux idempotence check
+correctly detected a launcher source edit made after bootstrap; the frozen-source
+rerun passes. Both native healthchecks and desktop task reads pass. All 2,095
+portable files per host were rehashed against the backups; all six databases per
+host passed SQLite quick_check on disposable copies, never the original backup.
+An independent focused review found no backup/history data-loss issue; its
+policy-refresh edge is documented explicitly: exported environment wins over
+host-file edits, so root changes need a fresh SSH login, not a shell replacement.
+Changes remain uncommitted and unpushed. Preserve unrelated local Claude/MCP
+edits; remote rc files and their templates received only the Codex launcher hunk.
+Final evidence logs: `/tmp/codex-migration-fast-final.log`,
+`/tmp/codex-migration-docker-final.log`, `/tmp/codex-migration-docs-complete.log`,
+`/tmp/codex-migration-shell-final.log`, and the two native host-check logs under
+`/tmp/codex-migration-*-check.log`. The follow-up deployment is complete.
+
+# Remote Codex and per-host configuration — September 10
+
+Implementation and deployment are authorized for two remote workstations; the
+unavailable workstation is out of scope. Public dotfiles owns a generic
+data-only host resolver. The private dotfiles-nvidia overlay owns internal
+hostname/path presets. Existing unrelated working-tree changes are preserved.
+
+Confirmed: both machines share NFS HOME and NFS scratch. Codex 0.153.4 uses WAL
+databases; the old per-file scratch symlinks also make database recovery fail
+with EXDEV. A complete real host-local CODEX_HOME passes native Unix listener
+initialization, unlike a symlinked app-server-control directory.
+
+Implemented and deployed: runtime host input precedence and shell/bootstrap
+integration; guided per-host configuration; host-local Codex managed assets;
+retirement of SQLite scratch migration; copy-only history import. The shared
+old state is intact. No remote package upgrades, commits, or pushes have been
+performed for this repair.
+
+History evidence: native Codex 0.153.4 reopened a copied 108 MB existing parent
+transcript in a fresh local runtime: same ID, 56 turns, 1,738 items, original
+SHA-256 unchanged. No database copy was needed. The generic importer now copies
+portable transcripts and the session index only, checks source stability and
+copied bytes, refuses destination links, and never overwrites continuations.
+Four focused importer tests passed. Both desktop connections now report
+connected and the desktop's native task reader retrieved the imported task
+from both hosts. Each received 1,983 transcripts and the index (7,832,512,016
+bytes), with originals untouched. The initial daemon start took extra time to
+rebuild local indexes; steady-state reconnect succeeded without modifying the
+app bundle. The scoped source and login files have recoverable backups. Private
+deployment details live in the overlay. Both full native Codex healthchecks
+pass, including declared plugins and generated-file hook protection. Existing
+official plugin artifacts were restored without upgrading them. Fresh Bash and
+Zsh logins resolve identical host-specific state paths; all 22 deployed source
+files match the local checkout by SHA-256.
+
+Validation complete: shell checks, native hook trust checks, 74 real-chezmoi
+guard checks, 12 runtime tests, four importer tests, nine host tests on macOS
+and Linux, and the documentation gate pass. The canonical macOS fast run passes
+264 cases. The canonical clean rootless Linux bootstrap and all 477 Docker
+cases pass (exit 0, no bootstrap degradations). Final logs are
+`/tmp/dotfiles-host-fast-complete.log`, `/tmp/dotfiles-host-docker-complete.log`,
+and `/tmp/dotfiles-host-docs-final.log`.
+
+Final validation also caught and fixed Zsh's no-overlay NOMATCH failure, with
+coverage for restoring caller shell options. Shell fixtures now choose policy
+at runtime rather than via retired template data. The fake bootstrap clone
+copies repository files, excluding ignored dependencies and private overlays;
+its four cases pass independently on both platforms. No required work remains;
+the changes are deployed but uncommitted and unpushed.
+
 # Documentation revamp
 
 ## Objective and boundary

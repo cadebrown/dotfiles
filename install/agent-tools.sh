@@ -10,8 +10,6 @@ source "$SCRIPT_DIR/agent-runtime.sh"
 log_section "agent helper commands"
 
 ensure_dir "$ARCH_BIN"
-ensure_dir "$HOME/.config/dotfiles"
-printf '%s\n' "$DF_USE_PLAT" > "$HOME/.config/dotfiles/agent-layout"
 
 for _command in df-agent-doctor plugin-eval local-agent df-task df-browser df-google-mcp df-gemini; do
     _source="$DF_ROOT/home/dot_local/bin/executable_$_command"

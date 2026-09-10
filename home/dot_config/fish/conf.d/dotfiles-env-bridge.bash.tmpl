@@ -4,29 +4,23 @@
 # also start services and load interactive shell machinery that Fish must not
 # inherit.
 
-{{ template "plat-detect.sh" . }}
-
-{{- $use_plat := false -}}
-{{- if hasKey . "use_plat" -}}{{ $use_plat = .use_plat }}{{- end -}}
-export DF_USE_PLAT={{ if $use_plat }}1{{ else }}0{{ end }}
-
-_df_local_root="$HOME/.local"
-if [[ -L "$_df_local_root" ]]; then
-    _df_local_root="$(cd "$_df_local_root" && pwd -P)"
-fi
-
-if [[ "$DF_USE_PLAT" == 1 ]]; then
-    if [[ -z "$_PLAT_DETECTED" ]]; then
-        printf '%s\n' 'ERROR: use_plat=true but no matching plat spec — run ~/dotfiles/bootstrap.sh' >&2
+# Resolve the same per-host data policy as Bash and Zsh; never use chezmoi
+# render-time data because this file can live in a shared home.
+_df_root="$HOME/dotfiles"
+if [[ -f "$_df_root/install/_host-config.sh" ]]; then
+    source "$_df_root/install/_host-config.sh"
+    _host_config_resolve "$_df_root" || exit 1
+    source "$_df_root/install/_runtime-paths.sh"
+    _normalize_plat_layout
+    _detect_plat "$_df_root" || { printf '%s\n' "ERROR: DF_PLAT=$DF_PLAT is not supported by this host" >&2; exit 1; }
+    if [[ "$DF_USE_PLAT" == 1 && -z "$PLAT" ]]; then
+        printf '%s\n' 'ERROR: DF_USE_PLAT=1 but no matching plat spec — run ~/dotfiles/bootstrap.sh' >&2
         exit 1
     fi
-    export _PLAT="$_PLAT_DETECTED"
-    export _LOCAL_PLAT="$_df_local_root/$_PLAT"
-else
-    export _PLAT="$_PLAT_DETECTED"
-    export _LOCAL_PLAT="$_df_local_root"
+    _resolve_local_plat
+    export _PLAT="$PLAT" _LOCAL_PLAT="$LOCAL_PLAT"
 fi
-unset _PLAT_DETECTED _df_local_root
+unset _df_root
 
 if [[ -n "$_PLAT" ]]; then
     _df_plat_env="$HOME/dotfiles/install/plat/$_PLAT/.plat_env.sh"
@@ -101,7 +95,7 @@ fi
 # newlines without evaluating shell syntax or exposing unrelated environment
 # variables from the parent process.
 for _df_name in \
-    PATH DF_USE_PLAT _PLAT _LOCAL_PLAT _PROFILE_SOURCED _DF_CACHE_POLICY_VERSION \
+    PATH DF_USE_PLAT DF_PLAT DF_TOOLS_ROOT DF_STATE_ROOT CODEX_HOME _PLAT _LOCAL_PLAT _PROFILE_SOURCED _DF_CACHE_POLICY_VERSION \
     HOMEBREW_PREFIX HOMEBREW_CELLAR HOMEBREW_REPOSITORY HOMEBREW_NO_AUTO_UPDATE HOMEBREW_NO_INSTALL_FROM_API HOMEBREW_OPTFLAGS \
     NVM_DIR RUSTUP_HOME CARGO_HOME ELAN_HOME JULIAUP_DEPOT_PATH JULIA_DEPOT_PATH GOPATH GOBIN GOCACHE \
     UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR PYTHON_ENV CONAN_HOME \

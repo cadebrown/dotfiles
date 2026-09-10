@@ -36,6 +36,7 @@ The merge is **append-only** — overlays add to the base, they don't replace it
 
 | Path in overlay | Effect |
 |---|---|
+| `hosts/<hostname>.env` | runtime host preset; local overrides and invocation environment win |
 | `packages/cargo.txt` | additional Rust crates installed by `install/rust.sh` |
 | `packages/mcp-servers.txt` | additional MCP servers registered by `install/claude.sh` and `install/codex.sh` |
 | `packages/claude-plugins.txt` | additional Claude plugins installed |

@@ -18,16 +18,27 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 case "$url" in
-    */install/_lib.sh|*/install/_runtime-paths.sh|*/install/scratch.sh|*/install/dirs.sh)
+    */install/_lib.sh|*/install/_runtime-paths.sh|*/install/_host-config.sh|*/install/scratch.sh|*/install/dirs.sh)
         cp "$REPO_SOURCE/install/${url##*/}" "$out" ;;
     *) printf 'unexpected curl URL: %s\n' "$url" >&2; exit 1 ;;
 esac
 SH
 
     cat > "$FAKE_BIN/git" <<'SH'
-#!/bin/sh
+#!/usr/bin/env bash
 if [ "$1" = clone ]; then
-    cp -R "$REPO_SOURCE" "$3"
+    # A clone contains repository files, not ignored dependencies, private
+    # overlays, or generated output. Include new working-tree sources so this
+    # fixture also validates an implementation before it is committed.
+    mkdir -p "$3"
+    (
+        cd "$REPO_SOURCE" || exit 1
+        /usr/bin/git ls-files --cached --others --exclude-standard -z \
+            | while IFS= read -r -d '' file_path; do
+                [[ -e "$file_path" || -L "$file_path" ]] && printf '%s\0' "$file_path"
+            done \
+            | tar --null -T - -cf -
+    ) | tar -xf - -C "$3" || exit 1
     if [ "${REMOTE_OMIT_PLAT:-0}" = 1 ]; then
         mv "$3/install/plat" "$3/install/plat.unavailable"
     fi
@@ -64,6 +75,7 @@ run_remote_bootstrap() {
         env \
             HOME="$2" PATH="$3:/usr/bin:/bin" REPO_SOURCE="$4" \
             DF_USE_PLAT="$5" DF_NAME=Test DF_EMAIL=test@example.com \
+            DF_TOOLS_ROOT="$2/.local" DF_STATE_ROOT= CODEX_HOME= \
             DF_DO_SCRATCH="$6" DF_DO_DIRS="$6" DF_SCRATCH= DF_SCRATCH_LINK="$2/no-scratch" \
             REMOTE_OMIT_PLAT="$7" DF_DO_ZSH=0 DF_DO_PACKAGES=0 \
             DF_DO_LLDB=0 DF_DO_QUARTO=0 DF_DO_MACOS_SERVICES=0 DF_DO_MACOS_SETTINGS=0 \

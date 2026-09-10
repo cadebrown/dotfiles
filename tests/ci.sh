@@ -76,12 +76,16 @@ fast_checks() {
         tests/bootstrap-remote.bats \
         tests/brew-glibc.bats \
         tests/ci-entrypoint.bats \
+        tests/codex-launcher.bats \
+        tests/codex-runtime.bats \
+        tests/codex-history.bats \
         tests/compiler-cache.bats \
         tests/cursor-extensions.bats \
         tests/cursor-harness.bats \
         tests/fish.bats \
         tests/gwt.bats \
         tests/google-auth.bats \
+        tests/host-config.bats \
         tests/lean.bats \
         tests/mcp-emitters.bats \
         tests/netrc.bats \
@@ -117,15 +121,16 @@ macos_checks() {
         printf 'ci: macos requires Darwin; run this check on a macOS host\n' >&2
         exit 1
     fi
-    require bash shellcheck bats
-    local bats_path
+    require bash shellcheck bats chezmoi
+    local bats_path chezmoi_path
     bats_path="$(command -v bats)"
+    chezmoi_path="$(command -v chezmoi)"
     shell_checks
     make_tmp
     mkdir -p "$ci_tmp/macos-home"
     ln -s "$REPO" "$ci_tmp/macos-home/dotfiles"
     printf '==> macOS constrained-PATH smoke tests\n'
-    env HOME="$ci_tmp/macos-home" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+    env HOME="$ci_tmp/macos-home" CHEZMOI_BIN="$chezmoi_path" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
         /bin/bash "$bats_path" \
         tests/agents.bats \
         tests/bootstrap-remote.bats \

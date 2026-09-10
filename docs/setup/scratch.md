@@ -1,7 +1,7 @@
 # Scratch space
 
 Use scratch only when a shared or quota-limited home cannot hold build caches,
-tool runtimes, and session data. Bootstrap moves selected state into
+tool runtimes, and bulk data. Bootstrap moves selected state into
 `$DF_SCRATCH/.paths`, verifies the copy, then replaces the original path with a
 symlink. A normal home needs none of this.
 
@@ -11,7 +11,7 @@ symlink. A normal home needs none of this.
 flowchart LR
   H[$HOME/.local and caches] -->|copy then verify| S[$DF_SCRATCH/.paths]
   S -->|symlink| H
-  C[$HOME/.claude and ~/.codex] -->|only unmanaged children| S
+  C[$HOME/.claude] -->|only unmanaged children| S
 ```
 
 | Path class | Default treatment | Why |
@@ -27,18 +27,23 @@ for the exact defaults.
 
 ### Codex specifics
 
-`~/.codex` stays real so chezmoi can maintain `config.toml` and `AGENTS.md`.
-Its selected heavy children (`sessions`, caches, images, plugins, attachments,
-logs, backups, and SQLite state) can move one level down. Migration skips the
-Codex portion while a process holds an affected file open; quit the process and
-rerun `bash install/scratch.sh` rather than moving active state. Markdown
-memory remains in `~/.codex/memories`; its index is derived state.
+The scratch installer no longer relocates Codex files. Existing links remain
+intact as recovery input; it neither deletes old databases nor repairs them
+while another host might be writing them. See
+[Codex host-local state](../agents/codex.md#host-local-state).
+
+SQLite WAL requires database users to be on the same host. Shared scratch is
+still shared storage. Moving individual database files can also break Codex
+recovery when its backup rename crosses filesystems. See
+[SQLite's WAL limitations](https://sqlite.org/wal.html).
 
 ### Why not `CODEX_HOME`?
 
-It relocates the whole tree, including chezmoi-managed configuration, and a
-launch without that environment variable can create a second unconfigured tree.
-Subdirectory links keep one stable launch path.
+`CODEX_HOME` is now the supported runtime boundary. A configured
+`DF_STATE_ROOT` selects a real host-local `$DF_STATE_ROOT/codex`; the installer
+projects managed configuration there. Login shells and agent launchers resolve
+the same host inputs. Launches that deliberately bypass that environment must
+provide `CODEX_HOME` explicitly. Ordinary local homes still use `~/.codex`.
 
 ### Why not symlink the whole dir and `.chezmoiignore` it?
 
@@ -64,7 +69,7 @@ ln -s /local/disk/$USER ~/scratch
 | `DF_LINKS` | installer default | colon-separated top-level directories |
 | `DF_CONFIG_LINKS` | `Code` | selected `~/.config` children |
 | `DF_CURSOR_LINKS` | `projects:worktrees` | selected `~/.cursor` children |
-| `DF_CLAUDE_LINKS` / `DF_CODEX_LINKS` | installer defaults | unmanaged agent-directory children |
+| `DF_CLAUDE_LINKS` | installer defaults | unmanaged Claude-directory children |
 | `DF_DO_SCRATCH` | install: `1`; update/upgrade: `0` | skip scratch setup |
 
 Set a links variable to an empty value to skip its group. Review the current
@@ -75,7 +80,6 @@ The shipped lists are deliberately explicit:
 ```text
 DF_LINKS=$HOME/.local:$HOME/.cache:$HOME/.cass:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom:$HOME/kb:$HOME/.computelab:$HOME/.agent-browser:$HOME/.gradle
 DF_CLAUDE_LINKS=projects:plugins:file-history
-DF_CODEX_LINKS=sessions:generated_images:cache:plugins:attachments:shell_snapshots:log:backups:.tmp:tmp
 ```
 
 `~/.cursor` itself stays real, but its default `projects:worktrees` children
@@ -90,9 +94,9 @@ apply can replace the directory and orphan the moved state. Do not move
 ## Filesystem caveats
 
 tmpfs loses data on reboot; cross-filesystem first runs can be slow; NFS can
-leave `.nfs*` files that require later cleanup. Scratch makes the redirected
-state per-machine, so use Git or another explicit synchronization mechanism
-for durable knowledge.
+leave `.nfs*` files that require later cleanup. Redirected state is only as
+local as its target filesystem: NFS scratch remains shared across hosts.
+Use Git or another explicit synchronization mechanism for durable knowledge.
 
 ## Re-running
 

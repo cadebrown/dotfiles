@@ -38,7 +38,8 @@ with tempfile.TemporaryDirectory() as temporary:
     config = codex_home / "config.toml"
     config.write_text('model = "gpt-6-astra"\n')
     environment = {**os.environ, "HOME": str(home), "CODEX_HOME": str(codex_home), "REPO": str(ROOT),
-                   "DF_DOTFILES_REPO": str(ROOT), "DF_USE_PLAT": "0", "DF_TASK_STATE_DIR": str(home / "checkpoints")}
+                   "DF_DOTFILES_REPO": str(ROOT), "DF_USE_PLAT": "0", "DF_STATE_ROOT": str(home / "state"),
+                   "DF_TASK_STATE_DIR": str(home / "checkpoints")}
     command = ["/bin/bash", "-c", 'source "$REPO/install/codex.sh"; _sync_hooks']
     subprocess.run(command, env=environment, check=True, capture_output=True, text=True)
     first = config.read_text()
