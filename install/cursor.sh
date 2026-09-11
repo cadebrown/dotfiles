@@ -52,7 +52,8 @@ _sync_cursor_mcp() {
     log_section "Cursor MCP servers"
 
     local _out="$HOME/.cursor/mcp.json" _stream _count=0
-    local _name _kind _transport _cmd _url _auth _ccid _profile _risk _extras
+    local _name _kind _transport _cmd _url _auth _ccid _cursor_cid _opencode_cid
+    local _codex_bearer _profile _risk _extras
     local _missing _hname _hval _def _login_cmd _entries _existing='{}' _remove='[]'
     # NB: no `trap ... RETURN` for cleanup — bash fires RETURN traps when any
     # sourced script finishes, so a `.`/`source` anywhere in this function
@@ -67,7 +68,9 @@ _sync_cursor_mcp() {
     # this function only renders Cursor's schema + auth policy.
     while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
        && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth \
-       && IFS= read -r _ccid && IFS= read -r _profile && IFS= read -r _risk \
+       && IFS= read -r _ccid && IFS= read -r _cursor_cid \
+       && IFS= read -r _opencode_cid && IFS= read -r _codex_bearer \
+       && IFS= read -r _profile && IFS= read -r _risk \
        && IFS= read -r _extras; do
             if [[ "$_auth" == "gcloud" ]]; then
                 _def="$(jq -nc --arg command "$HOME/.local/bin/df-google-mcp" --arg url "$_url" \
@@ -112,18 +115,25 @@ _sync_cursor_mcp() {
                         log_warn "  $_name: auth=$_auth credential unavailable — unauthenticated (run 'bash install/auth.sh $_auth')"
                     _def="$(jq -nc --arg url "$_url" '{url:$url}')"
                 fi
+
+                # Cursor's remote schema accepts a pre-registered OAuth
+                # client in auth.CLIENT_ID. Leave it absent so entries without
+                # a Cursor-specific ID retain Cursor's normal OAuth behavior.
+                if [[ -n "$_cursor_cid" ]]; then
+                    _def="$(jq -c --arg id "$_cursor_cid" '. + {auth:{CLIENT_ID:$id}}' <<< "$_def")"
+                fi
             fi
 
             jq -nc --arg n "$_name" --argjson def "$_def" '{name:$n, def:$def}' >> "$_stream"
             (( ++_count ))
-    done < <(printf '%s\n' "$_entries" | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .profile, .risk, .extras')
+    done < <(printf '%s\n' "$_entries" | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .cursor_client_id, .opencode_client_id, .codex_bearer, .profile, .risk, .extras')
 
     local _tmp; _tmp="$(mktemp)"
     jq -s --argjson existing "$_existing" --argjson remove "$_remove" '
         . as $entries | $existing
         | .mcpServers = (reduce $remove[] as $name (.mcpServers // {}; del(.[$name])))
         | .mcpServers = (reduce $entries[] as $e (.mcpServers;
-            .[$e.name] = ((.[$e.name] // {} | del(.url,.command,.args,.headers)) + $e.def)))
+            .[$e.name] = ((.[$e.name] // {} | del(.url,.command,.args,.headers,.auth)) + $e.def)))
     ' "$_stream" > "$_tmp" \
         || { log_warn "Cursor MCP assembly failed"; rm -f "$_tmp" "$_stream"; return 1; }
     rm -f "$_stream"

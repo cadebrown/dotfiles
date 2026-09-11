@@ -50,6 +50,9 @@
       "url": "https://mystery.example/mcp"
     },
     "oauthsrv": {
+      "auth": {
+        "CLIENT_ID": "cursor-oauth-id"
+      },
       "url": "https://oauth.example/mcp"
     },
     "plainsrv": {

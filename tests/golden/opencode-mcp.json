@@ -71,6 +71,9 @@
   },
   "oauthsrv": {
     "enabled": true,
+    "oauth": {
+      "clientId": "opencode-oauth-id"
+    },
     "type": "remote",
     "url": "https://oauth.example/mcp"
   },

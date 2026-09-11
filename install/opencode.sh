@@ -27,7 +27,8 @@ _mode="${1:-install}"
 # Schema: local  {type:"local",  command:[...], enabled}
 #         remote {type:"remote", url, headers?, enabled}
 _emit_opencode_mcp() {
-    local _stream _name _kind _transport _cmd _url _auth _ccid _profile _risk _extras _def _entries
+    local _stream _name _kind _transport _cmd _url _auth _ccid _cursor_cid _opencode_cid
+    local _codex_bearer _profile _risk _extras _def _entries
     # No `trap ... RETURN` cleanup: bash fires RETURN traps when any sourced
     # script finishes, which would delete the accumulator mid-loop if a
     # `source` ever lands in this function (bit install/cursor.sh for real).
@@ -39,7 +40,9 @@ _emit_opencode_mcp() {
     # this function only renders opencode's schema + auth policy.
     while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
        && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth \
-       && IFS= read -r _ccid && IFS= read -r _profile && IFS= read -r _risk \
+       && IFS= read -r _ccid && IFS= read -r _cursor_cid \
+       && IFS= read -r _opencode_cid && IFS= read -r _codex_bearer \
+       && IFS= read -r _profile && IFS= read -r _risk \
        && IFS= read -r _extras; do
         if [[ "$_auth" == "gcloud" ]]; then
             _def="$(jq -nc --arg command "$HOME/.local/bin/df-google-mcp" --arg url "$_url" \
@@ -61,9 +64,15 @@ _emit_opencode_mcp() {
                 *)        log_warn "  $_name: unknown auth '$_auth' — unauthenticated" >&2
                           _def="$(jq -nc --arg u "$_url" '{type:"remote", url:$u, enabled:true}')" ;;
             esac
+            # OpenCode v1 stores a pre-registered OAuth client on the remote
+            # declaration. Keep oauth absent when no OpenCode-specific ID was
+            # supplied, preserving its ordinary interactive OAuth flow.
+            if [[ -n "$_opencode_cid" ]]; then
+                _def="$(jq -c --arg id "$_opencode_cid" '. + {oauth:{clientId:$id}}' <<< "$_def")"
+            fi
         fi
         jq -nc --arg n "$_name" --argjson def "$_def" '{name:$n, def:$def}' >> "$_stream"
-    done < <(printf '%s\n' "$_entries" | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .profile, .risk, .extras')
+    done < <(printf '%s\n' "$_entries" | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .cursor_client_id, .opencode_client_id, .codex_bearer, .profile, .risk, .extras')
 
     jq -s 'reduce .[] as $e ({}; .[$e.name] = $e.def)' "$_stream"
     rm -f "$_stream"
@@ -141,7 +150,7 @@ _sync_config() {
         | . *= ($existing | del(.mcp,.agent))
         | .agent = ((.agent // {}) * ($existing.agent // {}))
         | .mcp = (reduce ($mcp | to_entries[]) as $e ($old;
-            .[$e.key] = (($old[$e.key] // {} | del(.type,.command,.url,.headers,.enabled)) + $e.value
+            .[$e.key] = (($old[$e.key] // {} | del(.type,.command,.url,.headers,.oauth,.enabled)) + $e.value
                 + (if ($old[$e.key].enabled | type) == "boolean"
                    then {enabled:$old[$e.key].enabled} else {} end))))
     ' | _scope_opencode_mcp > "$_tmp" \

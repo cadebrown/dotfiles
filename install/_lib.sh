@@ -373,15 +373,16 @@ mcp_profile_enabled() {
 # mcp_servers_each [--all] — the ONE parser for packages/mcp-servers.txt (+ overlays).
 # Emits one normalized JSON object per entry on stdout:
 #   {"name","kind":"stdio"|"remote","transport","cmd","url","auth",
-#    "codex_client_id","codex_bearer","profile","risk","extras"}
+#    "codex_client_id","cursor_client_id","opencode_client_id",
+#    "codex_bearer","profile","risk","extras"}
 # Untagged rows remain core/read entries. profile=<name> makes a row opt-in via
 # DF_MCP_PROFILES; --all returns every profile for validation and inventory.
 # risk is read, local-write, or external-write.
 # Policy-free: no {VAR} substitution, no credential resolution — the per-tool
 # renderers (install/{claude,codex,opencode,cursor}.sh) own that. `extras` is
-# the passthrough token string minus auth=, --codex-client-id, and
-# --codex-bearer (+ their values), i.e. exactly what `claude mcp add` should
-# receive. Consume with:
+# the passthrough token string minus auth=, the harness-specific client-ID
+# flags, and --codex-bearer (+ their values), i.e. exactly what `claude mcp add`
+# should receive. Consume with:
 #   while IFS= read -r _name && IFS= read -r _kind && ...; do ...
 #   done < <(mcp_servers_each | jq -r '.name, .kind, ...')
 # (one field per line — TSV would collapse empty fields under `read`).
@@ -389,15 +390,17 @@ mcp_profile_enabled() {
 # from hand-rolled copies of this loop — extend it HERE, not in a renderer.
 mcp_servers_each() {
     local _include_all=0 _file _line _name _transport _url _cmd _metadata
-    local _kind _auth _codex_client_id _codex_bearer _profile _risk _extras
-    local _grab_ccid _grab_cbear _tok
+    local _kind _auth _codex_client_id _cursor_client_id _opencode_client_id
+    local _codex_bearer _profile _risk _extras
+    local _grab_ccid _grab_cursor_cid _grab_opencode_cid _grab_cbear _tok
     [[ "${1:-}" == "--all" ]] && _include_all=1
     while IFS= read -r _file; do
         while IFS= read -r _line; do
             [[ -z "$_line" || "$_line" == \#* ]] && continue
             _cmd="" _url="" _kind="remote"
-            _auth="" _codex_client_id="" _codex_bearer="" _profile="core" _risk="read" _extras=""
-            _grab_ccid=0 _grab_cbear=0
+            _auth="" _codex_client_id="" _cursor_client_id="" _opencode_client_id=""
+            _codex_bearer="" _profile="core" _risk="read" _extras=""
+            _grab_ccid=0 _grab_cursor_cid=0 _grab_opencode_cid=0 _grab_cbear=0
 
             read -r _name _transport _url _metadata <<< "$_line"
             if [[ "$_transport" == "stdio" && "$_line" == *"cmd: "* ]]; then
@@ -420,12 +423,16 @@ mcp_servers_each() {
                         continue
                     fi
                     if (( _grab_ccid )); then _codex_client_id="$_tok"; _grab_ccid=0; continue; fi
+                    if (( _grab_cursor_cid )); then _cursor_client_id="$_tok"; _grab_cursor_cid=0; continue; fi
+                    if (( _grab_opencode_cid )); then _opencode_client_id="$_tok"; _grab_opencode_cid=0; continue; fi
                     if (( _grab_cbear )); then _codex_bearer="$_tok"; _grab_cbear=0; continue; fi
                     case "$_tok" in
                         auth=*)            _auth="${_tok#auth=}" ;;
                         profile=*)         _profile="${_tok#profile=}" ;;
                         risk=*)            _risk="${_tok#risk=}" ;;
                         --codex-client-id) _grab_ccid=1 ;;
+                        --cursor-client-id) _grab_cursor_cid=1 ;;
+                        --opencode-client-id) _grab_opencode_cid=1 ;;
                         --codex-bearer)    _grab_cbear=1 ;;
                         *)                 _extras="${_extras:+$_extras }$_tok" ;;
                     esac
@@ -441,10 +448,12 @@ mcp_servers_each() {
 
             jq -nc --arg n "$_name" --arg k "$_kind" --arg t "$_transport" \
                    --arg cmd "$_cmd" --arg url "$_url" --arg auth "$_auth" \
-                   --arg ccid "$_codex_client_id" --arg cbear "$_codex_bearer" \
+                   --arg ccid "$_codex_client_id" --arg cursor_cid "$_cursor_client_id" \
+                   --arg opencode_cid "$_opencode_client_id" --arg cbear "$_codex_bearer" \
                    --arg profile "$_profile" --arg risk "$_risk" --arg ex "$_extras" \
                 '{name:$n, kind:$k, transport:$t, cmd:$cmd, url:$url, auth:$auth,
-                  codex_client_id:$ccid, codex_bearer:$cbear, profile:$profile,
+                  codex_client_id:$ccid, cursor_client_id:$cursor_cid,
+                  opencode_client_id:$opencode_cid, codex_bearer:$cbear, profile:$profile,
                   risk:$risk, extras:$ex}'
         done < "$_file"
     done < <(overlay_package_files "mcp-servers.txt")

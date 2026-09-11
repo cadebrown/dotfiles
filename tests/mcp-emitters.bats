@@ -36,8 +36,10 @@ setup() {
     [ "$(echo "$output" | jq -r '.[] | select(.name=="tool") | .cmd')" = "uvx some-tool --flag val" ]
     # auth= extraction
     [ "$(echo "$output" | jq -r '.[] | select(.name=="ghsrv") | .auth')" = "gh" ]
-    # --codex-client-id is extracted; --client-id stays in extras
+    # Harness-specific client IDs are extracted; --client-id stays in Claude extras.
     [ "$(echo "$output" | jq -r '.[] | select(.name=="oauthsrv") | .codex_client_id')" = "codex-oauth-id" ]
+    [ "$(echo "$output" | jq -r '.[] | select(.name=="oauthsrv") | .cursor_client_id')" = "cursor-oauth-id" ]
+    [ "$(echo "$output" | jq -r '.[] | select(.name=="oauthsrv") | .opencode_client_id')" = "opencode-oauth-id" ]
     [ "$(echo "$output" | jq -r '.[] | select(.name=="oauthsrv") | .extras')" = "--client-id claude-oauth-id" ]
     # --codex-bearer is extracted with its value; nothing leaks into extras
     [ "$(echo "$output" | jq -r '.[] | select(.name=="bearersrv") | .codex_bearer')" = "FIXTURE_BEARER_TOKEN" ]
@@ -143,6 +145,7 @@ EOF
 {"mcp":{
   "scitesrv":{"type":"remote","url":"https://old.example/mcp","enabled":false,"timeout":9000},
   "gcsrv":{"type":"remote","url":"https://gc.example/mcp","headers":{"Authorization":"Bearer obsolete-secret"},"enabled":false},
+  "oauthsrv":{"type":"remote","url":"https://oauth.example/mcp","oauth":{"clientId":"obsolete-id"},"enabled":true},
   "misskey":{"type":"remote","url":"https://key.example/obsolete-secret/v2/mcp","enabled":true},
   "custom":{"type":"local","command":["mine"],"enabled":true}
 }}
@@ -156,6 +159,7 @@ EOF
         and (.mcp.gcsrv | has("headers") or has("url") | not)
         and .mcp.scitesrv.enabled == false
         and .mcp.scitesrv.timeout == 9000
+        and .mcp.oauthsrv.oauth == {clientId:"opencode-oauth-id"}
         and .mcp.custom == {type:"local",command:["mine"],enabled:true}
         and .mcp.misskey.url == "https://key.example/{env:FIXTURE_MISSING}/v2/mcp"
         and (.mcp | has("biomedsrv") | not)' "$HOME/.config/opencode/opencode.json"
@@ -184,6 +188,7 @@ EOF
   "scitesrv":{"url":"https://old.example/mcp","disabled":true,"headers":{"Stale":"remove"}},
   "misskey":{"url":"https://key.example/obsolete-secret/v2/mcp"},
   "gcsrv":{"url":"https://gc.example/mcp","headers":{"Authorization":"Bearer obsolete-secret"}},
+  "oauthsrv":{"url":"https://oauth.example/mcp","auth":{"CLIENT_ID":"obsolete-id"}},
   "tool":{"command":"old","args":[],"env":{"CUSTOM":"retained"}},
   "custom":{"command":"mine","args":["custom-flag"]}
 }}
@@ -200,6 +205,7 @@ EOF
         and .mcpServers.gcsrv.command == (env.HOME + "/.local/bin/df-google-mcp")
         and .mcpServers.gcsrv.args == ["https://gc.example/mcp"]
         and (.mcpServers.gcsrv | has("headers") | not)
+        and .mcpServers.oauthsrv.auth == {CLIENT_ID:"cursor-oauth-id"}
         and (.mcpServers | has("biomedsrv") | not)' "$HOME/.cursor/mcp.json"
 }
 
@@ -222,6 +228,20 @@ EOF
     mcp_fixture_env
     _emit_opencode_mcp 2>/dev/null | jq -S . | mcp_fixture_normalize > "$BATS_TEST_TMPDIR/opencode.json"
     diff -u "$BATS_TEST_DIRNAME/golden/opencode-mcp.json" "$BATS_TEST_TMPDIR/opencode.json"
+}
+
+@test "Cursor and OpenCode emit only their pre-registered OAuth client IDs" {
+    source "$REPO_ROOT/install/cursor.sh"
+    mcp_fixture_env
+    _sync_cursor_mcp >/dev/null
+    jq -e '.mcpServers.oauthsrv.auth == {CLIENT_ID:"cursor-oauth-id"}
+        and (.mcpServers.plainsrv | has("auth") | not)' "$HOME/.cursor/mcp.json"
+
+    source "$REPO_ROOT/install/opencode.sh"
+    mcp_fixture_env
+    _emit_opencode_mcp >/dev/null
+    _emit_opencode_mcp | jq -e '.oauthsrv.oauth == {clientId:"opencode-oauth-id"}
+        and (.plainsrv | has("oauth") | not)'
 }
 
 @test "cursor emitter matches golden" {

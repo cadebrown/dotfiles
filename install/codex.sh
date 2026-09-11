@@ -208,7 +208,8 @@ _check_plugins() {
 # TOML blocks, written to $1. Logs go to stdout via log_*; only TOML hits $1.
 _emit_mcp_blocks_to() {
     local out="$1" _name _kind _transport _cmd _head _tail _url
-    local _auth_source _client_id _codex_client_id _codex_bearer _profile _risk
+    local _auth_source _client_id _codex_client_id _cursor_client_id
+    local _opencode_client_id _codex_bearer _profile _risk
     local _extras _arg _first _sub
 
     : > "$out"
@@ -219,7 +220,8 @@ _emit_mcp_blocks_to() {
     log_info "  Reading MCP servers (packages/mcp-servers.txt + overlays)"
     while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
        && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth_source \
-       && IFS= read -r _codex_client_id && IFS= read -r _codex_bearer \
+       && IFS= read -r _codex_client_id && IFS= read -r _cursor_client_id \
+       && IFS= read -r _opencode_client_id && IFS= read -r _codex_bearer \
        && IFS= read -r _profile && IFS= read -r _risk && IFS= read -r _extras; do
 
             printf '\n[mcp_servers.%s]\n' "$_name" >> "$out"
@@ -372,7 +374,7 @@ _emit_mcp_blocks_to() {
                     printf 'client_id = "%s"\n' "$(_toml_escape "$_codex_client_id")"
                 } >> "$out"
             fi
-    done < <(mcp_servers_each --all | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .codex_bearer, .profile, .risk, .extras')
+    done < <(mcp_servers_each --all | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .cursor_client_id, .opencode_client_id, .codex_bearer, .profile, .risk, .extras')
 }
 
 # One-time eviction of the retired managed rules file. Managed rules moved

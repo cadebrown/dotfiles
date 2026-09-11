@@ -357,12 +357,15 @@ _register_mcps() {
     # this function only builds Claude's desired shape + reconciles it.
     log_info "Reading MCP servers (packages/mcp-servers.txt + overlays)"
     local _name _kind _transport _cmd _url _auth_source _codex_client_id
+    local _cursor_client_id _opencode_client_id _codex_bearer
     local _profile _risk _extra _client_id _entries
     mcp_registry_validate || die "invalid MCP registry"
     _entries="$(mcp_servers_for_config "$HOME/.claude.json" mcpServers)" || return 1
     while IFS= read -r _name && IFS= read -r _kind && IFS= read -r _transport \
        && IFS= read -r _cmd && IFS= read -r _url && IFS= read -r _auth_source \
-       && IFS= read -r _codex_client_id && IFS= read -r _profile \
+       && IFS= read -r _codex_client_id && IFS= read -r _cursor_client_id \
+       && IFS= read -r _opencode_client_id && IFS= read -r _codex_bearer \
+       && IFS= read -r _profile \
        && IFS= read -r _risk && IFS= read -r _extra; do
         _json="" _label=""
 
@@ -481,7 +484,7 @@ _register_mcps() {
             log_warn "  fail  $_name"
             (( _fail++ )) || true
         fi
-    done < <(printf '%s\n' "$_entries" | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .profile, .risk, .extras')
+    done < <(printf '%s\n' "$_entries" | jq -r '.name, .kind, .transport, .cmd, .url, .auth, .codex_client_id, .cursor_client_id, .opencode_client_id, .codex_bearer, .profile, .risk, .extras')
 }
 
 [[ "${BASH_SOURCE[0]}" != "$0" ]] && return 0

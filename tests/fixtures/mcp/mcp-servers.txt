@@ -11,7 +11,7 @@ hfsrv http https://hf.example/mcp auth=hf
 astasrv http https://asta.example/mcp auth=asta
 urlkey http https://key.example/{FIXTURE_KEY}/v2/mcp
 misskey http https://key.example/{FIXTURE_MISSING}/v2/mcp
-oauthsrv http https://oauth.example/mcp --client-id claude-oauth-id --codex-client-id codex-oauth-id
+oauthsrv http https://oauth.example/mcp --client-id claude-oauth-id --codex-client-id codex-oauth-id --cursor-client-id cursor-oauth-id --opencode-client-id opencode-oauth-id
 bearersrv http https://bearer.example/mcp --codex-bearer FIXTURE_BEARER_TOKEN
 mystery http https://mystery.example/mcp auth=doesnotexist
 tool stdio risk=local-write cmd: uvx some-tool --flag val
