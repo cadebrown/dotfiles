@@ -230,7 +230,7 @@
     {
       "id": "authentication",
       "title": "Authentication",
-      "description": "Sets up managed service credentials, including separate Gemini CLI, Developer API/Live, Vertex ADC, and Workspace consent paths.",
+      "description": "Sets up managed service credentials, separate Google consent paths, and private-overlay SSH forwarding policies with local opt-outs and a safe public default.",
       "page": "/setup/auth/",
       "sources": [
         "home/.chezmoitemplates/opencode-credentials.sh",

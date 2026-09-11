@@ -65,7 +65,7 @@ shell_checks() {
 }
 
 fast_checks() {
-    require bats bash jq chezmoi zsh fish cmake uv
+    require bats bash jq chezmoi zsh fish cmake uv ssh
     make_tmp
     mkdir -p "$ci_tmp/fast-home"
     ln -s "$REPO" "$ci_tmp/fast-home/dotfiles"
@@ -95,6 +95,7 @@ fast_checks() {
         tests/profiles.bats \
         tests/rust-glibc-smoke.bats \
         tests/skills-sync.bats \
+        tests/ssh-config.bats \
         tests/toolchains.bats \
         tests/verify-path.bats
 }
@@ -122,7 +123,7 @@ macos_checks() {
         printf 'ci: macos requires Darwin; run this check on a macOS host\n' >&2
         exit 1
     fi
-    require bash shellcheck bats chezmoi
+    require bash shellcheck bats chezmoi ssh
     local bats_path chezmoi_path
     bats_path="$(command -v bats)"
     chezmoi_path="$(command -v chezmoi)"
@@ -137,6 +138,7 @@ macos_checks() {
         tests/bootstrap-remote.bats \
         tests/gwt.bats \
         tests/mcp-emitters.bats \
+        tests/ssh-config.bats \
         tests/toolchains.bats \
         tests/verify-path.bats
 }

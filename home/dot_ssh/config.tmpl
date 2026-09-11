@@ -1,5 +1,9 @@
-# Machine-specific and private host blocks (e.g. from dotfiles-nvidia)
+# Local overrides take precedence over private overlays and public defaults.
 Include ~/.ssh/config.d/*
+
+# Reset any Host/Match scope left by a local include before loading overlays.
+Host *
+    Include "{{ joinPath .chezmoi.sourceDir ".." "dotfiles-*/ssh/config" }}"
 
 Host *
     # Multiplexing — socket on local disk (not NFS)
@@ -23,5 +27,5 @@ Host *
     StrictHostKeyChecking accept-new
     HashKnownHosts yes
 
-    # Agent forwarding — on by default; disable per-host if needed
-    ForwardAgent yes
+    # Local or private policy can opt in before this conservative default.
+    ForwardAgent no

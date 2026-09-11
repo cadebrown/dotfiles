@@ -1,4 +1,4 @@
-# Auth (API tokens)
+# Authentication
 
 `install/auth.sh` creates owner-only `~/.<service>.env` files for optional API
 workflows. It is not required for a normal bootstrap: leave a service empty
@@ -85,3 +85,61 @@ the guided walk.
 The helper writes env files with mode `600`, never prints a plaintext token,
 and removes an empty file after deletion. Keep these files out of repositories,
 screenshots, and shareable knowledge bases.
+
+## SSH agent forwarding
+
+Forward your local SSH agent only to trusted hosts that need to authenticate
+onward, for example when running Git on a remote workstation. The managed
+[`SSH template`](../../home/dot_ssh/config.tmpl) defaults to `ForwardAgent no`.
+Keep private host names in an overlay's `ssh/config`, not in this public repo:
+
+```sshconfig
+# ~/dotfiles/dotfiles-work/ssh/config (private repository)
+Host trusted-workstation trusted-workstation.example.com
+    ForwardAgent yes
+```
+
+SSH reads `~/.ssh/config.d/*` first, then `<dotfiles>/dotfiles-*/ssh/config`
+in lexical order, then public defaults. OpenSSH uses the first matching value,
+so local includes can opt a host out with `ForwardAgent no`. An absent overlay
+is harmless and does not enable forwarding. The overlay must remain checked
+out; its configuration is read directly, not copied into the public config.
+
+```sh
+chezmoi diff -- ~/.ssh/config
+chezmoi apply -- ~/.ssh/config
+ssh -G trusted-workstation | grep '^forwardagent '  # yes with the private entry
+ssh -G unrelated.example | grep '^forwardagent '   # no with the example above
+ssh-add -l                                        # local agent has an identity
+ssh -o ControlPath=none trusted-workstation 'test -S "$SSH_AUTH_SOCK" && ssh-add -l'
+```
+
+The final command checks a fresh connection without disrupting existing
+multiplexed sessions. Old master connections retain their original agent;
+reconnect desktop/terminal sessions when needed. Explicit `ssh -A`/`ssh -a`
+flags override configuration; clients using a different `-F` file must include
+these settings themselves. For an interactive multi-hop chain, install the
+policy on each machine that initiates the next SSH connection. Receiving a
+forwarded agent lets a host authenticate onward; forwarding it again makes it
+available to processes on the next host. Do not copy private keys or persist
+`SSH_AUTH_SOCK` in shared host configuration.
+
+An overlay can deliberately opt the whole client into forwarding:
+
+```sshconfig
+# At the end of the private overlay's ssh/config, after specific exceptions.
+Host *
+    ForwardAgent yes
+```
+
+This matches every destination, including external hosts, short aliases, and
+IP addresses; it does not identify which organization owns the destination.
+The same local `~/.ssh/config.d/*` opt-outs still take precedence. Removing the
+overlay returns to the public default on new connections.
+
+Forwarding exposes signing access, not private key files. Administrators or
+compromised processes on the destination can use the forwarded agent while
+connected. A wildcard is a deliberate broader-trust choice, not a requirement
+for Git authentication or a statement of organizational approval. Prefer
+scoped rules or `ProxyJump` where that broader access is unnecessary. See
+[OpenSSH's ForwardAgent and ControlMaster reference](https://man.openbsd.org/ssh_config).
