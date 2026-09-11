@@ -172,6 +172,15 @@ alias verify-path='bash ~/dotfiles/install/verify-path.sh'
 alias codexs='codex -p deep'        # Sol, extra-high reasoning
 alias codexr='codex -p review'      # Sol, read-only permissions
 
+# Claude launcher — NVIDIA managed settings select Sonnet on restart, while
+# Opus remains an allowed session choice. Apply the personal Opus 5 1M / medium
+# default only to sessions; explicit flags win and management commands pass
+# through untouched.
+{{ template "claude-defaults.sh" . }}
+claude() {
+    _claude_with_defaults "$@"
+}
+
 # codex launcher — MCP credentials resolved at launch (bearer_token_env_var /
 # env_http_headers in config.toml; tokens never land on disk).
 # GH_TOKEN supplies GitHub MCP; df-google-mcp refreshes Google Cloud ADC itself.

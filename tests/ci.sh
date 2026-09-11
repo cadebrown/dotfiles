@@ -76,6 +76,7 @@ fast_checks() {
         tests/bootstrap-remote.bats \
         tests/brew-glibc.bats \
         tests/ci-entrypoint.bats \
+        tests/claude-launcher.bats \
         tests/codex-launcher.bats \
         tests/codex-runtime.bats \
         tests/codex-history.bats \
@@ -136,6 +137,7 @@ macos_checks() {
         /bin/bash "$bats_path" \
         tests/agents.bats \
         tests/bootstrap-remote.bats \
+        tests/claude-launcher.bats \
         tests/gwt.bats \
         tests/mcp-emitters.bats \
         tests/ssh-config.bats \

@@ -138,6 +138,7 @@
       "description": "Configures Claude instructions, plugins, scoped hooks, and transcript status reporting.",
       "page": "/agents/claude/",
       "sources": [
+        "home/.chezmoitemplates/claude-defaults.sh",
         "home/dot_claude/CLAUDE.md.tmpl",
         "home/dot_claude/RTK.md",
         "home/dot_claude/agents/researcher.md",

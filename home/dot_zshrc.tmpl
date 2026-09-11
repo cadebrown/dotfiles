@@ -140,6 +140,15 @@ alias cursor-sync='bash ~/dotfiles/install/cursor.sh sync-extensions'
 alias codexs='codex -p deep'
 alias codexr='codex -p review'
 
+# Claude launcher — NVIDIA managed settings select Sonnet on restart, while
+# Opus remains an allowed session choice. Apply the personal Opus 5 1M / medium
+# default only to sessions; explicit flags win and management commands pass
+# through untouched.
+{{ template "claude-defaults.sh" . }}
+claude() {
+    _claude_with_defaults "$@"
+}
+
 # codex launcher — resolve MCP credentials at launch so config.toml can
 # reference them via *_env_var, keeping tokens off disk. Lazy (resolved per
 # codex launch, not per shell startup); caller-provided values win.
