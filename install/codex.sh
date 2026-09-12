@@ -210,7 +210,17 @@ _emit_mcp_blocks_to() {
     local out="$1" _name _kind _transport _cmd _head _tail _url
     local _auth_source _client_id _codex_client_id _cursor_client_id
     local _opencode_client_id _codex_bearer _profile _risk
-    local _extras _arg _first _sub
+    local _extras _arg _first _sub _profiles_was_set
+
+    # Codex enables the catalog by default, while the shared parser and the
+    # other harnesses retain their opt-in policy. A local dynamic-scope shadow
+    # lets mcp_profile_enabled see the Codex default without exporting or
+    # changing the caller's selection. An explicit empty value remains opt-out.
+    _profiles_was_set="${DF_MCP_PROFILES+x}"
+    local DF_MCP_PROFILES="${DF_MCP_PROFILES-}"
+    if [[ -z "$_profiles_was_set" ]]; then
+        DF_MCP_PROFILES="*"
+    fi
 
     : > "$out"
     mcp_registry_validate || die "invalid MCP registry"
@@ -225,7 +235,11 @@ _emit_mcp_blocks_to() {
        && IFS= read -r _profile && IFS= read -r _risk && IFS= read -r _extras; do
 
             printf '\n[mcp_servers.%s]\n' "$_name" >> "$out"
-            if ! mcp_profile_enabled "$_profile"; then
+            # mcp_profile_enabled intentionally keeps the shared parser's
+            # opt-in behavior. Treat the local Codex wildcard as the all-
+            # profiles selection here; unquoted word splitting in that shared
+            # helper would otherwise expand `*` to filenames.
+            if [[ "$DF_MCP_PROFILES" != "*" ]] && ! mcp_profile_enabled "$_profile"; then
                 printf 'enabled = false\n' >> "$out"
             fi
 
@@ -454,7 +468,14 @@ _sync_config() {
     _mcp="$_tmp/mcp.toml"
     _registry="$_tmp/registry.jsonl"
 
-    cp "$_tmpl" "$_managed"
+    if [[ -n "${DF_CODEX_MCP_CALLBACK_PORT:-}" ]]; then
+        # This must remain a root key: Codex reads the callback listener port
+        # before resolving the generated MCP server tables.
+        printf 'mcp_oauth_callback_port = %s\n' "$DF_CODEX_MCP_CALLBACK_PORT" > "$_managed"
+        cat "$_tmpl" >> "$_managed"
+    else
+        cp "$_tmpl" "$_managed"
+    fi
 
     # Registry names are managed; Desktop and manually added MCP names are not.
     mcp_servers_each --all > "$_registry"

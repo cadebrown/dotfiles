@@ -22,6 +22,16 @@ resolve() {
     ' _ "$TEST_REPO"
 }
 
+resolve_callback_port() {
+    local shell="$1"
+    shift
+    env -i HOME="$HOME_DIR" PATH="$BIN:/usr/bin:/bin" "$@" "$shell" -c '
+        source "$1/install/_host-config.sh"
+        _host_config_resolve "$1" || exit $?
+        printf "%s\n" "${DF_CODEX_MCP_CALLBACK_PORT:-}"
+    ' _ "$TEST_REPO"
+}
+
 @test "host configuration precedence is invocation, local, overlay, then defaults" {
     cat > "$TEST_REPO/dotfiles-team/hosts/fixture-host.example.env" <<'EOF'
 DF_PROFILE=core
@@ -113,6 +123,59 @@ EOF
     ' _ "$TEST_REPO"
     [ "$status" -eq 0 ]
     [ "$output" = "$bash_result" ]
+}
+
+@test "Codex MCP callback port accepts canonical unprivileged bounds with Bash and Zsh parity" {
+    command -v zsh >/dev/null 2>&1 || skip 'zsh is not installed'
+    run resolve_callback_port /bin/bash
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    run resolve_callback_port zsh "DF_CODEX_MCP_CALLBACK_PORT="
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+
+    for port in 1024 65535; do
+        printf 'DF_CODEX_MCP_CALLBACK_PORT=%s\n' "$port" \
+            > "$HOME_DIR/.config/dotfiles/hosts/fixture-host.example.env"
+        run resolve_callback_port /bin/bash
+        [ "$status" -eq 0 ]
+        [ "$output" = "$port" ]
+        bash_result="$output"
+        run resolve_callback_port zsh
+        [ "$status" -eq 0 ]
+        [ "$output" = "$bash_result" ]
+
+        rm "$HOME_DIR/.config/dotfiles/hosts/fixture-host.example.env"
+        run resolve_callback_port /bin/bash "DF_CODEX_MCP_CALLBACK_PORT=$port"
+        [ "$status" -eq 0 ]
+        [ "$output" = "$port" ]
+        bash_result="$output"
+        run resolve_callback_port zsh "DF_CODEX_MCP_CALLBACK_PORT=$port"
+        [ "$status" -eq 0 ]
+        [ "$output" = "$bash_result" ]
+    done
+}
+
+@test "Codex MCP callback port rejects malformed host and invocation values" {
+    command -v zsh >/dev/null 2>&1 || skip 'zsh is not installed'
+    for port in -1 +1024 01024 1023 65536 99999 10x24; do
+        printf 'DF_CODEX_MCP_CALLBACK_PORT=%s\n' "$port" \
+            > "$HOME_DIR/.config/dotfiles/hosts/fixture-host.example.env"
+        run resolve_callback_port /bin/bash
+        [ "$status" -ne 0 ]
+        [[ "$output" == *'canonical unprivileged port'* ]]
+        run resolve_callback_port zsh
+        [ "$status" -ne 0 ]
+        [[ "$output" == *'canonical unprivileged port'* ]]
+
+        rm "$HOME_DIR/.config/dotfiles/hosts/fixture-host.example.env"
+        run resolve_callback_port /bin/bash "DF_CODEX_MCP_CALLBACK_PORT=$port"
+        [ "$status" -ne 0 ]
+        [[ "$output" == *'canonical unprivileged port'* ]]
+        run resolve_callback_port zsh "DF_CODEX_MCP_CALLBACK_PORT=$port"
+        [ "$status" -ne 0 ]
+        [[ "$output" == *'canonical unprivileged port'* ]]
+    done
 }
 
 @test "resolver defaults with no overlays and preserves Zsh NOMATCH" {

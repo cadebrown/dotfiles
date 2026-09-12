@@ -1,14 +1,14 @@
 # AI workbench
 
-The default setup is a small Codex tool surface with GPT-6 Astra at extra-high
-reasoning. Add a domain profile when the task needs a specialist integration;
-use skills and project CLIs for the normal work loop. This keeps long-running
-coding and research sessions focused without discarding the capable local stack.
+The default Codex setup enables every MCP server in the managed registry with
+GPT-6 Astra at extra-high reasoning. Servers still need their credentials and
+runtime prerequisites to connect. Use skills and project CLIs for the normal
+work loop, and select a smaller MCP baseline explicitly when needed.
 
 ## Start a task
 
 ```bash
-codex                         # Astra, core tools
+codex                         # Astra, all managed MCPs enabled
 codex -p deep                 # demanding implementation or research
 codex -p review               # Astra, read-only exploration
 codex -p fast                 # quick Luna iteration
@@ -20,22 +20,25 @@ a supported client and ChatGPT Plus or Pro sign-in; API, Business, and Enterpris
 access does not enable it. Treat it as an opt-in experiment and keep durable
 project state outside the chat.
 
-Use one `-p` profile in a session. The profile inherits the core tool set, then
-adds a single domain. The current generated domain profiles are `browser`,
+Use one `-p` profile in a session. The profile inherits the configured baseline,
+then enables its domain. The current generated domain profiles are `browser`,
 `creative`, `desktop`, `research`, `math`, `cloud`, `workspace`, and `tools-all`.
-`tools-all` is for intentional broad work, not a normal startup choice.
+`tools-all` enables every declared server when the baseline has been narrowed;
+it is unnecessary with the default baseline. Domain profiles do not disable
+servers already enabled in the baseline.
 
-To change the persistent baseline for a host, select registry profiles while
-regenerating configuration:
+To enable all managed MCPs persistently, regenerate configuration with the
+default environment:
 
 ```bash
-DF_MCP_PROFILES=research:math bash ~/dotfiles/install/codex.sh sync-config
+env -u DF_MCP_PROFILES bash ~/dotfiles/install/codex.sh sync-config
 bash ~/dotfiles/install/codex.sh check
 ```
 
-That change applies to the generated harness configuration. Keep it scoped to a
-real project need and rerun without `DF_MCP_PROFILES` to restore the core-only
-baseline for new activation. Claude Code, OpenCode, and Cursor retain optional
+Ordinary subsequent syncs keep all managed Codex MCPs enabled. To opt down, run
+the sync with `DF_MCP_PROFILES=core` or a selection such as `research:math`.
+An explicitly empty value also selects core only; `*` explicitly selects all.
+This default is specific to Codex. Claude Code, OpenCode, and Cursor retain optional
 registry MCPs already activated there; profile selection controls which new
 ones a sync adds. Cursor's own harness (instructions, Composer 2.5 subagents,
 and the My Machines worker) is documented in

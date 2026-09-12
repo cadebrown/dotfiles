@@ -7,6 +7,7 @@ DF_USE_PLAT
 DF_PLAT
 DF_TOOLS_ROOT
 DF_STATE_ROOT
+DF_CODEX_MCP_CALLBACK_PORT
 DF_DO_AUTH
 DF_DO_BLENDER_MCP
 DF_DO_CLAUDE
@@ -66,6 +67,10 @@ _host_config_validate_value() {
         DF_USE_PLAT) case "$_value" in 0|1|false|true|no|yes|off|on|FALSE|TRUE|NO|YES|OFF|ON) ;; *) _host_config_bad 'DF_USE_PLAT must be boolean' ;; esac ;;
         DF_PLAT) [[ "$_value" == auto || ( "$_value" == plat_* && ( -d "$_root/install/plat/$_value" || "${DF_DEFER_PLAT_REQUIRE:-0}" == 1 ) ) ]] || _host_config_bad 'DF_PLAT must be auto or a supported plat selector' ;;
         DF_TOOLS_ROOT|DF_STATE_ROOT) [[ -z "$_value" || "$_value" == /* ]] || _host_config_bad "$_key must be an absolute path" ;;
+        DF_CODEX_MCP_CALLBACK_PORT)
+            [[ -z "$_value" || ( "$_value" =~ ^[1-9][0-9]{3,4}$ \
+                && $_value -ge 1024 && $_value -le 65535 ) ]] \
+                || _host_config_bad 'DF_CODEX_MCP_CALLBACK_PORT must be a canonical unprivileged port (1024-65535)' ;;
         DF_DO_*) [[ "$_value" == 0 || "$_value" == 1 ]] || _host_config_bad "$_key must be 0 or 1" ;;
     esac
 }
@@ -92,13 +97,22 @@ $_host_config_keys
 EOF
 }
 
+_host_config_validate_invocation() {
+    local _value
+    _host_config_caller_set DF_CODEX_MCP_CALLBACK_PORT || return 0
+    _value="$(printenv DF_CODEX_MCP_CALLBACK_PORT)"
+    _host_config_validate_value DF_CODEX_MCP_CALLBACK_PORT "$_value" "$1"
+}
+
 _host_config_resolve() {
     local _root="$1" _hostname _overlay
     [[ -d "$_root/install" ]] || { _host_config_bad "root has no install directory: $_root"; return 1; }
     # Bash leaves an unmatched glob literal; Zsh's default NOMATCH aborts.
     # Keep this local so sourcing the resolver never changes caller options.
     if [[ -n "${ZSH_VERSION:-}" ]]; then setopt localoptions nullglob; fi
-    _host_config_capture_callers; _host_config_clear_derived; DF_TOOLS_ROOT_EXPLICIT=0
+    _host_config_capture_callers
+    _host_config_validate_invocation "$_root" || return 1
+    _host_config_clear_derived; DF_TOOLS_ROOT_EXPLICIT=0
     _hostname="$(hostname)" || return 1
     [[ -n "$_hostname" && "$_hostname" != */* ]] || { _host_config_bad 'unsafe hostname'; return 1; }
     DF_HOST_CONFIG_OVERLAY_FILES=''

@@ -127,6 +127,7 @@ values, which intentionally take precedence over files.
 | `DF_PLAT` | `auto` | compatible platform detection or explicit specification |
 | `DF_TOOLS_ROOT` | `~/.local` | base directory before the optional PLAT suffix |
 | `DF_STATE_ROOT` | unset | persistent host-local state; Codex uses its `codex` child |
+| `DF_CODEX_MCP_CALLBACK_PORT` | unset | fixed MCP OAuth callback port, 1024–65535; pair with an SSH local forward for laptop browser sign-in |
 | supported `DF_DO_*` flags | bootstrap defaults | optional installer selection |
 
 An ordinary local-home machine needs no host file. Shared homes need an explicit

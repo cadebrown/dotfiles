@@ -267,9 +267,9 @@ normal work, then select one profile when its narrow purpose matches the job:
 | `codex -p fast` | GPT-5.6 Luna at low reasoning for quick, low-risk iteration. |
 | `codex -p context` | Astra with experimental context management. It requires a supported client and a ChatGPT Plus or Pro sign-in; it is not an API, Business, or Enterprise feature. |
 
-The base configuration enables only the small, general MCP set: GitHub, OpenAI
-developer docs, Context7, qmd, Rust docs, and crates.io. Domain profiles inherit
-that base and add one task surface:
+The base Codex configuration enables every managed MCP. Domain profiles inherit
+that baseline and enable one task surface; they are useful after explicitly
+narrowing the baseline and do not disable other enabled servers:
 
 | Command | Adds |
 |---|---|
@@ -280,14 +280,14 @@ that base and add one task surface:
 | `codex -p math` | Lean, theorem-search, and Wolfram tools. |
 | `codex -p cloud` | Cloudflare and Google Cloud tools. |
 | `codex -p workspace` | Google Workspace tools. |
-| `codex -p tools-all` | Every declared MCP; use only when its added context and authority are intentional. |
+| `codex -p tools-all` | Every declared MCP, including when the saved baseline is narrower. |
 
-Codex accepts one `-p` overlay per invocation. Treat it as a session choice:
-browser work uses `browser`, Blender work uses `creative`, and so on. When a
-project actually needs several domains at baseline, select the precise set with
+Codex accepts one `-p` overlay per invocation. To narrow the saved baseline,
+select the precise set with
 `DF_MCP_PROFILES=browser:creative` while running
-`bash ~/dotfiles/install/codex.sh sync-config`; rerun without that variable to
-return Codex's base activation to the core set. Claude Code, OpenCode, and
+`bash ~/dotfiles/install/codex.sh sync-config`; use `DF_MCP_PROFILES=core` for
+core only. Rerun with that variable unset to restore all managed Codex MCPs.
+Ordinary future syncs default to all. Claude Code, OpenCode, and
 Cursor preserve optional registry MCPs already activated there; profile
 selection determines which new ones a sync adds. Start a new task after a
 change to an MCP pin, environment, or activation, since an existing task keeps

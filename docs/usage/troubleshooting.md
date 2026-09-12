@@ -2089,23 +2089,24 @@ Adding a new app to this pattern means deleting its `home/` chezmoi source
 domain profile starts, but the expected tools are absent or Codex rejects the
 profile.
 
-**Root cause.** Domain overlays are generated files in `~/.codex`, while the
-base configuration intentionally contains only the core MCP set. An older
-checkout, an incomplete bootstrap, or a registry change can leave those
-overlays stale. Codex accepts one profile overlay per invocation.
+**Root cause.** Domain overlays are generated files in the active `CODEX_HOME`.
+Older configurations selected core MCPs only; current Codex sync enables every
+managed server unless `DF_MCP_PROFILES` explicitly narrows that selection.
+An older checkout, an incomplete bootstrap, or a registry change can leave
+the configuration or overlays stale. Codex accepts one profile per invocation.
 
 **Confirm and fix.** Regenerate the configuration, then run the same parser
 check used by bootstrap:
 
 ```bash
-bash ~/dotfiles/install/codex.sh sync-config
+env -u DF_MCP_PROFILES bash ~/dotfiles/install/codex.sh sync-config
 bash ~/dotfiles/install/codex.sh check
 codex -p browser debug prompt-input "healthcheck"
 ```
 
-For several domains in a persistent host baseline, set the exact
-`DF_MCP_PROFILES` value during `sync-config`; do not use `tools-all` merely to
-work around a missing overlay. Start a new Codex task after the check, because
+Set `DF_MCP_PROFILES=core` or a named selection only when a narrower baseline
+is wanted. Disabled custom entries outside the registry remain user-controlled.
+Start a new Codex task after the check, because
 an existing task keeps its initial tool inventory and may retain an old MCP
 subprocess environment.
 
@@ -2154,6 +2155,31 @@ Restart the affected harness connection so it starts the relay. Existing ADC
 continues to work; revoked credentials, disabled services, and missing IAM
 permissions still need their own fixes. See
 [Google Cloud MCP credentials](google-cloud-mcp.md).
+
+## Codex MCP login times out in an SSH shell after browser sign-in
+
+**Symptom.** The provider reports successful sign-in on the laptop, but the
+remote Codex CLI waits and eventually reports `timed out waiting for OAuth
+callback`. The browser's localhost callback may show connection refused.
+
+**Root cause.** Codex's callback listener is on the workstation. The laptop
+browser reaches its own loopback interface unless the same port is forwarded
+over SSH. `ForwardAgent yes` forwards SSH signing access; it does not deliver
+an HTTP callback. By default the MCP callback port changes between logins.
+
+**Confirm.** Read the callback host and port from the login URL's `redirect_uri`
+parameter. While login is waiting, compare `ss -ltnp` on the workstation with
+`lsof -nP -iTCP:<port> -sTCP:LISTEN` on the laptop. Keep callback query strings
+out of shared logs: they contain authorization codes and state.
+
+**Fix.** Configure a host-specific `DF_CODEX_MCP_CALLBACK_PORT` and matching
+loopback-only `LocalForward`, then retry a fresh login. If sign-in already
+completed while the CLI is still waiting, establish the matching tunnel and
+use the provider's **Finish OAuth** button. See
+[MCP login from SSH](../agents/codex.md#mcp-login-from-ssh) for commands,
+concurrent-host behavior, and existing SSH connection handling.
+
+---
 
 ## Codex MCP OAuth fails: "Authorization server response missing required issuer"
 

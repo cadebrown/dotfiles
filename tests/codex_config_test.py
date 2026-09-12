@@ -18,6 +18,27 @@ SPEC.loader.exec_module(SYNC)
 
 
 class CodexConfigTests(unittest.TestCase):
+    def test_managed_callback_port_is_root_integer_and_no_policy_preserves_custom_value(self):
+        managed = tomlkit.parse(
+            'mcp_oauth_callback_port = 1024\n'
+            '[features]\nmemories = true\n'
+            '[mcp_servers.docs]\nurl = "https://docs.example/mcp"\n'
+        )
+        current = tomlkit.parse(
+            'mcp_oauth_callback_port = 45231\n'
+            '[mcp_servers.custom]\ncommand = "keep-me"\n'
+        )
+        rendered = tomlkit.dumps(merge := SYNC.merge_config(managed, current, {"docs"}))
+        parsed = tomlkit.parse(rendered)
+        self.assertEqual(rendered.splitlines()[0], "mcp_oauth_callback_port = 1024")
+        self.assertEqual(parsed["mcp_oauth_callback_port"], 1024)
+        self.assertEqual(set(parsed["mcp_servers"]), {"docs", "custom"})
+        self.assertEqual(SYNC.merge_config(managed, merge, {"docs"}), merge)
+
+        no_policy = tomlkit.parse('[features]\nmemories = true\n')
+        preserved = SYNC.merge_config(no_policy, current, set())
+        self.assertEqual(preserved["mcp_oauth_callback_port"], 45231)
+
     def test_agent_scopes_keep_transports_and_exclude_runtime_integrations(self):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)

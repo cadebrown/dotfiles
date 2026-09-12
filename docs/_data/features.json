@@ -83,7 +83,7 @@
     {
       "id": "agent-stack",
       "title": "Codex agent stack",
-      "description": "Configures Codex profiles and roles, host-local state, non-login shell launch policy, verified full backups, and copy-only history migration.",
+      "description": "Enables all managed Codex MCPs by default with explicit narrower profiles, and configures focused roles, host-local state, SSH OAuth callback ports, verified backups, and copy-only history migration.",
       "page": "/agents/codex/",
       "sources": [
         "home/.chezmoiignore",
@@ -231,7 +231,7 @@
     {
       "id": "authentication",
       "title": "Authentication",
-      "description": "Sets up managed service credentials, separate Google consent paths, and private-overlay SSH forwarding policies with local opt-outs and a safe public default.",
+      "description": "Sets up managed service credentials, separate Google consent paths, private-overlay SSH policies, and host-specific Codex MCP OAuth callback ports for browser sign-in through SSH.",
       "page": "/setup/auth/",
       "sources": [
         "home/.chezmoitemplates/opencode-credentials.sh",

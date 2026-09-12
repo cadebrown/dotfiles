@@ -88,6 +88,10 @@ screenshots, and shareable knowledge bases.
 
 ## SSH agent forwarding
 
+For Codex browser sign-in from an SSH shell, configure a separate
+[MCP callback port and TCP forward](../agents/codex.md#mcp-login-from-ssh).
+SSH agent forwarding below does not forward browser callbacks.
+
 Forward your local SSH agent only to trusted hosts that need to authenticate
 onward, for example when running Git on a remote workstation. The managed
 [`SSH template`](../../home/dot_ssh/config.tmpl) defaults to `ForwardAgent no`.

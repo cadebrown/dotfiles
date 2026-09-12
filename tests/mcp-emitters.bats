@@ -286,9 +286,41 @@ EOF
 @test "codex emitter matches golden" {
     source "$REPO_ROOT/install/codex.sh"
     mcp_fixture_env
+    unset DF_MCP_PROFILES
     _emit_mcp_blocks_to "$BATS_TEST_TMPDIR/codex.toml" >/dev/null 2>&1
     mcp_fixture_normalize < "$BATS_TEST_TMPDIR/codex.toml" > "$BATS_TEST_TMPDIR/codex-normalized.toml"
     diff -u "$BATS_TEST_DIRNAME/golden/codex-mcp.toml" "$BATS_TEST_TMPDIR/codex-normalized.toml"
+}
+
+@test "codex enables every profile by default without changing the shared selection" {
+    source "$REPO_ROOT/install/codex.sh"
+    mcp_fixture_env
+    unset DF_MCP_PROFILES
+
+    _emit_mcp_blocks_to "$BATS_TEST_TMPDIR/codex-default-profiles.toml" >/dev/null 2>&1
+    ! grep -q '^enabled = false$' "$BATS_TEST_TMPDIR/codex-default-profiles.toml"
+    [[ -z "${DF_MCP_PROFILES+x}" ]]
+
+    run mcp_servers_each
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"scitesrv"* ]]
+    [[ "$output" != *"biomedsrv"* ]]
+    [[ "$output" != *"publishsrv"* ]]
+}
+
+@test "codex respects explicit MCP profile subsets and empty opt-out" {
+    source "$REPO_ROOT/install/codex.sh"
+    mcp_fixture_env
+
+    export DF_MCP_PROFILES="research-scite"
+    _emit_mcp_blocks_to "$BATS_TEST_TMPDIR/codex-subset-profiles.toml" >/dev/null 2>&1
+    [ "$(grep -c '^enabled = false$' "$BATS_TEST_TMPDIR/codex-subset-profiles.toml")" -eq 2 ]
+    ! sed -n '/^\[mcp_servers\.scitesrv\]$/,/^\[/p' \
+        "$BATS_TEST_TMPDIR/codex-subset-profiles.toml" | grep -q '^enabled = false$'
+
+    export DF_MCP_PROFILES=""
+    _emit_mcp_blocks_to "$BATS_TEST_TMPDIR/codex-empty-profiles.toml" >/dev/null 2>&1
+    [ "$(grep -c '^enabled = false$' "$BATS_TEST_TMPDIR/codex-empty-profiles.toml")" -eq 3 ]
 }
 
 @test "codex pre-approves MCP tools regardless of registry risk" {

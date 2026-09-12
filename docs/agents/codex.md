@@ -15,14 +15,14 @@ Profiles in [`home/dot_codex/`](../../home/dot_codex/) apply when a session star
 | `codex -p fast` | quick low-risk iteration | Luna serves the whole session |
 | `codex -p context` | context-management experiment | support depends on client, account, and rollout |
 
-`browser`, `creative`, `desktop`, `research`, `math`, `cloud`, and `workspace` come from the MCP registry; choose one only for its needed tool surface. `tools-all` intentionally exposes every declared server. See [AI workbench profiles](../usage/ai-workbench.md).
+Codex enables every managed MCP by default. `browser`, `creative`, `desktop`, `research`, `math`, `cloud`, and `workspace` come from the MCP registry and enable their domain on top of the configured baseline. `tools-all` enables every declared server when the baseline has been narrowed. See [AI workbench profiles](../usage/ai-workbench.md).
 
 ```bash
-DF_MCP_PROFILES=research:math bash ~/dotfiles/install/codex.sh sync-config
+env -u DF_MCP_PROFILES bash ~/dotfiles/install/codex.sh sync-config
 bash ~/dotfiles/install/codex.sh check
 ```
 
-Expected result: generated configuration passes its check for future sessions. Run sync without `DF_MCP_PROFILES` to restore core activation, then restart the harness after changing a pin, environment, or profile.
+Expected result: every managed server is enabled in generated configuration, except entries whose required URL credentials are missing. Subsequent ordinary syncs retain that baseline. `DF_MCP_PROFILES=core` explicitly opts down to core; `DF_MCP_PROFILES=research:math` selects core plus those domains. Separately configured custom servers retain their own enabled state. Restart the harness after changing a pin, environment, or profile; enabling a server does not authenticate it or install its runtime.
 
 ## Delegate only an independent bounded unit
 
@@ -52,6 +52,56 @@ Do not commit or edit other files.
 ```
 
 Supply scope, contract, acceptance checks, and artifact path. For extraction, give an output schema and reconciliation count; for `coder`, give the exact replacement and require it to report ambiguity. Use a direct command for a one-command transformation; the parent integrates and decides whether independent review is warranted.
+
+## MCP login from SSH
+
+When Codex runs in an SSH shell and the sign-in browser runs on your laptop,
+forward the MCP OAuth callback to the workstation. Opening the authorization
+link alone does not create that tunnel. SSH agent forwarding (`ForwardAgent`)
+is separate from TCP port forwarding.
+
+For a one-off login, use the same unprivileged port on both machines:
+
+```sh
+# Laptop: open the SSH shell with its callback tunnel.
+ssh -o ExitOnForwardFailure=yes -L 127.0.0.1:45231:127.0.0.1:45231 workstation
+# Workstation: start the login, then open its printed URL on the laptop.
+codex -c mcp_oauth_callback_port=45231 mcp login cloudflare
+```
+
+The browser callback should finish at the workstation's listener, and the CLI
+should print `Successfully logged in to MCP server`. Some providers display a
+**Finish OAuth** button after sign-in; click it while the CLI is still waiting.
+
+For ordinary `ssh workstation` sessions, set
+`DF_CODEX_MCP_CALLBACK_PORT=45231` in that workstation's hostname-specific
+[host policy](../setup/chezmoi.md#host-configuration), then run
+`bash ~/dotfiles/install/codex.sh sync-config` there. Add the matching forward
+to the laptop's private SSH overlay or `~/.ssh/config.d/`:
+
+```text
+Host workstation
+    LocalForward 127.0.0.1:45231 127.0.0.1:45231
+```
+
+Use a different port for each workstation that can be connected concurrently.
+The host setting accepts decimal ports from 1024 through 65535. Without it,
+sync preserves an existing callback setting; Codex's default is an OS-selected
+port. A server-specific OAuth callback port takes precedence over the global
+setting and must match its tunnel too. A fixed port permits one pending login
+at a time on that workstation. Reconnect after changing configuration; an
+existing multiplexed SSH connection can also receive the configured forward
+with `ssh -O forward workstation`. Do not use `ClearAllForwardings=yes` for the
+interactive connection that needs this callback.
+
+The tunnel follows the SSH connection's lifetime. Verify its configured route
+with `ssh -G workstation`, and check the actual local listener with `lsof` or
+`ss`. A port already owned by another workstation must not be reused: end that
+forward or choose another matching pair. A logged-in status establishes stored
+authentication, not access to every tool or permission scope.
+
+Sources: [Codex MCP configuration](https://learn.chatgpt.com/docs/extend/mcp),
+[OpenSSH LocalForward](https://man.openbsd.org/ssh_config#LocalForward).
 
 ## Host-local state
 

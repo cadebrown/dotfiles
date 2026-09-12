@@ -29,11 +29,11 @@ matrix.
   Never infer concealed identities or send private manuscripts to external
   services.
 
-Scite is an opt-in remote profile because queries and account-scoped library
-context leave the machine. Enable it during agent configuration with
-`DF_MCP_PROFILES=research-scite ~/dotfiles/bootstrap.sh update`; omit the
-profile to keep the default Asta/arXiv research stack local/keyless where
-possible. `biomed` and `publish` are reserved opt-in profiles; publication
+Scite belongs to the `research-scite` remote profile; queries and account-scoped
+library context leave the machine. Codex enables it with the rest of the registry
+by default. For other harnesses, select it during configuration with
+`DF_MCP_PROFILES=research-scite ~/dotfiles/bootstrap.sh update`. `biomed` and
+`publish` are reserved profiles; publication
 tools still require explicit confirmation for writes.
 
 ## Reproducibility and publication
