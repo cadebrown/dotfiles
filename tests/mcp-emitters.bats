@@ -344,3 +344,23 @@ EOF
     [ "$status" -eq 0 ]
     [ "$output" = 'default_tools_approval_mode = "approve"' ]
 }
+
+@test "Codex uses deterministic OAuth file storage on Linux with a root callback port" {
+    source "$REPO_ROOT/install/codex.sh"
+    uname() { printf 'Linux\n'; }
+    DF_CODEX_MCP_CALLBACK_PORT=45231
+    run _emit_host_settings
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = 'mcp_oauth_credentials_store = "file"' ]
+    [ "${lines[1]}" = 'mcp_oauth_callback_port = 45231' ]
+
+    unset DF_CODEX_MCP_CALLBACK_PORT
+    run _emit_host_settings
+    [ "$status" -eq 0 ]
+    [ "$output" = 'mcp_oauth_credentials_store = "file"' ]
+
+    uname() { printf 'Darwin\n'; }
+    run _emit_host_settings
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}

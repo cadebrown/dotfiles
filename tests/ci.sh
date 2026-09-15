@@ -78,6 +78,8 @@ fast_checks() {
         tests/ci-entrypoint.bats \
         tests/claude-launcher.bats \
         tests/codex-launcher.bats \
+        tests/codex-binary.bats \
+        tests/resource-limits.bats \
         tests/codex-runtime.bats \
         tests/codex-history.bats \
         tests/compiler-cache.bats \
@@ -86,6 +88,7 @@ fast_checks() {
         tests/fish.bats \
         tests/gwt.bats \
         tests/google-auth.bats \
+        tests/gh-mcp-headers.bats \
         tests/host-config.bats \
         tests/lean.bats \
         tests/mcp-emitters.bats \

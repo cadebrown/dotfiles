@@ -11,18 +11,6 @@
 # so we use that directly to keep this list authoritative.
 @earendil-works/pi-coding-agent
 
-# OpenAI Codex CLI — the npm tarball is just a thin wrapper around the same
-# Rust binary published on github.com/openai/codex/releases. We use npm so
-# upgrades happen via this list, not a hand-rolled GitHub release fetcher.
-# install/codex.sh still handles managed ~/.codex config + hooks + healthcheck.
-#
-# UNPINNED: `bootstrap upgrade` always pulls latest. codex.sh runs right after
-# node.sh and reconciles the managed ~/.codex config (profiles are per-file
-# since 0.134), so a config-format shift surfaces in that step's healthcheck
-# rather than silently. If codex ever breaks config compatibility again,
-# re-pin here (`@openai/codex@X.Y.Z`) until the config catches up.
-@openai/codex
-
 # OpenCode releases reach npm directly; share the managed Node LTS runtime.
 opencode-ai
 

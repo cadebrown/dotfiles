@@ -8,7 +8,7 @@ default_tools_approval_mode = "approve"
 
 [mcp_servers.ghsrv]
 url = "https://gh.example/mcp"
-bearer_token_env_var = "GH_TOKEN"
+http_headers_helper = "bash \"<HOME>/.claude/gh-mcp-headers.sh\""
 startup_timeout_sec = 20
 tool_timeout_sec = 60
 required = false

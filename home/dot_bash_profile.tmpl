@@ -75,6 +75,7 @@ export PATH="$_LOCAL_PLAT/bin:$HOME/.local/bin:$PATH"
 # because VS Code/Cursor embedded terminals are non-login shells that skip this
 # profile entirely (while still inheriting a forwarded LC_ALL from macOS ssh).
 {{ template "locale-env.sh" . }}
+{{ template "resource-limits.sh" . }}
 
 ### HOMEBREW ###
 # Source Homebrew first so PLAT paths can prepend on top of it.

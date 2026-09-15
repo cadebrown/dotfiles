@@ -273,8 +273,8 @@ if OS.mac?
   # former Codex desktop app: OpenAI folded it into ChatGPT and renamed the
   # bundle Codex.app → ChatGPT.app, keeping the `com.openai.codex` identifier.
   # The old `codex-app` cask is deprecated (disabled 2027-07-12) and names
-  # `chatgpt` as its replacement. NOT the `codex` cask — that one is the CLI,
-  # which we get from npm (@openai/codex in npm.txt).
+  # `chatgpt` as its replacement. NOT the `codex` cask — the CLI is installed
+  # from an official native GitHub release by install/codex.sh.
   #
   # The app shares ~/.codex/ with the CLI, so its substantive config
   # (config.toml, profiles, AGENTS.md, rules, themes) is already tracked via

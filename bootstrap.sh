@@ -30,11 +30,9 @@
 #                             #     app's own upgrade/migration silently unlinked
 #                             #     from scratch back onto the small NFS home)
 #                             # Always re-downloaded regardless of mode:
-#                             #   Claude Code, Codex CLI, cass (vs GitHub latest)
+#                             #   Claude Code and cass (vs latest); Codex CLI on upgrade
 #                             # Intentionally HELD (warned loudly, never silent):
 #                             #   any pkg pinned <name>@<version> in npm.txt
-#                             #   (@openai/codex is currently UNPINNED — codex.sh's
-#                             #   healthcheck catches config-format drift instead)
 #                             # NOT touched (out of scope — OS-level, needs sudo):
 #                             #   `softwareupdate` macOS system updates
 #
@@ -611,7 +609,11 @@ else
 fi
 
 if [[ "${DF_DO_CODEX:-1}" != "0" ]]; then
-    bash "$DF_INSTALL_DIR/codex.sh" || die "codex.sh failed"
+    if [[ "$DF_MODE" == upgrade ]]; then
+        bash "$DF_INSTALL_DIR/codex.sh" upgrade || die "codex.sh failed"
+    else
+        bash "$DF_INSTALL_DIR/codex.sh" install || die "codex.sh failed"
+    fi
 else
     log_info "Skipping Codex (DF_DO_CODEX=0)"
 fi

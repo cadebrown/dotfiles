@@ -53,6 +53,85 @@ Do not commit or edit other files.
 
 Supply scope, contract, acceptance checks, and artifact path. For extraction, give an output schema and reconciliation count; for `coder`, give the exact replacement and require it to report ambiguity. Use a direct command for a one-command transformation; the parent integrates and decides whether independent review is warranted.
 
+## Install and upgrade the native CLI
+
+`codex` links directly to the native executable from the standard platform bin directory
+(`$LOCAL_PLAT/bin`, or `~/.local/bin` without platform isolation). The managed
+installer owns it; Codex is no longer in the global npm package list.
+
+```sh
+bash ~/dotfiles/install/codex.sh install   # retain a working native installation
+bash ~/dotfiles/install/codex.sh upgrade   # latest stable release, config and checks
+CODEX_VERSION=rust-v0.154.0 bash ~/dotfiles/install/codex.sh install
+codex --version
+```
+
+The installer selects the complete official `codex-package` archive for the OS
+and architecture, verifies its published SHA-256 digest, manifest and executable
+version, and checks the code-mode host and bundled resources. It installs the
+whole runtime under `$LOCAL_PLAT/lib/codex/<release-tag>` and atomically changes
+the bin symlink. Failed checks retain the active runtime. The executable and
+`codex-code-mode-host` must stay together; a bare CLI download is insufficient.
+An existing process keeps its current executable until restarted; upgrades do
+not interrupt tasks. GitHub API access needs `GITHUB_TOKEN` on shared networks
+where the anonymous rate limit is exhausted. Exact tags are optional; without
+`CODEX_VERSION`, upgrade follows the latest stable release.
+
+The managed bin directory may be on NFS. Atomic replacement avoids mutating an
+npm package tree underneath active processes; an open old inode may remain as
+an NFS temporary file until its process exits. Do not delete those files or
+uninstall the old package tree while clients still use it. Check `type -a codex`
+for a stale npm shim taking precedence. The installer replaces its own bin entry after validation and warns about
+external npm shims; it does not remove active npm package trees.
+
+Sources: [official Codex CLI documentation](https://learn.chatgpt.com/docs/codex/cli)
+and [`install/codex.sh`](../../install/codex.sh).
+
+## Linux descriptor capacity
+
+Linux login and interactive shell startup raise the soft open-file limit to
+65,536, capped by the existing hard limit. Higher soft limits remain unchanged;
+macOS is unchanged. This applies before SSH-launched app servers start, without
+a Codex shell wrapper. Hundreds of active MCP helpers can consume several
+parent descriptors each for pipes and process handles; a 1,024 limit can fail
+while opening session metadata, CA files, or tool runners.
+
+```sh
+ulimit -Sn
+ulimit -Hn
+```
+
+A fresh SSH login should report a soft limit of 65,536 or the hard cap. Existing
+daemons retain their old limits until explicitly adjusted or restarted. Verify
+the actual daemon's `/proc/<pid>/limits`, not only the interactive shell. This
+provides descriptor capacity; it does not establish that helper growth is bounded.
+Source: [`resource-limits.sh`](../../home/.chezmoitemplates/resource-limits.sh).
+
+## MCP credentials on remote Linux hosts
+
+Run `bash ~/dotfiles/install/codex.sh sync-config` on each host after updating
+these sources. Linux sync sets the top-level `mcp_oauth_credentials_store =
+"file"`; macOS retains its configured storage choice. Login and runtime refresh
+then use the private `.credentials.json` in the active `CODEX_HOME`, avoiding an
+unavailable or locked desktop keyring. Keep the file mode `0600` and the
+host-local runtime directory `0700`. Existing keyring-only logins need a fresh
+`codex mcp login <server>`; sync does not copy or delete credentials.
+
+GitHub uses `~/.claude/gh-mcp-headers.sh` at connection time in both Codex and
+Claude. It reads explicit `GH_TOKEN`, then `GITHUB_TOKEN`, then `~/.github.env`,
+then `gh auth token`. App-server launches therefore do not depend on a shell
+function exporting `GH_TOKEN`. No token is embedded in MCP configuration.
+The helper fails explicitly when no credential is available.
+
+Restart an affected remote client when it is idle, then verify both `/mcp`
+initialization and a read-only tool operation. Saved OAuth metadata or a passing
+config parser alone does not establish working access. Missing optional API
+keys, Google ADC, or a local server executable still require their own setup.
+Increasing `startup_timeout_sec` does not fix these failures.
+
+See [repeated remote MCP warnings](../usage/troubleshooting.md#remote-codex-repeatedly-warns-about-mcp-authentication)
+and the [Codex configuration reference](https://developers.openai.com/codex/config-reference/).
+
 ## MCP login from SSH
 
 When Codex runs in an SSH shell and the sign-in browser runs on your laptop,
@@ -73,16 +152,24 @@ The browser callback should finish at the workstation's listener, and the CLI
 should print `Successfully logged in to MCP server`. Some providers display a
 **Finish OAuth** button after sign-in; click it while the CLI is still waiting.
 
-For ordinary `ssh workstation` sessions, set
+For remote OAuth logins, set
 `DF_CODEX_MCP_CALLBACK_PORT=45231` in that workstation's hostname-specific
 [host policy](../setup/chezmoi.md#host-configuration), then run
 `bash ~/dotfiles/install/codex.sh sync-config` there. Add the matching forward
 to the laptop's private SSH overlay or `~/.ssh/config.d/`:
 
 ```text
-Host workstation
+Host workstation-oauth
+    HostName workstation
     LocalForward 127.0.0.1:45231 127.0.0.1:45231
+    ControlPath /tmp/ssh-codex-oauth-%C
+    ExitOnForwardFailure yes
 ```
+
+Use `ssh workstation-oauth` for login. Keep callback forwards off the ordinary
+workstation alias used by the desktop app: separate app-managed SSH connections
+can otherwise compete for the same local port during reconnect or restart.
+The dedicated control path keeps the OAuth tunnel separate from app transport.
 
 Use a different port for each workstation that can be connected concurrently.
 The host setting accepts decimal ports from 1024 through 65535. Without it,
@@ -91,11 +178,11 @@ port. A server-specific OAuth callback port takes precedence over the global
 setting and must match its tunnel too. A fixed port permits one pending login
 at a time on that workstation. Reconnect after changing configuration; an
 existing multiplexed SSH connection can also receive the configured forward
-with `ssh -O forward workstation`. Do not use `ClearAllForwardings=yes` for the
+with `ssh -O forward workstation-oauth`. Do not use `ClearAllForwardings=yes` for the
 interactive connection that needs this callback.
 
 The tunnel follows the SSH connection's lifetime. Verify its configured route
-with `ssh -G workstation`, and check the actual local listener with `lsof` or
+with `ssh -G workstation-oauth`, and check the actual local listener with `lsof` or
 `ss`. A port already owned by another workstation must not be reused: end that
 forward or choose another matching pair. A logged-in status establishes stored
 authentication, not access to every tool or permission scope.
@@ -177,21 +264,20 @@ Database-only metadata may not be recoverable from a transcript alone.
 
 Unknown machines with local homes need no preset. Codex setup on network
 storage fails with a configuration action instead of silently using NFS or
-temporary storage. Bash and Zsh `codex` functions resolve host policy at launch,
-including in non-login shells, and preserve an explicit `CODEX_HOME`. Existing
-terminals retain their already-loaded functions: start a new shell or run
-`exec zsh -l` (or `exec bash -l`) once after deploying a launcher change.
+temporary storage. Bash and Zsh resolve host policy when the shell starts,
+including interactive non-login terminals; `codex` is the native executable,
+with no shell-function wrapper. Explicit `CODEX_HOME` overrides remain supported.
+After deploying the shell change, start a fresh SSH login. In an existing shell,
+`unset -f codex _codex_with_host_env` removes the old loaded functions.
 Already-exported runtime values take precedence over host-file edits; changing
-the state root requires a fresh SSH login, not just replacing the current shell
-and inheriting its environment. Direct
-services and vendor-binary launches bypassing these functions must still receive
-`CODEX_HOME` explicitly. Do not overwrite npm's Codex binary to change its home.
+the state root requires a fresh SSH login. Direct services must receive
+`CODEX_HOME` explicitly because they do not read interactive shell startup files.
 
 Sources: [`install/codex-runtime.sh`](../../install/codex-runtime.sh),
 [`install/codex.sh`](../../install/codex.sh),
 [`install/codex-history.py`](../../install/codex-history.py),
 [`install/codex-backup.py`](../../install/codex-backup.py),
-[`Codex shell launcher`](../../home/.chezmoitemplates/codex-launch.sh),
+[`Host policy resolver`](../../install/_host-config.sh),
 [Codex environment variables](https://learn.chatgpt.com/docs/config-file/environment-variables),
 [remote connections](https://learn.chatgpt.com/docs/remote-connections), and
 [SQLite WAL](https://sqlite.org/wal.html).

@@ -1,79 +1,64 @@
 #!/usr/bin/env bats
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    TEST_HOME="$BATS_TEST_TMPDIR/home"
-    TEST_BIN="$BATS_TEST_TMPDIR/bin"
-    mkdir -p "$TEST_HOME/dotfiles/install" "$TEST_HOME/.config/dotfiles/hosts" "$TEST_BIN"
-    cp "$REPO_ROOT/install/_host-config.sh" "$TEST_HOME/dotfiles/install/"
-    printf 'DF_STATE_ROOT=%s\n' "$BATS_TEST_TMPDIR/local-state" > "$TEST_HOME/.config/dotfiles/hosts/$(hostname).env"
+    export REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    export TEST_HOME="$BATS_TEST_TMPDIR/home"
+    export TEST_BIN="$BATS_TEST_TMPDIR/bin"
+    mkdir -p "$TEST_HOME/.config/dotfiles/hosts" "$TEST_BIN"
+    ln -s "$REPO_ROOT" "$TEST_HOME/dotfiles"
+    printf 'DF_STATE_ROOT=%s\n' "$BATS_TEST_TMPDIR/local-state" \
+        > "$TEST_HOME/.config/dotfiles/hosts/$(hostname).env"
     cat > "$TEST_BIN/codex" <<'EOF'
 #!/bin/sh
-printf 'root=%s token=%s\n' "${CODEX_HOME:-unset}" "${GH_TOKEN:-unset}"
+printf 'root=%s\n' "${CODEX_HOME:-unset}"
 printf '<%s>\n' "$@"
-exit "${PROBE_EXIT:-0}"
 EOF
     chmod +x "$TEST_BIN/codex"
 }
 
-run_launcher() {
-    local shell="$1"
-    shift
-    run env -u CODEX_HOME -u DF_STATE_ROOT -u DF_USE_PLAT -u DF_PLAT \
-        HOME="$TEST_HOME" PATH="$TEST_BIN:$PATH" GH_TOKEN=fixture-token \
-        "$shell" -c '. "$1"; shift; _codex_with_host_env "$@"' \
-        _ "$REPO_ROOT/home/.chezmoitemplates/codex-launch.sh" "$@"
+render_rc() {
+    local shell_name="$1" source_file
+    case "$shell_name" in
+        bash) source_file=dot_bashrc.tmpl ;;
+        zsh) source_file=dot_zshrc.tmpl ;;
+        *) return 1 ;;
+    esac
+    chezmoi --source "$REPO_ROOT/home" \
+        --override-data '{"chezmoi":{"os":"linux"},"use_plat":false}' \
+        execute-template --file "$REPO_ROOT/home/$source_file" \
+        > "$BATS_TEST_TMPDIR/$shell_name-rc"
+    printf '%s\n' "$BATS_TEST_TMPDIR/$shell_name-rc"
 }
 
-@test "Codex launch resolves host policy in non-login Bash and Zsh" {
-    local shell
-    for shell in bash zsh; do
-        run_launcher "$shell" resume 'a task' --last
+@test "interactive Bash and Zsh resolve host policy before the native Codex command" {
+    local shell_name rendered
+    for shell_name in bash zsh; do
+        rendered="$(render_rc "$shell_name")"
+        run env -u CODEX_HOME -u DF_STATE_ROOT -u DF_USE_PLAT -u DF_PLAT \
+            HOME="$TEST_HOME" PATH="$TEST_BIN:$PATH" "$shell_name" -f -c \
+            'source "$1"; type codex; codex resume "a task"' _ "$rendered"
         [ "$status" -eq 0 ]
-        [ "$output" = "root=$BATS_TEST_TMPDIR/local-state/codex token=fixture-token"$'\n<resume>\n<a task>\n<--last>' ]
+        [[ "$output" != *'function'* ]]
+        [[ "$output" == *"root=$BATS_TEST_TMPDIR/local-state/codex"* ]]
+        [[ "$output" == *$'<resume>\n<a task>' ]]
     done
 }
 
-@test "Codex launch preserves explicit runtime and does not leak policy into its shell" {
-    local shell
-    for shell in bash zsh; do
-        run env -u DF_STATE_ROOT HOME="$TEST_HOME" PATH="$TEST_BIN:$PATH" GH_TOKEN=fixture-token \
-            CODEX_HOME="$BATS_TEST_TMPDIR/explicit" "$shell" -c \
-            '. "$1"; _codex_with_host_env doctor; printf "policy=%s\n" "${DF_STATE_ROOT:-unset}"' \
-            _ "$REPO_ROOT/home/.chezmoitemplates/codex-launch.sh"
+@test "interactive shell startup preserves an explicit CODEX_HOME" {
+    local shell_name rendered
+    for shell_name in bash zsh; do
+        rendered="$(render_rc "$shell_name")"
+        run env -u DF_STATE_ROOT -u DF_USE_PLAT -u DF_PLAT \
+            HOME="$TEST_HOME" CODEX_HOME="$BATS_TEST_TMPDIR/explicit" \
+            PATH="$TEST_BIN:$PATH" "$shell_name" -f -c \
+            'source "$1"; codex doctor' _ "$rendered"
         [ "$status" -eq 0 ]
-        [ "$output" = "root=$BATS_TEST_TMPDIR/explicit token=fixture-token"$'\n<doctor>\npolicy=unset' ]
+        [[ "$output" == *"root=$BATS_TEST_TMPDIR/explicit"* ]]
     done
 }
 
-@test "Codex launch rejects invalid host data before invoking the binary" {
-    printf 'DF_USE_PLAT=invalid\n' > "$TEST_HOME/.config/dotfiles/hosts/$(hostname).env"
-    local shell
-    for shell in bash zsh; do
-        run_launcher "$shell" doctor
-        [ "$status" -ne 0 ]
-        [[ "$output" != *'root='* ]]
-        [[ "$output" == *'Invalid host configuration'* ]]
-    done
-}
-
-@test "Codex launch honors invocation override after a login already resolved policy" {
-    local shell
-    for shell in bash zsh; do
-        run env -u CODEX_HOME -u DF_STATE_ROOT HOME="$TEST_HOME" PATH="$TEST_BIN:$PATH" GH_TOKEN=fixture-token \
-            "$shell" -c '. "$HOME/dotfiles/install/_host-config.sh"; _host_config_resolve "$HOME/dotfiles"; . "$1"; CODEX_HOME=/explicit-after-login _codex_with_host_env doctor' \
-            _ "$REPO_ROOT/home/.chezmoitemplates/codex-launch.sh"
-        [ "$status" -eq 0 ]
-        [[ "$output" == 'root=/explicit-after-login token=fixture-token'* ]]
-    done
-}
-
-@test "Codex launch keeps the ordinary home fallback and command exit status" {
-    printf '# No override\n' > "$TEST_HOME/.config/dotfiles/hosts/$(hostname).env"
-    local shell
-    for shell in bash zsh; do
-        PROBE_EXIT=23 run_launcher "$shell" doctor
-        [ "$status" -eq 23 ]
-        [[ "$output" == 'root=unset token=fixture-token'* ]]
-    done
+@test "Codex shell templates contain no launcher wrapper" {
+    ! rg -q 'codex-launch\.sh|_codex_with_host_env|^[[:space:]]*codex\(\)' \
+        "$REPO_ROOT/home/dot_zshrc.tmpl" "$REPO_ROOT/home/dot_bashrc.tmpl"
+    [ ! -e "$REPO_ROOT/home/.chezmoitemplates/codex-launch.sh" ]
 }

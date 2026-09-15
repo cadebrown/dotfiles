@@ -83,11 +83,12 @@
     {
       "id": "agent-stack",
       "title": "Codex agent stack",
-      "description": "Enables all managed Codex MCPs by default with explicit narrower profiles, and configures focused roles, host-local state, SSH OAuth callback ports, verified backups, and copy-only history migration.",
+      "description": "Installs complete native Codex runtimes with atomic activation and raises Linux soft descriptor limits, resolves shell host policy without a Codex function, enables all managed Codex MCPs by default with explicit narrower profiles, and configures focused roles, host-local state, SSH OAuth callback ports, deterministic Linux OAuth storage, connection-time GitHub credentials, verified backups, and copy-only history migration.",
       "page": "/agents/codex/",
       "sources": [
         "home/.chezmoiignore",
         "home/.chezmoitemplates/agents-common.md",
+        "home/.chezmoitemplates/resource-limits.sh",
         "home/.chezmoitemplates/voice-common.md",
         "home/dot_agents/symlink_skills",
         "home/dot_codex/AGENTS.md.tmpl",
@@ -121,7 +122,6 @@
         "install/codex-runtime.sh",
         "install/codex-history.py",
         "install/codex-backup.py",
-        "home/.chezmoitemplates/codex-launch.sh",
         "install/codex.sh",
         "install/skills-sync.sh",
         "packages/agent-skills.lock.json",

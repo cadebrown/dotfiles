@@ -7,6 +7,18 @@
 # inheriting a forwarded LC_ALL from macOS ssh; without this guard, copy/paste
 # there rides a C-locale fallback and mangles UTF-8 into Â / â€™ mojibake.
 {{ template "locale-env.sh" . }}
+{{ template "resource-limits.sh" . }}
+
+### HOST POLICY ###
+# Embedded terminals start non-login shells, so resolve their host-local Codex
+# runtime before a native `codex` command runs. _host_config_resolve preserves
+# values explicitly supplied when this shell was invoked.
+_df_root="$HOME/dotfiles"
+if [[ -f "$_df_root/install/_host-config.sh" ]]; then
+    source "$_df_root/install/_host-config.sh"
+    _host_config_resolve "$_df_root" || return 1
+fi
+unset _df_root
 
 ### SHELL OPTIONS ###
 
@@ -179,14 +191,6 @@ alias codexr='codex -p review'      # Sol, read-only permissions
 {{ template "claude-defaults.sh" . }}
 claude() {
     _claude_with_defaults "$@"
-}
-
-# codex launcher — MCP credentials resolved at launch (bearer_token_env_var /
-# env_http_headers in config.toml; tokens never land on disk).
-# GH_TOKEN supplies GitHub MCP; df-google-mcp refreshes Google Cloud ADC itself.
-{{ template "codex-launch.sh" . }}
-codex() {
-    _codex_with_host_env "$@"
 }
 
 # OpenCode consumes the same GitHub MCP credentials as Codex and starts

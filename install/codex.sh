@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# install/codex.sh - manage OpenAI Codex CLI configuration
+# install/codex.sh - install OpenAI Codex CLI and manage its configuration
 #
-# The Codex binary itself is installed via npm (@openai/codex in packages/npm.txt),
-# which is just a thin wrapper around the same Rust binary published on
-# github.com/openai/codex/releases. We let npm own the install/upgrade story so
-# this script doesn't have to maintain a hand-rolled release fetcher (auth
-# headers, SHA verification, redirect handling, etc.).
+# Codex is installed from the official GitHub release archive into $ARCH_BIN,
+# which is PLAT-isolated for shared-home safety.  Do not replace it in place:
+# NFS can leave an npm-managed executable as an open .nfs file while an app
+# server is running.  A verified candidate is started before an atomic rename,
+# so a bad release or broken download leaves the working binary intact.
 #
 # What this script DOES handle:
 #   - sync-config: write managed ~/.codex/config.toml from the chezmoi template,
@@ -20,10 +20,10 @@
 #                  plugins present, guard blocks managed paths)
 #
 # Modes:
-#   install      -> verify codex is on PATH; complain if missing
+#   install      -> install only when absent (or CODEX_VERSION selects a release)
 #   sync-config  -> sync managed config + hooks
 #   check        -> run codex healthcheck
-#   upgrade      -> sync-config + check (default; install is a no-op verify)
+#   upgrade      -> fetch the latest stable binary, then sync-config + check
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
@@ -34,17 +34,17 @@ _usage() {
     cat <<'EOF'
 Usage: codex.sh [install|sync-runtime|sync-config|backup SOURCE DESTINATION|import-history SOURCE|check|upgrade]
 
-  install      Verify codex is on PATH (npm-installed via packages/npm.txt)
+  install      Install the native binary when absent; set CODEX_VERSION to an exact release tag
   sync-runtime Prepare and validate the host-local Codex runtime only
   sync-config  Sync managed Codex config/hooks while preserving runtime blocks
   backup SOURCE DESTINATION  Full verified backup to a new directory; stop writers first
   import-history SOURCE  Copy validated legacy transcripts into this host runtime
   check        Validate codex binary/config/rules
-  upgrade      Run sync-config + check (default)
+  upgrade      Update the native binary, then sync config + check
 EOF
 }
 
-_mode="${1:-upgrade}"
+_mode="${1:-install}"
 case "$_mode" in
     install|sync-runtime|sync-config|backup|import-history|check|upgrade) ;;
     -h|--help|help) _usage; exit 0 ;;
@@ -53,14 +53,188 @@ esac
 
 _verify_codex_present() {
     log_section "Codex CLI"
-    if has codex; then
-        log_okay "codex: $(codex --version 2>&1 | grep -v '^WARNING' | head -1)"
+    if [[ -x "$ARCH_BIN/codex" ]]; then
+        log_okay "codex: $($ARCH_BIN/codex --version 2>&1 | grep -v '^WARNING' | head -1)"
     else
-        log_warn "codex not on PATH — install with: npm install -g @openai/codex"
-        log_warn "  (or re-run install/node.sh, which reads packages/npm.txt)"
+        log_warn "native Codex binary missing: $ARCH_BIN/codex"
         return 1
     fi
 }
+
+_codex_asset_name() {
+    local _target
+    case "$OS/$ARCH" in
+        darwin/aarch64) _target="aarch64-apple-darwin" ;;
+        darwin/x86_64)  _target="x86_64-apple-darwin" ;;
+        linux/aarch64)  _target="aarch64-unknown-linux-musl" ;;
+        linux/x86_64)   _target="x86_64-unknown-linux-musl" ;;
+        *) die "Unsupported Codex platform: $OS/$ARCH" ;;
+    esac
+    printf 'codex-package-%s.tar.gz\n' "$_target"
+}
+
+_codex_requested_release_url() {
+    local _release="${CODEX_VERSION:-}"
+    if [[ -z "$_release" ]]; then
+        printf '%s\n' 'https://api.github.com/repos/openai/codex/releases/latest'
+        return
+    fi
+    # A tag is an API path component. Reject whitespace, slashes, and query
+    # syntax instead of allowing CODEX_VERSION to alter the requested endpoint.
+    _codex_release_tag_valid "$_release" \
+        || die "CODEX_VERSION must be an exact GitHub release tag (for example rust-v0.154.0)"
+    printf 'https://api.github.com/repos/openai/codex/releases/tags/%s\n' "$_release"
+}
+
+_codex_release_tag_valid() {
+    [[ "$1" =~ ^rust-v[0-9][[:alnum:]._-]*$ ]]
+}
+
+_codex_release_version() {
+    local _tag="$1"
+    printf '%s\n' "${_tag#rust-v}"
+}
+
+_codex_is_legacy_npm_shim() {
+    local _path="$1" _target
+    [[ -e "$_path" || -L "$_path" ]] || return 1
+    if [[ -L "$_path" ]]; then
+        _target="$(readlink "$_path" 2>/dev/null || true)"
+        [[ "$_target" == *"@openai/codex/"* ]] && return 0
+    fi
+    # npm's POSIX shim can also be a small JavaScript launcher rather than a
+    # symlink. Limit this check to text files so a native executable is never
+    # mistaken for a stale package tree.
+    grep -Iq '@openai/codex' "$_path" 2>/dev/null
+}
+
+_codex_runtime_valid() {
+    local _runtime="$1" _expected="$2" _target="${3:-}" _health
+    [[ -x "$_runtime/bin/codex" ]] || return 1
+    [[ -x "$_runtime/bin/codex-code-mode-host" ]] || return 1
+    [[ -x "$_runtime/codex-path/rg" ]] || return 1
+    [[ "$OS" == darwin || -x "$_runtime/codex-resources/bwrap" ]] || return 1
+    [[ -x "$_runtime/codex-resources/zsh/bin/zsh" ]] || return 1
+    [[ -f "$_runtime/codex-package.json" ]] || return 1
+    jq -e --arg version "$_expected" --arg target "$_target" \
+        '.layoutVersion == 1 and .version == $version and (.variant == "codex")
+         and (.entrypoint == "bin/codex") and (.resourcesDir == "codex-resources")
+         and (.pathDir == "codex-path") and ($target == "" or .target == $target)' \
+        "$_runtime/codex-package.json" >/dev/null 2>&1 || return 1
+    _health="$("$_runtime/bin/codex" --version 2>&1)" || return 1
+    [[ "${_health%%$'\n'*}" == "codex-cli $_expected" ]] \
+        && "$_runtime/bin/codex-code-mode-host" --help </dev/null >/dev/null 2>&1
+}
+
+_codex_activate_runtime() {
+    local _runtime="$1" _link="$ARCH_BIN/codex" _next
+    ensure_dir "$ARCH_BIN"
+    _next="$(mktemp "$ARCH_BIN/.codex.XXXXXX")"
+    # The relative link remains valid if the complete $LOCAL_PLAT tree moves.
+    rm -f "$_next"
+    ln -s "../lib/codex/$(basename "$_runtime")/bin/codex" "$_next"
+    mv -f "$_next" "$_link"
+}
+
+_codex_install_binary() (
+    local _intent="${1:-install}" _dest="$ARCH_BIN/codex" _asset _metadata
+    local _tag _url _digest _want _got _archive _stage _runtime_root _next="" _health
+    local _expected _is_prerelease _is_draft _active _runtime _staged_runtime _target _link_target
+
+    if [[ -n "${CODEX_VERSION:-}" ]]; then
+        _codex_release_tag_valid "$CODEX_VERSION" \
+            || die "CODEX_VERSION must be an exact GitHub release tag (for example rust-v0.154.0)"
+    fi
+    _asset="$(_codex_asset_name)"
+    _target="${_asset#codex-package-}"
+    _target="${_target%.tar.gz}"
+
+    if [[ "$_intent" == install && -z "${CODEX_VERSION:-}" && -L "$_dest" ]]; then
+        _link_target="$(readlink "$_dest")"
+        if [[ "$_link_target" == /* ]]; then
+            _runtime="$(cd "$(dirname "$_link_target")/.." 2>/dev/null && pwd -P || true)"
+        else
+            _runtime="$(cd "$(dirname "$_dest")/$(dirname "$_link_target")/.." 2>/dev/null && pwd -P || true)"
+        fi
+        if [[ -n "$_runtime" ]] && _codex_runtime_valid "$_runtime" "$("$_dest" --version 2>/dev/null | awk '{print $2}')" "$_target"; then
+            log_okay "Codex complete runtime already active: $_runtime"
+            return
+        fi
+        log_warn "Codex link does not point to a complete native runtime; repairing it"
+    elif [[ "$_intent" == install && -x "$_dest" ]]; then
+        log_info "Migrating the legacy standalone or npm Codex executable to a complete native runtime"
+    fi
+
+    _runtime_root="$LOCAL_PLAT/lib/codex"
+    ensure_dir "$_runtime_root"
+    if [[ -n "${CODEX_VERSION:-}" ]]; then
+        _expected="$(_codex_release_version "$CODEX_VERSION")"
+        _runtime="$_runtime_root/$CODEX_VERSION"
+        if _codex_runtime_valid "$_runtime" "$_expected" "$_target"; then
+            _codex_activate_runtime "$_runtime"
+            log_okay "Activated Codex complete runtime $_expected"
+            return
+        fi
+    fi
+
+    has jq || die "jq is required to select and verify the Codex GitHub release"
+    _metadata="$(mktemp "${TMPDIR:-/tmp}/codex-release.XXXXXX")"
+    _archive="$(mktemp "${TMPDIR:-/tmp}/codex-archive.XXXXXX")"
+    _stage="$(mktemp -d "$_runtime_root/.codex-stage.XXXXXX")"
+    trap 'rm -f "$_metadata" "$_archive"; rm -rf "$_stage"' EXIT
+
+    log_section "Codex CLI"
+    log_info "Fetching Codex release metadata..."
+    download "$(_codex_requested_release_url)" "$_metadata" \
+        || die "Could not fetch Codex release metadata; set GITHUB_TOKEN with install/auth.sh github if GitHub rate-limits this host"
+    _tag="$(jq -r '.tag_name // empty' "$_metadata")"
+    _codex_release_tag_valid "$_tag" \
+        || die "Codex release metadata has an unsafe tag: $_tag"
+    _is_prerelease="$(jq -r 'if has("prerelease") then .prerelease else true end' "$_metadata")"
+    _is_draft="$(jq -r 'if has("draft") then .draft else true end' "$_metadata")"
+    _url="$(jq -r --arg asset "$_asset" '.assets[] | select(.name == $asset) | .browser_download_url' "$_metadata" | head -1)"
+    _digest="$(jq -r --arg asset "$_asset" '.assets[] | select(.name == $asset) | .digest // empty' "$_metadata" | head -1)"
+    [[ -n "$_tag" && -n "$_url" ]] || die "Codex release does not publish $_asset"
+    if [[ -n "${CODEX_VERSION:-}" ]]; then
+        [[ "$_tag" == "$CODEX_VERSION" ]] || die "Codex release metadata tag $_tag does not match CODEX_VERSION=$CODEX_VERSION"
+    else
+        [[ "$_is_prerelease" == false && "$_is_draft" == false ]] || die "GitHub latest Codex release is not a published stable release: $_tag"
+    fi
+    [[ "$_digest" =~ ^sha256:[[:xdigit:]]{64}$ ]] || die "Codex release $_tag does not publish a SHA-256 digest for $_asset"
+    _expected="$(_codex_release_version "$_tag")"
+    _runtime="$_runtime_root/$_tag"
+    if [[ -e "$_runtime" || -L "$_runtime" ]]; then
+        if _codex_runtime_valid "$_runtime" "$_expected" "$_target"; then
+            _codex_activate_runtime "$_runtime"
+            log_okay "Activated Codex complete runtime $_expected"
+            return
+        fi
+        die "Refusing to replace invalid existing Codex runtime: $_runtime"
+    fi
+    _want="${_digest#sha256:}"
+
+    log_info "Downloading Codex $_tag ($_asset)..."
+    download "$_url" "$_archive" || die "Could not download Codex $_tag ($_asset)"
+    _got="$(_sha256_stdin < "$_archive")" \
+        || die "sha256sum or shasum is required to verify Codex releases"
+    [[ "$_got" == "$_want" ]] \
+        || die "Codex archive checksum mismatch for $_tag ($_asset)"
+    tar -xzf "$_archive" -C "$_stage" || die "Could not extract Codex archive $_asset"
+    _staged_runtime="$_stage"
+    _codex_runtime_valid "$_staged_runtime" "$_expected" "$_target" \
+        || die "Codex package $_asset is incomplete or reports the wrong version; keeping active runtime"
+    mv "$_staged_runtime" "$_runtime" || die "Could not atomically publish Codex runtime $_expected"
+    _stage=""
+    _codex_activate_runtime "$_runtime"
+    _active="$(command -v codex 2>/dev/null || true)"
+    if [[ "$_active" != "$_dest" ]]; then
+        # Do not unlink a npm shim outside $ARCH_BIN. It can be held open by a
+        # running app server on NFS and must be migrated separately; the native
+        # binary is nevertheless installed safely for the next fresh shell.
+        log_warn "native Codex is at $_dest but PATH currently resolves ${_active:-no codex}; restart the shell or remove a stale npm shim"
+    fi
+    log_okay "Installed complete Codex runtime $_expected → $_dest"
+)
 
 _sha256_stdin() {
     if has sha256sum; then
@@ -293,16 +467,15 @@ _emit_mcp_blocks_to() {
 
                 # auth= sources mirror install/claude.sh's contract, but Codex
                 # resolves credentials at launch instead of storing them:
-                #   gh       → bearer_token_env_var, filled by the codex() shell
-                #              wrapper (GH_TOKEN) — token never lands on disk
+                #   gh       → connection-time helper shared with Claude, so
+                #              app-server launches do not depend on shell functions
                 #   context7 → env_http_headers, read from the environment
                 #              (zprofile sources ~/.context7.env)
                 if [[ -n "$_auth_source" ]]; then
                     case "$_auth_source" in
                         gh)
-                            printf 'bearer_token_env_var = "GH_TOKEN"\n' >> "$out"
-                            has gh || log_warn "    $_name: gh not installed — GH_TOKEN stays empty until 'gh auth login'"
-                            log_info "    $_name ($_transport, auth=gh via GH_TOKEN)"
+                            printf 'http_headers_helper = "%s"\n' "$(_toml_escape "bash \"$HOME/.claude/gh-mcp-headers.sh\"")" >> "$out"
+                            log_info "    $_name ($_transport, auth=gh via credential helper)"
                             ;;
                         context7)
                             if [[ -f "$HOME/.context7.env" ]]; then
@@ -428,6 +601,11 @@ _sync_runtime_assets() {
         fi
     done
 
+    # Codex and Claude share the connection-time GitHub credential helper.
+    ensure_dir "$HOME/.claude"
+    install -m 755 "$DF_ROOT/home/dot_claude/executable_gh-mcp-headers.sh" \
+        "$HOME/.claude/gh-mcp-headers.sh"
+
     # AGENTS.md is a chezmoi template, but the native app requires rendered
     # instructions in its host-local runtime. Do not reuse a shared-home copy.
     has chezmoi || die "chezmoi is required to render Codex AGENTS.md"
@@ -445,6 +623,18 @@ _sync_runtime_assets() {
         [[ -f "$_theme" ]] || continue
         install -m 644 "$_theme" "$_root/themes/$(basename "$_theme")"
     done
+}
+
+# Root settings precede the template's first TOML table.
+_emit_host_settings() {
+    if [[ "$(uname -s)" == Linux ]]; then
+        # Headless app servers cannot rely on an unlocked desktop keyring.
+        # Login and runtime refresh must resolve the same credential store.
+        printf 'mcp_oauth_credentials_store = "file"\n'
+    fi
+    if [[ -n "${DF_CODEX_MCP_CALLBACK_PORT:-}" ]]; then
+        printf 'mcp_oauth_callback_port = %s\n' "$DF_CODEX_MCP_CALLBACK_PORT"
+    fi
 }
 
 _sync_config() {
@@ -468,14 +658,8 @@ _sync_config() {
     _mcp="$_tmp/mcp.toml"
     _registry="$_tmp/registry.jsonl"
 
-    if [[ -n "${DF_CODEX_MCP_CALLBACK_PORT:-}" ]]; then
-        # This must remain a root key: Codex reads the callback listener port
-        # before resolving the generated MCP server tables.
-        printf 'mcp_oauth_callback_port = %s\n' "$DF_CODEX_MCP_CALLBACK_PORT" > "$_managed"
-        cat "$_tmpl" >> "$_managed"
-    else
-        cp "$_tmpl" "$_managed"
-    fi
+    _emit_host_settings > "$_managed"
+    cat "$_tmpl" >> "$_managed"
 
     # Registry names are managed; Desktop and manually added MCP names are not.
     mcp_servers_each --all > "$_registry"
@@ -768,6 +952,7 @@ case "$_mode" in
             --source "codex=$2" --destination "$3"
         ;;
     install)
+        _codex_install_binary install
         _verify_codex_present
         ;;
     sync-runtime)
@@ -794,7 +979,8 @@ case "$_mode" in
         _check_setup
         ;;
     upgrade)
-        _verify_codex_present || die "codex not installed — run install/node.sh first"
+        _codex_install_binary upgrade
+        _verify_codex_present
         codex_runtime_prepare
         _sync_config
         _sync_hooks

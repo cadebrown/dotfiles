@@ -2370,3 +2370,85 @@ list in `install/scratch.sh` and rerun it — Codex/Claude Code must not be
 running at the time, since `scratch.sh` refuses to migrate `~/.codex` while a
 process holds its files open (a live app-server can otherwise keep writing to
 an unlinked inode across the migration).
+
+## Remote Codex repeatedly warns about MCP authentication
+
+**Symptom.** Startup warnings reappear during ongoing work or after a client
+reconnect. Remote logs report `failed to read OAuth tokens from keyring` or
+`refusing file fallback`, even though `.credentials.json` exists.
+
+**Root cause.** Automatic OAuth storage selection can resolve a desktop keyring
+that the headless app-server cannot read reliably. Runtime MCP refresh and new
+agent initialization surface the connection failures again. Separately,
+GitHub's `GH_TOKEN` shell-function export is absent when an app starts the Codex
+binary directly. Neither condition is fixed by a longer startup timeout.
+
+**Confirm and fix.** Inspect the active `CODEX_HOME`, server startup errors, and
+credential presence without printing secrets. Update dotfiles and run
+`bash ~/dotfiles/install/codex.sh sync-config` on each remote host. Linux sync
+selects file OAuth storage and GitHub uses its connection-time credential
+helper. Restart affected clients when idle. Authenticate a missing server with
+`codex mcp login <server>` using the [SSH callback tunnel](../agents/codex.md#mcp-login-from-ssh),
+then verify a read-only operation. Keep existing credential files private; do not
+copy rotating OAuth credentials between hosts or delete them as a reset.
+
+An untrusted-project warning naming the legacy `~/.codex` is a separate config
+layer warning after moving `CODEX_HOME`. Inspect the effective config and actual
+project root. Do not trust an entire home directory just to silence it. The
+warning does not mean that the active host-local global config was disabled.
+
+## Codex disappears after an npm upgrade on NFS
+
+**Symptom.** `codex resume` reports `command not found`; `npm install -g
+@openai/codex@latest` fails with `EBUSY` while unlinking a `.nfs…` file.
+
+**Root cause.** An active Codex process holds a file in the npm package tree
+open. NFS retains that file under a temporary name; npm cannot remove it during
+package replacement, and the failed replacement can leave a dangling CLI shim.
+A shell function named `codex` still appears in `which` even when the executable
+it delegates to is gone.
+
+**Fix.** The managed installer now owns the native executable and stages and
+verifies its replacement before atomic activation. Run `bash
+~/dotfiles/install/codex.sh install`, then use its `upgrade` mode for updates.
+Start a fresh login shell to remove the retired function and inspect `type -a
+codex`. Do not remove open `.nfs…` files or delete the package tree underneath
+running clients. Restart affected app-server processes when interruption is
+acceptable; no prompts or paused queues should be replayed automatically.
+
+## Codex reconnect collides with an SSH OAuth tunnel
+
+**Symptom.** Remote restart or reconnect logs report a callback port already in
+use, sometimes alongside `mux session refused`.
+
+**Root cause.** A persistent SSH connection owns a `LocalForward`, while a
+separate app-managed SSH connection tries to bind that same port. MCP refresh
+warnings after reconnect are a separate result of initializing enabled servers.
+
+**Fix.** Keep callback forwarding on a dedicated `workstation-oauth` alias with
+its own `ControlPath`; keep the ordinary app workstation alias free of callback
+forwards. See [MCP login from SSH](../agents/codex.md#mcp-login-from-ssh). Existing
+SSH masters retain their original forwards until closed. A task marked
+`interrupted` also needs its own event timeline: received interrupt requests,
+transport failures, and MCP authentication errors are distinct events.
+
+## Codex cannot read sessions: No file descriptors available
+
+**Symptom.** Session resume reports `thread-store internal error` and `os error
+24`. MCP initialization, CA certificate reads, or helper launches may also fail.
+
+**Root cause.** The app-server has exhausted its per-process soft descriptor
+limit. Each live MCP child can hold pipe and process-handle descriptors in the
+parent. A 1,024 limit can be too small for many simultaneously loaded sessions;
+the transcript itself need not be damaged.
+
+**Confirm.** Inspect `/proc/<daemon-pid>/limits` and count entries under
+`/proc/<daemon-pid>/fd`. Compare live process handles, pipes, sockets, and files
+before diagnosing corruption or expired credentials.
+
+**Fix.** Deploy the shared Linux resource-limit startup policy, start a fresh
+SSH login, and restart the affected Codex daemon when authorized. Verify its
+actual soft limit is 65,536 (or the hard cap), then read the affected session and
+exercise tool execution. Leave the hard limit unchanged. Raising capacity does
+not repair a missing code-mode-host binary; install the complete matching
+runtime for that error. Investigate continuing unbounded helper growth separately.
