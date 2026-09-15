@@ -49,3 +49,30 @@ SSH proves the command ran on that host; it does not prove a GUI, durable creden
 ## Hooks are checkpoint signals, not an autonomous scheduler
 
 Managed Codex hooks call `df-task hook` at lifecycle events with short timeouts. They record state; they do not decide continuation, restart cancelled jobs, or resume work. Use `long-running-work` with the checkpoint record for a sustained plan.
+
+Lifecycle hooks reuse the host's already resolved `PYTHON_ENV` when it names an
+executable Python runtime. Their POSIX shell launcher avoids Bash's additional
+noninteractive SSH startup. Other `df-task` commands still resolve host policy
+before launching. The host resolver uses one Bash export-name snapshot or direct
+Zsh parameter metadata instead of starting a process for every policy key.
+
+Codex normally uses the task environment's non-login shell for hooks; its default
+shell fallback is a login shell. These paths have different startup costs, so
+validate lifecycle events through the native app-server rather than assuming a
+manual `bash -lc` timing describes the active path. The regression test completes
+a turn against a local model fixture and checks `SessionStart`, `Stop`, and
+`SessionEnd`. Three-second lifecycle limits remain unchanged; Codex itself caps
+`Interrupt` and `SessionEnd` at three seconds. Checkpoint lock acquisition stops
+after 200 ms.
+
+Checkpoints use `DF_TASK_STATE_DIR` when explicitly set; otherwise they live in
+`$DF_STATE_ROOT/dotfiles/tasks/<host-id>`. Without `DF_STATE_ROOT`, the base is
+`XDG_STATE_HOME` or `~/.local/state`. Keep `DF_STATE_ROOT` on local storage for a
+remote host. Existing records at the old XDG location remain readable and are
+copied on their first update under the destination lock. A destination record
+always wins; the old file is retained. An explicit `DF_TASK_STATE_DIR` isolates
+that directory and never falls back to old records.
+
+After updating dotfiles, run `bash ~/dotfiles/install/codex.sh sync-runtime` on
+each host to install the helper. These helper changes take effect on the next
+hook invocation without restarting Codex or resubmitting work.

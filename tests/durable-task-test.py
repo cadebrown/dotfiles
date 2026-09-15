@@ -184,6 +184,88 @@ class DurableTaskTest(unittest.TestCase):
         self.assertNotIn("note", result)
         self.assertEqual(len(json.loads(self.command("list").stdout)), 2)
 
+    def test_state_root_precedence(self):
+        host = MODULE.state_host()
+        with patch.dict(os.environ, {"DF_TASK_STATE_DIR": str(self.root / "explicit"),
+                                     "DF_STATE_ROOT": str(self.root / "host-state"),
+                                     "XDG_STATE_HOME": str(self.root / "legacy")}, clear=False):
+            self.assertEqual(MODULE.state_root(), self.root / "explicit")
+        with patch.dict(os.environ, {"DF_TASK_STATE_DIR": "", "DF_STATE_ROOT": str(self.root / "host-state"),
+                                     "XDG_STATE_HOME": str(self.root / "legacy")}, clear=False):
+            self.assertEqual(MODULE.state_root(), self.root / "host-state/dotfiles/tasks" / host)
+        with patch.dict(os.environ, {"DF_TASK_STATE_DIR": "", "DF_STATE_ROOT": "", "XDG_STATE_HOME": str(self.root / "legacy")}, clear=False):
+            self.assertEqual(MODULE.state_root(), self.root / "legacy/dotfiles/tasks" / host)
+
+    def test_host_state_reads_and_migrates_legacy_records_without_overwriting_target(self):
+        host_state = self.root / "host-state"
+        legacy_base = self.root / "legacy"
+        environment = {**os.environ, "DF_TASK_STATE_DIR": "", "DF_STATE_ROOT": str(host_state), "XDG_STATE_HOME": str(legacy_base),
+                       "CODEX_THREAD_ID": "session-123"}
+        legacy = legacy_base / "dotfiles/tasks" / MODULE.state_host()
+        legacy.mkdir(parents=True, mode=0o700)
+        legacy_record = {"version": 1, "session_id": "session-123", "created_at": "old", "cwd": str(self.workspace),
+                         "jobs": {}, "artifacts": [], "logs": [], "events": [], "title": "legacy"}
+        (legacy / "session-123.json").write_text(json.dumps(legacy_record))
+        (legacy / "session-123.json").chmod(0o600)
+
+        self.assertEqual(json.loads(self.command("status", environment=environment).stdout)["title"], "legacy")
+        self.assertEqual(json.loads(self.command("list", environment=environment).stdout)[0]["title"], "legacy")
+        self.command("checkpoint", "--note", "migrated", environment=environment)
+        target = host_state / "dotfiles/tasks" / MODULE.state_host() / "session-123.json"
+        self.assertTrue(target.is_file())
+        self.assertEqual(json.loads(target.read_text())["note"], "migrated")
+        self.assertEqual(json.loads((legacy / "session-123.json").read_text())["title"], "legacy")
+
+        legacy_record["title"] = "newer legacy"
+        (legacy / "session-123.json").write_text(json.dumps(legacy_record))
+        self.assertEqual(json.loads(self.command("status", environment=environment).stdout)["title"], "legacy")
+        self.assertEqual(json.loads(self.command("list", environment=environment).stdout)[0]["title"], "legacy")
+
+    def test_explicit_task_state_override_does_not_fall_back_to_legacy(self):
+        legacy = self.root / "legacy/dotfiles/tasks" / MODULE.state_host()
+        legacy.mkdir(parents=True, mode=0o700)
+        (legacy / "session-123.json").write_text(json.dumps({"version": 1, "session_id": "session-123", "jobs": {}, "artifacts": [], "logs": [], "events": []}))
+        (legacy / "session-123.json").chmod(0o600)
+        environment = {**os.environ, "DF_TASK_STATE_DIR": str(self.root / "explicit"), "DF_STATE_ROOT": str(self.root / "host-state"),
+                       "XDG_STATE_HOME": str(self.root / "legacy"), "CODEX_THREAD_ID": "session-123"}
+        self.command("status", expected=1, environment=environment)
+        self.assertEqual(json.loads(self.command("list", environment=environment).stdout), [])
+
+    def test_session_end_migrates_an_existing_legacy_record(self):
+        host_state = self.root / "host-state"
+        legacy_base = self.root / "legacy"
+        environment = {**os.environ, "DF_TASK_STATE_DIR": "", "DF_STATE_ROOT": str(host_state),
+                       "XDG_STATE_HOME": str(legacy_base), "CODEX_THREAD_ID": "session-123"}
+        legacy = legacy_base / "dotfiles/tasks" / MODULE.state_host()
+        legacy.mkdir(parents=True, mode=0o700)
+        record = {"version": 1, "session_id": "session-123", "created_at": "old", "cwd": str(self.workspace),
+                  "jobs": {}, "artifacts": [], "logs": [], "events": [], "observed_state": "session-opened"}
+        (legacy / "session-123.json").write_text(json.dumps(record))
+        (legacy / "session-123.json").chmod(0o600)
+        self.command("hook", payload={"hook_event_name": "SessionEnd", "session_id": "session-123", "cwd": str(self.workspace)}, environment=environment)
+        target = host_state / "dotfiles/tasks" / MODULE.state_host() / "session-123.json"
+        self.assertTrue(target.is_file())
+        self.assertEqual(json.loads(target.read_text())["observed_state"], "session-ended")
+        self.assertEqual(json.loads((legacy / "session-123.json").read_text())["observed_state"], "session-opened")
+
+    def test_unsafe_legacy_records_are_rejected_without_creating_target_state(self):
+        host_state = self.root / "host-state"
+        legacy_base = self.root / "legacy"
+        environment = {**os.environ, "DF_TASK_STATE_DIR": "", "DF_STATE_ROOT": str(host_state),
+                       "XDG_STATE_HOME": str(legacy_base), "CODEX_THREAD_ID": "session-123"}
+        legacy = legacy_base / "dotfiles/tasks" / MODULE.state_host()
+        legacy.mkdir(parents=True, mode=0o700)
+        victim = self.root / "victim.json"
+        victim.write_text("{}")
+        (legacy / "session-123.json").symlink_to(victim)
+        self.command("status", expected=1, environment=environment)
+        self.assertFalse(host_state.exists())
+        (legacy / "session-123.json").unlink()
+        (legacy / "session-123.json").write_bytes(b"x" * 262145)
+        (legacy / "session-123.json").chmod(0o600)
+        self.command("checkpoint", "--note", "must not migrate", expected=1, environment=environment)
+        self.assertFalse(host_state.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

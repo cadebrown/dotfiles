@@ -215,7 +215,7 @@
     {
       "id": "agent-runtime",
       "title": "Agent runtime services",
-      "description": "Provides durable task checkpoints, browser workspaces, local-agent launch, and managed Google MCP transport.",
+      "description": "Provides host-local task checkpoints with legacy metadata preservation, fast lifecycle hook startup, browser workspaces, local-agent launch, and managed Google MCP transport.",
       "page": "/agents/durable-work/",
       "sources": [
         "home/dot_local/bin/executable_df-browser",

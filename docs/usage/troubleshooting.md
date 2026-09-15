@@ -2397,6 +2397,35 @@ layer warning after moving `CODEX_HOME`. Inspect the effective config and actual
 project root. Do not trust an entire home directory just to silence it. The
 warning does not mean that the active host-local global config was disabled.
 
+## Codex lifecycle hook times out after three seconds
+
+**Symptom.** `Hook failed: hook timed out after 3s` appears at a lifecycle event,
+including after the model finishes a response. The managed command is
+`~/.local/bin/df-task hook`.
+
+**Root cause.** The deadline includes the shell runner, helper launcher, and
+checkpoint write. Older launchers started Bash, which can read `.bashrc` under
+SSH, then resolved host policy and CPU platform again despite an inherited
+runtime. The host resolver also started a process for each policy variable.
+Older checkpoint code ignored `DF_STATE_ROOT`, placing records on a shared home
+filesystem despite a configured local state directory.
+
+**Fix.** Update dotfiles and run `bash ~/dotfiles/install/codex.sh sync-runtime`.
+The resolver inspects exported names without per-variable processes. The POSIX
+hook launcher reuses an executable resolved Python runtime, and checkpoint
+writes honor the host state root. Existing metadata remains readable during
+migration. The three-second timeout and 200 ms lock-wait bound remain unchanged.
+No daemon restart or prompt replay is needed for these helper changes.
+
+**Verify.** Run the native hook regression test (`bats tests/codex-hooks.bats`).
+It completes a real app-server turn using a local model fixture and checks its
+lifecycle checkpoints. Codex normally provides a non-login environment shell;
+`$SHELL -lc` is its fallback. A manual full login-shell timing can overstate the
+normal hook cost. Inspect the active shell path and native hook completion
+results before changing a timeout. `Interrupt` and `SessionEnd` are capped at
+three seconds by Codex, and requesting a larger value also changes the effective
+trust hash. See [durable work](../agents/durable-work.md).
+
 ## Codex disappears after an npm upgrade on NFS
 
 **Symptom.** `codex resume` reports `command not found`; `npm install -g

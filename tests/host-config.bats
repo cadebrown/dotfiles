@@ -70,6 +70,92 @@ EOF
     [ "$output" = 'core|/invocation-state|/overlay-state/codex' ]
 }
 
+@test "caller override capture is shell-native and preserves exported empty values" {
+    cat > "$HOME_DIR/.config/dotfiles/hosts/fixture-host.example.env" <<'EOF'
+DF_PROFILE=full
+DF_STATE_ROOT=/host-state
+EOF
+    cat > "$BIN/printenv" <<'EOF'
+#!/bin/sh
+exit 97
+EOF
+    chmod +x "$BIN/printenv"
+    local shell_name
+    for shell_name in bash zsh; do
+        command -v "$shell_name" >/dev/null 2>&1 || continue
+        run env -i HOME="$HOME_DIR" PATH="$BIN:/usr/bin:/bin" DF_PROFILE=core DF_STATE_ROOT= \
+            "$shell_name" -f -c '
+                source "$1/install/_host-config.sh"
+                _host_config_resolve "$1" || exit $?
+                printf "%s|<%s>\n" "$DF_PROFILE" "$DF_STATE_ROOT"
+            ' _ "$TEST_REPO"
+        [ "$status" -eq 0 ]
+        [ "$output" = 'core|<>' ]
+    done
+}
+
+@test "nonexported shell values do not override host policy in Bash or Zsh" {
+    cat > "$HOME_DIR/.config/dotfiles/hosts/fixture-host.example.env" <<'EOF'
+DF_PROFILE=full
+DF_STATE_ROOT=/host-state
+EOF
+    local shell_name
+    for shell_name in bash zsh; do
+        command -v "$shell_name" >/dev/null 2>&1 || continue
+        run env -i HOME="$HOME_DIR" PATH="$BIN:/usr/bin:/bin" "$shell_name" -f -c '
+            DF_PROFILE=core
+            DF_STATE_ROOT=/nonexported-state
+            source "$1/install/_host-config.sh"
+            _host_config_resolve "$1" || exit $?
+            printf "%s|%s\n" "$DF_PROFILE" "$DF_STATE_ROOT"
+        ' _ "$TEST_REPO"
+        [ "$status" -eq 0 ]
+        [ "$output" = 'full|/host-state' ]
+    done
+}
+
+@test "exported caller values override host policy in Bash and Zsh" {
+    cat > "$HOME_DIR/.config/dotfiles/hosts/fixture-host.example.env" <<'EOF'
+DF_PROFILE=full
+DF_STATE_ROOT=/host-state
+EOF
+    local shell_name
+    for shell_name in bash zsh; do
+        command -v "$shell_name" >/dev/null 2>&1 || continue
+        run env -i HOME="$HOME_DIR" PATH="$BIN:/usr/bin:/bin" "$shell_name" -f -c '
+            export DF_PROFILE=core DF_STATE_ROOT=/caller-state
+            source "$1/install/_host-config.sh"
+            _host_config_resolve "$1" || exit $?
+            printf "%s|%s\n" "$DF_PROFILE" "$DF_STATE_ROOT"
+        ' _ "$TEST_REPO"
+        [ "$status" -eq 0 ]
+        [ "$output" = 'core|/caller-state' ]
+    done
+}
+
+@test "exported readonly attributes remain caller overrides in Bash and Zsh" {
+    cat > "$HOME_DIR/.config/dotfiles/hosts/fixture-host.example.env" <<'EOF'
+DF_PROFILE=full
+DF_STATE_ROOT=/host-state
+EOF
+    local shell_name
+    for shell_name in bash zsh; do
+        command -v "$shell_name" >/dev/null 2>&1 || continue
+        run env -i HOME="$HOME_DIR" PATH="$BIN:/usr/bin:/bin" "$shell_name" -f -c '
+            if [[ -n "${BASH_VERSION:-}" ]]; then
+                declare -rx DF_PROFILE=core DF_STATE_ROOT=/readonly-state
+            else
+                typeset -rx DF_PROFILE=core DF_STATE_ROOT=/readonly-state
+            fi
+            source "$1/install/_host-config.sh"
+            _host_config_resolve "$1" || exit $?
+            printf "%s|%s\n" "$DF_PROFILE" "$DF_STATE_ROOT"
+        ' _ "$TEST_REPO"
+        [ "$status" -eq 0 ]
+        [ "$output" = 'core|/readonly-state' ]
+    done
+}
+
 @test "host files are hostname-separated data and reject shell syntax or unknown keys" {
     printf 'DF_PROFILE=core\n' > "$HOME_DIR/.config/dotfiles/hosts/other-host.env"
     run resolve

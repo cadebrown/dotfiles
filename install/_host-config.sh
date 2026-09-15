@@ -43,16 +43,28 @@ _host_config_bad() { printf 'Invalid host configuration: %s\n' "$*" >&2; return 
 
 # Bookkeeping remains in this shell only: child processes capture their own
 # invocation environment instead of inheriting resolver implementation state.
+_host_config_exported() {
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        [[ "${parameters[$1]-}" == *-export* ]]
+    else
+        [[ $'\n'"${DF_HOST_CONFIG_EXPORTED_KEYS:-}"$'\n' == *$'\n'"$1"$'\n'* ]]
+    fi
+}
+
 _host_config_capture_callers() {
     [[ -n "${DF_HOST_CONFIG_INITIALIZED+x}" ]] && return 0
-    local _key _value
+    local _key
     DF_HOST_CONFIG_CALLER_KEYS=''
+    # Bash's compgen is available in 3.2 and snapshots exports once. Zsh
+    # exposes the export attribute directly through its parameter metadata.
+    [[ -n "${ZSH_VERSION:-}" ]] || DF_HOST_CONFIG_EXPORTED_KEYS="$(compgen -e)"
     while IFS= read -r _key; do
-        if _value="$(printenv "$_key" 2>/dev/null)"; then DF_HOST_CONFIG_CALLER_KEYS+=" $_key"; fi
+        _host_config_exported "$_key" && DF_HOST_CONFIG_CALLER_KEYS+=" $_key"
     done <<EOF
 $_host_config_keys
 CODEX_HOME
 EOF
+    unset DF_HOST_CONFIG_EXPORTED_KEYS
     DF_HOST_CONFIG_INITIALIZED=1
 }
 _host_config_caller_set() { [[ " $DF_HOST_CONFIG_CALLER_KEYS " == *" $1 "* ]]; }
@@ -100,7 +112,7 @@ EOF
 _host_config_validate_invocation() {
     local _value
     _host_config_caller_set DF_CODEX_MCP_CALLBACK_PORT || return 0
-    _value="$(printenv DF_CODEX_MCP_CALLBACK_PORT)"
+    _value="${DF_CODEX_MCP_CALLBACK_PORT-}"
     _host_config_validate_value DF_CODEX_MCP_CALLBACK_PORT "$_value" "$1"
 }
 

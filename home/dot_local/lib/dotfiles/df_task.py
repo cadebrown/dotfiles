@@ -24,12 +24,32 @@ def timestamp():
     return datetime.now(UTC).isoformat(timespec="milliseconds")
 
 
-def state_root():
+def state_host():
     machine = Path("/etc/machine-id")
     identity = machine.read_text().strip() if machine.is_file() else socket.gethostname()
-    host = hashlib.sha256(identity.encode()).hexdigest()[:16]
+    return hashlib.sha256(identity.encode()).hexdigest()[:16]
+
+
+def legacy_state_root():
     base = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state"))
-    return Path(os.environ.get("DF_TASK_STATE_DIR", base / "dotfiles/tasks" / host))
+    return base / "dotfiles/tasks" / state_host()
+
+
+def state_root():
+    explicit = os.environ.get("DF_TASK_STATE_DIR")
+    if explicit:
+        return Path(explicit)
+    state = os.environ.get("DF_STATE_ROOT")
+    if state:
+        return Path(state) / "dotfiles/tasks" / state_host()
+    return legacy_state_root()
+
+
+def legacy_fallback_root():
+    if os.environ.get("DF_TASK_STATE_DIR") or not os.environ.get("DF_STATE_ROOT"):
+        return None
+    legacy = legacy_state_root()
+    return legacy if legacy != state_root() else None
 
 
 def private_directory(path):
@@ -46,6 +66,13 @@ def session_path(session):
     return state_root() / (session + ".json")
 
 
+def legacy_session_path(session):
+    # Validate the ID through the canonical path constructor first.
+    session_path(session)
+    legacy = legacy_fallback_root()
+    return legacy / (session + ".json") if legacy else None
+
+
 def read_record(path):
     if not path.exists():
         return None
@@ -60,16 +87,30 @@ def read_record(path):
     return data
 
 
+def record_path(session):
+    path = session_path(session)
+    if path.exists():
+        return path
+    legacy = legacy_session_path(session)
+    return legacy if legacy and legacy.exists() else path
+
+
 @contextmanager
 def transaction(session, create=True):
     path = session_path(session)
-    if not create and not path.exists():
+    legacy = legacy_session_path(session)
+    if not create and not path.exists() and not (legacy and legacy.exists()):
         yield None
         return
+    # Validate a legacy fallback before creating a new target directory. An
+    # unsafe legacy symlink or oversized file must not leave partial target
+    # state behind merely because a migration was attempted.
+    legacy_record = read_record(legacy) if legacy and legacy.exists() and not path.exists() else None
     private_directory(path.parent)
     descriptor = os.open(path.with_suffix(".lock"), os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
-        if os.fstat(descriptor).st_uid != os.getuid():
+        lock_metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(lock_metadata.st_mode) or lock_metadata.st_uid != os.getuid():
             raise ValueError("task lock belongs to another user")
         deadline = time.monotonic() + 0.2
         while True:
@@ -81,6 +122,11 @@ def transaction(session, create=True):
                     raise TimeoutError("task checkpoint is busy; retry the command")
                 time.sleep(0.005)
         record = read_record(path)
+        if record is None:
+            if legacy_record is not None:
+                # The target lock serializes first migration. Target wins once
+                # it exists, so a later legacy update cannot overwrite it.
+                record = legacy_record
         if record is None:
             if not create:
                 yield None
@@ -214,7 +260,7 @@ def track_job(args):
 
 
 def inspect_record(session):
-    record = read_record(session_path(session))
+    record = read_record(record_path(session))
     if record is None:
         raise ValueError("no checkpoint for that session")
     for job in record["jobs"].values():
@@ -258,7 +304,13 @@ def main():
             hook(payload)
             print("{}")
         elif args.command == "list":
-            paths = sorted(state_root().glob("*.json"), key=lambda path: path.stat().st_mtime, reverse=True)[:20]
+            paths = list(state_root().glob("*.json"))
+            legacy = legacy_fallback_root()
+            if legacy and legacy.is_dir():
+                # A newer target checkpoint wins for duplicate session IDs.
+                target_names = {path.name for path in paths}
+                paths.extend(path for path in legacy.glob("*.json") if path.name not in target_names)
+            paths = sorted(paths, key=lambda path: path.stat().st_mtime, reverse=True)[:20]
             records = [read_record(path) for path in paths]
             print(json.dumps([{key: record.get(key) for key in ("session_id", "title", "cwd", "observed_state", "updated_at")} for record in records], indent=2))
         else:
