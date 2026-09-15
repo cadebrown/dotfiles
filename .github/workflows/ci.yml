@@ -108,4 +108,6 @@ jobs:
           persist-credentials: false
 
       - name: Run core-profile bootstrap suite
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: ./tests/run.sh

@@ -163,6 +163,21 @@ TOML
     [[ "$output" == *"requires Darwin"* ]]
 }
 
+@test "Docker bootstrap forwards an optional GitHub token by name only" {
+    local token='fixture-secret-token'
+    run env PATH="$BIN:$PATH" DOCKER_BUILD=0 GITHUB_TOKEN="$token" /bin/bash "$SOURCE_REPO/tests/run.sh"
+    [ "$status" -eq 0 ]
+    grep -Eq '^docker run .* -e GITHUB_TOKEN( |$)' "$CI_LOG"
+    [ "$(grep -Fc -- '-e GITHUB_TOKEN' "$CI_LOG")" -eq 1 ]
+    ! grep -Fq "$token" "$CI_LOG"
+
+    : > "$CI_LOG"
+    run env -u GITHUB_TOKEN PATH="$BIN:$PATH" DOCKER_BUILD=0 /bin/bash "$SOURCE_REPO/tests/run.sh"
+    [ "$status" -eq 0 ]
+    grep -Eq '^docker run .* -e GITHUB_TOKEN( |$)' "$CI_LOG"
+    [ "$(grep -Fc -- '-e GITHUB_TOKEN' "$CI_LOG")" -eq 1 ]
+}
+
 @test "CI shell catches the dynamic-source SC1090 regression" {
     command -v shellcheck >/dev/null || skip 'ShellCheck is not installed in this environment'
     local real_shellcheck
@@ -187,6 +202,7 @@ TOML
         grep -Eq "^[[:space:]]+run: ./tests/ci.sh $mode$" "$workflow"
     done
     grep -Eq '^[[:space:]]+run: ./tests/run.sh$' "$workflow"
+    grep -Eq '^[[:space:]]+GITHUB_TOKEN: \$\{\{ github\.token \}\}$' "$workflow"
     # Commands belong in ci.sh; inline copies would let local and hosted gates drift.
     ! grep -Eq '^[[:space:]]+(shellcheck -|bats |npm --prefix site run (check|verify)|tofu (fmt|init|validate))' "$workflow"
 }

@@ -7,6 +7,7 @@
 # Environment variables:
 #   DF_NAME     — display name for chezmoi config (default: "Test User")
 #   DF_EMAIL    — email for chezmoi config (default: "test@example.com")
+#   GITHUB_TOKEN — optional GitHub token forwarded to the bootstrap container
 #   DOCKER_BUILD     — set to 0 to skip rebuilding the image (faster re-runs)
 
 set -euo pipefail
@@ -30,5 +31,6 @@ docker run --rm \
     -v "$REPO_ROOT:/home/user/dotfiles" \
     -e DF_NAME="${DF_NAME:-Test User}" \
     -e DF_EMAIL="${DF_EMAIL:-test@example.com}" \
+    -e GITHUB_TOKEN \
     dotfiles-test \
     bash /home/user/dotfiles/tests/entrypoint.sh
