@@ -18,6 +18,6 @@ exec bash -c '
     _repo="${DF_DOTFILES_REPO:-$HOME/dotfiles}"
     source "$_repo/install/agent-runtime.sh" --runtime-only
     _python="$PYTHON_ENV/bin/python"
-    [[ -x "$_python" ]] || { printf "df-task requires the managed Python runtime: %s\n" "$_python" >&2; exit 1; }
+    [[ -x "$_python" ]] || { printf "%s\n" "Run install/python.sh before using df-task" >&2; exit 1; }
     exec "$_python" "$HOME/.local/lib/dotfiles/df_task.py" "$@"
 ' df-task "$@"
