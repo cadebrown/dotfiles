@@ -115,3 +115,43 @@ EOF
     [ "$status" -eq 0 ]
     [ "$output" = $'Bearer quote" slash\\' ]
 }
+
+@test "Codex healthcheck requires the GitHub helper in its MCP section" {
+    local config="$BATS_TEST_TMPDIR/config.toml"
+    mkdir -p "$TEST_HOME/.claude"
+    cp "$HELPER" "$TEST_HOME/.claude/gh-mcp-headers.sh"
+    chmod +x "$TEST_HOME/.claude/gh-mcp-headers.sh"
+
+    run env HOME="$TEST_HOME" REPO="$REPO" CONFIG="$config" bash -c '
+        source "$REPO/install/codex.sh"
+        _emit_mcp_blocks_to "$CONFIG" >/dev/null
+        _check_github_mcp_config "$CONFIG"
+    '
+    [ "$status" -eq 0 ]
+}
+
+@test "Codex healthcheck rejects legacy GitHub bearer config and a missing helper" {
+    local config="$BATS_TEST_TMPDIR/config.toml"
+    cat > "$config" <<'EOF'
+[mcp_servers.github]
+bearer_token_env_var = "GH_TOKEN"
+EOF
+
+    run env HOME="$TEST_HOME" REPO="$REPO" CONFIG="$config" bash -c '
+        source "$REPO/install/codex.sh"
+        _check_github_mcp_config "$CONFIG"
+    '
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'missing http_headers_helper'* ]]
+
+    cat > "$config" <<EOF
+[mcp_servers.github]
+http_headers_helper = "bash \"$TEST_HOME/.claude/gh-mcp-headers.sh\""
+EOF
+    run env HOME="$TEST_HOME" REPO="$REPO" CONFIG="$config" bash -c '
+        source "$REPO/install/codex.sh"
+        _check_github_mcp_config "$CONFIG"
+    '
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'Missing executable GitHub MCP headers helper'* ]]
+}

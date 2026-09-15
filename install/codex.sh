@@ -826,6 +826,25 @@ _toml_section_key_matches() {
     ' "$_file"
 }
 
+_check_github_mcp_config() {
+    local _config="$1" _helper="$HOME/.claude/gh-mcp-headers.sh" _command _line
+    _command="$(_toml_escape "bash \"$_helper\"")"
+    _line="http_headers_helper = \"$_command\""
+    if ! GITHUB_MCP_HELPER_LINE="$_line" awk '
+        $0 == "[mcp_servers.github]" { in_section = 1; next }
+        in_section && /^\[/ { exit 1 }
+        in_section && $0 == ENVIRON["GITHUB_MCP_HELPER_LINE"] { found = 1; exit }
+        END { exit(found ? 0 : 1) }
+    ' "$_config"; then
+        die "GitHub MCP missing http_headers_helper in $_config (auth=gh)"
+        return 1
+    fi
+    if [[ ! -x "$_helper" ]]; then
+        die "Missing executable GitHub MCP headers helper: $_helper"
+        return 1
+    fi
+}
+
 _check_setup() {
     local _config _rules _hooks _guard _profile _pfile _guard_rc _hook_hash _runtime_guard_rc
     local _want_model _mcp_name
@@ -868,8 +887,7 @@ _check_setup() {
         || die "Open-world app tools are not enabled in $_config"
     ! grep -q '^\[profiles\.' "$_config" \
         || die "Legacy [profiles.*] tables in $_config — Codex 0.134+ ignores them (profiles live in ~/.codex/<name>.config.toml)"
-    grep -q 'bearer_token_env_var = "GH_TOKEN"' "$_config" \
-        || die "GitHub MCP missing bearer_token_env_var in $_config (auth=gh)"
+    _check_github_mcp_config "$_config"
 
     # Every registry server, including disabled optional profiles, must exist
     # and use the prompt-free server-level default. Risk still informs clients
