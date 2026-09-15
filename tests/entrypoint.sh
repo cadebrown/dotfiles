@@ -33,13 +33,15 @@ echo ""
 # DF_DO_PACKAGES=0: Homebrew Linux needs Docker-in-Docker, not available here
 # DF_DO_GO=0 / DF_DO_LOCAL_LLM=0: both depend on Brewfile commands in this image
 # DF_DO_CLAUDE=0:  Claude plugins require a running claude binary + auth
+# DF_DO_CODEX=1: install the complete native runtime used by hook validation;
+# it is no longer provided as a side effect of the npm package list.
 # DF_DO_MEMORY=0 / DF_DO_SKILLS=0: avoid model downloads and remote skill installs
 # DF_DO_JULIA=0 / DF_DO_LEAN=0 / DF_DO_LATEX=0: large language toolchains are
 #   covered by static contract tests rather than downloaded on every test run.
 # DF_DO_QUARTO=0: the archive installer is covered by the same contract tests.
 # DF_DO_OVERLAYS=0: local/private overlay bootstraps have their own dependencies.
 DF_DO_PACKAGES=0 DF_DO_LLDB=0 DF_DO_GO=0 DF_DO_LOCAL_LLM=0 \
-    DF_DO_CLAUDE=0 DF_DO_CODEX=0 DF_DO_MEMORY=0 DF_DO_SKILLS=0 \
+    DF_DO_CLAUDE=0 DF_DO_CODEX=1 DF_DO_MEMORY=0 DF_DO_SKILLS=0 \
     DF_DO_QUARTO=0 DF_DO_JULIA=0 DF_DO_LEAN=0 DF_DO_LATEX=0 \
     DF_DO_OVERLAYS="${DF_DO_OVERLAYS:-0}" \
     bash "$DOTFILES/bootstrap.sh"

@@ -80,6 +80,6 @@ run_limits() {
 @test "every login and interactive shell template applies the shared limit policy" {
     local template
     for template in dot_zprofile.tmpl dot_bash_profile.tmpl dot_zshrc.tmpl dot_bashrc.tmpl; do
-        rg -Fq '{{ template "resource-limits.sh" . }}' "$BATS_TEST_DIRNAME/../home/$template"
+        grep -Fq '{{ template "resource-limits.sh" . }}' "$BATS_TEST_DIRNAME/../home/$template"
     done
 }
