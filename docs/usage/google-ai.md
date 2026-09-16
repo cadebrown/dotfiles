@@ -38,8 +38,9 @@ separate; it cannot determine a paid subscription or a model's usable quota.
 | gcloud administration | `bash ~/dotfiles/install/auth.sh gcloud` | gcloud's own account login |
 | Cloud MCP | `bash ~/dotfiles/install/auth.sh google` | Application Default Credentials (ADC) |
 | Vertex model APIs | `bash ~/dotfiles/install/auth.sh vertex` | ADC, explicit project/region, and Vertex API enablement |
-| Existing Workspace MCP | `bash ~/dotfiles/install/auth.sh workspace` | Separate Desktop OAuth client in `~/.google.env` |
-| Workspace CLI | `bash ~/dotfiles/install/auth.sh workspace-cli` | Separate gws consent; read-only Drive/Gmail/Calendar scope selection |
+| Workspace MCP client | `bash ~/dotfiles/install/auth.sh workspace` | Separate Desktop OAuth client in `~/.google.env`; see [Google Workspace](/usage/google-workspace/) |
+| Workspace CLI (read) | `bash ~/dotfiles/install/auth.sh workspace-cli` | Separate gws consent; read-only Drive/Gmail/Calendar scope selection |
+| Workspace CLI (edit) | `bash ~/dotfiles/install/auth.sh workspace-cli-edit` | Separate selected consent for Drive, Docs, Slides, and Sheets |
 
 The main auth walk offers Gemini API-key storage and Gemini CLI login. Open a
 new login shell after storing a key, or run `. ~/.gemini.env` in the current
@@ -192,16 +193,13 @@ dialogue, proactive audio, or asynchronous tools.
 
 ## Workspace and optional services
 
-`gws` covers Drive, Gmail, Calendar, Sheets, Docs and other discovery-backed
-Workspace APIs. Its Google-hosted repository explicitly says it is **not an
-officially supported Google product**, so this setup pins 0.22.5. Its npm
-postinstall downloads a matching binary and checks its SHA-256. The auth
-helper maps the existing Workspace OAuth client only into the gws process;
-gws keeps its own tokens. It starts with read-only scopes for three services.
-Selecting more access is a separate consent action. Do not run `gws auth setup`
-casually: it can create a project and enable APIs. Unverified personal-account
-OAuth clients should select a few services rather than the large recommended
-scope bundle. [Upstream usage and auth](https://github.com/googleworkspace/cli).
+The Workspace MCP and `gws` CLI use a separate Desktop OAuth client and token
+store from Gemini, gcloud, and ADC. The managed MCP pin exposes Gmail, Calendar,
+Drive, Docs, Slides, and Sheets with its complete upstream tool tier; those
+tools can make external changes. Read the dedicated [Google Workspace guide](/usage/google-workspace/)
+before authorizing it. The `gws` CLI remains an independent, Google-hosted
+community project rather than an officially supported Google product. Do not
+run `gws auth setup` casually: it can create Cloud state and enable APIs.
 
 | Addition | Useful for | Install / auth approach |
 | --- | --- | --- |

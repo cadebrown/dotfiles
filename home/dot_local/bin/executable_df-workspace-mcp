@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Launch the managed Workspace MCP with the Desktop OAuth client available to
+# GUI-launched harnesses without putting credentials in their configuration.
+set -euo pipefail
+
+_repo="${DF_DOTFILES_REPO:-$HOME/dotfiles}"
+# shellcheck source=install/agent-runtime.sh
+source "$_repo/install/agent-runtime.sh" --runtime-only >&2
+export PATH="$ARCH_BIN:$HOME/.local/bin:$PATH"
+
+# Explicit process credentials and client-secret file mechanisms win. A
+# Dock-launched client normally has neither, so load the owner-only client file
+# for this child process only.
+if [[ -z "${GOOGLE_OAUTH_CLIENT_ID:-}${GOOGLE_OAUTH_CLIENT_SECRET:-}${GOOGLE_CLIENT_SECRET_PATH:-}${GOOGLE_CLIENT_SECRETS:-}" && -r "$HOME/.google.env" ]]; then
+    # shellcheck source=/dev/null
+    source "$HOME/.google.env"
+fi
+
+_uvx="$(command -v uvx || true)"
+[[ -n "$_uvx" ]] || { printf '%s\n' "Run install/python.sh before using df-workspace-mcp" >&2; exit 1; }
+
+# workspace-mcp's local OAuth callback is loopback HTTP; retain this only in
+# the child environment so it never changes the harness process globally.
+export OAUTHLIB_INSECURE_TRANSPORT=1
+exec "$_uvx" workspace-mcp==1.26.2 "$@"

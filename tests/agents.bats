@@ -13,6 +13,7 @@ setup() {
     bash -n "$REPO/install/agent-tools.sh"
     bash -n "$REPO/home/dot_local/bin/executable_df-agent-doctor"
     bash -n "$REPO/home/dot_local/bin/executable_df-cursor-worker"
+    bash -n "$REPO/home/dot_local/bin/executable_df-workspace-mcp"
     bash -n "$REPO/install/cursor.sh"
 }
 
@@ -64,7 +65,7 @@ setup() {
     [ -x "$evaluator" ]
     cmp -s "$REPO/home/dot_local/bin/executable_plugin-eval" "$evaluator"
     local helper
-    for helper in df-task df-browser df-google-mcp; do
+    for helper in df-task df-browser df-google-mcp df-workspace-mcp; do
         cmp -s "$REPO/home/dot_local/bin/executable_$helper" "$(dirname "$destination")/$helper"
         cmp -s "$REPO/home/dot_local/bin/executable_$helper" "$fake_home/.local/bin/$helper"
         [ -x "$fake_home/.local/bin/$helper" ]

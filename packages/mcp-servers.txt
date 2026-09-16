@@ -150,23 +150,24 @@ cloud-storage    http https://storage.googleapis.com/storage/mcp       auth=gclo
 bigquery         http https://bigquery.googleapis.com/mcp              auth=gcloud profile=cloud risk=external-write
 
 # === Google Workspace: community server (full read+WRITE) ===
-# taylorwilsdon/google_workspace_mcp — full Gmail (incl. send), Calendar (create/
-# modify), Drive (edit/delete), Docs/Sheets. Chosen over Google's official
-# Workspace MCP because (a) those are Developer-Preview + read-mostly, and (b)
-# their restricted scopes are blocked for gcloud's generic OAuth client — so
-# Workspace needs a self-made OAuth client EITHER WAY, and at equal setup cost
-# full write beats read-only. Uses the STANDARD Gmail/Calendar/Drive APIs (no
-# Preview Program needed).
+# taylorwilsdon/google_workspace_mcp exposes the selected Gmail (including
+# send), Calendar, Drive, Docs, Slides, and Sheets tools through the standard
+# Workspace APIs. It uses this machine's Desktop OAuth client; gcloud's generic
+# OAuth client cannot request the restricted Workspace scopes. This is a
+# community server. Do not characterize Google's official Workspace MCP by its
+# availability or write surface: those change independently.
 #
 # Setup: create a Desktop OAuth client in your GCP project + consent screen with
 # yourself as a test user, then `bash install/auth.sh workspace` to store the
-# id/secret in ~/.google.env (auto-sourced by login shells, so this stdio server
-# inherits them — and Codex too). First tool call opens a browser to authorize;
-# tokens cache encrypted under ~/.workspace-mcp/. OAUTHLIB_INSECURE_TRANSPORT=1
+# id/secret in ~/.google.env. df-workspace-mcp loads that owner-only file when
+# a GUI-launched client has no explicit credential mechanism. First tool call
+# opens a browser to authorize;
+# tokens are stored by upstream under ~/.google_workspace_mcp/credentials.
+# OAUTHLIB_INSECURE_TRANSPORT=1
 # lets the localhost callback (http://localhost:8000/oauth2callback) complete.
 # Registers inert until ~/.google.env exists — harmless, like chrome-devtools
 # without Chrome.
-google-workspace stdio profile=workspace risk=external-write cmd: env OAUTHLIB_INSECURE_TRANSPORT=1 uvx workspace-mcp==1.26.0 --tools gmail drive calendar
+google-workspace stdio profile=workspace risk=external-write cmd: df-workspace-mcp --tools gmail drive calendar docs slides sheets --tool-tier complete
 
 # === Desktop automation (macOS) ===
 # macos-automator: run AppleScript/JXA — control any Mac app (Finder, Mail,

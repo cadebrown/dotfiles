@@ -141,6 +141,24 @@ EOF
     ! grep -Fq 'auth setup' "$CALLS"
 }
 
+@test "workspace CLI edit login selects Docs and Slides scopes without printing client credentials" {
+    cat > "$HOME/.google.env" <<'EOF'
+export GOOGLE_OAUTH_CLIENT_ID=client\ id
+export GOOGLE_OAUTH_CLIENT_SECRET=client\ secret
+export UNRELATED_TOKEN=preserve\ me
+EOF
+
+    run bash "$REPO/install/auth.sh" workspace-cli-edit
+
+    [ "$status" -eq 0 ]
+    grep -Fx 'gws auth login -s drive,docs,slides,sheets|client id|client secret' "$CALLS"
+    ! grep -Fq 'auth setup' "$CALLS"
+    [[ "$output" == *"may replace its previous selected-scope grant"* ]]
+    [[ "$output" != *"client id"* ]]
+    [[ "$output" != *"client secret"* ]]
+    grep -Fx 'export UNRELATED_TOKEN=preserve\ me' "$HOME/.google.env"
+}
+
 @test "vertex command logs into ADC and only enables its API after opt-in" {
     run bash -c "printf 'y\\n' | bash '$REPO/install/auth.sh' vertex"
 

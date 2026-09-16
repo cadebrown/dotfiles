@@ -11,7 +11,7 @@ log_section "agent helper commands"
 
 ensure_dir "$ARCH_BIN"
 
-for _command in df-agent-doctor plugin-eval local-agent df-task df-browser df-google-mcp df-gemini; do
+for _command in df-agent-doctor plugin-eval local-agent df-task df-browser df-google-mcp df-workspace-mcp df-gemini; do
     _source="$DF_ROOT/home/dot_local/bin/executable_$_command"
     _destination="$ARCH_BIN/$_command"
     [[ -f "$_source" ]] || die "Missing $_command source: $_source"
@@ -34,7 +34,7 @@ install -m 644 "$DF_ROOT/home/dot_local/lib/dotfiles/df_task.py" \
 # MCP clients launched from the Dock need architecture-neutral entrypoints.
 if [[ "$ARCH_BIN" != "$HOME/.local/bin" ]]; then
     ensure_dir "$HOME/.local/bin"
-    for _command in df-task df-browser df-google-mcp df-gemini; do
+    for _command in df-task df-browser df-google-mcp df-workspace-mcp df-gemini; do
         install -m 755 "$DF_ROOT/home/dot_local/bin/executable_$_command" \
             "$HOME/.local/bin/$_command"
     done

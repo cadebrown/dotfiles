@@ -14,6 +14,8 @@
 #   bash auth.sh google-status    # focused, non-secret Google/Gemini state
 #   bash auth.sh vertex           # ADC login for Vertex AI (optional API enable)
 #   bash auth.sh workspace        # set Workspace MCP OAuth client (community server)
+#   bash auth.sh workspace-cli    # run Workspace CLI login (read-only)
+#   bash auth.sh workspace-cli-edit # consent to selected Workspace edit APIs
 #   bash auth.sh gh               # run `gh auth login` (browser flow)
 #   bash auth.sh gcloud           # run `gcloud auth login` (browser flow)
 #
@@ -588,6 +590,23 @@ _gemini_cli_login() {
 }
 
 _workspace_cli_login() {
+    _workspace_cli_login_with_scopes \
+        "read-only" \
+        "read-only gws login for Drive, Gmail, and Calendar" \
+        "drive,gmail,calendar" \
+        "--readonly"
+}
+
+_workspace_cli_edit_login() {
+    _workspace_cli_login_with_scopes \
+        "editable" \
+        "gws login for Drive, Docs, Slides, and Sheets" \
+        "drive,docs,slides,sheets"
+}
+
+_workspace_cli_login_with_scopes() {
+    local access="$1" description="$2" scopes="$3"
+    shift 3
     if ! has gws; then
         log_warn "gws Workspace CLI not installed — skipping"
         return 0
@@ -602,10 +621,16 @@ _workspace_cli_login() {
         log_info "\`gws auth setup\` can create Cloud state, so this command does not run it automatically."
         return 0
     fi
-    log_info "Launching read-only gws login for Drive, Gmail, and Calendar."
+    log_info "Launching $description."
+    if [[ "$access" == "editable" ]]; then
+        log_warn "This grants gws write-capable Workspace scopes; review the browser consent screen."
+        log_warn "gws may replace its previous selected-scope grant; re-consent the complete scope set you need."
+    fi
+    # gws owns its own token store. This helper only supplies the existing
+    # Desktop client to its child process and never rewrites ~/.google.env.
     GOOGLE_WORKSPACE_CLI_CLIENT_ID="$client_id" \
         GOOGLE_WORKSPACE_CLI_CLIENT_SECRET="$client_secret" \
-        gws auth login --readonly -s drive,gmail,calendar
+        gws auth login "$@" -s "$scopes"
 }
 
 _vertex_adc_login() {
@@ -713,7 +738,7 @@ _mode="${1:-walk}"
 # terminal mode.
 if (( $# > 1 )); then
     case "$_mode" in
-        google-status|gemini-cli|vertex|workspace-cli|workspace|google|gcloud|gcloud-cli|gh|github-cli)
+        google-status|gemini-cli|vertex|workspace-cli|workspace-cli-edit|workspace|google|gcloud|gcloud-cli|gh|github-cli)
             _mode="__multi__"
             ;;
     esac
@@ -758,6 +783,10 @@ case "$_mode" in
         log_section "Workspace CLI login (read-only)"
         _workspace_cli_login
         ;;
+    workspace-cli-edit)
+        log_section "Workspace CLI login (selected write scopes)"
+        _workspace_cli_edit_login
+        ;;
     workspace)
         # Community Workspace MCP server creds: walk both client vars (→ ~/.google.env).
         log_section "Workspace MCP OAuth client (community full-write server)"
@@ -770,7 +799,7 @@ case "$_mode" in
         _gcloud_login
         ;;
     -h|--help|help)
-        printf 'Usage: %s [walk|status|google-status|gh|gcloud|google|gemini-cli|vertex|workspace|workspace-cli|<service>]\n\n' "$0"
+        printf 'Usage: %s [walk|status|google-status|gh|gcloud|google|gemini-cli|vertex|workspace|workspace-cli|workspace-cli-edit|<service>]\n\n' "$0"
         printf 'Services:\n'
         for row in "${_SERVICE_DEFS[@]}"; do
             printf '  %-12s %s\n' "$(_field "$row" 1)" "$(_field "$row" 4)"
@@ -781,6 +810,7 @@ case "$_mode" in
         printf '  %-12s %s\n' "vertex" 'ADC login for Vertex AI (+ optional aiplatform.googleapis.com enable)'
         printf '  %-12s %s\n' "workspace" 'Set Workspace MCP OAuth client (id+secret) for the community server'
         printf '  %-12s %s\n' "workspace-cli" 'Run read-only gws login using the existing Workspace OAuth client'
+        printf '  %-12s %s\n' "workspace-cli-edit" 'Consent to selected gws edit scopes for Drive, Docs, Slides, and Sheets'
         printf '  %-12s %s\n' "gh" 'Run `gh auth login` (browser flow)'
         printf '  %-12s %s\n' "gcloud" 'Run `gcloud auth login` (browser flow + optional ADC)'
         ;;
@@ -822,6 +852,10 @@ case "$_mode" in
                 workspace-cli)
                     log_section "Workspace CLI login (read-only)"
                     _workspace_cli_login
+                    ;;
+                workspace-cli-edit)
+                    log_section "Workspace CLI login (selected write scopes)"
+                    _workspace_cli_edit_login
                     ;;
                 *)
                     if row="$(_find_service_row "$_svc")"; then

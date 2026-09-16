@@ -88,6 +88,7 @@ fast_checks() {
         tests/fish.bats \
         tests/gwt.bats \
         tests/google-auth.bats \
+        tests/workspace-mcp.bats \
         tests/gh-mcp-headers.bats \
         tests/host-config.bats \
         tests/lean.bats \

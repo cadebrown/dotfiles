@@ -49,6 +49,7 @@ export const sidebar = [
     item('WebMCP', 'usage/webmcp'),
     item('Google Cloud MCP', 'usage/google-cloud-mcp'),
     item('Gemini & Google APIs', 'usage/google-ai'),
+    item('Google Workspace', 'usage/google-workspace'),
     item('Creative work', 'usage/creative-workflows'),
     item('Game development', 'usage/gamedev'),
     item('Mathematics', 'usage/math'),

@@ -381,7 +381,7 @@
     {
       "id": "google-ai",
       "title": "Gemini and Google APIs",
-      "description": "Installs Gemini and Workspace CLIs, separates Google auth paths, and provides a locked Developer API and Live audio probe.",
+      "description": "Installs Gemini and Workspace CLIs, separates Gemini, Cloud, and selected Workspace consent paths, exposes a complete Workspace MCP tool tier and shared authoring workflow, and provides a locked Developer API and Live audio probe.",
       "page": "/usage/google-ai/",
       "sources": [
         "install/gemini-api.py",
@@ -389,6 +389,17 @@
         "home/dot_local/bin/executable_df-gemini"
       ],
       "demo": "df-gemini --check-runtime"
+    },
+    {
+      "id": "google-workspace",
+      "title": "Google Workspace",
+      "description": "Configures a pinned, complete-tier Workspace MCP with separate Desktop OAuth consent and a shared native Docs, Sheets, and Slides authoring workflow.",
+      "page": "/usage/google-workspace/",
+      "sources": [
+        "home/dot_local/bin/executable_df-workspace-mcp",
+        "home/dot_claude/skills/google-workspace-flow/SKILL.md"
+      ],
+      "demo": "bash install/auth.sh help"
     }
   ]
 }
