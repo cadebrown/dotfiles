@@ -110,6 +110,60 @@ setup() {
     [[ "$output" == *"Could not parse Codex TOML"* ]]
 }
 
+@test "Codex credential healthcheck accepts missing and JSON object stores without changing them" {
+    mkdir -p "$RUNTIME_HOME"
+
+    run env HOME="$LEGACY_HOME" CODEX_HOME="$RUNTIME_HOME" DF_STATE_ROOT="$BATS_TEST_TMPDIR/state" DF_USE_PLAT=0 \
+        bash -c 'source "$REPO/install/codex.sh"; _check_credentials_store'
+    [ "$status" -eq 0 ]
+    [ ! -e "$RUNTIME_HOME/.credentials.json" ]
+
+    printf '%s\n' '{}' > "$RUNTIME_HOME/.credentials.json"
+    local before
+    before="$(cksum "$RUNTIME_HOME/.credentials.json")"
+    run env HOME="$LEGACY_HOME" CODEX_HOME="$RUNTIME_HOME" DF_STATE_ROOT="$BATS_TEST_TMPDIR/state" DF_USE_PLAT=0 \
+        bash -c 'source "$REPO/install/codex.sh"; _check_credentials_store'
+    [ "$status" -eq 0 ]
+    [ "$(cksum "$RUNTIME_HOME/.credentials.json")" = "$before" ]
+}
+
+@test "Codex credential healthcheck rejects empty, malformed, whitespace-only, non-object, and multi-document stores" {
+    mkdir -p "$RUNTIME_HOME"
+
+    : > "$RUNTIME_HOME/.credentials.json"
+    run env HOME="$LEGACY_HOME" CODEX_HOME="$RUNTIME_HOME" DF_STATE_ROOT="$BATS_TEST_TMPDIR/state" DF_USE_PLAT=0 \
+        bash -c 'source "$REPO/install/codex.sh"; _check_credentials_store'
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"credentials store is empty"* ]]
+
+    printf '%s\n' '{' > "$RUNTIME_HOME/.credentials.json"
+    local malformed_before
+    malformed_before="$(cksum "$RUNTIME_HOME/.credentials.json")"
+    run env HOME="$LEGACY_HOME" CODEX_HOME="$RUNTIME_HOME" DF_STATE_ROOT="$BATS_TEST_TMPDIR/state" DF_USE_PLAT=0 \
+        bash -c 'source "$REPO/install/codex.sh"; _check_credentials_store'
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"credentials store is malformed JSON"* ]]
+    [ "$(cksum "$RUNTIME_HOME/.credentials.json")" = "$malformed_before" ]
+
+    printf '%s\n' '[]' > "$RUNTIME_HOME/.credentials.json"
+    run env HOME="$LEGACY_HOME" CODEX_HOME="$RUNTIME_HOME" DF_STATE_ROOT="$BATS_TEST_TMPDIR/state" DF_USE_PLAT=0 \
+        bash -c 'source "$REPO/install/codex.sh"; _check_credentials_store'
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"credentials store must contain exactly one JSON object"* ]]
+
+    printf ' \n\t' > "$RUNTIME_HOME/.credentials.json"
+    run env HOME="$LEGACY_HOME" CODEX_HOME="$RUNTIME_HOME" DF_STATE_ROOT="$BATS_TEST_TMPDIR/state" DF_USE_PLAT=0 \
+        bash -c 'source "$REPO/install/codex.sh"; _check_credentials_store'
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"credentials store must contain exactly one JSON object"* ]]
+
+    printf '%s\n' '{} {}' > "$RUNTIME_HOME/.credentials.json"
+    run env HOME="$LEGACY_HOME" CODEX_HOME="$RUNTIME_HOME" DF_STATE_ROOT="$BATS_TEST_TMPDIR/state" DF_USE_PLAT=0 \
+        bash -c 'source "$REPO/install/codex.sh"; _check_credentials_store'
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"credentials store must contain exactly one JSON object"* ]]
+}
+
 @test "Codex runtime leaves scratch-managed legacy Codex links unchanged" {
     local scratch="$BATS_TEST_TMPDIR/scratch"
     mkdir -p "$scratch/.paths/.codex" "$LEGACY_HOME/.codex"

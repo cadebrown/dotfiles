@@ -2397,6 +2397,54 @@ layer warning after moving `CODEX_HOME`. Inspect the effective config and actual
 project root. Do not trust an entire home directory just to silence it. The
 warning does not mean that the active host-local global config was disabled.
 
+## Codex MCP login fails with EOF parsing .credentials.json
+
+**Symptom.** HTTP MCP servers report `Unknown` authentication and login fails
+with `failed to parse credentials file` and `EOF while parsing a value at line
+1 column 0`. The active `$CODEX_HOME/.credentials.json` is empty. A second
+login can separately report `Address in use` when the first still owns the
+configured OAuth callback port.
+
+**Root cause.** An empty credential file is invalid JSON, so Codex cannot read
+the store to update it. Disk exhaustion can leave a credential write
+incomplete. On Blackwell, inspected September 23, 2026, the ext4 credential
+file's modification time was September 16 at `04:58:24.871558 UTC`; the Codex
+`logs_2.sqlite` database contained 24 `No space left on device` errors in the
+`04:58:20–04:58:30 UTC` window. This strongly implicates a failed write during
+disk exhaustion; the logs do not identify the credential writer itself.
+Freeing space afterward does not repair the file. The
+[Codex 0.154.0 credential writer](https://github.com/openai/codex/blob/rust-v0.154.0/codex-rs/rmcp-client/src/oauth.rs#L1082-L1107)
+calls `set_len(0)` before `write_all`, so a failed replacement write can leave
+an empty store. A healthcheck detects this damage; it cannot make upstream
+writes atomic.
+
+**Confirm.** Check the active directory, capacity, and callback listener without
+printing credentials. On Linux:
+
+```sh
+runtime_dir="${CODEX_HOME:-$HOME/.codex}"
+stat -c '%n bytes=%s modified=%y' "$runtime_dir/.credentials.json"
+df -h "$runtime_dir"
+df -i "$runtime_dir"
+ss -ltnp 'sport = :45231' # Blackwell; use the configured port on other hosts
+bash ~/dotfiles/install/codex.sh check
+```
+
+**Fix.** Resolve capacity exhaustion first. End an outstanding login in its
+original terminal before starting another. Preserve the damaged file privately;
+if it is confirmed empty, replace it atomically with a mode-`0600` file
+containing `{}`. Do not overwrite a nonempty store or silently reset it during
+bootstrap. Reauthenticate each affected server and verify a read-only tool
+operation. A successful `codex mcp list --json` with `not_logged_in` confirms
+that parsing is repaired, not that authentication is restored. Legacy NFS
+credentials may contain stale rotating refresh tokens; their presence alone
+does not establish a safe recovery copy.
+
+Keep active SQLite state host-local; [SQLite WAL does not support network filesystems](https://sqlite.org/wal.html#overview).
+Relocating the runtime does not fix a
+failed credential writer; protect runtime storage from build/cache exhaustion
+and retain private, consistent backups. See [Codex runtime storage](../agents/codex.md).
+
 ## Codex lifecycle hook times out after three seconds
 
 **Symptom.** `Hook failed: hook timed out after 3s` appears at a lifecycle event,

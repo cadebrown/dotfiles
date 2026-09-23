@@ -845,6 +845,26 @@ _check_github_mcp_config() {
     fi
 }
 
+_check_credentials_store() {
+    local _credentials="${CODEX_HOME:-$HOME/.codex}/.credentials.json"
+
+    # A missing store simply means this host has not authenticated yet. Do not
+    # create, replace, or otherwise repair it here: credentials are owned by
+    # Codex's login flow, and a damaged store must remain available for
+    # inspection until the operator chooses how to recover it.
+    [[ ! -e "$_credentials" ]] && return 0
+    [[ -f "$_credentials" ]] \
+        || die "Codex credentials store is not a regular file: $_credentials"
+    [[ -s "$_credentials" ]] \
+        || die "Codex credentials store is empty: $_credentials; preserve the damaged file and repair the credential store before 'codex mcp login <server>' (see docs/usage/troubleshooting.md)"
+
+    has jq || die "jq is required to validate Codex credentials store"
+    jq empty "$_credentials" >/dev/null 2>&1 \
+        || die "Codex credentials store is malformed JSON: $_credentials; preserve the damaged file and repair the credential store before 'codex mcp login <server>' (see docs/usage/troubleshooting.md)"
+    jq -s -e 'length == 1 and (.[0] | type == "object")' "$_credentials" >/dev/null 2>&1 \
+        || die "Codex credentials store must contain exactly one JSON object: $_credentials; preserve the damaged file and repair the credential store before 'codex mcp login <server>' (see docs/usage/troubleshooting.md)"
+}
+
 _check_setup() {
     local _config _rules _hooks _guard _profile _pfile _guard_rc _hook_hash _runtime_guard_rc
     local _want_model _mcp_name
@@ -863,6 +883,7 @@ _check_setup() {
     [[ -f "$_rules" ]] || die "Missing codex rules: $_rules"
     [[ -f "$_hooks" ]] || die "Missing codex hooks: $_hooks"
     [[ -x "$_guard" ]] || die "Missing executable chezmoi guard: $_guard"
+    _check_credentials_store
 
     # Live model selection is a user preference, not managed drift.
     _want_model="$(grep '^model = ' "$DF_ROOT/home/dot_codex/create_private_config.toml" | head -1 || true)"

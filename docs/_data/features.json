@@ -83,7 +83,7 @@
     {
       "id": "agent-stack",
       "title": "Codex agent stack",
-      "description": "Installs complete native Codex runtimes with atomic activation and raises Linux soft descriptor limits, resolves shell host policy without a Codex function, enables all managed Codex MCPs by default with explicit narrower profiles, and configures focused roles, host-local state, SSH OAuth callback ports, deterministic Linux OAuth storage, connection-time GitHub credentials, verified backups, and copy-only history migration.",
+      "description": "Installs complete native Codex runtimes with atomic activation and raises Linux soft descriptor limits, resolves shell host policy without a Codex function, enables all managed Codex MCPs by default with explicit narrower profiles, and configures focused roles, host-local state, SSH OAuth callback ports, deterministic Linux OAuth storage, credential-file healthchecks, connection-time GitHub credentials, verified backups, and copy-only history migration.",
       "page": "/agents/codex/",
       "sources": [
         "home/.chezmoiignore",

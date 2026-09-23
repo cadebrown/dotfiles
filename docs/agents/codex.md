@@ -117,6 +117,13 @@ unavailable or locked desktop keyring. Keep the file mode `0600` and the
 host-local runtime directory `0700`. Existing keyring-only logins need a fresh
 `codex mcp login <server>`; sync does not copy or delete credentials.
 
+Run `bash ~/dotfiles/install/codex.sh check` to validate the active credential
+store before troubleshooting individual servers. A missing file means no file
+credentials have been saved; an existing file must contain a JSON object.
+This check detects empty or malformed stores without printing tokens or
+resetting credentials. It does not verify token freshness or provider access.
+See [empty credential store recovery](../usage/troubleshooting.md#codex-mcp-login-fails-with-eof-parsing-credentialsjson).
+
 GitHub uses `~/.claude/gh-mcp-headers.sh` at connection time in both Codex and
 Claude. It reads explicit `GH_TOKEN`, then `GITHUB_TOKEN`, then `~/.github.env`,
 then `gh auth token`. App-server launches therefore do not depend on a shell
