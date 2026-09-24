@@ -1649,6 +1649,34 @@ The installer owns `$LOCAL_PLAT/python` and exposes its interpreter as
 `$LOCAL_PLAT/bin/python`; project-specific dependencies still belong in each
 project's uv environment.
 
+## WhisperX upgrade fails with SQLAlchemy `duplicate normalized extra name`
+
+**Symptom:** `uv tool upgrade --all` fails while building SQLAlchemy 2.1.0,
+reporting duplicate normalized extra name `mssql-pymssql`.
+
+**Root-cause chain:** WhisperX depends indirectly on SQLAlchemy through
+pyannote and Optuna. SQLAlchemy's source metadata declares both
+`mssql-pymssql` and the legacy alias `mssql_pymssql`; uv rejects this collision.
+On 2026-09-24, the PyPI release initially lacked a Python 3.12 macOS ARM64
+wheel, exposing the source metadata failure. Later that session, the matching
+wheel became available and the same installer upgrade succeeded with SQLAlchemy
+2.1.0. This bypasses the source-package defect; it does not repair its metadata.
+
+**Confirm:** inspect the failing package/version and the platform wheels on the
+[SQLAlchemy release page](https://pypi.org/project/SQLAlchemy/2.1.0/#files).
+The [extra-name normalization specification](https://peps.python.org/pep-0685/)
+explains why underscores and hyphens collide.
+
+**Fix:** once a compatible wheel is published, retry the managed upgrade:
+
+```sh
+DF_MODE=upgrade bash ~/dotfiles/install/python.sh
+```
+
+Expected result: all tool upgrades and the installer's entrypoint checks pass.
+Do not edit uv's cached source or change the default Python solely to bypass
+this error. Other platforms without a compatible wheel may still encounter it.
+
 ## Python@3.14 build fails on Linux (uuid or test_datetime errors)
 
 Python 3.14 from Homebrew has build issues on some Linux systems:
