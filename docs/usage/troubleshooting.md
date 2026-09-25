@@ -918,6 +918,35 @@ not depend on `rustup-init`.
 
 ---
 
+## Bootstrap upgrade leaves GUI apps outdated
+
+**Symptom:** formula upgrades complete, but VS Code, ChatGPT, or other casks
+remain outdated. The output says `Cask upgrades deferred`.
+
+**Root cause:** the cask pass requires cached sudo authentication. Previously,
+bootstrap only checked `sudo -n true` and skipped every cask if it failed, even
+when individual apps did not need privileges. A manual `sudo -v` before starting
+was unreliable because lengthy formula upgrades could outlast the timestamp.
+
+**Confirm:** inspect the bootstrap output for the deferral message and compare
+Homebrew's records with the app's own version:
+
+```sh
+brew outdated --cask --greedy
+```
+
+Auto-updating apps can have stale Homebrew receipts, so this list alone does
+not establish the version of the app bundle.
+
+**Fix:** run the updated `~/dotfiles/bootstrap.sh upgrade` from an interactive
+terminal. Bootstrap authenticates once and maintains the timestamp until exit.
+Keep `DF_SUDO=auto` and the desired cask/MAS upgrade gates enabled. Unattended
+runs without authentication report the skipped upgrades in the degradation
+summary. See [sudo session behavior](/setup/bootstrap/#one-sudo-authentication-per-run)
+for configuration and limitations.
+
+---
+
 ## Cask upgrade fails: `It seems there is already an App at '/Applications/X.app'`
 
 Symptom: `bootstrap.sh upgrade` reports `Some greedy cask upgrades failed`, and

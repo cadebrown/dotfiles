@@ -112,7 +112,7 @@ SH
 
 @test "unattended Mac App Store upgrades require cached sudo" {
     grep -q 'DF_BREW_UPGRADE_MAS:-auto' "$REPO/install/homebrew.sh"
-    grep -q "Mac App Store upgrades deferred: cache sudo first" "$REPO/install/homebrew.sh"
+    grep -q "Mac App Store upgrades deferred: no live sudo credential" "$REPO/install/homebrew.sh"
 }
 
 @test "Homebrew download concurrency is bounded and configurable" {
@@ -925,7 +925,7 @@ RUBY
 @test "unattended cask upgrades require cached sudo" {
     grep -q 'DF_BREW_UPGRADE_CASKS:-auto' "$REPO/install/homebrew.sh"
     grep -q 'sudo -n true' "$REPO/install/homebrew.sh"
-    ! grep -q 'log_warn "Cask upgrades' "$REPO/install/homebrew.sh"
+    grep -q 'log_warn "Cask upgrades deferred: no live sudo credential' "$REPO/install/homebrew.sh"
 }
 
 @test "Python optional arguments are safe under macOS system Bash nounset" {

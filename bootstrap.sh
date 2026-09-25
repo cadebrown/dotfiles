@@ -52,6 +52,8 @@
 #   DF_BREW_UPGRADE       — control Homebrew upgrades (default: 0; upgrade mode: 1)
 #   DF_BREW_DOWNLOAD_CONCURRENCY — simultaneous Homebrew downloads (default: 4)
 #   DF_BREW_UPGRADE_CASKS — 0/1/auto; auto requires a cached sudo ticket
+#   DF_SUDO               — auto (default) authenticates once on interactive macOS;
+#                           0 disables bootstrap's sudo timestamp helper
 #   DF_DIRS               — colon-separated home dirs to create (default: dev:bones:misc)
 #   DF_DEBUG              — set to 1 for verbose debug output with timing
 #   DF_DO_SCRATCH       — set to 0 to skip scratch space symlink setup
@@ -172,7 +174,7 @@ export DF_DEGRADE_LOG="$_BOOTSTRAP_TMP/degradations"
 : > "$DF_DEGRADE_LOG"
 
 _bootstrap_summary() {
-    local _rc=$?
+    local _rc="${1:-$?}"
     if [[ -s "$DF_DEGRADE_LOG" ]]; then
         local _n _line _collapsed
         # Collapse warnings that share a `run '<cmd>'` remediation: one missing
@@ -204,7 +206,21 @@ _bootstrap_summary() {
     fi
     return "$_rc"
 }
-trap '_bootstrap_summary; rm -rf "$_BOOTSTRAP_TMP"' EXIT
+_bootstrap_exit() {
+    local _rc=$?
+    sudo_session_stop
+    _bootstrap_summary "$_rc" || true
+    rm -rf "$_BOOTSTRAP_TMP"
+    return "$_rc"
+}
+trap '_bootstrap_exit' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# Do this before installers start so commands that need authorization have one
+# visible foreground prompt. The helper only refreshes with `sudo -n -v` after
+# that, and is a no-op on Linux and when DF_SUDO=0.
+sudo_session_start || die "Could not establish the sudo session"
 
 log_section "dotfiles bootstrap ($DF_MODE)"
 log_info "OS: $OS | Arch: $ARCH | Host: $(hostname)"

@@ -101,6 +101,7 @@ fast_checks() {
         tests/rust-glibc-smoke.bats \
         tests/skills-sync.bats \
         tests/ssh-config.bats \
+        tests/sudo-session.bats \
         tests/toolchains.bats \
         tests/verify-path.bats
 }

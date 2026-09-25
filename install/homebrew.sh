@@ -79,8 +79,9 @@ if [[ "$_brew_upgrade" != "0" ]]; then
         || die "Homebrew formula upgrade failed"
 
     # Some auto-updating casks ask Homebrew to inspect privileged launchd state.
-    # Only enter that path when sudo is already cached; otherwise the prompt is
-    # hidden inside run_logged and an unattended upgrade appears to hang.
+    # bootstrap.sh has already authenticated visibly when it can, and maintains
+    # the ticket without prompting. Auto mode avoids hidden prompts when this
+    # installer runs alone; an explicit 1 retains the operator's override.
     _upgrade_casks="${DF_BREW_UPGRADE_CASKS:-auto}"
     if [[ "$_upgrade_casks" == "1" ]] \
         || { [[ "$_upgrade_casks" == "auto" ]] && sudo -n true 2>/dev/null; }; then
@@ -88,7 +89,7 @@ if [[ "$_brew_upgrade" != "0" ]]; then
         run_logged brew upgrade --cask --greedy --yes \
             || die "Homebrew cask upgrade failed"
     elif [[ "$_upgrade_casks" != "0" ]]; then
-        log_info "Cask upgrades deferred: cache sudo first with 'sudo -v', or set DF_BREW_UPGRADE_CASKS=1"
+        log_warn "Cask upgrades deferred: no live sudo credential (run bootstrap interactively, or do the upgrade manually)"
     fi
 
     # Mac App Store apps (Xcode, GarageBand, iMovie, …) are installed outside
@@ -102,7 +103,7 @@ if [[ "$_brew_upgrade" != "0" ]]; then
         run_logged mas upgrade \
             || log_warn "Mac App Store upgrade failed — update pending apps in App Store, then retry"
     elif [[ "$OS" == "darwin" && "$_upgrade_mas" != "0" ]] && has mas; then
-        log_info "Mac App Store upgrades deferred: cache sudo first with 'sudo -v', or update apps in App Store"
+        log_warn "Mac App Store upgrades deferred: no live sudo credential; update apps in App Store or rerun bootstrap interactively"
     fi
 fi
 

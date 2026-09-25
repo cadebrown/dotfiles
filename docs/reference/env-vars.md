@@ -20,7 +20,8 @@ Complete reference for `DF_*` variables and the tool-standard ones this repo car
 | `DF_USE_PLAT` | `0` | Per-PLAT directory isolation. `1` enables `$LOCAL_PLAT=$HOME/.local/$PLAT`; `0` collapses to `$HOME/.local`. Accepts `1\|true\|yes\|on` (case-insensitive). See [PLAT isolation](../setup/plat.md). |
 | `DF_BREW_UPGRADE` | `0` | Whether to upgrade existing formulae/casks. Auto-set to `1` in `upgrade` mode on both platforms. |
 | `DF_BREW_DOWNLOAD_CONCURRENCY` | `4` | Maximum simultaneous Homebrew bottle/cask downloads. |
-| `DF_BREW_UPGRADE_CASKS` | `auto` | Upgrade greedy casks only when sudo is already cached; set `0` to skip or run `sudo -v`/set `1` to permit prompts. |
+| `DF_BREW_UPGRADE_CASKS` | `auto` | Upgrade greedy casks with a cached sudo ticket, maintained by interactive bootstrap; set `0` to skip or `1` to explicitly enable the upgrade path. |
+| `DF_SUDO` | `auto` | On macOS, authenticate once in an interactive terminal and maintain the sudo timestamp until bootstrap exits. Unattended runs only refresh existing authentication. Set `0` to disable the helper. Linux never uses it. |
 | `DF_STRICT_UPGRADE` | `1` | Run `install/audit-versions.sh --strict` after `bootstrap.sh upgrade`; set `0` for a report-only audit. |
 | `DF_MCP_PROFILES` | unset: all in Codex, core in other harnesses | Colon/comma/space-separated MCP profiles. `*` selects all; `core` or explicitly empty selects core only. Core servers are always selected. Codex's ordinary sync enables all managed servers unless this variable explicitly narrows the set. |
 | `DF_CURSOR_WORKER` | `1` when Cursor setup runs on macOS | `0` bootouts and disables the My Machines computer-use LaunchAgent. |

@@ -47,7 +47,37 @@ for stage order and recovery behavior.
 | Xcode Command Line Tools | `xcode-select --install`, or Homebrew's prompt |
 | Internet access | required for package sources |
 
-Homebrew installation uses the system privilege flow.
+### One sudo authentication per run
+
+From an interactive terminal, run bootstrap normally:
+
+```sh
+~/dotfiles/bootstrap.sh upgrade
+```
+
+On macOS, bootstrap authenticates with `sudo -v` before starting the work and
+refreshes the sudo timestamp while it runs. Enter your password at
+most once under the standard sudo policy; an existing valid timestamp may mean
+no prompt. Homebrew still runs as your user and requests privileges only for
+operations that need them. Cask and Mac App Store upgrades can use that session
+even after lengthy formula builds.
+
+The refresh process stops when bootstrap exits or is interrupted. Bootstrap
+does not erase the existing sudo timestamp; it expires normally.
+`DF_SUDO=0` disables bootstrap's authentication and refresh helper; it does not
+disable privileged operations or prompts inside individual installers. Unattended
+runs never prompt through this helper; they can refresh an already valid
+timestamp. Linux remains rootless.
+
+This covers sudo authentication, not App Store sign-in, macOS privacy dialogs,
+or installers using a separate authorization mechanism. A custom sudo policy
+that disables caching, or manually invalidating the timestamp during the run,
+can prevent renewal and is reported rather than silently ignored. The existing
+macOS settings installer configures a shared, 60-minute timestamp; sudo's
+unmodified default is five minutes per terminal. The refresh helper uses the
+installed policy without changing it.
+See the installed `man sudo` and `man sudoers`, or the upstream
+[sudo manual](https://www.sudo.ws/docs/man/sudo.man/), for timestamp semantics.
 
 ### What gets installed
 
@@ -121,6 +151,7 @@ same selected check.
 | `DF_DO_AUTH`, `DF_DO_OVERLAYS` | auth: off; overlays: on | token walk; sibling overlays |
 | `DF_USE_PLAT`, `DF_BREW_UPGRADE`, `DF_STRICT_UPGRADE` | off; brew off except upgrade; strict upgrade on | runtime layout and upgrade policy |
 | `DF_BREW_UPGRADE_CASKS`, `DF_BREW_UPGRADE_MAS` | `auto` | permit GUI/MAS upgrades only with a cached sudo ticket |
+| `DF_SUDO` | `auto` | authenticate once on interactive macOS and maintain sudo until exit; `0` disables the helper |
 
 ```sh
 # narrow command-line machine

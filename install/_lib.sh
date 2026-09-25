@@ -65,6 +65,15 @@ die() {
     exit 1
 }
 
+# DF_SUDO governs the bootstrap-owned sudo timestamp session. It deliberately
+# has no effect on individual installer commands outside bootstrap.sh.
+DF_SUDO="${DF_SUDO:-auto}"
+case "$DF_SUDO" in
+    auto|0) ;;
+    *) die "DF_SUDO must be 'auto' or '0' (got '$DF_SUDO')" ;;
+esac
+export DF_SUDO
+
 ### ERROR TRAP ###
 
 _on_error() {
@@ -602,6 +611,63 @@ run_logged() {
         log_debug "exit=$_rc elapsed=$(( SECONDS - _start ))s"
     fi
     return "$_rc"
+}
+
+### SUDO SESSION ###
+
+# A bootstrap can take longer than sudo's default timestamp. Authenticate once
+# in its foreground terminal, then refresh without prompting from a background
+# keeper. The timestamp remains owned by sudo; stopping the keeper must never
+# invalidate a ticket the operator had before bootstrap started.
+_sudo_session_interactive() {
+    [[ -t 0 && -t 2 ]]
+}
+
+_sudo_session_keepalive() {
+    local _owner="${_DF_SUDO_SESSION_OWNER:-}"
+    while :; do
+        sleep 60 || return 0
+        # A SIGKILL cannot run bootstrap's cleanup trap. Do not let a keeper
+        # adopted by launchd keep refreshing the ticket after its owner died.
+        [[ -n "$_owner" ]] || return 0
+        kill -0 "$_owner" 2>/dev/null || return 0
+        if ! sudo -n -v; then
+            log_warn "sudo credential renewal failed; privileged bootstrap steps may be skipped"
+            return 1
+        fi
+    done
+}
+
+sudo_session_start() {
+    [[ "$OS" == "darwin" && "$DF_SUDO" != "0" ]] || return 0
+
+    if _sudo_session_interactive; then
+        log_info "Authenticating sudo for this bootstrap"
+        if ! sudo -v; then
+            log_fail "sudo authentication failed; refusing to continue privileged macOS bootstrap steps"
+            return 1
+        fi
+    elif ! sudo -n -v 2>/dev/null; then
+        log_warn "Non-interactive macOS bootstrap cannot prompt for sudo; privileged upgrades requiring it will be skipped"
+        return 0
+    else
+        log_info "Using existing sudo credential for non-interactive bootstrap"
+    fi
+
+    _DF_SUDO_SESSION_OWNER=$$
+    _sudo_session_keepalive &
+    _DF_SUDO_KEEPER_PID=$!
+}
+
+sudo_session_stop() {
+    local _pid="${_DF_SUDO_KEEPER_PID:-}"
+    [[ -n "$_pid" ]] || return 0
+
+    # The keeper may be blocked in sleep. Kill its child first, then reap the
+    # shell so no delayed child can outlive this bootstrap.
+    _kill_process_tree "$_pid" TERM
+    wait "$_pid" 2>/dev/null || true
+    unset _DF_SUDO_KEEPER_PID _DF_SUDO_SESSION_OWNER
 }
 
 _collect_process_tree() {

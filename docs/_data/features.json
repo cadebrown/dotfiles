@@ -3,7 +3,7 @@
     {
       "id": "bootstrap",
       "title": "Bootstrap orchestration",
-      "description": "Coordinates install, update, and upgrade with runtime host presets, local overrides, and platform-aware tools and state paths.",
+      "description": "Coordinates install, update, and upgrade with runtime host presets, local overrides, platform-aware paths, and one maintained sudo authentication per interactive macOS run.",
       "page": "/setup/bootstrap/",
       "sources": [
         "bootstrap.sh",
