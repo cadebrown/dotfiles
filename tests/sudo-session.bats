@@ -52,8 +52,14 @@ run_helper() {
         done
         test -n "$sleeper"
         sudo_session_stop
-        kill -0 "$keeper" 2>/dev/null && exit 97
-        kill -0 "$sleeper" 2>/dev/null && exit 96
+        if kill -0 "$keeper" 2>/dev/null; then
+            printf "keeper still exists: %s\n" "$keeper"
+            exit 97
+        fi
+        if kill -0 "$sleeper" 2>/dev/null; then
+            ps -o pid=,ppid=,stat=,command= -p "$sleeper"
+            exit 96
+        fi
         test "$(grep -cx -- "-v" "$SUDO_LOG")" = 1
     '
 

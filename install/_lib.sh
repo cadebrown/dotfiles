@@ -625,8 +625,18 @@ _sudo_session_interactive() {
 
 _sudo_session_keepalive() {
     local _owner="${_DF_SUDO_SESSION_OWNER:-}"
+    local _sleeper=""
+    # Reap our own child before exiting. Killing the entire process tree at
+    # once can orphan sleep before this shell collects it (observable on Linux).
+    trap 'if [[ -n "$_sleeper" ]]; then
+        kill -TERM "$_sleeper" 2>/dev/null || true
+        wait "$_sleeper" 2>/dev/null || true
+    fi; exit 0' TERM
     while :; do
-        sleep 60 || return 0
+        sleep 60 &
+        _sleeper=$!
+        wait "$_sleeper" || return 0
+        _sleeper=""
         # A SIGKILL cannot run bootstrap's cleanup trap. Do not let a keeper
         # adopted by launchd keep refreshing the ticket after its owner died.
         [[ -n "$_owner" ]] || return 0
@@ -663,9 +673,8 @@ sudo_session_stop() {
     local _pid="${_DF_SUDO_KEEPER_PID:-}"
     [[ -n "$_pid" ]] || return 0
 
-    # The keeper may be blocked in sleep. Kill its child first, then reap the
-    # shell so no delayed child can outlive this bootstrap.
-    _kill_process_tree "$_pid" TERM
+    # The keeper's TERM trap reaps its sleep child before we reap the keeper.
+    kill -TERM "$_pid" 2>/dev/null || true
     wait "$_pid" 2>/dev/null || true
     unset _DF_SUDO_KEEPER_PID _DF_SUDO_SESSION_OWNER
 }
