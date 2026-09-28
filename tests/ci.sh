@@ -74,6 +74,7 @@ fast_checks() {
         tests/agents.bats \
         tests/agent-doctor.bats \
         tests/bootstrap-remote.bats \
+        tests/brew-coreutils.bats \
         tests/brew-glibc.bats \
         tests/ci-entrypoint.bats \
         tests/claude-launcher.bats \

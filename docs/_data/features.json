@@ -36,7 +36,7 @@
     {
       "id": "core-toolchains",
       "title": "Core toolchains",
-      "description": "Installs shell, language, compiler, documentation, and workflow-validation tools, with a 250 GiB sccache policy, native build launchers, Python bytecode caching, and Gradle task caching.",
+      "description": "Installs shell, language, compiler, documentation, and workflow-validation tools, checks Linux checksum execution before downstream installers, and maintains a 250 GiB sccache policy, native build launchers, Python bytecode caching, and Gradle task caching.",
       "page": "/setup/packages/",
       "sources": [
         "home/dot_bash_profile.tmpl",
@@ -329,11 +329,12 @@
     {
       "id": "homebrew-patches",
       "title": "Homebrew compatibility patches",
-      "description": "Applies reviewed package-manager compatibility patches during bootstrap.",
+      "description": "Applies reviewed package-manager compatibility patches during bootstrap, including an explicit OpenSSL dependency for source-built Coreutils checksum tools.",
       "page": "/usage/troubleshooting/",
       "sources": [
         "install/patch-homebrew-apache-serf.sh",
         "install/patch-homebrew-cc65.sh",
+        "install/patch-homebrew-coreutils.sh",
         "install/patch-homebrew-fastfetch.sh",
         "install/patch-homebrew-fish.sh",
         "install/patch-homebrew-gecode.sh",

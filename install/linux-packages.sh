@@ -117,6 +117,38 @@ _reconcile_brew_llvm_z3() {
     fi
 }
 
+_verify_brew_coreutils_sha256sum() {
+    local _prefix="$1" _state
+    if ! _state="$(_brew_formula_state coreutils)"; then
+        log_warn "Could not list installed Homebrew formulae"
+        return 1
+    fi
+    if [[ "$_state" == "missing" ]]; then
+        log_warn "Required coreutils is not installed"
+        return 1
+    fi
+
+    printf abc | "$_prefix/bin/sha256sum" - | grep -Fxq \
+        'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad  -'
+}
+
+_reconcile_brew_coreutils() {
+    local _prefix="$1" _state
+    if ! _state="$(_brew_formula_state coreutils)"; then
+        log_warn "Could not determine whether coreutils is installed"
+        return 1
+    fi
+    [[ "$_state" == "missing" ]] && return 0
+    _verify_brew_coreutils_sha256sum "$_prefix" &>/dev/null && return 0
+
+    log_info "Reinstalling coreutils from source to repair sha256sum OpenSSL linkage..."
+    brew reinstall --build-from-source coreutils || return 1
+    if ! _verify_brew_coreutils_sha256sum "$_prefix"; then
+        log_warn "coreutils sha256sum is still broken after its source rebuild"
+        return 1
+    fi
+}
+
 _verify_brew_gecode() {
     local _required="${1:-0}" _state _prefix
     _state="$(_brew_formula_state gecode)" || return 1
@@ -511,6 +543,12 @@ else
     # See install/patch-homebrew-openssh.sh for full details.
     [[ -f "$DF_INSTALL_DIR/patch-homebrew-openssh.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-openssh.sh"
 
+    # coreutils: source builds need a declared openssl@4 dependency so sha256sum
+    # receives a stable versioned libcrypto RUNPATH instead of an accidental
+    # globally linked openssl@3 dependency.
+    # See install/patch-homebrew-coreutils.sh for full details.
+    [[ -f "$DF_INSTALL_DIR/patch-homebrew-coreutils.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-coreutils.sh"
+
     # mesa: installs pyyaml from its binary wheel instead of building from source.
     # venv.pip_install always passes --no-binary=:all:, forcing a source build;
     # pyyaml's Cython get_requires_for_build_wheel subprocess receives SIGILL (exit -4)
@@ -602,6 +640,10 @@ _bundle_flags="--no-upgrade"
 # outdated LLVM with its dependency before unrelated source builds start.
 _reconcile_brew_llvm_z3 "$_REAL_BREW_PREFIX" "$_brew_upgrade"
 
+if [[ "${DF_PATCH_BREW_ALL:-1}" != "0" && "${DF_PATCH_BREW_COREUTILS:-1}" != "0" ]]; then
+    _reconcile_brew_coreutils "$_REAL_BREW_PREFIX"
+fi
+
 if [[ "${DF_PATCH_BREW_ALL:-1}" != "0" && "${DF_PATCH_BREW_GECODE:-1}" != "0" ]]; then
     _reconcile_brew_gecode
 fi
@@ -623,6 +665,10 @@ _bundle_exit=0
 _run_brew_bundle "$_BREWFILE_TMP" $_bundle_flags || _bundle_exit=$?
 if [[ "$_bundle_exit" -ne 0 ]]; then
     die "brew bundle failed with exit $_bundle_exit; every Brewfile declaration is required"
+fi
+
+if [[ "${DF_PATCH_BREW_ALL:-1}" != "0" && "${DF_PATCH_BREW_COREUTILS:-1}" != "0" ]]; then
+    _reconcile_brew_coreutils "$_REAL_BREW_PREFIX"
 fi
 
 if [[ "${DF_PATCH_BREW_ALL:-1}" != "0" && "${DF_PATCH_BREW_GECODE:-1}" != "0" ]]; then

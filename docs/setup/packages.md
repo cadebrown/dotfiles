@@ -73,6 +73,13 @@ Bootstrap owns `brew bundle`; use the manifest rather than `brew install` for a
 durable addition. Linux uses its rootless managed prefix, while macOS uses the
 standard Homebrew prefix.
 
+On Linux, bootstrap checks that Homebrew's `sha256sum` computes the known
+digest of `abc` before and after Bundle. A broken installed Coreutils is
+rebuilt from the managed formula before download-verifying installers such
+as uv run. The formula patch declares its OpenSSL dependency explicitly;
+see [checksum loader failures](/usage/troubleshooting/#uv-update-reports-a-checksum-mismatch-because-sha256sum-cannot-start)
+for recovery commands, limits, and patch switches.
+
 ### 5. VS Code / Cursor extensions
 
 Add marketplace identifiers to `packages/vscode-extensions.txt` or

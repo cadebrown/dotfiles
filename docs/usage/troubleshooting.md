@@ -869,6 +869,46 @@ HOMEBREW_NO_INSTALL_CLEANUP=1 brew reinstall --build-from-source "$formula"
 This run found both forms: Fish 4.8.1 was complete but its `bin/fish` symlink
 still named 4.5.0, while GLib 2.88.3 lacked a receipt and had to be rebuilt.
 
+### OpenSSL 4 retries collide with an existing manpage
+
+On Linux, an interrupted OpenSSL 3-to-4 transition can leave a complete but
+unlinked `openssl@4` keg while `openssl@3` still owns the global links. A retry
+can install over leftover output and fail with `Errno::EEXIST` for
+`share/man/man1/asn1parse.1ssl.gz`: the formula tries to create a compressed
+manpage symlink that already exists. A long-prefix bottle warning explains
+the source build; it does not explain this file collision.
+
+After all installs using the shared prefix have stopped, apply the receipt,
+direct-executable, and linkage checks above to `openssl@4`. If they pass,
+repair the transition without rebuilding the existing keg:
+
+```sh
+brew unlink openssl@3
+brew link openssl@4
+brew postinstall openssl@4
+HOMEBREW_NO_INSTALL_CLEANUP=1 brew upgrade wget
+brew linkage --test openssl@4 wget
+wget --version
+wget --spider --timeout=20 --tries=1 https://docs.brew.sh/
+```
+
+Unlinking preserves OpenSSL 3's installed keg and `opt/openssl@3` path, but
+source-built tools with an undeclared OpenSSL dependency may still need repair.
+Check the checksum execution described under
+[checksum loader failures](/usage/troubleshooting/#uv-update-reports-a-checksum-mismatch-because-sha256sum-cannot-start)
+before proceeding to other installers. OpenSSL 4 should become globally linked, its post-install
+step should create the CA-certificate link, and wget should upgrade without
+rebuilding OpenSSL. If the keg fails the checks, use the source-reinstall path
+above instead; do not delete individual manpages or lock files.
+
+On `blackwell` (Linux x86-64, shared NFS prefix, 2026-09-28), this repaired
+OpenSSL `4.0.2_1` and installed wget `1.25.0_2`; Bundle check and the HTTPS
+request passed. The wget linkage audit still exited nonzero for indirect
+`libunistring` linkage: the Linux formula declares it transitively through
+dependencies, while this source build links it directly. It reported no
+missing libraries; this formula-declaration issue is separate from the
+OpenSSL installation failure and remains unresolved.
+
 ---
 
 ## Brew Bundle reports a circular `libtiff, webp` dependency
@@ -1233,6 +1273,61 @@ dirname "$(dirname "$(nvm which default)")"
 ```
 
 The last two paths must match.
+
+---
+
+## uv update reports a checksum mismatch because sha256sum cannot start
+
+**Symptom:** both uv self-update and its standalone installer print
+`sha256sum: error while loading shared libraries: libcrypto.so.3`, followed by
+`ERROR: checksum mismatch` with an empty `got:` value. The checksum program
+did not run; this output does not establish a corrupt download.
+
+**Cause:** a source-built Coreutils can auto-detect globally linked OpenSSL
+without the Homebrew formula declaring that dependency. Its checksum binaries
+then search the global Brew library directory. Transitioning global links from
+OpenSSL 3 to 4 removes `libcrypto.so.3` from that directory even though the
+OpenSSL 3 keg remains installed. Keeping that keg alone does not repair the
+binary's search path.
+
+Confirm the selected binary's execution and ELF dependencies. If inspecting
+runtime resolution, use its own ELF interpreter with `--list`; system `ldd`
+can mislead by resolving libraries against the system glibc instead:
+
+```sh
+command -v sha256sum
+printf abc | sha256sum
+readelf -d "$(readlink -f "$(command -v sha256sum)")"
+```
+
+**Fix:** after all other installs using the prefix have stopped, apply the
+managed formula patch and rebuild Coreutils:
+
+```sh
+bash ~/dotfiles/install/patch-homebrew-coreutils.sh
+HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_FROM_API=1 \
+  HOMEBREW_NO_INSTALL_CLEANUP=1 brew reinstall --build-from-source coreutils
+printf abc | sha256sum
+DF_MODE=upgrade bash ~/dotfiles/install/python.sh
+```
+
+The digest must be
+`ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad`.
+The patch adds an explicit `openssl@4` dependency and `--with-openssl=yes`,
+preserving OpenSSL acceleration while giving the build a versioned library
+search path. [`linux-packages.sh`](../../install/linux-packages.sh) checks
+the known digest before and after Bundle and rebuilds a broken installed
+Coreutils; [`python.sh`](../../install/python.sh) preserves the original
+self-update failure instead of claiming every failure means an unsupported
+uv build.
+
+`DF_PATCH_BREW_COREUTILS=0` or `DF_PATCH_BREW_ALL=0` disables this Linux
+patch and automatic repair. The check covers checksum execution, not every
+installed program. Do not skip checksum verification, globally set
+`LD_LIBRARY_PATH`, or relink OpenSSL 3 over OpenSSL 4. The authoritative
+patch is [`patch-homebrew-coreutils.sh`](../../install/patch-homebrew-coreutils.sh);
+GNU documents the build option in its
+[Coreutils manual](https://www.gnu.org/software/coreutils/manual/coreutils.html).
 
 ---
 
