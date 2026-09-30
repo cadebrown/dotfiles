@@ -3,6 +3,8 @@
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     TEST_HOME="$BATS_TEST_TMPDIR/home"
+    # Host overlays may point outside HOME; keep every fixture in its sandbox.
+    export DF_TOOLS_ROOT="$TEST_HOME/.local"
     mkdir -p "$TEST_HOME/.config/dotfiles/hosts"
     printf 'DF_USE_PLAT=0\n' > "$TEST_HOME/.config/dotfiles/hosts/$(hostname).env"
 }
@@ -152,6 +154,33 @@ run_installer() {
         done
     '
     [ "$status" -eq 0 ]
+}
+
+@test "npm migration follows scratch-backed local storage in flat and PLAT layouts" {
+    for layout in 0 1; do
+        local fixture="$BATS_TEST_TMPDIR/scratch-layout-$layout"
+        mkdir -p "$fixture/home" "$fixture/scratch/.local"
+        ln -s "$fixture/scratch/.local" "$fixture/home/.local"
+        run env HOME="$fixture/home" DF_TOOLS_ROOT="$fixture/scratch/.local" \
+            DF_USE_PLAT="$layout" REPO_ROOT="$REPO_ROOT" bash -c '
+            source "$REPO_ROOT/install/codex.sh"
+            [[ "$LOCAL_PLAT" != "$HOME/"* ]]
+            prefix="$LOCAL_PLAT/nvm/versions/node/v1"
+            mkdir -p "$prefix/bin" "$prefix/lib/node_modules/@openai/codex/bin" "$ARCH_BIN"
+            printf "#!/bin/sh\necho native\n" > "$ARCH_BIN/codex"
+            printf "#!/bin/sh\necho legacy\n" > "$prefix/lib/node_modules/@openai/codex/bin/codex.js"
+            chmod +x "$ARCH_BIN/codex" "$prefix/lib/node_modules/@openai/codex/bin/codex.js"
+            ln -s ../lib/node_modules/@openai/codex/bin/codex.js "$prefix/bin/codex"
+            export PATH="$prefix/bin:$ARCH_BIN:$PATH"
+            test "$(codex)" = legacy
+            _codex_retire_npm_launchers
+            _codex_retire_npm_launchers
+            test "$(codex)" = native
+            test ! -L "$prefix/bin/codex"
+            test "$("$prefix/lib/node_modules/@openai/codex/bin/codex.js")" = legacy
+        '
+        [ "$status" -eq 0 ]
+    done
 }
 
 @test "Codex PATH validation rejects a missing managed bin directory" {

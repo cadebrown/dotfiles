@@ -995,18 +995,22 @@ an interactive follow-up to complete skipped updates.
 
 ## Native Codex installed but the shell runs an older npm version
 
-**Symptom:** `~/.local/bin/codex --version` is newer than `codex --version`.
+**Symptom:** `~/.local/bin/codex --version` is newer than `codex --version`, or
+bootstrap reports `Codex PATH conflict` after installing the complete runtime.
 
 **Root cause:** nvm precedes the native bin directory on PATH, and a previous
 global npm installation left its `codex` launcher in the node version's bin
-directory. Restarting the shell recreates the same ordering.
+directory. Restarting the shell recreates the same ordering. Older cleanup code
+also skipped the managed nvm directory when `~/.local` resolved to scratch
+storage outside `$HOME`, leaving that launcher in place after installation.
 
 **Confirm:** compare `command -v codex` and the versions reported by that path
 and the managed `$LOCAL_PLAT/bin/codex` (`~/.local/bin/codex` without isolation).
 
 **Fix:** run `bash ~/dotfiles/install/codex.sh install`, then `rehash` in zsh
 or `hash -r` in Bash. The installer validates the native runtime, retires known
-npm launcher symlinks, and verifies PATH resolution. It preserves package files
+npm launcher symlinks in the resolved managed root (including scratch storage
+and PLAT layouts) and `~/.nvm`, and verifies PATH resolution. It preserves package files
 for active sessions and refuses to replace unknown launchers. See
 [native CLI migration](../agents/codex.md#install-and-upgrade-the-native-cli).
 

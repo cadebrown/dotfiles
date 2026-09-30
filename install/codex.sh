@@ -74,8 +74,9 @@ _codex_retire_npm_launchers() {
     local _root _launcher _target
     # Retire only npm's known nvm symlinks. Keep the package and its native
     # executables intact for running sessions, including NFS users.
+    # LOCAL_PLAT is the managed root even when scratch symlinks or host policy
+    # resolve it outside HOME; a textual HOME prefix would skip that layout.
     for _root in "$LOCAL_PLAT/nvm" "$HOME/.nvm"; do
-        [[ "$_root" == "$HOME/"* ]] || continue
         for _launcher in "$_root"/versions/node/*/bin/codex; do
             [[ -L "$_launcher" && ! "$_launcher" -ef "$ARCH_BIN/codex" ]] || continue
             _target="$(readlink "$_launcher")"
