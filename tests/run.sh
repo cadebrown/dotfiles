@@ -27,8 +27,13 @@ docker run --rm --user root \
     bash -c 'apt-get update -qq && runuser -u user -- env HOME=/home/user bash /home/user/dotfiles/tests/lldb-clean-container.sh'
 
 echo "==> Running tests"
+# The explicitly mounted checkout can belong to a different host UID. Trust
+# only this fixture path, without changing the host's Git configuration.
 docker run --rm \
     -v "$REPO_ROOT:/home/user/dotfiles" \
+    -e GIT_CONFIG_COUNT=1 \
+    -e GIT_CONFIG_KEY_0=safe.directory \
+    -e GIT_CONFIG_VALUE_0=/home/user/dotfiles \
     -e DF_NAME="${DF_NAME:-Test User}" \
     -e DF_EMAIL="${DF_EMAIL:-test@example.com}" \
     -e GITHUB_TOKEN \
