@@ -57,10 +57,14 @@ From an interactive terminal, run bootstrap normally:
 
 On macOS, bootstrap authenticates with `sudo -v` before starting the work and
 refreshes the sudo timestamp while it runs. Enter your password at
-most once under the standard sudo policy; an existing valid timestamp may mean
+most once while renewal succeeds; an existing valid timestamp may mean
 no prompt. Homebrew still runs as your user and requests privileges only for
 operations that need them. Cask and Mac App Store upgrades can use that session
-even after lengthy formula builds.
+even after lengthy formula builds. Before cask, App Store, and TeX package
+updates, the installer checks the credential again. If it has expired, an
+interactive macOS run visibly asks for authentication at that point. Unattended
+runs still skip the affected update instead of prompting. `DF_SUDO=0` disables
+this recovery prompt as well as the renewal helper.
 
 The refresh process stops when bootstrap exits or is interrupted. Bootstrap
 does not erase the existing sudo timestamp; it expires normally.
@@ -72,7 +76,9 @@ timestamp. Linux remains rootless.
 This covers sudo authentication, not App Store sign-in, macOS privacy dialogs,
 or installers using a separate authorization mechanism. A custom sudo policy
 that disables caching, or manually invalidating the timestamp during the run,
-can prevent renewal and is reported rather than silently ignored. The existing
+can prevent renewal and is reported with sudo's error. The keeper continues
+noninteractive renewal attempts, allowing a foreground recovery to restore the
+session without a background password prompt. The existing
 macOS settings installer configures a shared, 60-minute timestamp; sudo's
 unmodified default is five minutes per terminal. The refresh helper uses the
 installed policy without changing it.

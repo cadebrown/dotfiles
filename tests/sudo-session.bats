@@ -19,12 +19,21 @@ SH
 #!/bin/sh
 printf '%s\n' "$*" >> "$SUDO_LOG"
 case "$*" in
-    '-v') [ "${SUDO_FAIL_FOREGROUND:-0}" != 1 ] ;;
+    '-v')
+        if [ "${SUDO_FAIL_FOREGROUND:-0}" = 1 ]; then
+            printf '%s\n' 'sudo: foreground authentication failed' >&2
+            exit 1
+        fi
+        ;;
     '-n -v')
+        [ -z "${SUDO_NONINTERACTIVE_ERROR:-}" ] || printf '%s\n' "$SUDO_NONINTERACTIVE_ERROR" >&2
         attempts=0
         if [ -n "${SUDO_ATTEMPTS:-}" ] && [ -f "$SUDO_ATTEMPTS" ]; then attempts="$(cat "$SUDO_ATTEMPTS")"; fi
         attempts=$((attempts + 1))
         [ -z "${SUDO_ATTEMPTS:-}" ] || printf '%s\n' "$attempts" > "$SUDO_ATTEMPTS"
+        case ",${SUDO_FAIL_NONINTERACTIVE_ATTEMPTS:-}," in
+            *,"$attempts",*) exit 1 ;;
+        esac
         [ "${SUDO_FAIL_NONINTERACTIVE:-0}" != 1 ] && \
             { [ -z "${SUDO_FAIL_NONINTERACTIVE_AFTER:-}" ] || [ "$attempts" -lt "$SUDO_FAIL_NONINTERACTIVE_AFTER" ]; }
         ;;
@@ -79,20 +88,68 @@ run_helper() {
     [[ "$output" == *"sudo authentication failed"* ]]
 }
 
-@test "renewal failure is visible and recorded as a degradation" {
+@test "keeper warns once and keeps retrying until a credential recovers" {
     run env PATH="$FAKE_BIN:/usr/bin:/bin" SUDO_LOG="$SUDO_LOG" REPO="$REPO" \
-        SUDO_ATTEMPTS="$BATS_TEST_TMPDIR/attempts" SUDO_FAIL_NONINTERACTIVE_AFTER=2 \
+        SUDO_ATTEMPTS="$BATS_TEST_TMPDIR/attempts" SUDO_FAIL_NONINTERACTIVE_ATTEMPTS=1,2 \
+        SUDO_NONINTERACTIVE_ERROR='sudo: cached credential expired' \
         DF_DEGRADE_LOG="$BATS_TEST_TMPDIR/degradations" bash -c '
             source "$REPO/install/_lib.sh"
-            sleep() { return 0; }
             _DF_SUDO_SESSION_OWNER=$$
-            if _sudo_session_keepalive; then exit 98; fi
-            test "$(cat "$SUDO_ATTEMPTS")" = 2
+            sleep() { command sleep 0.01; }
+            _sudo_session_keepalive &
+            keeper=$!
+            for attempt in {1..100}; do
+                [[ -f "$SUDO_ATTEMPTS" && "$(cat "$SUDO_ATTEMPTS")" -ge 3 ]] && break
+                command sleep 0.01
+            done
+            kill -TERM "$keeper"
+            wait "$keeper"
+            test "$(cat "$SUDO_ATTEMPTS")" -ge 3
             grep -Fq "sudo credential renewal failed" "$DF_DEGRADE_LOG"
+            test "$(grep -Fc "sudo credential renewal failed" "$DF_DEGRADE_LOG")" = 1
+            test "$(grep -Fc "sudo: cached credential expired" "$DF_DEGRADE_LOG")" = 1
         '
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"sudo credential renewal failed"* ]]
+}
+
+@test "interactive macOS recovers an expired ticket in the foreground" {
+    run env PATH="$FAKE_BIN:/usr/bin:/bin" SUDO_LOG="$SUDO_LOG" REPO="$REPO" \
+        SUDO_FAIL_NONINTERACTIVE=1 bash -c '
+            source "$REPO/install/_lib.sh"
+            _sudo_session_interactive() { return 0; }
+            sudo_session_ensure
+            grep -Fx -- "-n -v" "$SUDO_LOG"
+            grep -Fx -- "-v" "$SUDO_LOG"
+        '
+
+    [ "$status" -eq 0 ]
+}
+
+@test "foreground recovery keeps the sudo authentication error visible" {
+    run env PATH="$FAKE_BIN:/usr/bin:/bin" SUDO_LOG="$SUDO_LOG" REPO="$REPO" \
+        SUDO_FAIL_NONINTERACTIVE=1 SUDO_FAIL_FOREGROUND=1 bash -c '
+            source "$REPO/install/_lib.sh"
+            _sudo_session_interactive() { return 0; }
+            if sudo_session_ensure; then exit 98; fi
+        '
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"sudo: foreground authentication failed"* ]]
+}
+
+@test "unattended macOS does not recover an expired ticket with a prompt" {
+    run env PATH="$FAKE_BIN:/usr/bin:/bin" SUDO_LOG="$SUDO_LOG" REPO="$REPO" \
+        SUDO_FAIL_NONINTERACTIVE=1 bash -c '
+            source "$REPO/install/_lib.sh"
+            _sudo_session_interactive() { return 1; }
+            if sudo_session_ensure; then exit 98; fi
+            test "$(grep -cx -- "-v" "$SUDO_LOG" || true)" = 0
+            test "$(grep -cx -- "-n -v" "$SUDO_LOG")" = 1
+        '
+
+    [ "$status" -eq 0 ]
 }
 
 @test "keeper stops without renewal after its bootstrap owner is gone" {
@@ -174,6 +231,31 @@ run_bootstrap_exit_harness() {
             sudo_session_start
             sudo_session_stop
             test ! -e "$SUDO_LOG"
+        '
+
+    [ "$status" -eq 0 ]
+}
+
+@test "DF_SUDO=0 preserves use of an existing ticket without prompting" {
+    run env PATH="$FAKE_BIN:/usr/bin:/bin" SUDO_LOG="$SUDO_LOG" REPO="$REPO" \
+        DF_SUDO=0 bash -c '
+            source "$REPO/install/_lib.sh"
+            sudo_session_ensure
+            test "$(grep -cx -- "-v" "$SUDO_LOG" || true)" = 0
+            test "$(grep -cx -- "-n -v" "$SUDO_LOG")" = 1
+        '
+
+    [ "$status" -eq 0 ]
+}
+
+@test "DF_SUDO=0 never recovers an expired ticket with a foreground prompt" {
+    run env PATH="$FAKE_BIN:/usr/bin:/bin" SUDO_LOG="$SUDO_LOG" REPO="$REPO" \
+        DF_SUDO=0 SUDO_FAIL_NONINTERACTIVE=1 bash -c '
+            source "$REPO/install/_lib.sh"
+            _sudo_session_interactive() { return 0; }
+            if sudo_session_ensure; then exit 98; fi
+            test "$(grep -cx -- "-v" "$SUDO_LOG" || true)" = 0
+            test "$(grep -cx -- "-n -v" "$SUDO_LOG")" = 1
         '
 
     [ "$status" -eq 0 ]

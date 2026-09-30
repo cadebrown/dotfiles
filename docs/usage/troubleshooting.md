@@ -985,6 +985,31 @@ runs without authentication report the skipped upgrades in the degradation
 summary. See [sudo session behavior](/setup/bootstrap/#one-sudo-authentication-per-run)
 for configuration and limitations.
 
+If the log first reports `sudo credential renewal failed`, the credential was
+lost during the run. Updated installers recheck before cask, App Store, and TeX
+updates and can visibly reauthenticate in an interactive terminal. The keeper
+preserves sudo's error and retries without prompting. Inspect the effective
+policy with `sudo -l` if renewal repeatedly fails; do not change sudo timeout or
+security policy merely to suppress the warning. An unattended run still needs
+an interactive follow-up to complete skipped updates.
+
+## Native Codex installed but the shell runs an older npm version
+
+**Symptom:** `~/.local/bin/codex --version` is newer than `codex --version`.
+
+**Root cause:** nvm precedes the native bin directory on PATH, and a previous
+global npm installation left its `codex` launcher in the node version's bin
+directory. Restarting the shell recreates the same ordering.
+
+**Confirm:** compare `command -v codex` and the versions reported by that path
+and the managed `$LOCAL_PLAT/bin/codex` (`~/.local/bin/codex` without isolation).
+
+**Fix:** run `bash ~/dotfiles/install/codex.sh install`, then `rehash` in zsh
+or `hash -r` in Bash. The installer validates the native runtime, retires known
+npm launcher symlinks, and verifies PATH resolution. It preserves package files
+for active sessions and refuses to replace unknown launchers. See
+[native CLI migration](../agents/codex.md#install-and-upgrade-the-native-cli).
+
 ---
 
 ## Cask upgrade fails: `It seems there is already an App at '/Applications/X.app'`

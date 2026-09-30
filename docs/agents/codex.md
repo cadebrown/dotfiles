@@ -81,8 +81,21 @@ The managed bin directory may be on NFS. Atomic replacement avoids mutating an
 npm package tree underneath active processes; an open old inode may remain as
 an NFS temporary file until its process exits. Do not delete those files or
 uninstall the old package tree while clients still use it. Check `type -a codex`
-for a stale npm shim taking precedence. The installer replaces its own bin entry after validation and warns about
-external npm shims; it does not remove active npm package trees.
+for a stale npm shim taking precedence. After validating the native runtime,
+install and upgrade retire recognized npm launcher symlinks under the managed
+nvm tree and the conventional `~/.nvm` tree. They retain the package files so active
+sessions can finish. This also runs when the native runtime is already current.
+Unknown launchers are preserved and a PATH conflict fails validation; inspect
+them explicitly instead of repeatedly restarting the shell. `check` verifies
+that PATH resolves the managed native executable.
+
+Run `bash ~/dotfiles/install/codex.sh install`, then `rehash` in an existing zsh
+session (`hash -r` in Bash). `command -v codex` should report the managed bin
+entry and `codex --version` should match that binary. Once sessions using the
+old npm package have ended, it can be uninstalled with
+`npm uninstall --global --prefix /absolute/path/to/nvm/versions/node/VERSION @openai/codex`.
+Retiring a launcher does not reclaim the old package's disk space; npm can
+recreate it if that package is explicitly reinstalled.
 
 Sources: [official Codex CLI documentation](https://learn.chatgpt.com/docs/codex/cli)
 and [`install/codex.sh`](../../install/codex.sh).

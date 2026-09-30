@@ -3,7 +3,7 @@
     {
       "id": "bootstrap",
       "title": "Bootstrap orchestration",
-      "description": "Coordinates install, update, and upgrade with runtime host presets, local overrides, platform-aware paths, and one maintained sudo authentication per interactive macOS run.",
+      "description": "Coordinates install, update, and upgrade with runtime host presets, local overrides, platform-aware paths, maintained sudo authentication, and visible interactive recovery before privileged macOS updates when credentials expire.",
       "page": "/setup/bootstrap/",
       "sources": [
         "bootstrap.sh",
@@ -83,7 +83,7 @@
     {
       "id": "agent-stack",
       "title": "Codex agent stack",
-      "description": "Installs complete native Codex runtimes with atomic activation and raises Linux soft descriptor limits, resolves shell host policy without a Codex function, enables all managed Codex MCPs by default with explicit narrower profiles, and configures focused roles, host-local state, SSH OAuth callback ports, deterministic Linux OAuth storage, credential-file healthchecks, connection-time GitHub credentials, verified backups, and copy-only history migration.",
+      "description": "Installs complete native Codex runtimes with atomic activation, retires legacy npm launcher symlinks without deleting active package files, verifies PATH resolution, and raises Linux soft descriptor limits, resolves shell host policy without a Codex function, enables all managed Codex MCPs by default with explicit narrower profiles, and configures focused roles, host-local state, SSH OAuth callback ports, deterministic Linux OAuth storage, credential-file healthchecks, connection-time GitHub credentials, verified backups, and copy-only history migration.",
       "page": "/agents/codex/",
       "sources": [
         "home/.chezmoiignore",

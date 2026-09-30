@@ -122,3 +122,63 @@ run_installer() {
     [ "$status" -eq 0 ]
     [ "$output" = "https://api.github.com/repos/openai/codex/releases/tags/rust-v0.154.0" ]
 }
+
+@test "npm migration retires launchers across node versions and preserves package executables" {
+    run env HOME="$TEST_HOME" DF_USE_PLAT=0 REPO_ROOT="$REPO_ROOT" bash -c '
+        source "$REPO_ROOT/install/codex.sh"
+        mkdir -p "$ARCH_BIN"
+        printf "#!/bin/sh\necho native\n" > "$ARCH_BIN/codex"
+        chmod +x "$ARCH_BIN/codex"
+        export NVM_DIR="$LOCAL_PLAT/nvm"
+        for version in v1 v2; do
+            prefix="$NVM_DIR/versions/node/$version"
+            mkdir -p "$prefix/bin" "$prefix/lib/node_modules/@openai/codex/bin"
+            printf "#!/bin/sh\necho legacy\n" > "$prefix/lib/node_modules/@openai/codex/bin/codex.js"
+            chmod +x "$prefix/lib/node_modules/@openai/codex/bin/codex.js"
+            ln -s ../lib/node_modules/@openai/codex/bin/codex.js "$prefix/bin/codex"
+        done
+        mkdir -p "$HOME/.nvm/versions/node/old/bin"
+        ln -s ../lib/node_modules/@openai/codex/bin/codex.js "$HOME/.nvm/versions/node/old/bin/codex"
+        export PATH="$NVM_DIR/versions/node/v1/bin:$ARCH_BIN:$PATH"
+        test "$(codex)" = legacy
+        _codex_retire_npm_launchers
+        _codex_retire_npm_launchers
+        test "$(codex)" = native
+        test ! -L "$HOME/.nvm/versions/node/old/bin/codex"
+        for version in v1 v2; do
+            prefix="$NVM_DIR/versions/node/$version"
+            test ! -L "$prefix/bin/codex"
+            test "$("$prefix/lib/node_modules/@openai/codex/bin/codex.js")" = legacy
+        done
+    '
+    [ "$status" -eq 0 ]
+}
+
+@test "Codex PATH validation rejects a missing managed bin directory" {
+    run env HOME="$TEST_HOME" DF_USE_PLAT=0 REPO_ROOT="$REPO_ROOT" bash -c '
+        source "$REPO_ROOT/install/codex.sh"
+        mkdir -p "$ARCH_BIN"
+        printf "#!/bin/sh\necho native\n" > "$ARCH_BIN/codex"
+        chmod +x "$ARCH_BIN/codex"
+        PATH=/usr/bin:/bin _codex_verify_path
+    '
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Codex PATH conflict: not found"* ]]
+}
+
+@test "npm migration refuses to replace an unrelated shadowing executable" {
+    run env HOME="$TEST_HOME" DF_USE_PLAT=0 REPO_ROOT="$REPO_ROOT" bash -c '
+        source "$REPO_ROOT/install/codex.sh"
+        export NVM_DIR="$LOCAL_PLAT/nvm"
+        prefix="$NVM_DIR/versions/node/v1"
+        mkdir -p "$prefix/bin" "$ARCH_BIN"
+        printf "#!/bin/sh\necho custom\n" > "$prefix/bin/codex"
+        chmod +x "$prefix/bin/codex"
+        cp "$prefix/bin/codex" "$ARCH_BIN/codex"
+        export PATH="$prefix/bin:$ARCH_BIN:$PATH"
+        _codex_retire_npm_launchers
+    '
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Codex PATH conflict"* ]]
+    [ -x "$TEST_HOME/.local/nvm/versions/node/v1/bin/codex" ]
+}

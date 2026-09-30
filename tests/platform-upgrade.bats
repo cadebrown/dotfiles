@@ -924,7 +924,7 @@ RUBY
 
 @test "unattended cask upgrades require cached sudo" {
     grep -q 'DF_BREW_UPGRADE_CASKS:-auto' "$REPO/install/homebrew.sh"
-    grep -q 'sudo -n true' "$REPO/install/homebrew.sh"
+    grep -q 'sudo_session_ensure' "$REPO/install/homebrew.sh"
     grep -q 'log_warn "Cask upgrades deferred: no live sudo credential' "$REPO/install/homebrew.sh"
 }
 

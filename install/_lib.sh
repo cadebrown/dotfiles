@@ -623,9 +623,35 @@ _sudo_session_interactive() {
     [[ -t 0 && -t 2 ]]
 }
 
+sudo_session_ensure() {
+    local _sudo_error=""
+    [[ "$OS" == "darwin" ]] || return 1
+
+    # Keep unattended runs non-prompting. A foreground recovery is safe only
+    # when both the terminal input and error stream belong to the operator;
+    # run_logged pipes stdout but leaves both of those descriptors intact.
+    if _sudo_error="$(sudo -n -v 2>&1)"; then
+        unset _DF_SUDO_SESSION_ERROR
+        return 0
+    fi
+    # DF_SUDO=0 opts out of bootstrap-owned prompting and keepalive, while
+    # preserving the prior behavior of using an operator's cached ticket.
+    if [[ "$DF_SUDO" == "0" ]] || ! _sudo_session_interactive; then
+        # Keep the actionable sudo diagnostic available to the caller without
+        # repeating multiline errors in every deferred-upgrade warning.
+        _DF_SUDO_SESSION_ERROR="${_sudo_error%%$'\n'*}"
+        _DF_SUDO_SESSION_ERROR="${_DF_SUDO_SESSION_ERROR:0:240}"
+        return 1
+    fi
+    log_info "Refreshing sudo authentication for privileged macOS upgrade"
+    sudo -v
+}
+
 _sudo_session_keepalive() {
     local _owner="${_DF_SUDO_SESSION_OWNER:-}"
     local _sleeper=""
+    local _renewal_warned=0
+    local _renewal_error=""
     # Reap our own child before exiting. Killing the entire process tree at
     # once can orphan sleep before this shell collects it (observable on Linux).
     trap 'if [[ -n "$_sleeper" ]]; then
@@ -641,9 +667,15 @@ _sudo_session_keepalive() {
         # adopted by launchd keep refreshing the ticket after its owner died.
         [[ -n "$_owner" ]] || return 0
         kill -0 "$_owner" 2>/dev/null || return 0
-        if ! sudo -n -v; then
-            log_warn "sudo credential renewal failed; privileged bootstrap steps may be skipped"
-            return 1
+        if ! _renewal_error="$(sudo -n -v 2>&1)"; then
+            if (( !_renewal_warned )); then
+                _renewal_error="${_renewal_error%%$'\n'*}"
+                _renewal_error="${_renewal_error:0:240}"
+                log_warn "sudo credential renewal failed${_renewal_error:+: $_renewal_error}; privileged bootstrap steps may be skipped"
+                _renewal_warned=1
+            fi
+        else
+            _renewal_warned=0
         fi
     done
 }

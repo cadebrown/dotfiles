@@ -59,6 +59,32 @@ _verify_codex_present() {
         log_warn "native Codex binary missing: $ARCH_BIN/codex"
         return 1
     fi
+    _codex_verify_path
+}
+
+_codex_verify_path() {
+    local _active
+    hash -r
+    _active="$(command -v codex 2>/dev/null || true)"
+    [[ -n "$_active" && "$_active" -ef "$ARCH_BIN/codex" ]] \
+        || die "Codex PATH conflict: ${_active:-not found}; expected $ARCH_BIN/codex"
+}
+
+_codex_retire_npm_launchers() {
+    local _root _launcher _target
+    # Retire only npm's known nvm symlinks. Keep the package and its native
+    # executables intact for running sessions, including NFS users.
+    for _root in "$LOCAL_PLAT/nvm" "$HOME/.nvm"; do
+        [[ "$_root" == "$HOME/"* ]] || continue
+        for _launcher in "$_root"/versions/node/*/bin/codex; do
+            [[ -L "$_launcher" && ! "$_launcher" -ef "$ARCH_BIN/codex" ]] || continue
+            _target="$(readlink "$_launcher")"
+            [[ "$_target" == ../lib/node_modules/@openai/codex/bin/codex.js ]] || continue
+            rm -- "$_launcher" || die "Could not retire legacy Codex launcher: $_launcher"
+            log_info "Retired npm Codex launcher: $_launcher (package retained for active sessions)"
+        done
+    done
+    _codex_verify_path
 }
 
 _codex_asset_name() {
@@ -139,7 +165,7 @@ _codex_activate_runtime() {
 _codex_install_binary() (
     local _intent="${1:-install}" _dest="$ARCH_BIN/codex" _asset _metadata
     local _tag _url _digest _want _got _archive _stage _runtime_root _next="" _health
-    local _expected _is_prerelease _is_draft _active _runtime _staged_runtime _target _link_target
+    local _expected _is_prerelease _is_draft _runtime _staged_runtime _target _link_target
 
     if [[ -n "${CODEX_VERSION:-}" ]]; then
         _codex_release_tag_valid "$CODEX_VERSION" \
@@ -226,13 +252,6 @@ _codex_install_binary() (
     mv "$_staged_runtime" "$_runtime" || die "Could not atomically publish Codex runtime $_expected"
     _stage=""
     _codex_activate_runtime "$_runtime"
-    _active="$(command -v codex 2>/dev/null || true)"
-    if [[ "$_active" != "$_dest" ]]; then
-        # Do not unlink a npm shim outside $ARCH_BIN. It can be held open by a
-        # running app server on NFS and must be migrated separately; the native
-        # binary is nevertheless installed safely for the next fresh shell.
-        log_warn "native Codex is at $_dest but PATH currently resolves ${_active:-no codex}; restart the shell or remove a stale npm shim"
-    fi
     log_okay "Installed complete Codex runtime $_expected → $_dest"
 )
 
@@ -992,6 +1011,7 @@ case "$_mode" in
         ;;
     install)
         _codex_install_binary install
+        _codex_retire_npm_launchers
         _verify_codex_present
         ;;
     sync-runtime)
@@ -1014,11 +1034,13 @@ case "$_mode" in
             --source "$2" --destination "${CODEX_HOME:-$HOME/.codex}"
         ;;
     check)
+        _codex_verify_path
         codex_runtime_prepare
         _check_setup
         ;;
     upgrade)
         _codex_install_binary upgrade
+        _codex_retire_npm_launchers
         _verify_codex_present
         codex_runtime_prepare
         _sync_config

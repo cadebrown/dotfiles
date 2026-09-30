@@ -26,13 +26,14 @@ if [[ "$OS" == "darwin" ]]; then
     if [[ "${DF_MODE:-}" == "upgrade" ]]; then
         # The cask only moves on yearly MacTeX releases, so package-level updates
         # have to come from tlmgr, which writes root-owned /usr/local/texlive.
-        # Skip rather than block bootstrap on a password prompt.
-        if sudo -n true 2>/dev/null; then
+        # Interactive macOS upgrades recover visibly; unattended runs skip
+        # rather than hiding a password prompt inside this installer.
+        if sudo_session_ensure; then
             log_info "Updating TeX Live packages (tlmgr)"
             run_logged sudo -n "$_texbin/tlmgr" update --self --all \
                 || die "tlmgr update failed"
         else
-            log_warn "No sudo ticket — skipping tlmgr. Run: sudo tlmgr update --self --all"
+            log_warn "No sudo ticket${_DF_SUDO_SESSION_ERROR:+: $_DF_SUDO_SESSION_ERROR} — skipping tlmgr. Run: sudo tlmgr update --self --all"
         fi
     fi
     exit 0
