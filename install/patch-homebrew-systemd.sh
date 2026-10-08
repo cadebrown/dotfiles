@@ -33,7 +33,9 @@ fi
 
 log_section "Patching systemd formula for Linux (lxml binary wheel install)"
 
-_result=$(python3 - "$SYSTEMD_RB" <<'PY'
+# Bash 3.2 misparses this heredoc inside command substitution; capture a function instead.
+_patch_formula() {
+python3 - "$SYSTEMD_RB" <<'PY'
 import re
 import sys
 
@@ -88,7 +90,9 @@ elif original in text or legacy in text:
 else:
     print("notfound:virtualenv resource installation")
 PY
-)
+}
+_result="$(_patch_formula)"
+unset -f _patch_formula
 case "$_result" in
     already) log_okay "systemd lxml binary-wheel patch already applied" ;;
     patched) log_okay "Patched: systemd lxml installs from its formula-version binary wheel on Linux" ;;

@@ -82,7 +82,7 @@ run_fixture_command() (
 
 shell_checks() {
     require bash shellcheck
-    local script
+    local script syntax_bash="${1:-bash}"
     local scripts=(.githooks/pre-push bootstrap.sh install/*.sh install/plat/*/.plat_env.sh home/dot_local/bin/executable_git-wt home/dot_local/bin/executable_df-cursor-worker)
     # Helpers without a Bash shebang are checked through their callers.
     for script in tests/*.sh; do
@@ -91,7 +91,7 @@ shell_checks() {
         fi
     done
     printf '==> Bash syntax and ShellCheck\n'
-    for script in "${scripts[@]}"; do bash -n "$script"; done
+    for script in "${scripts[@]}"; do "$syntax_bash" -n "$script"; done
     shellcheck -S warning "${scripts[@]}"
 }
 
@@ -168,7 +168,7 @@ macos_checks() {
     local bats_path chezmoi_path
     bats_path="$(command -v bats)"
     chezmoi_path="$(command -v chezmoi)"
-    shell_checks
+    shell_checks /bin/bash
     make_tmp
     mkdir -p "$ci_tmp/macos-home"
     ln -s "$REPO" "$ci_tmp/macos-home/dotfiles"
@@ -177,6 +177,8 @@ macos_checks() {
         /bin/bash "$bats_path" \
         tests/agents.bats \
         tests/bootstrap-remote.bats \
+        tests/brew-mesa.bats \
+        tests/brew-systemd.bats \
         tests/claude-launcher.bats \
         tests/gwt.bats \
         tests/mcp-emitters.bats \

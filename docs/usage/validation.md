@@ -37,6 +37,9 @@ Docker bootstrap suite. It requires a running Docker daemon and the declared
 validation tools. Missing tools and failed checks stop the gate; it does not
 silently install dependencies or skip unavailable checks. Temporary homes,
 documentation output, and provider data keep checks away from live settings.
+The macOS mode parses shell scripts with `/bin/bash` explicitly and exercises
+Mesa and systemd formula fixtures under the constrained system PATH, preserving
+compatibility with macOS's Bash 3.2 even when Homebrew provides a newer Bash.
 The Bats entrypoints also clear inherited managed runtime roots and build flags
 before creating fixtures. A fake `HOME` alone is insufficient on hosts that
 export `DF_TOOLS_ROOT`, `CODEX_HOME`, or language-specific runtime directories.

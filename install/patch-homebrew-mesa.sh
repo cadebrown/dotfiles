@@ -37,7 +37,9 @@ MESA_RB="$LOCAL_PLAT/brew/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/m
 
 log_section "Patching mesa formula for Linux (pyyaml wheel + bindgen toolchain)"
 
-_result=$(python3 - "$MESA_RB" <<'PY'
+# Bash 3.2 misparses this heredoc inside command substitution; capture a function instead.
+_patch_formula() {
+python3 - "$MESA_RB" <<'PY'
 import re
 import sys
 
@@ -145,7 +147,9 @@ else:
         formula.write(text)
     print("patched")
 PY
-)
+}
+_result="$(_patch_formula)"
+unset -f _patch_formula
 case "$_result" in
     already) log_okay "mesa pyyaml and bindgen patches already applied" ;;
     patched) log_okay "Patched: mesa uses its PyYAML resource wheel and a system GCC with C++ headers" ;;

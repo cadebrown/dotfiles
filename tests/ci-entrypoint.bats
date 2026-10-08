@@ -135,6 +135,20 @@ SH
     [ "$(grep -c '^npm ' "$CI_LOG")" -eq 0 ]
 }
 
+@test "macOS syntax validation uses system Bash even when PATH selects another Bash" {
+    cat > "$BIN/bash" <<'SH'
+#!/bin/bash
+printf 'unexpected-path-bash\n' >> "$CI_LOG"
+exit 42
+SH
+    chmod +x "$BIN/bash"
+    run env PATH="$BIN:$PATH" CI_FIXTURE_OS=Darwin /bin/bash "$FIXTURE/tests/ci.sh" macos
+    [ "$status" -eq 0 ]
+    ! grep -q '^unexpected-path-bash$' "$CI_LOG"
+    grep -q 'tests/brew-mesa.bats' "$CI_LOG"
+    grep -q 'tests/brew-systemd.bats' "$CI_LOG"
+}
+
 @test "Bats can use a separate temporary directory without changing later CI stages" {
     local docs_tmp="$BATS_TEST_TMPDIR/docs-tmp" fixture_tmp="$BATS_TEST_TMPDIR/fixture-tmp"
     mkdir "$docs_tmp" "$fixture_tmp"

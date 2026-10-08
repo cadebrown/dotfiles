@@ -1042,6 +1042,30 @@ not depend on `rustup-init`.
 
 ---
 
+## macOS syntax checks report an unmatched quote in a formula patch
+
+**Symptom:** `./tests/ci.sh macos` fails in `patch-homebrew-mesa.sh` or
+`patch-homebrew-systemd.sh` with `unexpected EOF while looking for matching`
+a single quote, although the same scripts pass Linux checks.
+
+**Cause:** Bash 3.2 misparses the embedded Python heredoc inside command
+substitution. Quoting the outer assignment does not resolve this parser
+failure. A newer Bash on Linux does not reproduce it.
+
+**Confirm:** run `/bin/bash -n install/patch-homebrew-mesa.sh` and
+`/bin/bash -n install/patch-homebrew-systemd.sh` on macOS. These commands parse
+the files without installing packages or changing formulas.
+
+**Fix:** update the checkout. Each patch now puts its Python heredoc in a shell
+function and captures that function's output. Formula transformations and
+Linux-only execution remain the same. The macOS CI mode explicitly validates
+with `/bin/bash` and runs both formula fixture suites under its constrained
+system PATH, even when Homebrew Bash is installed.
+
+See the [Mesa source](../../install/patch-homebrew-mesa.sh),
+[systemd source](../../install/patch-homebrew-systemd.sh), and Bash's
+[heredoc reference](https://www.gnu.org/software/bash/manual/html_node/Redirections.html#Here-Documents).
+
 ## Mesa PyYAML patch target not found
 
 **Symptom:** Linux bootstrap stops during Homebrew preparation with
