@@ -132,6 +132,16 @@ log_section "Claude Code plugins"
 
 has claude || die "claude is not on PATH after installation: $ARCH_BIN/claude"
 
+# A failed inventory is a prerequisite failure, not an empty marketplace list.
+# Read it once: the declarations below have distinct marketplace names.
+if ! _mp_list="$(claude plugin marketplace list 2>&1)"; then
+    log_fail "Claude marketplace inventory could not be read: ${_mp_list//$'\n'/ }"
+    if grep -Eqi 'remote managed settings|authentication|unauthorized|not logged in|invalid api.?key|http.?401' <<< "$_mp_list"; then
+        die "Check Claude authentication and managed-settings access. If authentication was rejected, run 'claude auth login'; then retry 'claude plugin marketplace list' before rerunning bootstrap."
+    fi
+    die "Resolve the marketplace inventory diagnostic above before rerunning bootstrap."
+fi
+
 # Third-party marketplaces required by claude-plugins.txt entries
 # (<name>@<marketplace> form). Format: "owner/repo|marketplace-name".
 _MARKETPLACES=(
@@ -143,11 +153,6 @@ _MARKETPLACES=(
 _marketplace_fail=0
 for _mp_entry in "${_MARKETPLACES[@]}"; do
     IFS='|' read -r _mp_repo _mp_name <<< "$_mp_entry"
-    if ! _mp_list="$(claude plugin marketplace list 2>&1)"; then
-        log_warn "  failed listing marketplaces: ${_mp_list//$'\n'/ }"
-        (( _marketplace_fail++ )) || true
-        _mp_list=""
-    fi
     if grep -q "$_mp_name" <<< "$_mp_list"; then
         log_info "  marketplace $_mp_name (already known)"
     elif run_logged claude plugin marketplace add "$_mp_repo"; then
@@ -157,7 +162,7 @@ for _mp_entry in "${_MARKETPLACES[@]}"; do
         (( _marketplace_fail++ )) || true
     fi
 done
-unset _mp_entry _mp_repo _mp_name
+unset _mp_entry _mp_repo _mp_name _mp_list
 
 # Plugin installs resolve against the LOCAL marketplace clones, which never
 # auto-refresh (DISABLE_AUTOUPDATER=1). A plugin added upstream after a

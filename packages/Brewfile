@@ -111,6 +111,7 @@ brew "lz4"
 brew "zstd"
 
 ### Build Tools ###
+brew "openssl@3" # locked Cargo dependencies may not support globally linked OpenSSL 4
 brew "cmake"
 brew "ninja"
 brew "meson"

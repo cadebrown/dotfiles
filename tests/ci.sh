@@ -49,6 +49,37 @@ make_tmp() {
     fi
 }
 
+# Fixtures choose their own homes and policy. Inherited install roots can make
+# their setup overwrite live tools before any assertion runs. Keep the cleanup
+# local to Bats so later CI stages retain their caller's environment and fixture
+# controls such as CI_LOG and FAIL_TOOL still reach nested entrypoint tests.
+run_fixture_command() (
+    local fixture_home="$1" fixture_tmp="${DF_TEST_TMPDIR:-}" variable
+    shift
+    while IFS= read -r variable; do
+        case "$variable" in
+            DF_*|CODEX_HOME|CODEX_SQLITE_HOME|CLAUDE_CONFIG_DIR|CASS_DATA_DIR|QMD_CACHE_DIR|\
+            XDG_CONFIG_HOME|XDG_CACHE_HOME|XDG_DATA_HOME|XDG_STATE_HOME|XDG_RUNTIME_DIR|\
+            ARCH_BIN|LOCAL_PLAT|PLAT|_LOCAL_PLAT|_PLAT|SCRATCH|PATHS|\
+            CARGO_HOME|CARGO_TARGET_DIR|CARGO_BUILD_*|CARGO_ENCODED_RUSTFLAGS|\
+            RUSTUP_HOME|RUSTFLAGS|RUSTC_WRAPPER|RUSTC_WORKSPACE_WRAPPER|\
+            NVM_DIR|NVM_BIN|NVM_INC|UV_TOOL_BIN_DIR|UV_TOOL_DIR|UV_PYTHON_INSTALL_DIR|UV_CACHE_DIR|\
+            PYTHON_ENV|PYTHONHOME|PYTHONPATH|PYTHONPYCACHEPREFIX|PYTHONDONTWRITEBYTECODE|\
+            CONAN_HOME|GOPATH|GOBIN|GOCACHE|ELAN_HOME|JULIAUP_DEPOT_PATH|JULIA_DEPOT_PATH|\
+            CCACHE_*|SCCACHE_*|CMAKE_*|CFLAGS|CXXFLAGS|CPPFLAGS|LDFLAGS|_PROFILE_SOURCED)
+                unset "$variable"
+                ;;
+        esac
+    done < <(compgen -e)
+    # Empty exported roots also prevent this checkout's optional host overlay
+    # from restoring a live root; _lib derives each fixture's current HOME.
+    export HOME="$fixture_home" DF_TOOLS_ROOT='' DF_STATE_ROOT='' CODEX_HOME=''
+    export DF_USE_PLAT=0 DF_PLAT=auto DF_PROFILE=full
+    # Bats derives BATS_TMPDIR from TMPDIR, independently of later docs builds.
+    if [[ -n "$fixture_tmp" ]]; then export TMPDIR="$fixture_tmp"; fi
+    "$@"
+)
+
 shell_checks() {
     require bash shellcheck
     local script
@@ -70,12 +101,14 @@ fast_checks() {
     mkdir -p "$ci_tmp/fast-home"
     ln -s "$REPO" "$ci_tmp/fast-home/dotfiles"
     printf '==> Fast Bats tests\n'
-    HOME="$ci_tmp/fast-home" bats \
+    run_fixture_command "$ci_tmp/fast-home" bats \
         tests/agents.bats \
         tests/agent-doctor.bats \
         tests/bootstrap-remote.bats \
         tests/brew-coreutils.bats \
         tests/brew-glibc.bats \
+        tests/brew-mesa.bats \
+        tests/brew-systemd.bats \
         tests/ci-entrypoint.bats \
         tests/claude-launcher.bats \
         tests/codex-launcher.bats \
@@ -92,6 +125,7 @@ fast_checks() {
         tests/workspace-mcp.bats \
         tests/gh-mcp-headers.bats \
         tests/host-config.bats \
+        tests/latex.bats \
         tests/lean.bats \
         tests/mcp-emitters.bats \
         tests/netrc.bats \
@@ -139,7 +173,7 @@ macos_checks() {
     mkdir -p "$ci_tmp/macos-home"
     ln -s "$REPO" "$ci_tmp/macos-home/dotfiles"
     printf '==> macOS constrained-PATH smoke tests\n'
-    env HOME="$ci_tmp/macos-home" CHEZMOI_BIN="$chezmoi_path" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+    run_fixture_command "$ci_tmp/macos-home" env CHEZMOI_BIN="$chezmoi_path" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
         /bin/bash "$bats_path" \
         tests/agents.bats \
         tests/bootstrap-remote.bats \

@@ -84,7 +84,7 @@ record npm 12 minimum npm configured-major "$(command_version npm 's/^v?([0-9.]+
 record python 3.14 major homebrew python@3.14 "$(command_version python3 's/^Python ([0-9.]+).*/\1/p')"
 record uv 0.12 major uv self-update "$(command_version uv 's/^uv ([0-9.]+).*/\1/p')"
 record go 1.27 minimum homebrew go "$(go version 2>/dev/null | sed -nE 's/^go version go([0-9.]+).*/\1/p' || true)"
-record zig 0.16.0 exact homebrew zig "$(zig version 2>/dev/null | sed -nE 's/^([0-9.]+).*/\1/p' || true)"
+record zig 0.16.0 minimum homebrew zig "$(zig version 2>/dev/null | sed -nE 's/^([0-9.]+).*/\1/p' || true)"
 record juliaup 1.22.3 minimum homebrew juliaup "$(command_version juliaup 's/^Juliaup ([0-9.]+).*/\1/p')"
 record julia 1.12.7 minimum juliaup release "$(command_version julia 's/^julia version ([0-9.]+).*/\1/p')"
 record lean 4.33.1 exact elan mathlib-paired-pin "$(command_version lean 's/^Lean \(version ([0-9.]+).*/\1/p')"

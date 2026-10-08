@@ -30,6 +30,9 @@ setup() {
 managed_version_fixture() {
     fake_home="$BATS_TEST_TMPDIR/audit-home"
     stub_bin="$BATS_TEST_TMPDIR/audit-bin"
+    # The host policy may export a tools root outside HOME. Keep version probes
+    # inside the fixture even when running on a configured bootstrap host.
+    export DF_TOOLS_ROOT="$fake_home/.local"
     local command
     mkdir -p "$fake_home/.local/nvm" "$stub_bin"
     printf '%s\n' 'nvm() { printf "0.40.7\\n"; }' \
@@ -46,7 +49,7 @@ case "${0##*/}" in
     python3) printf 'Python 3.14.7\n' ;;
     uv)      printf 'uv 0.12.9\n' ;;
     go)      printf 'go version go1.27.1 linux/arm64\n' ;;
-    zig)     printf '0.16.0\n' ;;
+    zig)     printf '%s\n' "${DF_VERSION_FIXTURE_ZIG:-0.17.0}" ;;
     juliaup) printf 'Juliaup 1.22.4\n' ;;
     julia)   printf 'julia version 1.12.7\n' ;;
     lean)    printf 'Lean (version 4.33.1, test)\n' ;;
@@ -76,7 +79,7 @@ EOF
     export DF_VERSION_FIXTURE_LOG="$BATS_TEST_TMPDIR/version-commands"
 }
 
-@test "strict audit accepts patch releases newer than minimum floors" {
+@test "strict audit accepts unpinned releases newer than minimum floors" {
     managed_version_fixture
 
     run env HOME="$fake_home" DF_USE_PLAT=0 PATH="$fixture_path" \
@@ -84,8 +87,24 @@ EOF
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '
-        .[] | select(.tool == "rustup" or .tool == "juliaup")
-        | .policy == "minimum" and .status == "current"
+        [.[] | select(.tool == "rustup" or .tool == "juliaup" or .tool == "zig")]
+        | length == 3 and all(.[]; .policy == "minimum" and .status == "current")
+    ' >/dev/null
+}
+
+@test "strict audit rejects Zig below its minimum floor" {
+    managed_version_fixture
+
+    run env HOME="$fake_home" DF_USE_PLAT=0 PATH="$fixture_path" \
+        DF_VERSION_FIXTURE_ZIG=0.15.2 \
+        bash "$REPO/install/audit-versions.sh" --strict
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '
+        [.[] | select(.status != "current")]
+        | length == 1 and .[0].tool == "zig" and .[0].policy == "minimum"
+          and .[0].expected == "0.16.0" and .[0].installed == "0.15.2"
+          and .[0].status == "outdated"
     ' >/dev/null
 }
 

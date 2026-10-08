@@ -28,7 +28,7 @@ transcript.
 
 ## Plugin and hook lifecycle
 
-`install/claude.sh` installs the CLI, refreshes declared marketplaces, reconciles plugins, and regenerates narrow hook gates. After an intentional direct plugin update:
+`install/claude.sh` installs the CLI, reads the marketplace inventory, refreshes declared marketplaces, reconciles plugins, and regenerates narrow hook gates. An inventory failure stops before marketplace or plugin changes; resolve [authentication or managed-settings failures](../usage/troubleshooting.md#claude-cannot-load-required-remote-managed-settings) before retrying. After an intentional direct plugin update:
 
 ```bash
 bash ~/dotfiles/install/claude.sh sync-hooks

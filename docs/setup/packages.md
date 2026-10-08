@@ -46,6 +46,27 @@ Linux it prefers musl candidates to avoid a too-new glibc; a failing binary is
 retried from a compatible source path. A macOS source build needs a normal
 terminal because Sequoia's linker provenance rules can reject sandboxed builds.
 
+Source installs use the installed Homebrew `openssl@3` keg through a
+command-local `OPENSSL_DIR`; older locked `openssl-sys` dependencies reject
+OpenSSL 4. `packages/Brewfile` keeps OpenSSL 3 installed alongside the global
+version. Explicit `OPENSSL_DIR`, `OPENSSL_LIB_DIR`, or `OPENSSL_INCLUDE_DIR`
+settings (including target-prefixed variants) take precedence. Without that
+keg, Cargo keeps its normal discovery behavior. This applies to installer
+source builds; ordinary project builds keep their own environment. On Linux,
+the installer also adds that keg's library directory to the executable's
+runtime search path so it loads the same OpenSSL it built against; existing
+Rust compiler flags are preserved.
+
+After installing the Brewfile dependencies, retry with:
+
+```sh
+bash ~/dotfiles/install/rust.sh
+```
+
+Expect source fallbacks to report the OpenSSL 3 path and the final tool count
+to show zero failures. See the [OpenSSL mismatch recovery](../usage/troubleshooting.md#cargo-source-build-rejects-openssl-4)
+and upstream [rust-openssl build configuration](https://github.com/rust-openssl/rust-openssl/blob/openssl-sys-v0.9.109/openssl/src/lib.rs#manual).
+
 ### 2. npm — npm-specific tools
 
 Add global CLIs to `packages/npm.txt`. nvm owns Node and its global prefix under

@@ -25,6 +25,12 @@ Expected result: a final selected-tool verification and, if applicable, a
 degradation summary to repair. It does not prove cloud credentials, GUI privacy
 grants, or running local services.
 
+Upgrade mode prints `bootstrap complete` only after its version audit returns
+success; the audit is strict by default (`DF_STRICT_UPGRADE=0` selects report-only
+mode). Informational source-build timing notices and the independently verified
+`rust-docs-mcp` GitHub diagnostic exception remain visible without being counted
+as failed installations.
+
 ## Modes
 
 ```sh

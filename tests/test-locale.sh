@@ -43,7 +43,7 @@ else
 fi
 
 # 4. without LOCPATH → should be ASCII (confirms we're testing the right thing)
-CODESET_NO_LOC=$(LOCPATH="" LANG=en_US.UTF-8 "$ZSH" --no-rcs -c \
+CODESET_NO_LOC=$(LC_ALL="" LC_CTYPE="" LOCPATH="" LANG=en_US.UTF-8 "$ZSH" --no-rcs -c \
     'zmodload zsh/langinfo; printf "%s" $langinfo[CODESET]' 2>/dev/null)
 if [[ "$CODESET_NO_LOC" != "UTF-8" ]]; then
     pass "without LOCPATH codeset is '$CODESET_NO_LOC' (not UTF-8 — expected)"
@@ -53,7 +53,7 @@ else
 fi
 
 # 5. with LOCPATH → must be UTF-8
-CODESET=$(LOCPATH="$LOCALE_DIR" LANG=en_US.UTF-8 "$ZSH" --no-rcs -c \
+CODESET=$(LC_ALL="" LC_CTYPE="" LOCPATH="$LOCALE_DIR" LANG=en_US.UTF-8 "$ZSH" --no-rcs -c \
     'zmodload zsh/langinfo; printf "%s" $langinfo[CODESET]' 2>/dev/null)
 if [[ "$CODESET" == "UTF-8" ]]; then
     pass "CODESET with LOCPATH: UTF-8"
@@ -62,7 +62,7 @@ else
 fi
 
 # 6. wcwidth(❯) == 1
-WCWIDTH=$(LOCPATH="$LOCALE_DIR" LANG=en_US.UTF-8 "$ZSH" --no-rcs -c \
+WCWIDTH=$(LC_ALL="" LC_CTYPE="" LOCPATH="$LOCALE_DIR" LANG=en_US.UTF-8 "$ZSH" --no-rcs -c \
     'printf "%d" ${(m)#:-❯}' 2>/dev/null)
 if [[ "$WCWIDTH" == "1" ]]; then
     pass "wcwidth(❯) == 1"
@@ -70,7 +70,21 @@ else
     fail "wcwidth(❯) == '$WCWIDTH' (expected 1 — cursor math will be off)"
 fi
 
-# 7. LOCPATH exported in deployed ~/.zprofile
+# Category overrides used by non-login processes need matching locale data.
+if [[ -f "$LOCALE_DIR/C.UTF-8/LC_CTYPE" ]]; then
+    pass "C.UTF-8 category locale is generated"
+else
+    fail "C.UTF-8 category locale is missing (run linux-packages.sh)"
+fi
+CODESET_C=$(LC_ALL="" LOCPATH="$LOCALE_DIR" LANG=en_US.UTF-8 LC_CTYPE=C.UTF-8 \
+    "$ZSH" --no-rcs -c 'zmodload zsh/langinfo; printf "%s" $langinfo[CODESET]' 2>/dev/null)
+if [[ "$CODESET_C" == UTF-8 ]]; then
+    pass "inherited LC_CTYPE=C.UTF-8 keeps the UTF-8 codeset"
+else
+    fail "inherited LC_CTYPE=C.UTF-8 produced '$CODESET_C'"
+fi
+
+# Deployed profiles must expose the generated locales.
 if grep -q 'export LOCPATH' "$HOME/.zprofile" 2>/dev/null; then
     pass "LOCPATH exported in ~/.zprofile"
 else

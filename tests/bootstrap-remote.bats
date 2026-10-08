@@ -52,8 +52,10 @@ SH
 
 make_fake_chezmoi() {
     local use_plat="$1" local_plat
-    local_plat="$(env HOME="$TEST_HOME" DF_USE_PLAT="$use_plat" PATH="/usr/bin:/bin" \
+    local_plat="$(env HOME="$TEST_HOME" DF_USE_PLAT="$use_plat" DF_PLAT=auto \
+        DF_TOOLS_ROOT="$TEST_HOME/.local" DF_STATE_ROOT= CODEX_HOME= PATH="/usr/bin:/bin" \
         bash -c 'source "$1/install/_lib.sh"; printf %s "$LOCAL_PLAT"' _ "$REPO")"
+    [[ "$local_plat" == "$TEST_HOME/.local" || "$local_plat" == "$TEST_HOME/.local/"* ]] || return 1
     mkdir -p "$local_plat/bin"
     cat > "$local_plat/bin/chezmoi" <<'SH'
 #!/bin/sh
@@ -74,7 +76,7 @@ run_remote_bootstrap() {
         cd "$1"
         env \
             HOME="$2" PATH="$3:/usr/bin:/bin" REPO_SOURCE="$4" \
-            DF_USE_PLAT="$5" DF_NAME=Test DF_EMAIL=test@example.com \
+            DF_USE_PLAT="$5" DF_PLAT=auto DF_NAME=Test DF_EMAIL=test@example.com \
             DF_TOOLS_ROOT="$2/.local" DF_STATE_ROOT= CODEX_HOME= \
             DF_DO_SCRATCH="$6" DF_DO_DIRS="$6" DF_SCRATCH= DF_SCRATCH_LINK="$2/no-scratch" \
             REMOTE_OMIT_PLAT="$7" DF_DO_ZSH=0 DF_DO_PACKAGES=0 \
@@ -88,6 +90,22 @@ run_remote_bootstrap() {
             DF_DO_AUTH=0 DF_DO_OVERLAYS=0 \
             bash < "$4/bootstrap.sh"
     ' _ "$BATS_TEST_TMPDIR/unrelated" "$TEST_HOME" "$FAKE_BIN" "$REPO" "$use_plat" "$preclone_installers" "$omit_plat"
+}
+
+@test "remote bootstrap fixture never writes inherited tool or state roots" {
+    local inherited_root="$BATS_TEST_TMPDIR/inherited"
+    export DF_TOOLS_ROOT="$inherited_root/tools" DF_TOOLS_ROOT_EXPLICIT=1
+    export DF_STATE_ROOT="$inherited_root/state" CODEX_HOME="$inherited_root/state/codex"
+    export DF_PLAT=plat_fixture_unsupported
+    mkdir -p "$DF_TOOLS_ROOT/bin"
+    printf 'keep inherited chezmoi\n' > "$DF_TOOLS_ROOT/bin/chezmoi"
+
+    run_remote_bootstrap 1
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DF_TOOLS_ROOT/bin/chezmoi")" = 'keep inherited chezmoi' ]
+    [ ! -e "$DF_STATE_ROOT" ]
+    [[ "$output" == *"LOCAL_PLAT=$TEST_HOME/.local/plat_"* ]]
 }
 
 @test "piped bootstrap clones to HOME/dotfiles from an unrelated directory" {

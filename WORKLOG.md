@@ -273,3 +273,87 @@ another task committed it separately as f17a5df while this task ran.
 - Sampled a separate Homebrew Bash 5.3.15 preprocessing stall in `heredoc_write`.
   Invocation-local `BASH_COMPAT=50` let Bats enumerate all 187 fixtures. Added
   the diagnosis and bounded workaround to the troubleshooting guide.
+
+# Full bootstrap recovery — October 8
+
+Objective: complete the actual Linux/full-profile bootstrap upgrade on this host,
+including every selected installer, overlays, runtime postconditions, and strict
+version audit. Prior Rust/OpenSSL and systemd fixes remain in the working tree.
+The TeX installer failed because it installed packages before updating tlmgr.
+Repair installers at their source and retain failure checks; no commits/pushes.
+Logs and run evidence: `/tmp/dotfiles-bootstrap.KZ7sGf/`.
+TeX implementation/tests are delegated; parent owns live execution and integration.
+
+First full upgrade stopped at Mesa formula drift before package installation.
+TinyTeX self-update repair was applied and the real TeX installer passed; latexmk
+rendered a one-page PDF. Mesa now preserves the new test-resource exclusion.
+Zig audit now follows its declared unpinned Homebrew ownership, with newer/below-
+floor strict-audit fixtures. Generated missing C.UTF-8 locale data after
+reproducing brewed Perl's inherited-LC_CTYPE warning; native locale checks pass.
+Second complete upgrade is starting with all original stages enabled.
+
+Second full upgrade passed Homebrew (93 dependencies), Python, Node, Rust
+(36/36), Go, Julia, Lean, and TeX, then stopped at Claude's organization-policy
+fetch: server HTTP 401 with a saved managed login. User was asked to run
+`claude auth login`; policy/cache are preserved. Later stages are being exercised
+individually to discover remaining failures while authentication is pending.
+The agent environment exports CODEX_VERSION=0.154.0, which is not an installer
+release tag; clearing that invocation-only metadata lets the normal latest
+Codex upgrade proceed (0.161.0). No declared pin was edited.
+
+Local CI exposed unsafe fixture inheritance of the live DF_TOOLS_ROOT. The run
+was stopped after tests replaced both chezmoi entrypoints with fixture stubs.
+Stubs were moved into the evidence directory; the actual PLAT chezmoi was
+restored through install/chezmoi.sh (2.73.0). Other potentially touched managed
+helpers match their authoritative sources. Fixture isolation is being repaired.
+A fresh validation snapshot uses a sibling same-filesystem TMPDIR and explicitly
+excludes its site/node_modules symlink from source-cloning fixtures.
+
+Independent continuation completed: Codex latest 0.161.0 passes its full
+healthcheck; CMake, local-LLM platform checks, OpenCode, memory/QMD, and skills
+installers pass. NVIDIA CUDA/Nsight/p4/Colossus/cuWatch/ComputeLab installers pass;
+agent-history, JFrog, Artifactory MCP, Jenkins MCP, and Jenkins tools also pass.
+Public runtime verification and all 16 strict toolchain audit entries pass.
+The overlay verifier confirms the same Claude-auth blocker in nv-pptx and found
+its Docker image absent. Existing GitLab credentials authenticated successfully;
+the image was pulled (digest in nv-pptx-image.txt), and Node, LibreOffice, and
+pdftoppm execute inside it. Claude authentication remains pending with the user.
+
+Claude now stops at its failed marketplace prerequisite with one preserved
+diagnostic and conditional login guidance. Seven focused tests pass. CI fixture
+isolation has 71 passing focused checks, including protected inherited roots and
+Fish host-overlay isolation. Full validation of frozen source is running in
+/home/scratch.cadeb_ent_1/dotfiles-bootstrap-check.p8tAmw with a sibling TMPDIR;
+log: validation-full-03.log. No commits or pushes have been made.
+
+User refreshed Claude authentication. Marketplace readback succeeded. Complete
+full-profile `env -u CODEX_VERSION GIT_TERMINAL_PROMPT=0 bash bootstrap.sh upgrade`
+then exited 0 with the NVIDIA overlay, both nv-pptx plugins/image, final public
+and NVIDIA runtime postconditions, and all 16 strict version entries passing.
+No installer failure appears in bootstrap-03.log. Six optional MCP credential
+sets are absent (Context7, Tavily, Exa, Hugging Face, Firecrawl, Asta); the
+installer reports these honestly. Existing local skill modifications were
+preserved and also appear in its degradation summary. Do not claim zero
+warnings or fully authenticated optional services.
+Full CI04 passed 395 native fixtures, docs, secrets/workflow lint, infrastructure,
+clean rootless LLDB and clean Docker bootstrap; its 608 Docker tests are running.
+
+Full validation completed successfully: validation-full-04.exit is 0, all 395
+native fixtures and 608 Docker tests passed, and the shared entrypoint reports
+`full validation passed`. Docs/rendered artifacts, secrets/workflow lint,
+infrastructure, clean rootless LLDB, and clean Docker bootstrap passed too.
+Validated source files match the live working tree (apart from this worklog).
+Changes remain local and uncommitted; no push was requested or performed.
+
+User subsequently requested commit and push. Publish these related bootstrap
+repairs as one commit, preserving the existing integrated pre-push gate; verify
+the hosted CI run for the published revision after the exact-commit gate passes.
+
+Publication found two host-specific issues in the exact-commit gate. Playwright's
+IPv6-first download timed out; the same locked official browser archives were
+fetched with curl and served through its supported download-host override on
+loopback. No dependency or validation check was changed. Native 395 fixtures,
+documentation, secrets/workflow lint, and infrastructure then passed, but Docker
+could not traverse the gate's mode-0700 temporary snapshot on root-squashed NFS.
+A direct mount probe failed before adding traversal permission and passed after;
+the gate now creates Docker-readable snapshots with no other-user write access.

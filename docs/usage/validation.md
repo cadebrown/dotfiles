@@ -37,6 +37,24 @@ Docker bootstrap suite. It requires a running Docker daemon and the declared
 validation tools. Missing tools and failed checks stop the gate; it does not
 silently install dependencies or skip unavailable checks. Temporary homes,
 documentation output, and provider data keep checks away from live settings.
+The Bats entrypoints also clear inherited managed runtime roots and build flags
+before creating fixtures. A fake `HOME` alone is insufficient on hosts that
+export `DF_TOOLS_ROOT`, `CODEX_HOME`, or language-specific runtime directories.
+Fixtures that write tools must explicitly select their temporary roots when
+run directly as well.
+`DF_TEST_TMPDIR` selects a separate temporary directory for Bats; it defaults to
+`TMPDIR` (or `/tmp`). On an NFS checkout, documentation output may need the same
+filesystem as the checkout, while Codex runtime fixtures require local storage:
+
+```sh
+mkdir -p .ci-validation
+docs_tmp=$(mktemp -d "$PWD/.ci-validation/tmp.XXXXXX")
+TMPDIR="$docs_tmp" DF_TEST_TMPDIR=/var/tmp ./tests/ci.sh full
+```
+
+Use a local, trusted temporary directory for `DF_TEST_TMPDIR`; `/var/tmp` must be
+a root-owned sticky directory. This separation preserves the runtime filesystem
+checks and avoids cross-filesystem documentation renames.
 The full gate always rebuilds the test image from the committed Dockerfile;
 `DOCKER_BUILD=0` remains available only for focused `tests/run.sh` iterations.
 
@@ -62,6 +80,10 @@ removed in later commits. Unrelated local branches are not part of that snapshot
 they are scanned separately if pushed.
 Clones live under the ignored `.ci-validation/` directory so Docker uses the
 same shared host mount as the original checkout; each clone is removed on exit.
+The gate makes its snapshot ancestors traversable and creates a readable
+checkout so a Docker daemon subject to NFS root squashing can mount it. It does
+not grant other users write access or change permissions on the working tree.
+The checkout's existing parent directories must already permit Docker access.
 Uncommitted fixes cannot conceal committed failures; unrelated working changes
 are left alone. Branch and annotated-tag updates to the same commit share one
 validation within the push. Ref deletion publishes no new code and needs no
@@ -70,6 +92,9 @@ validation. No success receipt from an earlier commit or environment is reused.
 The validation runs once as part of the push, so there is no need to manually run
 the full gate immediately before pushing. Use focused modes while editing.
 After a failed check, fix and commit the correction before retrying.
+The implementation lives in [`tests/pre-push.sh`](../../tests/pre-push.sh);
+see Git's [pre-push hook contract](https://git-scm.com/docs/githooks#_pre_push)
+and Docker's [bind mount requirements](https://docs.docker.com/engine/storage/bind-mounts/).
 
 ## What a passing gate establishes
 

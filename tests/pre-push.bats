@@ -60,6 +60,80 @@ EOF
     printf '%s\n' "$stub_dir"
 }
 
+write_snapshot_permission_check() {
+    cat > "$fixture/tests/ci.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "$1" == full ]]
+cd "$(dirname "$0")/.."
+mode_of() {
+    if [[ "$(uname -s)" == Darwin ]]; then stat -f '%Lp' "$1"; else stat -c '%a' "$1"; fi
+}
+for directory in ../.. .. . tests .git .git/objects; do
+    mode="$(mode_of "$directory")"
+    (( (8#$mode & 0001) != 0 && (8#$mode & 0022) == 0 ))
+done
+for source in tests/ci.sh private-source.txt .git/config; do
+    mode="$(mode_of "$source")"
+    (( (8#$mode & 0004) != 0 && (8#$mode & 0022) == 0 ))
+done
+mode="$(mode_of private-source.txt)"
+(( (8#$mode & 0111) == 0 ))
+git rev-parse HEAD >> "$HOOK_MARKER"
+pwd -P > "$HOOK_LOCATION"
+EOF
+    printf 'committed source\n' > "$fixture/private-source.txt"
+    chmod 600 "$fixture/private-source.txt"
+    git -C "$fixture" add tests/ci.sh private-source.txt
+    git -C "$fixture" commit -qm permissions
+}
+
+@test "push snapshots remain readable to Docker under a restrictive caller umask" {
+    write_snapshot_permission_check
+    chmod 700 "$fixture"
+    run bash -c 'umask 077; git -C "$1" push origin main' _ "$fixture"
+    [ "$status" -eq 0 ]
+    [ "$(git --git-dir="$remote" rev-parse refs/heads/main)" = "$(cat "$HOOK_MARKER")" ]
+    [ ! -d "$(cat "$HOOK_LOCATION")" ]
+    # Only gate-owned snapshot permissions may change.
+    if [[ "$(uname -s)" == Darwin ]]; then
+        [ "$(stat -f '%Lp' "$fixture")" = 700 ]
+        [ "$(stat -f '%Lp' "$fixture/private-source.txt")" = 600 ]
+    else
+        [ "$(stat -c '%a' "$fixture")" = 700 ]
+        [ "$(stat -c '%a' "$fixture/private-source.txt")" = 600 ]
+    fi
+}
+
+@test "push gate repairs only its existing snapshot parent permissions" {
+    write_snapshot_permission_check
+    mkdir "$fixture/.ci-validation"
+    local parent_mode
+    for parent_mode in 700 770; do
+        chmod "$parent_mode" "$fixture/.ci-validation"
+        git -C "$fixture" commit -qm "parent $parent_mode" --allow-empty
+        run bash -c 'umask 077; git -C "$1" push origin main' _ "$fixture"
+        [ "$status" -eq 0 ]
+        [ ! -d "$(cat "$HOOK_LOCATION")" ]
+    done
+}
+
+@test "push gate refuses a symlinked snapshot parent without changing its target" {
+    local private_target="$BATS_TEST_TMPDIR/private-target"
+    mkdir -m 700 "$private_target"
+    ln -s "$private_target" "$fixture/.ci-validation"
+    run git -C "$fixture" push origin main
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'Snapshot directory must be a real directory owned by the current user'* ]]
+    [ ! -e "$HOOK_MARKER" ]
+    if [[ "$(uname -s)" == Darwin ]]; then
+        [ "$(stat -f '%Lp' "$private_target")" = 700 ]
+    else
+        [ "$(stat -c '%a' "$private_target")" = 700 ]
+    fi
+    ! git --git-dir="$remote" rev-parse --verify refs/heads/main
+}
+
 @test "push gate validates the outgoing commit despite dirty working files" {
     local expected
     expected="$(git -C "$fixture" rev-parse HEAD)"

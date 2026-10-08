@@ -38,14 +38,25 @@ while read -r local_ref local_oid remote_ref remote_oid extra; do
     # per-user TMPDIR is not shared with Colima/Docker by default.
     snapshot_parent="$repo_root/.ci-validation"
     (umask 077; mkdir -p "$snapshot_parent")
+    if [[ -L "$snapshot_parent" || ! -O "$snapshot_parent" ]]; then
+        printf 'Snapshot directory must be a real directory owned by the current user: %s\n' "$snapshot_parent" >&2
+        exit 1
+    fi
     scratch_dir="$(mktemp -d "$snapshot_parent/push.XXXXXXXX")"
+    # A root-squashed Docker daemon needs to traverse these owned ancestors.
+    # Keep their contents unlistable unless already readable, and never writable.
+    chmod go-w,go+x "$snapshot_parent" "$scratch_dir"
     # A full independent clone makes Git history available to secret scanning
     # and Docker without alternates that point outside its mounted checkout.
-    git -c core.hooksPath=/dev/null clone --quiet --no-local --no-checkout \
-        "$repo_root" "$scratch_dir/repo"
-    # Explicit SHA pushes can reference a commit outside advertised branches.
-    git -C "$scratch_dir/repo" -c core.hooksPath=/dev/null fetch --quiet --no-tags "$repo_root" "$commit_oid"
-    git -C "$scratch_dir/repo" -c core.hooksPath=/dev/null checkout --quiet --detach "$commit_oid"
+    (
+        # Container users must read the public snapshot even under caller umask 077.
+        umask 022
+        git -c core.hooksPath=/dev/null clone --quiet --no-local --no-checkout \
+            "$repo_root" "$scratch_dir/repo"
+        # Explicit SHA pushes can reference a commit outside advertised branches.
+        git -C "$scratch_dir/repo" -c core.hooksPath=/dev/null fetch --quiet --no-tags "$repo_root" "$commit_oid"
+        git -C "$scratch_dir/repo" -c core.hooksPath=/dev/null checkout --quiet --detach "$commit_oid"
+    )
     if [[ ! -x "$scratch_dir/repo/tests/ci.sh" ]]; then
         printf 'Commit %s has no shared CI entrypoint that is executable; refusing unvalidated push.\n' "$commit_oid" >&2
         exit 1

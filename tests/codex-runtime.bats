@@ -4,7 +4,12 @@ setup() {
     export REPO="${REPO:-$BATS_TEST_DIRNAME/..}"
     export RUNTIME_HOME="$BATS_TEST_TMPDIR/runtime/codex"
     export LEGACY_HOME="$BATS_TEST_TMPDIR/legacy-home"
+    STICKY_RUNTIME_FIXTURE=''
     mkdir -p "$LEGACY_HOME/.codex"
+}
+
+teardown() {
+    [[ -z "$STICKY_RUNTIME_FIXTURE" ]] || rm -rf -- "$STICKY_RUNTIME_FIXTURE"
 }
 
 @test "Codex runtime seeds only config and auth from the legacy home" {
@@ -79,8 +84,21 @@ setup() {
 }
 
 @test "Codex runtime allows a private child under a sticky system boundary" {
-    local sticky_root
-    sticky_root="$(mktemp -d /tmp/codex-runtime.XXXXXX)"
+    local sticky_root sticky_parent='' candidate owner
+    for candidate in /tmp /var/tmp; do
+        [[ -d "$candidate" && -k "$candidate" ]] || continue
+        if [[ "$(uname -s)" == Darwin ]]; then
+            owner="$(stat -f '%u' "$candidate")"
+        else
+            owner="$(stat -c '%u' "$candidate")"
+        fi
+        [[ "$owner" == 0 ]] || continue
+        sticky_parent="$candidate"
+        break
+    done
+    [ -n "$sticky_parent" ]
+    sticky_root="$(mktemp -d "$sticky_parent/codex-runtime.XXXXXX")"
+    STICKY_RUNTIME_FIXTURE="$sticky_root"
     run env HOME="$LEGACY_HOME" CODEX_HOME="$sticky_root/codex" DF_STATE_ROOT="$BATS_TEST_TMPDIR/state" DF_USE_PLAT=0 \
         bash -c 'source "$REPO/install/_lib.sh"; source "$REPO/install/codex-runtime.sh"; codex_runtime_prepare'
     [ "$status" -eq 0 ]

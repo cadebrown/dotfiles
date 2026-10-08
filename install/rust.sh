@@ -63,12 +63,36 @@ _source_install_crate() {
     local crate="$1"
     shift
     local _cmd=(cargo install --locked "$@" "$crate")
+    local _env=(env) _openssl_prefix _encoded_flags
+    local _rustflags=()
+
+    # Locked openssl-sys releases may reject Homebrew's globally linked
+    # OpenSSL 4. Use the versioned OpenSSL 3 keg for this build, respecting
+    # caller-provided paths (including target-prefixed cross-build settings).
+    if ! compgen -e | grep -E '(^|_)OPENSSL_(DIR|LIB_DIR|INCLUDE_DIR)$' >/dev/null \
+        && has brew \
+        && _openssl_prefix="$(brew --prefix openssl@3 2>/dev/null)" \
+        && [[ -f "$_openssl_prefix/include/openssl/ssl.h" ]]; then
+        _env+=("OPENSSL_DIR=$_openssl_prefix")
+        if [[ "$OS" == "linux" ]]; then
+            # -L selects libraries at link time only. Keep runtime loading on
+            # the same keg rather than an older distro libssl.so.3. Cargo's
+            # encoded flags preserve paths with spaces and take precedence
+            # over RUSTFLAGS, including when explicitly empty.
+            _encoded_flags="${CARGO_ENCODED_RUSTFLAGS-}"
+            if [[ -z "${CARGO_ENCODED_RUSTFLAGS+x}" ]]; then
+                read -r -d '' -a _rustflags <<< "${RUSTFLAGS:-}" || true
+                _encoded_flags="$(IFS=$'\x1f'; printf '%s' "${_rustflags[*]}")"
+            fi
+            _env+=("CARGO_ENCODED_RUSTFLAGS=${_encoded_flags:+$_encoded_flags$'\x1f'}-Clink-arg=-Wl,-rpath,$_openssl_prefix/lib")
+        fi
+        log_info "  $crate source build: OpenSSL 3 at $_openssl_prefix"
+    fi
 
     if [[ "$crate" == "rust-docs-mcp" ]]; then
-        run_logged env LIBGIT2_NO_PKG_CONFIG=1 "${_cmd[@]}"
-    else
-        run_logged "${_cmd[@]}"
+        _env+=(LIBGIT2_NO_PKG_CONFIG=1)
     fi
+    run_logged "${_env[@]}" "${_cmd[@]}"
 }
 
 # rust-docs-mcp 0.2.3 probes github.com with a request shape that returns 403
@@ -389,7 +413,7 @@ if [[ -x "$CARGO_HOME/bin/rust-docs-mcp" ]]; then
     if _rdm_output="$(_rdm_doctor 2>&1)"; then
         log_okay "rust-docs-mcp doctor passed"
     elif _rust_docs_doctor_passed "$_rdm_output"; then
-        log_warn "rust-docs-mcp doctor has a false GitHub 403; independent HTTPS and Git probes passed"
+        log_info "rust-docs-mcp doctor has a false GitHub 403; independent HTTPS and Git probes passed"
         log_okay "rust-docs-mcp runtime checks passed"
     else
         _rdm_pin="$(printf '%s\n' "$_rdm_output" \
@@ -402,7 +426,7 @@ if [[ -x "$CARGO_HOME/bin/rust-docs-mcp" ]]; then
         if _rdm_output="$(_rdm_doctor 2>&1)"; then
             log_okay "rust-docs-mcp doctor passed after repair"
         elif _rust_docs_doctor_passed "$_rdm_output"; then
-            log_warn "rust-docs-mcp doctor has a false GitHub 403 after repair; independent HTTPS and Git probes passed"
+            log_info "rust-docs-mcp doctor has a false GitHub 403 after repair; independent HTTPS and Git probes passed"
             log_okay "rust-docs-mcp runtime checks passed after repair"
         else
             log_fail "rust-docs-mcp doctor failed after repair"

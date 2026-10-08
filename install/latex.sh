@@ -60,6 +60,16 @@ fi
 
 _tlmgr="${_tlmgr_glob[0]}"
 
+# TeX Live refuses package installs while its manager needs a critical update.
+# --self is a no-op when current; upgrade mode also updates existing packages.
+if [[ "${DF_MODE:-}" == "upgrade" ]]; then
+    log_info "Updating TeX Live packages (tlmgr)"
+    run_logged "$_tlmgr" update --self --all || die "tlmgr update failed"
+else
+    log_info "Checking TeX Live package manager updates (tlmgr)"
+    run_logged "$_tlmgr" update --self || die "tlmgr self-update failed"
+fi
+
 # Symlink binaries into ARCH_BIN (already on PATH) instead of TinyTeX's default
 # ~/.local/bin assumption — keeps the PLAT layout invariant.
 run_logged "$_tlmgr" option sys_bin "$ARCH_BIN"
@@ -89,11 +99,6 @@ fi
 log_info "Installing base packages (latexmk chktex texcount latexdiff)"
 run_logged "$_tlmgr" install latexmk chktex texcount latexdiff \
     || die "tlmgr failed to install the required baseline packages"
-
-if [[ "${DF_MODE:-}" == "upgrade" ]]; then
-    log_info "Updating TeX Live packages (tlmgr)"
-    run_logged "$_tlmgr" update --self --all || die "tlmgr update failed"
-fi
 
 for _tex_cmd in pdflatex latexmk chktex texcount latexdiff; do
     [[ -x "$ARCH_BIN/$_tex_cmd" ]] || die "TinyTeX is missing required command: $ARCH_BIN/$_tex_cmd"

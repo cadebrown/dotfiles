@@ -56,7 +56,8 @@ setup() {
     local fake_home="$BATS_TEST_TMPDIR/agent-tools-home"
     local destination
 
-    run env HOME="$fake_home" DF_USE_PLAT=1 bash "$REPO/install/agent-tools.sh"
+    run env HOME="$fake_home" DF_TOOLS_ROOT="$fake_home/.local" DF_USE_PLAT=1 \
+        DF_PLAT=auto DF_STATE_ROOT= CODEX_HOME= bash "$REPO/install/agent-tools.sh"
     [ "$status" -eq 0 ]
     destination="$(printf '%s\n' "$fake_home"/.local/plat_*/bin/df-agent-doctor)"
     [ -x "$destination" ]
@@ -75,7 +76,8 @@ setup() {
     printf '#!/usr/bin/env bash\nexit 0\n' > "$destination"
     chmod 755 "$destination"
     printf '#!/usr/bin/env bash\nexit 0\n' > "$evaluator"
-    run env HOME="$fake_home" DF_USE_PLAT=1 bash "$REPO/install/agent-tools.sh"
+    run env HOME="$fake_home" DF_TOOLS_ROOT="$fake_home/.local" DF_USE_PLAT=1 \
+        DF_PLAT=auto DF_STATE_ROOT= CODEX_HOME= bash "$REPO/install/agent-tools.sh"
     [ "$status" -eq 0 ]
     cmp -s "$REPO/home/dot_local/bin/executable_df-agent-doctor" "$destination"
     cmp -s "$REPO/home/dot_local/bin/executable_plugin-eval" "$evaluator"
@@ -102,7 +104,7 @@ setup() {
     mkdir -p "$fake_home/.local/nvm/versions/node/v25.9.0/bin"
     printf '24\n' > "$fake_home/.local/nvm/alias/default"
 
-    run env HOME="$fake_home" DF_USE_PLAT=0 bash -c '
+    run env HOME="$fake_home" DF_TOOLS_ROOT="$fake_home/.local" DF_USE_PLAT=0 bash -c '
         source "$1/install/_lib.sh"
         printf "%s\n" "${PATH%%:*}"
     ' _ "$REPO"

@@ -784,8 +784,6 @@ log_section "final verification"
 bash "$DF_INSTALL_DIR/verify-tools.sh" \
     || die "Selected tool runtime verification failed"
 
-log_section "bootstrap complete"
-
 if [[ "$DF_MODE" == "upgrade" ]]; then
     log_section "version audit"
     if [[ "${DF_STRICT_UPGRADE:-1}" == "0" ]]; then
@@ -795,6 +793,8 @@ if [[ "$DF_MODE" == "upgrade" ]]; then
             || die "Version audit found missing or stale managed toolchains"
     fi
 fi
+
+log_section "bootstrap complete"
 
 _elapsed=$(( SECONDS - _BOOTSTRAP_START ))
 log_okay "Done in ${_elapsed}s! Open a new shell or: source ~/.zprofile"

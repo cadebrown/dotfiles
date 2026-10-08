@@ -58,6 +58,26 @@ legacy uv snippet with an empty ownership marker. The Python installer now
 uses `UV_NO_MODIFY_PATH=1` to prevent future standalone installations from
 rewriting shell startup. See [Fish setup](../workflows/shell-editor-terminal.md#use-fish-with-the-managed-tools).
 
+## Push validation cannot mount its isolated checkout on NFS
+
+**Symptom:** native tests, documentation, and lint pass, then Docker reports
+`permission denied` for `.ci-validation/push.*/repo` before container tests start.
+
+**Root cause:** `mktemp -d` creates a private directory. On an NFS export with
+root squashing, the Docker daemon cannot traverse that directory even though
+the invoking user can read the checkout. A restrictive caller umask can also
+make cloned files unreadable to the container.
+
+**Confirm:** inspect the permissions of `.ci-validation/` and the `push.*`
+ancestor while validation runs. A bind mount of the same test source succeeds
+once the gate-owned ancestors allow traversal and the source is readable.
+
+**Fix:** use the updated `tests/pre-push.sh` and retry `git push`. The gate
+creates a readable snapshot with traversable ancestors and no write access
+for other users; it leaves the original checkout permissions unchanged. The
+checkout's existing parent directories must also be accessible to Docker.
+See [validation before publishing](validation.md#install-the-push-gate).
+
 ## Docker bootstrap build reports invalid Ubuntu package signatures
 
 **Symptom:** `./tests/run.sh` fails during `apt-get update` with
@@ -213,6 +233,28 @@ The fast test entrypoint now requires uv before it starts any fixtures.
 **Fix:** Provision uv through the existing SHA-pinned validation-tool action.
 Its manifest pins uv's version with the action revision. Keep the dependency
 check and real runtime/backup tests enabled.
+
+## Local fixture tests overwrite a managed tool
+
+**Symptom:** Remote-bootstrap tests fail to find their fake chezmoi, while the
+real `chezmoi --version` unexpectedly prints `chezmoi version test`. Fish profile
+fixtures can also resolve live runtime directories instead of their fake home.
+
+**Root cause:** Setting a fixture's `HOME` does not override exported
+`DF_TOOLS_ROOT`, `DF_STATE_ROOT`, `CODEX_HOME`, or other managed runtime variables.
+The fixture can therefore write into the real installation. A host overlay can
+also restore these roots if the test only unsets the variables.
+
+**Confirm:** Inspect the executable reported by `command -v chezmoi` with
+`file`; the fixture stub is a short shell script containing the test version.
+Inspect path variables without printing credential values.
+
+**Fix:** Stop the affected test run, preserve the confirmed stub outside the
+managed executable path, and restore chezmoi with `bash install/chezmoi.sh`.
+Use the updated `tests/ci.sh`, whose Bats subprocess clears inherited runtime
+and build settings and exports empty root overrides. Writing fixtures also set
+their temporary roots explicitly. Rerun `./tests/ci.sh fast`; the regression
+checks require inherited tool and state directories to remain untouched.
 
 ## Quality CI fails with `chezmoi: command not found`
 
@@ -393,6 +435,48 @@ really does omit a declared selector, prune or replace that selector in
 
 The `WARNING: failed to clean up stale arg0 temp dirs: Directory not empty` line
 from codex-cli is unrelated NFS noise (`.nfs*` files in its temp dir) — harmless.
+
+---
+
+## Claude cannot load required remote managed settings
+
+Symptom: `install/claude.sh` stops at the marketplace inventory with
+`Your organization requires remote managed settings to load, but they could not be loaded.`
+
+Root cause: an organization with `forceRemoteSettingsRefresh` requires a fresh
+policy fetch before Claude starts. A cached policy does not satisfy that
+requirement. Authentication commands remain available so the user can sign in
+again. See [server-managed settings](https://code.claude.com/docs/en/server-managed-settings).
+
+Confirm with `claude plugin marketplace list`. For the fetch cause, use a private
+debug log:
+
+```sh
+umask 077
+debug_dir=$(mktemp -d "${TMPDIR:-/tmp}/claude-policy.XXXXXX")
+claude --debug-file "$debug_dir/debug.log" plugin marketplace list
+```
+
+Inspect the `Remote settings` lines locally. `http_401` means the server rejected
+the credential; `claude auth status` reporting `loggedIn: true` alone does not
+prove the server accepts it. Console API keys are static credentials, while OAuth
+profiles support automatic token refresh. See [authentication](https://code.claude.com/docs/en/authentication).
+
+**Fix for an authentication rejection:** refresh the sign-in, verify that the
+inventory loads, then rerun bootstrap:
+
+```sh
+claude auth login
+claude plugin marketplace list
+~/dotfiles/bootstrap.sh upgrade
+```
+
+[`claude auth login`](https://code.claude.com/docs/en/cli-reference) opens the
+supported sign-in flow. For network or policy-delivery failures instead, restore
+access to `api.anthropic.com` or contact the organization administrator. Preserve
+the managed policy and cache; changing them does not repair rejected credentials.
+The installer checks this prerequisite once and stops before dependent plugin
+operations if it fails.
 
 ---
 
@@ -958,6 +1042,107 @@ not depend on `rustup-init`.
 
 ---
 
+## Mesa PyYAML patch target not found
+
+**Symptom:** Linux bootstrap stops during Homebrew preparation with
+`mesa pyyaml patch target not found — formula changed`.
+
+**Cause:** Mesa added `r.test?` to its Python resource filter. The old exact
+replacement only recognized the earlier filter, so it rejected the new formula.
+
+**Fix:** update the checkout and rerun the maintained patch:
+
+```sh
+bash ~/dotfiles/install/patch-homebrew-mesa.sh
+```
+
+Expect a successful patch report, then an already-applied report on a repeat
+run. The patch preserves the formula's test/resource exclusions and existing
+bindgen compiler workaround, selects the formula's Python expression, and uses
+the declared PyYAML version. Linux requires that version's binary wheel;
+unsupported formula or bindgen shapes fail before changing the file. This
+prepares the formula without rebuilding Mesa. `install/linux-packages.sh` calls
+it before Bundle; `DF_PATCH_BREW_MESA=0` explicitly skips it.
+
+See the [patch source](../../install/patch-homebrew-mesa.sh) and the
+[Homebrew formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/m/mesa.rb).
+
+---
+
+## systemd patch target not found
+
+**Symptom:** Linux bootstrap reports `systemd patch target not found` after a
+Homebrew formula update.
+
+**Cause:** the old patch matched a literal `"python3.14"` interpreter and pinned
+lxml to `6.0.2`. The formula now passes a `python3` variable to
+`virtualenv_create` and declares its own newer lxml resource. Matching only the
+new interpreter spelling would still install the wrong lxml version.
+
+**Confirm:** inspect the interpreter and resource in the local formula:
+
+```sh
+brew cat systemd | grep -A 5 -E 'resource "lxml"|virtualenv_create'
+```
+
+**Fix:** update the checkout and apply the maintained patch:
+
+```sh
+bash ~/dotfiles/install/patch-homebrew-systemd.sh
+```
+
+Expect a successful patch report, or an already-applied report on the next
+run. The patch retains the formula's interpreter expression and obtains lxml's
+version from `resource("lxml").version`. Linux builds require a wheel for that
+exact version and fail if none is available; macOS retains its original
+resource install. Unsupported formula shapes produce a visible failure
+without being rewritten. `DF_PATCH_BREW_SYSTEMD=0` explicitly skips the patch.
+
+This repairs the formula preparation step; it does not rebuild systemd.
+`install/linux-packages.sh` applies the patch before its package pass. See the
+[patch source](../../install/patch-homebrew-systemd.sh) and Homebrew's
+[formula cookbook](https://docs.brew.sh/Formula-Cookbook#specifying-gems-python-modules-go-projects-etc-as-dependencies).
+
+---
+
+## Cargo source build rejects OpenSSL 4
+
+**Symptom:** `rust-docs-mcp` or another Cargo source fallback fails in
+`openssl-sys` with `version: 4_0_3` and a message that only OpenSSL 1.x or 3
+is supported. `OPENSSL_DIR unset` is diagnostic output, not the failure itself.
+
+**Cause:** Homebrew's global `pkg-config` search finds OpenSSL 4, while the
+crate's locked `openssl-sys` version rejects that major. An installed OpenSSL 3
+keg is insufficient unless the build selects its versioned path. A later
+successful doctor check can belong to the previously installed binary; the
+failed replacement still makes `install/rust.sh` fail.
+
+**Confirm:** compare default discovery with the available OpenSSL 3 headers:
+
+```sh
+pkg-config --modversion openssl
+brew --prefix openssl@3
+test -f "$(brew --prefix openssl@3)/include/openssl/ssl.h"
+```
+
+**Fix:** update the checkout and retry the Rust installer. If OpenSSL 3 is
+absent, install its declared Brewfile dependency first:
+
+```sh
+brew install openssl@3
+bash ~/dotfiles/install/rust.sh
+```
+
+The installer selects `opt/openssl@3` for source builds through `OPENSSL_DIR`,
+adds its library directory to Linux runtime search paths, preserves explicit
+OpenSSL path overrides, and leaves global Homebrew links
+unchanged. Expect the source-build log to name OpenSSL 3 and the final count to
+report zero failures. If you explicitly selected OpenSSL 4, remove or correct
+that override before retrying. See [Cargo package behavior](../setup/packages.md#1-cargo--rust-crates)
+and the [upstream build variables](https://github.com/rust-openssl/rust-openssl/blob/openssl-sys-v0.9.109/openssl/src/lib.rs#manual).
+
+---
+
 ## Bootstrap upgrade leaves GUI apps outdated
 
 **Symptom:** formula upgrades complete, but VS Code, ChatGPT, or other casks
@@ -1112,8 +1297,9 @@ bash install/audit-versions.sh | jq '.[] | select(.status != "current")'
 brew info --json=v2 rustup juliaup | jq '.formulae[] | {name, stable: .versions.stable, installed: .installed[0].version}'
 ```
 
-**Fix:** update the repo, then rerun `bootstrap.sh upgrade`. Unpinned `rustup` and
-`juliaup` releases now use minimum-version floors; genuinely pinned toolchains
+**Fix:** update the repo, then rerun `bootstrap.sh upgrade`. Unpinned `rustup`,
+`juliaup`, and unversioned Homebrew `zig` releases use minimum-version floors;
+genuinely pinned toolchains
 remain exact.
 
 ---
@@ -1687,9 +1873,14 @@ zsh --no-rcs -c 'zmodload zsh/langinfo; echo $langinfo[CODESET]'
 # working: UTF-8
 ```
 
-**Fix:** `linux-packages.sh` generates `en_US.UTF-8` locale data for brew's glibc into
+**Fix:** `linux-packages.sh` generates `en_US.UTF-8` and `C.UTF-8` locale data for brew's glibc into
 `$LOCAL_PLAT/locale/` using brew's own `localedef`. The shell profiles export `LOCPATH`
 pointing there so brew zsh picks it up at startup.
+
+Both locales are needed: non-login processes can inherit `LC_CTYPE=C.UTF-8`
+while the profile sets `LANG=en_US.UTF-8`. Without the category locale, brewed
+Perl reports `Setting locale failed` on each `tlmgr` invocation. Generating the
+matching data preserves the requested UTF-8 locale without suppressing warnings.
 
 If you installed before this fix:
 
@@ -2172,6 +2363,35 @@ Related trap: pinning `cysignals` older than what passagemath wheels were
 built against fails later with `cysignals.signals does not export expected C
 function _do_raise_exception` — keep the resolver's cysignals (1.12.x), fix
 the handlers instead.
+
+## TinyTeX refuses package installation until tlmgr is updated
+
+**Symptom:** Linux bootstrap stops at the TeX baseline with `tlmgr itself needs
+to be updated`, followed by `latex.sh failed`.
+
+**Cause:** TeX Live requires critical package-manager updates before it permits
+package installation. The installer previously attempted `tlmgr install` before
+its upgrade-mode self-update, so it could never reach the repair command.
+
+**Fix:** update the checkout and run the installer again:
+
+```sh
+DF_MODE=upgrade bash ~/dotfiles/install/latex.sh
+```
+
+The Linux installer now runs `tlmgr update --self --all` before installing the
+baseline in upgrade mode. Install/update modes run `tlmgr update --self` first,
+leaving broad package upgrades opt-in. It then installs the baseline and checks
+`pdflatex`, `latexmk`, `chktex`, `texcount`, and `latexdiff` in the managed tool
+directory. Expect `TeX ready`; a failed manager update, missing command, or
+failed package operation still stops the installer. This does not bypass TeX
+Live's repository/release compatibility checks.
+
+The implementation is [`install/latex.sh`](../../install/latex.sh); see the
+[upstream tlmgr manual](https://www.tug.org/texlive/tlmgr.html) for self-update
+and package-update behavior.
+
+---
 
 ## `pdflatex: command not found` on macOS with MacTeX installed
 

@@ -1,9 +1,22 @@
 {
   "features": [
     {
+      "id": "publication-validation",
+      "title": "Publication validation",
+      "description": "Validates each outgoing commit in an independent checkout, isolates test runtime roots, and permits Docker to read snapshots on NFS without granting other users write access.",
+      "page": "/usage/validation/",
+      "sources": [
+        ".githooks/pre-push",
+        "tests/pre-push.sh",
+        "tests/install-hooks.sh",
+        "tests/ci.sh"
+      ],
+      "demo": "./tests/ci.sh full"
+    },
+    {
       "id": "bootstrap",
       "title": "Bootstrap orchestration",
-      "description": "Coordinates install, update, and upgrade with runtime host presets, local overrides, platform-aware paths, maintained sudo authentication, and visible interactive recovery before privileged macOS updates when credentials expire.",
+      "description": "Coordinates install, update, and upgrade with runtime host presets, local overrides, platform-aware paths, maintained sudo authentication, and completion only after required runtime and version checks; informational notices remain separate from installation degradations.",
       "page": "/setup/bootstrap/",
       "sources": [
         "bootstrap.sh",
@@ -36,7 +49,7 @@
     {
       "id": "core-toolchains",
       "title": "Core toolchains",
-      "description": "Installs shell, language, compiler, documentation, and workflow-validation tools, checks Linux checksum execution before downstream installers, and maintains a 250 GiB sccache policy, native build launchers, Python bytecode caching, and Gradle task caching.",
+      "description": "Installs shell, language, compiler, documentation, and workflow-validation tools, generates both supported Linux UTF-8 locales, updates TinyTeX's manager before package operations, selects Homebrew OpenSSL 3 for locked Cargo source builds while preserving explicit OpenSSL paths, checks Linux checksum execution before downstream installers, and maintains a 250 GiB sccache policy, native build launchers, Python bytecode caching, and Gradle task caching.",
       "page": "/setup/packages/",
       "sources": [
         "home/dot_bash_profile.tmpl",
@@ -135,7 +148,7 @@
     {
       "id": "claude-code",
       "title": "Claude Code",
-      "description": "Configures Claude instructions, plugins, scoped hooks, and transcript status reporting.",
+      "description": "Configures Claude instructions, plugins, scoped hooks, and transcript status reporting. Stops before plugin changes when the marketplace inventory cannot load, preserving authentication and managed-policy diagnostics.",
       "page": "/agents/claude/",
       "sources": [
         "home/.chezmoitemplates/claude-defaults.sh",
@@ -329,7 +342,7 @@
     {
       "id": "homebrew-patches",
       "title": "Homebrew compatibility patches",
-      "description": "Applies reviewed package-manager compatibility patches during bootstrap, including an explicit OpenSSL dependency for source-built Coreutils checksum tools.",
+      "description": "Applies reviewed package-manager compatibility patches during bootstrap, including an explicit OpenSSL dependency for source-built Coreutils checksum tools and systemd/Mesa wheel patches that follow formula-owned Python and resource versions while preserving resource exclusions and bindgen settings.",
       "page": "/usage/troubleshooting/",
       "sources": [
         "install/patch-homebrew-apache-serf.sh",

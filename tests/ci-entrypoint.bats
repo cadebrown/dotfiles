@@ -25,6 +25,28 @@ printf '%s %s\n' "$name" "$*" >> "$CI_LOG"
 if [[ "$name" == bats ]]; then
     [[ -L "$HOME/dotfiles" ]] || exit 91
     printf 'fixture-home %s\n' "$HOME" >> "$CI_LOG"
+    if [[ -n "${CI_EXPECT_FIXTURE_TMPDIR:-}" ]]; then
+        [[ "$TMPDIR" == "$CI_EXPECT_FIXTURE_TMPDIR" && -z "${DF_TEST_TMPDIR+x}" ]] || exit 98
+        printf 'fixture-tmpdir-preserved\n' >> "$CI_LOG"
+    fi
+    if [[ "${CI_CHECK_FIXTURE_ENV:-0}" == 1 ]]; then
+        [[ -z "${DF_TOOLS_ROOT:-}" && -z "${DF_STATE_ROOT:-}" && -z "${CODEX_HOME:-}" ]] || exit 93
+        [[ "$DF_USE_PLAT" == 0 && "$DF_PLAT" == auto && "$DF_PROFILE" == full ]] || exit 94
+        for variable in DF_TOOLS_ROOT_EXPLICIT DF_DO_PACKAGES DF_HOST_CONFIG_INITIALIZED \
+            CARGO_HOME UV_TOOL_DIR XDG_CONFIG_HOME CMAKE_CXX_COMPILER_LAUNCHER PYTHONPYCACHEPREFIX; do
+            [[ -z "${!variable+x}" ]] || exit 95
+        done
+        [[ "$CI_PRESERVED" == fixture-control ]] || exit 96
+        printf 'fixture-env-isolated\n' >> "$CI_LOG"
+    fi
+fi
+if [[ "$name" == npm && -n "${CI_EXPECT_OUTER_ROOT:-}" ]]; then
+    [[ "$DF_TOOLS_ROOT" == "$CI_EXPECT_OUTER_ROOT" ]] || exit 97
+    printf 'outer-env-preserved\n' >> "$CI_LOG"
+fi
+if [[ "$name" == npm && -n "${CI_EXPECT_OUTER_TMPDIR:-}" ]]; then
+    [[ "$TMPDIR" == "$CI_EXPECT_OUTER_TMPDIR" ]] || exit 99
+    printf 'outer-tmpdir-preserved\n' >> "$CI_LOG"
 fi
 if [[ "$name" == tofu ]]; then
     [[ "$PWD" == */infra/cloudflare && "$TF_DATA_DIR" == */dotfiles-ci.*/* ]] || exit 92
@@ -34,7 +56,7 @@ if [[ "$name" == "${FAIL_TOOL:-}" ]]; then exit 23; fi
 SH
         chmod +x "$BIN/$tool"
     done
-    printf '#!/bin/bash\nprintf "Linux\\n"\n' > "$BIN/uname"
+    printf '#!/bin/bash\nprintf "%%s\\n" "${CI_FIXTURE_OS:-Linux}"\n' > "$BIN/uname"
     chmod +x "$BIN/uname"
 }
 
@@ -77,6 +99,59 @@ SH
     [ "$status" -eq 127 ]
     [[ "$output" == *"requires missing tool: uv"* ]]
     [ ! -e "$CI_LOG" ]
+}
+
+@test "fast and macOS Bats isolate managed roots while preserving fixture controls" {
+    local ci_mode fixture_os inherited_root="$BATS_TEST_TMPDIR/inherited"
+    for ci_mode in fast macos; do
+        fixture_os=Linux
+        [[ "$ci_mode" != macos ]] || fixture_os=Darwin
+        run env PATH="$BIN:$PATH" CI_FIXTURE_OS="$fixture_os" \
+            CI_CHECK_FIXTURE_ENV=1 CI_PRESERVED=fixture-control \
+            DF_TOOLS_ROOT="$inherited_root/tools" DF_TOOLS_ROOT_EXPLICIT=1 \
+            DF_STATE_ROOT="$inherited_root/state" CODEX_HOME="$inherited_root/codex" \
+            DF_USE_PLAT=1 DF_PLAT=unsupported DF_PROFILE=core DF_DO_PACKAGES=0 \
+            DF_HOST_CONFIG_INITIALIZED=1 CARGO_HOME="$inherited_root/cargo" \
+            UV_TOOL_DIR="$inherited_root/uv" XDG_CONFIG_HOME="$inherited_root/config" \
+            CMAKE_CXX_COMPILER_LAUNCHER=unexpected PYTHONPYCACHEPREFIX="$inherited_root/pycache" \
+            /bin/bash "$FIXTURE/tests/ci.sh" "$ci_mode"
+        [ "$status" -eq 0 ]
+    done
+    [ "$(grep -c '^fixture-env-isolated$' "$CI_LOG")" -eq 2 ]
+    [ ! -e "$inherited_root" ]
+}
+
+@test "Bats isolation preserves failure controls and the environment of later CI stages" {
+    local inherited_root="$BATS_TEST_TMPDIR/inherited-tools"
+    run env PATH="$BIN:$PATH" DF_TOOLS_ROOT="$inherited_root" \
+        CI_CHECK_FIXTURE_ENV=1 CI_PRESERVED=fixture-control \
+        CI_EXPECT_OUTER_ROOT="$inherited_root" /bin/bash "$FIXTURE/tests/ci.sh" quality
+    [ "$status" -eq 0 ]
+    grep -q '^outer-env-preserved$' "$CI_LOG"
+
+    : > "$CI_LOG"
+    run env PATH="$BIN:$PATH" FAIL_TOOL=bats /bin/bash "$FIXTURE/tests/ci.sh" quality
+    [ "$status" -eq 23 ]
+    [ "$(grep -c '^npm ' "$CI_LOG")" -eq 0 ]
+}
+
+@test "Bats can use a separate temporary directory without changing later CI stages" {
+    local docs_tmp="$BATS_TEST_TMPDIR/docs-tmp" fixture_tmp="$BATS_TEST_TMPDIR/fixture-tmp"
+    mkdir "$docs_tmp" "$fixture_tmp"
+    run env PATH="$BIN:$PATH" TMPDIR="$docs_tmp" DF_TEST_TMPDIR="$fixture_tmp" \
+        CI_EXPECT_FIXTURE_TMPDIR="$fixture_tmp" CI_EXPECT_OUTER_TMPDIR="$docs_tmp" \
+        /bin/bash "$FIXTURE/tests/ci.sh" quality
+    [ "$status" -eq 0 ]
+    grep -q '^fixture-tmpdir-preserved$' "$CI_LOG"
+    grep -q '^outer-tmpdir-preserved$' "$CI_LOG"
+
+    : > "$CI_LOG"
+    run env -u DF_TEST_TMPDIR PATH="$BIN:$PATH" TMPDIR="$docs_tmp" \
+        CI_EXPECT_FIXTURE_TMPDIR="$docs_tmp" CI_EXPECT_OUTER_TMPDIR="$docs_tmp" \
+        /bin/bash "$FIXTURE/tests/ci.sh" quality
+    [ "$status" -eq 0 ]
+    grep -q '^fixture-tmpdir-preserved$' "$CI_LOG"
+    grep -q '^outer-tmpdir-preserved$' "$CI_LOG"
 }
 
 @test "CI quality runs every stage from any directory and cleans fixture outputs" {

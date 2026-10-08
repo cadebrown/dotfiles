@@ -1,81 +1,23 @@
 #!/usr/bin/env bash
-# install/patch-homebrew-systemd.sh — patch systemd.rb for Linux custom-prefix builds
+# install/patch-homebrew-systemd.sh — use an lxml wheel for Linux source builds
 #
-# ─── WHY THIS EXISTS ────────────────────────────────────────────────────────────
+# Homebrew's venv.pip_install forces source builds. Its lxml build-requirements
+# subprocess has failed with SIGILL under superenv on this custom Linux prefix.
+# Keep the formula's Python interpreter and lxml resource version, but require
+# a matching binary wheel instead of returning to the failing source-build path.
+# Remove this workaround when lxml source builds work in that environment.
 #
-# systemd is a dependency of openssh (and podman). The systemd formula builds
-# Python resources (jinja2, lxml, markupsafe) in a virtualenv for use by systemd's
-# meson build system. lxml is required for XML parsing in the build.
-#
-# Homebrew's venv.pip_install always passes --no-binary=:all: (from std_pip_args),
-# which forces source builds for all Python resources. Building lxml from source
-# fails on Linux with a custom Homebrew prefix:
-#
-#   Getting requirements to build wheel: finished with status 'error'
-#   exit code: -4
-#
-# Exit code -4 means the subprocess received SIGILL (signal 4 = illegal instruction).
-# This happens inside the Homebrew superenv during the pip subprocess that runs
-# `get_requires_for_build_wheel` for lxml. The exact cause is unclear (likely
-# a Cython wheel compiled with instructions that crash in the superenv context),
-# but it is 100% reproducible on this platform.
-#
-# lxml provides a pre-built binary wheel for cp314-cp314-manylinux_2_26_x86_64
-# that installs and runs correctly. The fix is to install lxml using the binary
-# wheel instead of building from source.
-#
-# ─── WHAT THE PATCH DOES ────────────────────────────────────────────────────────
-#
-# In the install def, splits venv.pip_install resources into two parts on Linux:
-#
-# Before:
-#   venv = virtualenv_create(buildpath/"venv", "python3.14")
-#   venv.pip_install resources
-#
-# After:
-#   venv = virtualenv_create(buildpath/"venv", "python3.14")
-#   if OS.linux?
-#     # lxml source builds fail with SIGILL on custom prefix — use binary wheel
-#     venv.pip_install resources.reject { |r| r.name == "lxml" }
-#     system "python3.14", "-m", "pip", "--python=#{venv.root}/bin/python",
-#            "install", "--verbose", "--no-deps", "--ignore-installed", "--no-compile",
-#            "--prefer-binary", "lxml==6.0.2"
-#   else
-#     venv.pip_install resources
-#   end
-#
-# The OS.linux? guard ensures macOS builds are unaffected.
-# --prefer-binary tells pip to use the binary wheel if available, falling back
-# to source only if no wheel exists (avoids the SIGILL path).
-#
-# ─── INTERACTION WITH OTHER PATCHES ─────────────────────────────────────────────
-#
-# This patch does not interact with the superenv or stdenv patches. The lxml
-# source build issue is distinct from the linux-headers/gnulib issues.
-#
-# ─── SIDE EFFECTS ───────────────────────────────────────────────────────────────
-#
-# lxml is installed from its binary wheel instead of being compiled from source.
-# The wheel is ABI-compatible with the brew python@3.14 build. No functionality
-# is lost — only the compilation step is skipped.
-#
-# ─── WHEN TO REMOVE ─────────────────────────────────────────────────────────────
-#
-# When the upstream systemd formula explicitly handles the lxml source build failure
-# on non-standard prefixes, or when the SIGILL root cause is fixed (e.g., a Cython
-# update that doesn't trigger the issue in the superenv).
-#
-# ─── SKIP FLAG ──────────────────────────────────────────────────────────────────
-#
-# Set DF_PATCH_BREW_SYSTEMD=0 to skip:
-#   DF_PATCH_BREW_SYSTEMD=0 bash install/linux-packages.sh
-#
-# ────────────────────────────────────────────────────────────────────────────────
+# Set DF_PATCH_BREW_SYSTEMD=0 to skip the patch.
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 [[ "$OS" == "linux" ]] || { log_okay "Not on Linux — skipping systemd patch"; exit 0; }
+
+if [[ "${DF_PATCH_BREW_ALL:-1}" == "0" ]]; then
+    log_info "DF_PATCH_BREW_ALL=0 — skipping all Homebrew formula patches"
+    exit 0
+fi
 
 if [[ "${DF_PATCH_BREW_SYSTEMD:-1}" == "0" ]]; then
     log_info "DF_PATCH_BREW_SYSTEMD=0 — skipping systemd formula patch"
@@ -84,14 +26,45 @@ fi
 
 SYSTEMD_RB="$LOCAL_PLAT/brew/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/s/systemd.rb"
 
-[[ -f "$SYSTEMD_RB" ]] || { log_warn "systemd.rb not found at $SYSTEMD_RB — skipping"; exit 0; }
+if [[ ! -f "$SYSTEMD_RB" ]]; then
+    log_warn "systemd.rb not found at $SYSTEMD_RB — refusing to start source builds"
+    exit 1
+fi
 
 log_section "Patching systemd formula for Linux (lxml binary wheel install)"
 
-_ORIG='    venv = virtualenv_create(buildpath/"venv", "python3.14")
-    venv.pip_install resources'
+_result=$(python3 - "$SYSTEMD_RB" <<'PY'
+import re
+import sys
 
-_FIX='    venv = virtualenv_create(buildpath/"venv", "python3.14")
+formula_path = sys.argv[1]
+with open(formula_path) as formula:
+    text = formula.read()
+
+venvs = list(re.finditer(
+    r'^    venv = virtualenv_create\(buildpath/"venv", (python3|"python3\.\d+")\)$',
+    text, re.MULTILINE,
+))
+resources = re.findall(r'^  resource "lxml" do$', text, re.MULTILINE)
+if len(venvs) != 1 or len(resources) != 1:
+    print("notfound:unique virtualenv and lxml resource declarations")
+    sys.exit(0)
+
+venv = venvs[0]
+original = venv.group() + "\n    venv.pip_install resources\n"
+replacement = venv.group() + '''
+    if OS.linux?
+      # Keep the formula's resource version; do not fall back to an lxml source build.
+      venv.pip_install resources.reject { |r| r.name == "lxml" }
+      system PYTHON, "-m", "pip", "--python=#{venv.root}/bin/python",
+             "install", "--verbose", "--no-deps", "--ignore-installed", "--no-compile",
+             "--only-binary=:all:", "lxml==#{resource("lxml").version}"
+    else
+      venv.pip_install resources
+    end\n'''.replace("PYTHON", venv.group(1))
+
+# Upgrade only the exact previous patch; unknown local edits require review.
+legacy = '''    venv = virtualenv_create(buildpath/"venv", "python3.14")
     if OS.linux?
       # lxml source builds fail with SIGILL on a custom Homebrew prefix — the
       # Cython get_requires_for_build_wheel subprocess receives SIGILL in the
@@ -103,21 +76,27 @@ _FIX='    venv = virtualenv_create(buildpath/"venv", "python3.14")
              "--prefer-binary", "lxml==6.0.2"
     else
       venv.pip_install resources
-    end'
+    end\n'''
 
-_result=$(python3 -c "
-import sys
-path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
-txt = open(path).read()
-if new in txt:    print('already')
-elif old in txt:  open(path,'w').write(txt.replace(old, new, 1)); print('patched')
-else:             print('notfound')
-" "$SYSTEMD_RB" "$_ORIG" "$_FIX")
+if replacement in text:
+    print("already")
+elif original in text or legacy in text:
+    old = legacy if legacy in text else original
+    with open(formula_path, "w") as formula:
+        formula.write(text.replace(old, replacement, 1))
+    print("patched")
+else:
+    print("notfound:virtualenv resource installation")
+PY
+)
 case "$_result" in
-    already)  log_okay "systemd lxml binary-wheel patch already applied" ;;
-    patched)  log_okay "Patched: systemd lxml installs from binary wheel on Linux" ;;
-    notfound) log_warn "systemd patch target not found — formula may have changed; check systemd.rb" ;;
+    already) log_okay "systemd lxml binary-wheel patch already applied" ;;
+    patched) log_okay "Patched: systemd lxml installs from its formula-version binary wheel on Linux" ;;
+    notfound:*)
+        log_warn "systemd patch target not found (${_result#notfound:}) — refusing to start source builds"
+        exit 1
+        ;;
 esac
-unset _ORIG _FIX _result
+unset _result
 
 log_okay "systemd.rb patch done"

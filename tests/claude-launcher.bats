@@ -67,3 +67,101 @@ assert_session_defaults() {
         done
     done
 }
+
+setup_installer() {
+    INSTALL_REPO="$BATS_TEST_TMPDIR/repo"
+    INSTALL_HOME="$BATS_TEST_TMPDIR/home"
+    INSTALL_TOOLS="$BATS_TEST_TMPDIR/tools"
+    CLAUDE_CALL_LOG="$BATS_TEST_TMPDIR/claude-calls.log"
+    mkdir -p "$INSTALL_REPO/install" "$INSTALL_REPO/packages" \
+        "$INSTALL_REPO/home/.chezmoitemplates" "$INSTALL_HOME" "$INSTALL_TOOLS/bin"
+    cp "$REPO_ROOT/install/claude.sh" "$REPO_ROOT/install/_lib.sh" \
+        "$REPO_ROOT/install/_host-config.sh" "$REPO_ROOT/install/_runtime-paths.sh" \
+        "$INSTALL_REPO/install/"
+    cp "$REPO_ROOT/home/.chezmoitemplates/compiler-cache.sh" \
+        "$INSTALL_REPO/home/.chezmoitemplates/"
+    printf '%s\n' 'fixture@trailofbits' > "$INSTALL_REPO/packages/claude-plugins.txt"
+    cat > "$TEST_BIN/curl" <<'SH'
+#!/bin/sh
+case "$*" in
+    *https://downloads.claude.ai/claude-code-releases/latest) printf '%s\n' 2.1.294 ;;
+    *) exit 90 ;;
+esac
+SH
+    cat > "$TEST_BIN/claude" <<'SH'
+#!/bin/sh
+if [ "$*" = --version ]; then
+    printf '%s\n' '2.1.294 (fixture)'
+    exit 0
+fi
+printf '%s\n' "$*" >> "$CLAUDE_CALL_LOG"
+case "$*" in
+    'plugin marketplace list')
+        printf '%s\n' "$CLAUDE_INVENTORY"
+        exit "$CLAUDE_INVENTORY_STATUS"
+        ;;
+    'plugin marketplace add '*|'plugin marketplace update') exit 0 ;;
+    'plugin install -y fixture@trailofbits')
+        printf '%s\n' 'fixture plugin unavailable' >&2
+        exit 91
+        ;;
+    *) exit 92 ;;
+esac
+SH
+    chmod +x "$TEST_BIN/curl" "$TEST_BIN/claude"
+    cp "$TEST_BIN/claude" "$INSTALL_TOOLS/bin/claude"
+}
+
+run_installer() {
+    run env -i HOME="$INSTALL_HOME" PATH="$TEST_BIN:/usr/bin:/bin" \
+        DF_TOOLS_ROOT="$INSTALL_TOOLS" DF_STATE_ROOT="$BATS_TEST_TMPDIR/state" \
+        DF_USE_PLAT=0 CLAUDE_CONFIG_DIR="$INSTALL_HOME/.claude" \
+        CLAUDE_CALL_LOG="$CLAUDE_CALL_LOG" CLAUDE_INVENTORY="$1" \
+        CLAUDE_INVENTORY_STATUS="$2" bash "$INSTALL_REPO/install/claude.sh"
+}
+
+@test "Claude installer stops before plugin changes when managed settings cannot load" {
+    setup_installer
+    local diagnostic='Your organization requires remote managed settings to load, but they could not be loaded.'
+
+    run_installer "$diagnostic" 1
+
+    [ "$status" -ne 0 ]
+    [ "$(cat "$CLAUDE_CALL_LOG")" = 'plugin marketplace list' ]
+    [[ "$output" == *"$diagnostic"* ]]
+    [[ "$output" == *"claude auth login"* ]]
+}
+
+@test "Claude installer preserves authentication rejection and gives the sign-in command" {
+    setup_installer
+
+    run_installer 'Authentication failed: HTTP 401 Unauthorized' 1
+
+    [ "$status" -ne 0 ]
+    [ "$(cat "$CLAUDE_CALL_LOG")" = 'plugin marketplace list' ]
+    [[ "$output" == *'Authentication failed: HTTP 401 Unauthorized'* ]]
+    [[ "$output" == *"claude auth login"* ]]
+}
+
+@test "Claude installer preserves unrelated inventory failures without recommending sign-in" {
+    setup_installer
+
+    run_installer 'Network connection timed out' 1
+
+    [ "$status" -ne 0 ]
+    [ "$(cat "$CLAUDE_CALL_LOG")" = 'plugin marketplace list' ]
+    [[ "$output" == *'Network connection timed out'* ]]
+    [[ "$output" != *"claude auth login"* ]]
+}
+
+@test "Claude installer reads inventory once and adds only missing marketplaces" {
+    setup_installer
+
+    run_installer $'trailofbits\nlean4-skills' 0
+
+    # The deliberate downstream plugin failure keeps this fixture out of hooks
+    # and MCP setup while proving the successful marketplace prerequisite path.
+    [ "$status" -ne 0 ]
+    [[ "$output" == *'fixture plugin unavailable'* ]]
+    [ "$(cat "$CLAUDE_CALL_LOG")" = $'plugin marketplace list\nplugin marketplace add openai/codex-plugin-cc\nplugin marketplace add AlmogBaku/debug-skill\nplugin marketplace update\nplugin install -y fixture@trailofbits' ]
+}

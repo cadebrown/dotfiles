@@ -652,7 +652,7 @@ _ensure_brew_subversion_for_brewfile "$_BREWFILE_TMP"
 
 if [[ -z "$_bundle_flags" ]]; then
     log_info "Running brew bundle (with upgrades)..."
-    log_warn "Linux upgrades can be slow — source builds for Python/Perl/git/vim"
+    log_info "Linux upgrades can be slow — source builds for Python/Perl/git/vim"
 else
     log_info "Running brew bundle (install only, no upgrades)..."
 fi
@@ -691,9 +691,9 @@ fi
 # of display columns. This breaks ZLE cursor positioning in brew zsh: every
 # tab-completion leaves remnant characters on screen.
 #
-# Fix: generate en_US.UTF-8 into $LOCAL_PLAT/locale/ using brew's own localedef
-# and i18n data. The shell profiles export LOCPATH pointing there so brew zsh
-# picks it up at startup.
+# Generate both the shell default and the C.UTF-8 category locale commonly
+# inherited by non-login processes. Brew's glibc needs its own data for each.
+# The shell profiles export LOCPATH so brewed programs can find both locales.
 #
 # The archive is glibc's own binary format and is read by the loader that
 # generated it, so a version stamp forces a regenerate whenever the keg moves.
@@ -705,17 +705,21 @@ _glibc_installed="$(_glibc_keg_version "$_REAL_BREW_PREFIX")"
 
 if [[ -x "$BREW_GLIBC/bin/localedef" ]]; then
     if [[ -f "$LOCALE_DIR/en_US.UTF-8/LC_CTYPE" \
+          && -f "$LOCALE_DIR/C.UTF-8/LC_CTYPE" \
           && "$(cat "$_LOCALE_STAMP" 2>/dev/null || true)" == "$_glibc_installed" ]]; then
         log_okay "brew glibc locale already generated"
     else
-        log_info "Generating en_US.UTF-8 locale for brew glibc → $LOCALE_DIR"
+        log_info "Generating en_US.UTF-8 and C.UTF-8 locales for brew glibc → $LOCALE_DIR"
         ensure_dir "$LOCALE_DIR"
-        I18NPATH="$BREW_GLIBC/share/i18n" \
-        GCONV_PATH="$BREW_GLIBC/lib/gconv" \
-            run_logged "$BREW_GLIBC/bin/localedef" \
-                --prefix="$LOCALE_DIR" \
-                -i en_US -f UTF-8 \
-                "$LOCALE_DIR/en_US.UTF-8"
+        for _locale_name in en_US C; do
+            I18NPATH="$BREW_GLIBC/share/i18n" \
+            GCONV_PATH="$BREW_GLIBC/lib/gconv" \
+                run_logged "$BREW_GLIBC/bin/localedef" \
+                    --prefix="$LOCALE_DIR" \
+                    -i "$_locale_name" -f UTF-8 \
+                    "$LOCALE_DIR/$_locale_name.UTF-8"
+        done
+        unset _locale_name
         printf '%s\n' "$_glibc_installed" > "$_LOCALE_STAMP"
         log_okay "locale generated"
     fi
