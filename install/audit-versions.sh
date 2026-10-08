@@ -91,7 +91,12 @@ record lean 4.33.1 exact elan mathlib-paired-pin "$(command_version lean 's/^Lea
 record llvm@22 22.1.8 exact homebrew llvm@22 "$(brew list --versions llvm@22 2>/dev/null | awk '{print $2}' || true)"
 record cmake 4.4.2 minimum homebrew cmake "$(command_version cmake 's/^cmake version ([0-9.]+).*/\1/p')"
 record ninja 1.13.2 minimum homebrew ninja "$(command_version ninja 's/^([0-9.]+).*/\1/p')"
-record quarto 1.10.18 exact quarto release-archive "$(command_version quarto 's/^([0-9.]+).*/\1/p')"
+# macOS uses an unpinned Homebrew cask; Linux installs a selected release archive.
+if [[ "$OS" == "darwin" ]]; then
+    record quarto 1.10.18 minimum homebrew quarto "$(command_version quarto 's/^([0-9.]+).*/\1/p')"
+else
+    record quarto "${DF_QUARTO_VERSION:-1.10.18}" exact quarto release-archive "$(command_version quarto 's/^([0-9.]+).*/\1/p')"
+fi
 
 printf '%s\n' "${rows[@]}" | jq -s .
 if (( strict && failed )); then

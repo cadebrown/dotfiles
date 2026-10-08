@@ -326,7 +326,7 @@
     {
       "id": "workspace-maintenance",
       "title": "Workspace maintenance",
-      "description": "Maintains chezmoi, scratch layout, Git workflows, platform cleanup, and version audits.",
+      "description": "Maintains chezmoi, scratch layout, Git workflows, platform cleanup, and version audits, with a minimum Quarto baseline for the unpinned macOS cask and an exact selected Linux archive pin.",
       "page": "/setup/chezmoi/",
       "sources": [
         "home/dot_local/bin/executable_git-wt",

@@ -101,6 +101,23 @@ as uv run. The formula patch declares its OpenSSL dependency explicitly;
 see [checksum loader failures](/usage/troubleshooting/#uv-update-reports-a-checksum-mismatch-because-sha256sum-cannot-start)
 for recovery commands, limits, and patch switches.
 
+Quarto is owned by the unpinned macOS cask and by a checksum-verified release
+archive on Linux. The version audit accepts macOS releases at or above `1.10.18`;
+Linux must match `DF_QUARTO_VERSION` (default `1.10.18`) exactly. With the managed
+toolchains installed, inspect the policy and verify all required versions:
+
+```sh
+bash install/audit-versions.sh | jq '.[] | select(.tool == "quarto")'
+bash install/audit-versions.sh --strict
+```
+
+Expect Quarto's policy to be `minimum` on macOS or `exact` on Linux, and strict
+mode to exit zero only when all toolchains pass. `DF_QUARTO_VERSION` selects
+only the Linux archive; it does not pin the macOS cask. See the
+[Quarto install guide](https://quarto.org/docs/get-started/) and authoritative
+[installer](../../install/quarto.sh), [audit](../../install/audit-versions.sh),
+and [Brewfile](../../packages/Brewfile).
+
 ### 5. VS Code / Cursor extensions
 
 Add marketplace identifiers to `packages/vscode-extensions.txt` or

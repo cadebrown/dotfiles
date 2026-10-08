@@ -33,6 +33,9 @@ managed_version_fixture() {
     # The host policy may export a tools root outside HOME. Keep version probes
     # inside the fixture even when running on a configured bootstrap host.
     export DF_TOOLS_ROOT="$fake_home/.local"
+    export DF_PLAT=auto
+    export DF_VERSION_FIXTURE_OS="${1:-Linux}"
+    unset DF_QUARTO_VERSION
     local command
     mkdir -p "$fake_home/.local/nvm" "$stub_bin"
     printf '%s\n' 'nvm() { printf "0.40.7\\n"; }' \
@@ -55,7 +58,7 @@ case "${0##*/}" in
     lean)    printf 'Lean (version 4.33.1, test)\n' ;;
     cmake)   printf 'cmake version 4.4.3\n' ;;
     ninja)   printf '1.13.2\n' ;;
-    quarto)  printf '1.10.18\n' ;;
+    quarto)  printf '%s\n' "${DF_VERSION_FIXTURE_QUARTO:-1.10.18}" ;;
     brew)    printf 'llvm@22 22.1.8\n' ;;
 esac
 EOF
@@ -65,12 +68,29 @@ EOF
         ln -s managed-version "$stub_bin/$command"
     done
 
+    cat > "$stub_bin/uname" <<'EOF'
+#!/bin/sh
+case "$1" in
+    -s) printf '%s\n' "$DF_VERSION_FIXTURE_OS" ;;
+    -m)
+        case "$DF_VERSION_FIXTURE_OS" in
+            Linux) printf 'aarch64\n' ;;
+            Darwin) printf 'arm64\n' ;;
+            *) exit 1 ;;
+        esac ;;
+    *) exit 1 ;;
+esac
+EOF
+    # Avoid selecting a live host's overlay policy during an OS fixture test.
+    printf '#!/bin/sh\nprintf "version-audit-fixture\\n"\n' > "$stub_bin/hostname"
+    chmod 755 "$stub_bin/uname" "$stub_bin/hostname"
+
     # Only explicitly selected shell utilities are visible. A missing/new
     # version stub must not fall through to a host manager that can install tools.
     local utility utility_path
     local utility_bin="$BATS_TEST_TMPDIR/audit-utilities"
     mkdir -p "$utility_bin"
-    for utility in bash jq dirname uname hostname tr sed head awk grep cat sort tail cut \
+    for utility in bash jq dirname tr sed head awk grep cat sort tail cut \
         readlink sysctl getconf find date ls; do
         utility_path="$(command -v "$utility" || true)"
         if [[ "$utility_path" == /* ]]; then ln -s "$utility_path" "$utility_bin/$utility"; fi
@@ -106,6 +126,101 @@ EOF
           and .[0].expected == "0.16.0" and .[0].installed == "0.15.2"
           and .[0].status == "outdated"
     ' >/dev/null
+}
+
+@test "strict audit accepts macOS Quarto newer than its Homebrew minimum" {
+    managed_version_fixture Darwin
+
+    run env HOME="$fake_home" DF_USE_PLAT=0 PATH="$fixture_path" \
+        DF_VERSION_FIXTURE_QUARTO=1.10.20 \
+        bash "$REPO/install/audit-versions.sh" --strict
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e 'any(.[]; .tool == "quarto"
+        and .platform == "darwin/aarch64" and .manager == "homebrew"
+        and .source == "quarto" and .policy == "minimum"
+        and .expected == "1.10.18" and .installed == "1.10.20"
+        and .status == "current")' >/dev/null
+}
+
+@test "strict audit rejects macOS Quarto below its Homebrew minimum" {
+    managed_version_fixture Darwin
+
+    run env HOME="$fake_home" DF_USE_PLAT=0 PATH="$fixture_path" \
+        DF_VERSION_FIXTURE_QUARTO=1.10.17 \
+        bash "$REPO/install/audit-versions.sh" --strict
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '[.[] | select(.status != "current")]
+        | length == 1 and .[0].tool == "quarto"
+          and .[0].platform == "darwin/aarch64" and .[0].manager == "homebrew"
+          and .[0].source == "quarto" and .[0].policy == "minimum"
+          and .[0].expected == "1.10.18" and .[0].installed == "1.10.17"
+          and .[0].status == "outdated"' >/dev/null
+}
+
+@test "strict audit rejects missing macOS Quarto without probing a host tool" {
+    managed_version_fixture Darwin
+    rm "$stub_bin/quarto"
+
+    run env HOME="$fake_home" DF_USE_PLAT=0 PATH="$fixture_path" \
+        bash "$REPO/install/audit-versions.sh" --strict
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '[.[] | select(.status != "current")]
+        | length == 1 and .[0].tool == "quarto"
+          and .[0].platform == "darwin/aarch64" and .[0].manager == "homebrew"
+          and .[0].source == "quarto" and .[0].policy == "minimum"
+          and .[0].expected == "1.10.18" and .[0].installed == ""
+          and .[0].status == "missing"' >/dev/null
+    ! grep -qx quarto "$DF_VERSION_FIXTURE_LOG"
+}
+
+@test "strict audit rejects Linux Quarto newer than its archive pin" {
+    managed_version_fixture Linux
+
+    run env HOME="$fake_home" DF_USE_PLAT=0 PATH="$fixture_path" \
+        DF_VERSION_FIXTURE_QUARTO=1.10.20 \
+        bash "$REPO/install/audit-versions.sh" --strict
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '[.[] | select(.status != "current")]
+        | length == 1 and .[0].tool == "quarto"
+          and .[0].platform == "linux/aarch64" and .[0].manager == "quarto"
+          and .[0].source == "release-archive" and .[0].policy == "exact"
+          and .[0].expected == "1.10.18" and .[0].installed == "1.10.20"
+          and .[0].status == "outdated"' >/dev/null
+}
+
+@test "strict audit accepts Linux Quarto matching a custom archive pin" {
+    managed_version_fixture Linux
+
+    run env HOME="$fake_home" DF_USE_PLAT=0 PATH="$fixture_path" \
+        DF_QUARTO_VERSION=1.10.20 DF_VERSION_FIXTURE_QUARTO=1.10.20 \
+        bash "$REPO/install/audit-versions.sh" --strict
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e 'any(.[]; .tool == "quarto"
+        and .platform == "linux/aarch64" and .manager == "quarto"
+        and .source == "release-archive" and .policy == "exact"
+        and .expected == "1.10.20" and .installed == "1.10.20"
+        and .status == "current")' >/dev/null
+}
+
+@test "strict audit rejects Linux Quarto differing from a custom archive pin" {
+    managed_version_fixture Linux
+
+    run env HOME="$fake_home" DF_USE_PLAT=0 PATH="$fixture_path" \
+        DF_QUARTO_VERSION=1.10.20 DF_VERSION_FIXTURE_QUARTO=1.10.18 \
+        bash "$REPO/install/audit-versions.sh" --strict
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '[.[] | select(.status != "current")]
+        | length == 1 and .[0].tool == "quarto"
+          and .[0].platform == "linux/aarch64" and .[0].manager == "quarto"
+          and .[0].source == "release-archive" and .[0].policy == "exact"
+          and .[0].expected == "1.10.20" and .[0].installed == "1.10.18"
+          and .[0].status == "outdated"' >/dev/null
 }
 
 @test "version schema fixture reports missing Julia without calling a host launcher" {

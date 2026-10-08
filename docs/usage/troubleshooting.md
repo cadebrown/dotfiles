@@ -1326,6 +1326,13 @@ brew info --json=v2 rustup juliaup | jq '.formulae[] | {name, stable: .versions.
 genuinely pinned toolchains
 remain exact.
 
+Quarto follows the same ownership rule: the macOS Homebrew cask uses a minimum
+floor of `1.10.18`, so an installed `1.10.19` passes. Linux uses an exact release
+archive pin, including an explicit `DF_QUARTO_VERSION` override. An older audit
+applied the Linux pin on macOS and incorrectly rejected newer cask releases.
+After updating the audit, rerun `bash install/audit-versions.sh --strict`; a
+successful report requires every row to have `status: current` and exits zero.
+
 ---
 
 ## Skill upgrade reports both “up to date” and committed-digest drift
