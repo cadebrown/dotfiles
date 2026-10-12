@@ -105,11 +105,52 @@ check_launchers() {
     check_launchers "$FLAT" "$FAKE_HOME/custom-cache" UV_CACHE_DIR="$FAKE_HOME/custom-cache"
 }
 
+@test "installers and script launchers use host-local uv cache and preserve overrides" {
+    local state_root="$BATS_TEST_TMPDIR/local state" cache
+    printf 'DF_USE_PLAT=0\nDF_STATE_ROOT=%s\n' "$state_root" > "$HOST_FILE"
+    write_runtimes "$FLAT"
+    install_helpers
+    check_launchers "$FLAT" "$state_root/uv/cache"
+    check_launchers "$FLAT" "$FAKE_HOME/custom-cache" UV_CACHE_DIR="$FAKE_HOME/custom-cache"
+
+    for cache in "$state_root/uv/cache" "$FAKE_HOME/custom-cache"; do
+        local override=()
+        [[ "$cache" == "$FAKE_HOME/custom-cache" ]] && override=(UV_CACHE_DIR="$cache")
+        run env -i HOME="$FAKE_HOME" PATH=/usr/bin:/bin "${override[@]}" \
+            /bin/bash -c 'source "$1/install/_lib.sh"; printf "%s\n" "$UV_CACHE_DIR"' _ "$FAKE_REPO"
+        [ "$status" -eq 0 ]
+        [ "$output" = "$cache" ]
+
+        run env -i HOME="$FAKE_HOME" PATH=/usr/bin:/bin DF_DOTFILES_REPO="$FAKE_REPO" \
+            "${override[@]}" "$FAKE_HOME/.local/bin/df-gemini" --check-runtime
+        [ "$status" -eq 0 ]
+        [ "${lines[0]}" = "runtime=$FLAT/bin/uv" ]
+        [ "${lines[1]}" = "cache=$cache" ]
+        [ "${lines[6]}" = "arg=$FAKE_REPO/install/gemini-api.py" ]
+        [ "${lines[7]}" = "arg=--check-runtime" ]
+    done
+}
+
 @test "host policy accepts a final digit without a newline" {
     printf 'DF_USE_PLAT=1' > "$HOST_FILE"
     write_runtimes "$ISOLATED"
     install_helpers
     check_launchers "$ISOLATED" "$ISOLATED/uv/cache"
+}
+
+@test "installer cache defaults follow a relocated tool root and explicit cache stays fixed" {
+    local override
+    for override in '' "$FAKE_HOME/custom-cache"; do
+        run env -i HOME="$FAKE_HOME" PATH=/usr/bin:/bin UV_CACHE_DIR="$override" \
+            /bin/bash -c '
+                source "$1/install/_lib.sh"
+                LOCAL_PLAT="$HOME/moved-tools"
+                _re_derive_plat_vars
+                printf "%s\n" "$UV_CACHE_DIR"
+            ' _ "$FAKE_REPO"
+        [ "$status" -eq 0 ]
+        [ "$output" = "${override:-$FAKE_HOME/moved-tools/uv/cache}" ]
+    done
 }
 
 @test "malformed host policy stops installer and launchers before a runtime executes" {

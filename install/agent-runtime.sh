@@ -26,6 +26,7 @@ if [[ "${1:-}" == --runtime-only ]]; then
     UV_TOOL_BIN_DIR="$ARCH_BIN"
     UV_TOOL_DIR="$LOCAL_PLAT/uv/tools"
     UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
+    _resolve_uv_cache
     export DF_USE_PLAT DF_PLAT PLAT ARCH_BIN PYTHON_ENV UV_TOOL_BIN_DIR UV_TOOL_DIR UV_PYTHON_INSTALL_DIR
     unset _agent_install _agent_root
 else

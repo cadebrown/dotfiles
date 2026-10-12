@@ -206,7 +206,8 @@ _run_brew_bundle() {
     local _brewfile="$1" _exit=0
     shift
 
-    brew bundle install "$@" --file="$_brewfile" 2>&1 || _exit=$?
+    # Bundle otherwise captures child output, hiding progress during source builds.
+    brew bundle install --verbose "$@" --file="$_brewfile" 2>&1 || _exit=$?
     if [[ "$_exit" -eq 0 ]]; then
         brew bundle check "$@" --file="$_brewfile"
         return
@@ -217,7 +218,7 @@ _run_brew_bundle() {
 
     log_info "brew bundle returned $_exit after satisfying the Brewfile; retrying once"
     _exit=0
-    brew bundle install "$@" --file="$_brewfile" 2>&1 || _exit=$?
+    brew bundle install --verbose "$@" --file="$_brewfile" 2>&1 || _exit=$?
     [[ "$_exit" -eq 0 ]] || return "$_exit"
     brew bundle check "$@" --file="$_brewfile" || return
     log_okay "brew bundle retry completed cleanly"

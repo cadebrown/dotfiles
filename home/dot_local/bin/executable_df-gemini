@@ -4,7 +4,6 @@ _repo="${DF_DOTFILES_REPO:-$HOME/dotfiles}"
 # shellcheck source=install/agent-runtime.sh
 source "$_repo/install/agent-runtime.sh" --runtime-only >&2
 export PATH="$ARCH_BIN:$HOME/.local/bin:$PATH"
-export UV_CACHE_DIR="${UV_CACHE_DIR:-$LOCAL_PLAT/uv/cache}"
 # A GUI-launched shell may predate auth setup. Explicit environment keys win.
 if [[ -z "${GOOGLE_API_KEY:-}${GEMINI_API_KEY:-}" && -r "$HOME/.gemini.env" ]]; then
     # shellcheck source=/dev/null

@@ -64,7 +64,7 @@ fi
 # Reconcile declarations without allowing a cask prompt to block formula work,
 # then ask Bundle to verify the declared state instead of trusting install's
 # exit alone.
-run_logged brew bundle install --no-upgrade --file="$BREWFILE" \
+run_logged brew bundle install --no-upgrade --verbose --file="$BREWFILE" \
     || die "Homebrew could not install every Brewfile declaration"
 run_logged brew bundle check --no-upgrade --file="$BREWFILE" \
     || die "Homebrew reports unsatisfied Brewfile declarations after install"

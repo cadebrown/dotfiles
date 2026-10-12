@@ -94,7 +94,7 @@ SH
     grep -q '_brew_upgrade="${DF_BREW_UPGRADE:-0}"' "$REPO/install/homebrew.sh"
     grep -q 'DF_BREW_UPGRADE="${DF_BREW_UPGRADE:-1}"' "$REPO/bootstrap.sh"
     grep -q '^export DF_BREW_UPGRADE$' "$REPO/bootstrap.sh"
-    grep -q 'brew bundle install --no-upgrade' "$REPO/install/homebrew.sh"
+    grep -q 'brew bundle install --no-upgrade --verbose' "$REPO/install/homebrew.sh"
     grep -q 'brew upgrade --formula --yes' "$REPO/install/homebrew.sh"
 }
 
@@ -663,9 +663,9 @@ RUBY
 
     [ "$status" -eq 0 ]
     [ "$(wc -l <"$calls")" -eq 4 ]
-    [ "$(sed -n '1p' "$calls")" = "bundle install --no-upgrade --file=$brewfile" ]
+    [ "$(sed -n '1p' "$calls")" = "bundle install --verbose --no-upgrade --file=$brewfile" ]
     [ "$(sed -n '2p' "$calls")" = "bundle check --no-upgrade --file=$brewfile" ]
-    [ "$(sed -n '3p' "$calls")" = "bundle install --no-upgrade --file=$brewfile" ]
+    [ "$(sed -n '3p' "$calls")" = "bundle install --verbose --no-upgrade --file=$brewfile" ]
     [ "$(sed -n '4p' "$calls")" = "bundle check --no-upgrade --file=$brewfile" ]
     [[ "$output" == *"brew bundle retry completed cleanly"* ]]
 }
@@ -688,7 +688,7 @@ RUBY
 
     [ "$status" -eq 11 ]
     [ "$(wc -l <"$calls")" -eq 2 ]
-    [ "$(sed -n '1p' "$calls")" = "bundle install --no-upgrade --file=$brewfile" ]
+    [ "$(sed -n '1p' "$calls")" = "bundle install --verbose --no-upgrade --file=$brewfile" ]
     [ "$(sed -n '2p' "$calls")" = "bundle check --no-upgrade --file=$brewfile" ]
 }
 
@@ -718,7 +718,7 @@ RUBY
 
     [ "$status" -eq 7 ]
     [ "$(wc -l <"$calls")" -eq 2 ]
-    [ "$(sed -n '1p' "$calls")" = "bundle install --no-upgrade --file=$brewfile" ]
+    [ "$(sed -n '1p' "$calls")" = "bundle install --verbose --no-upgrade --file=$brewfile" ]
     [ "$(sed -n '2p' "$calls")" = "bundle check --no-upgrade --file=$brewfile" ]
 }
 
@@ -756,7 +756,7 @@ RUBY
 
     [ "$status" -eq 130 ]
     [ "$(wc -l <"$calls")" -eq 1 ]
-    grep -Fxq 'bundle install --file='"$brewfile" "$calls"
+    grep -Fxq 'bundle install --verbose --file='"$brewfile" "$calls"
 }
 
 @test "Ruby formula patch isolates the build runner from the previous keg" {

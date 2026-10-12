@@ -87,12 +87,36 @@ uv add numpy
 uv run python -c 'import numpy; print(numpy.__version__)'
 ```
 
+Installers and managed Google/Gemini launchers default `UV_CACHE_DIR` to
+`$DF_STATE_ROOT/uv/cache` when host-local state is configured, otherwise to
+`$LOCAL_PLAT/uv/cache`. An explicit `UV_CACHE_DIR` takes precedence. Installed
+Python and CLI environments remain under `$LOCAL_PLAT`; the cache location
+keeps script-environment locks off a shared NFS tool root.
+
+With [host-local state configured](../agents/codex.md#host-local-state), check
+the resolved path and prepare the locked transport without authentication:
+
+```sh
+bash -c 'source ~/dotfiles/install/_lib.sh; printf "%s\n" "$UV_CACHE_DIR"'
+df-google-mcp --check-runtime
+```
+
+Expect the configured local state path followed by `Google MCP runtime ready`.
+The first preparation downloads dependencies. Existing processes retain their
+old cache; this does not relocate installed tool environments or repair a
+broken NFS lock service. See [NFS cache waits](../usage/troubleshooting.md#python-setup-waits-in-nfs-locking)
+and upstream [uv cache configuration](https://docs.astral.sh/uv/concepts/cache/#cache-directory).
+
 ### 4. Homebrew — non-language-specific tools and C libraries
 
 Use `packages/Brewfile` for formulae, casks, SDKs, and shared libraries.
 Bootstrap owns `brew bundle`; use the manifest rather than `brew install` for a
 durable addition. Linux uses its rootless managed prefix, while macOS uses the
 standard Homebrew prefix.
+
+Bundle runs with `--verbose` so package build and download output appears as it
+runs. Its `Using ...` inventory can precede a batched install; those lines do
+not establish completion. See [silent Bundle output](../usage/troubleshooting.md#brew-bundle-appears-stuck-after-using-lines).
 
 On Linux, bootstrap checks that Homebrew's `sha256sum` computes the known
 digest of `abc` before and after Bundle. A broken installed Coreutils is

@@ -672,6 +672,78 @@ Manual one-off: `brew tap owner/tap`, then rerun `install/homebrew.sh`.
 
 ---
 
+## Brew bundle appears stuck after `Using` lines
+
+**Symptom:** bootstrap prints its package inventory, ending in a line such as
+`Using surrealdb/tap/surreal`, then produces no visible build output.
+
+**Root cause:** current Homebrew Bundle lists satisfied and actionable entries
+before running one batched install. Without `--verbose`, it captures that
+child's output and can discard it on success. The last inventory line does not
+identify the running package or prove the process is hung.
+
+**Confirm:** on Linux, inspect the original bootstrap's descendants:
+
+```sh
+pgrep -af 'bootstrap.sh'
+pstree -ap BOOTSTRAP_PID
+```
+
+A compiler beneath `brew` establishes an active build. A different installer
+means Bundle has already returned. If the tree names `google-mcp.py`, check
+[Python's cache lock wait](troubleshooting.md#python-setup-waits-in-nfs-locking).
+
+**Fix:** the Linux and macOS package installers now pass `--verbose` to Bundle,
+including Linux's single verified retry. After the original process exits,
+rerun `~/dotfiles/bootstrap.sh upgrade` with the updated sources. This exposes
+build output; it does not shorten a build or bypass dependency checks.
+Sources: [Homebrew Bundle](https://docs.brew.sh/Brew-Bundle-and-Brewfile),
+[`linux-packages.sh`](../../install/linux-packages.sh), and
+[`homebrew.sh`](../../install/homebrew.sh).
+
+## Python setup waits in NFS locking
+
+**Symptom:** Python setup stops at `Preparing the refreshable Google MCP
+transport`; `uv run --locked --script ... --check-runtime` stays idle.
+
+**Root cause:** the script environment cache lives under a shared NFS tool
+root. uv locks its environment before installing dependencies, and an NFS lock
+request can wait in the kernel even though no local process holds the lock.
+On Blackwell, observed on 2026-10-12, the cache was on NFSv3 and a uv worker's
+wait channel was `nlmclnt_wait`. The same locked check completed with its cache
+on the host's ext4 state volume.
+
+**Confirm on Linux:** select the affected uv PID and inspect its actual cache
+and worker threads:
+
+```sh
+pgrep -af 'uv.*google-mcp.py'
+findmnt -T "$UV_CACHE_DIR" -o TARGET,FSTYPE
+ps -L -p UV_PID -o pid,tid,stat,wchan:30,args
+```
+
+If the calling shell does not have `UV_CACHE_DIR`, read only that variable from
+`/proc/UV_PID/environ`; do not print the complete environment.
+
+**Fix:** configure a persistent host-local `DF_STATE_ROOT` with
+`bash ~/dotfiles/install/host.sh configure`. Current installers and managed
+Google/Gemini launchers then use `$DF_STATE_ROOT/uv/cache`. An explicit
+`UV_CACHE_DIR` still wins. Stop the stuck bootstrap in its terminal before
+starting another; with Blackwell's existing local state configuration, the
+one-invocation recovery is:
+
+```sh
+UV_CACHE_DIR="$DF_STATE_ROOT/uv/cache" ~/dotfiles/bootstrap.sh upgrade
+```
+
+The first run populates a fresh cache. Existing processes retain the old path;
+do not delete a lock file or disable locking. This change does not relocate
+installed Python/tool environments or fix project environments stored on NFS.
+Sources: [uv cache safety](https://docs.astral.sh/uv/concepts/cache/#cache-safety),
+[`_runtime-paths.sh`](../../install/_runtime-paths.sh),
+[`python.sh`](../../install/python.sh), and
+[package cache defaults](../setup/packages.md#3-uv--python-libraries-and-cli-tools).
+
 ## Brew bundle reports `Upgrading X has failed!` after installing X
 
 Symptom: `bootstrap.sh upgrade` pours and links a formula successfully, then
@@ -1801,6 +1873,39 @@ du -sh ~/scratch/.codex                     # what was orphaned
 
 The supported `CODEX_HOME` boundary now includes managed-configuration sync;
 see [Codex host-local state](../agents/codex.md#host-local-state).
+
+## Codex background server has incompatible feature settings
+
+**Symptom:** interactive Codex requires `api_key_model_discovery` and offers
+`Run without daemon this time`; restarting is disabled because the server is
+not managed by Codex.
+
+**Root cause:** the CLI and the shared app server have different effective
+startup features. A desktop/SSH-launched app server can outlive CLI upgrades,
+and the CLI cannot automatically restart a server it does not manage. A
+version difference is useful evidence, but does not by itself establish which
+feature differs.
+
+**Confirm:** compare the CLI and running server through the native command:
+
+```sh
+codex --version
+codex app-server daemon version
+codex features list
+```
+
+**Fix for the current invocation:** select `Run without daemon this time`, or:
+
+```sh
+codex --no-daemon
+```
+
+This preserves the shared server and its existing clients. For a persistent
+repair, restart it through the desktop/SSH client that owns it when active and
+queued work may be interrupted, using the shared features named by the
+compatibility dialog. Changing a file does not update an already running
+server's startup features. Sources: [official CLI reference](https://developers.openai.com/codex/cli/reference/)
+and the installed CLI's `codex --help`.
 
 ## SSH works but the remote Codex desktop cannot initialize its database
 

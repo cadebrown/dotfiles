@@ -45,3 +45,13 @@ _resolve_local_plat() {
     fi
     export LOCAL_PLAT
 }
+
+# Script environments take file locks inside the cache. Prefer host-local
+# state over a shared NFS tool root, while preserving an explicit override.
+_resolve_uv_cache() {
+    if [[ -z "${UV_CACHE_DIR:-}" || "${UV_CACHE_DIR:-}" == "${_DF_UV_CACHE_DEFAULT:-}" ]]; then
+        UV_CACHE_DIR="${DF_STATE_ROOT:-$LOCAL_PLAT}/uv/cache"
+        _DF_UV_CACHE_DEFAULT="$UV_CACHE_DIR"
+    fi
+    export UV_CACHE_DIR
+}

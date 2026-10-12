@@ -49,7 +49,7 @@
     {
       "id": "core-toolchains",
       "title": "Core toolchains",
-      "description": "Installs shell, language, compiler, documentation, and workflow-validation tools, generates both supported Linux UTF-8 locales, updates TinyTeX's manager before package operations, selects Homebrew OpenSSL 3 for locked Cargo source builds while preserving explicit OpenSSL paths, checks Linux checksum execution before downstream installers, and maintains a 250 GiB sccache policy, native build launchers, Python bytecode caching, and Gradle task caching.",
+      "description": "Installs shell, language, compiler, documentation, and workflow-validation tools, streams Homebrew Bundle build output, prefers configured host-local state for uv cache locks while preserving overrides, generates both supported Linux UTF-8 locales, updates TinyTeX's manager before package operations, selects Homebrew OpenSSL 3 for locked Cargo source builds while preserving explicit OpenSSL paths, checks Linux checksum execution before downstream installers, and maintains a 250 GiB sccache policy, native build launchers, Python bytecode caching, and Gradle task caching.",
       "page": "/setup/packages/",
       "sources": [
         "home/dot_bash_profile.tmpl",

@@ -173,10 +173,11 @@ CARGO_HOME="$LOCAL_PLAT/cargo"
 # (/var/folders/.../T/). Redirect cargo build artifacts to a home-dir path.
 CARGO_TARGET_DIR="$LOCAL_PLAT/cargo-build"
 
-# uv: keep all arch-specific state under LOCAL_PLAT
+# uv: installed tools/Python stay PLAT-isolated; cache locks use host-local state.
 UV_TOOL_BIN_DIR="$ARCH_BIN"
 UV_TOOL_DIR="$LOCAL_PLAT/uv/tools"
 UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
+_resolve_uv_cache
 PYTHON_ENV="$LOCAL_PLAT/python"
 
 # nvm: per-PLAT so arch-specific node binaries don't collide on shared homes
@@ -886,6 +887,7 @@ _re_derive_plat_vars() {
     UV_TOOL_BIN_DIR="$ARCH_BIN"
     UV_TOOL_DIR="$LOCAL_PLAT/uv/tools"
     UV_PYTHON_INSTALL_DIR="$LOCAL_PLAT/uv/python"
+    _resolve_uv_cache
     PYTHON_ENV="$LOCAL_PLAT/python"
     NVM_DIR="$LOCAL_PLAT/nvm"
     CONAN_HOME="$LOCAL_PLAT/conan2"
