@@ -2941,6 +2941,55 @@ SSH masters retain their original forwards until closed. A task marked
 `interrupted` also needs its own event timeline: received interrupt requests,
 transport failures, and MCP authentication errors are distinct events.
 
+## Codex daemon bootstrap reports an unmanaged app server
+
+**Symptom.** `codex app-server daemon bootstrap` fails with `app server is
+running but is not managed by codex app-server daemon`.
+
+**Root cause.** A directly launched `codex app-server --listen unix://` already
+owns the control socket for this `CODEX_HOME`, but has no daemon process record.
+Desktop SSH connections can launch this way. In Codex 0.162.1, bootstrap refuses
+to adopt that process; daemon stop and restart refuse it too. Management uses a
+PID file, so the absence of a systemd unit is expected.
+
+**Confirm.** Inspect the current CLI, server version, and exact process:
+
+```sh
+type -a codex
+codex app-server daemon version
+ps -u "$(id -u)" -o pid,ppid,args | rg '[c]odex.*app-server'
+```
+
+An unmanaged server can report `status: running` while omitting `backend` and
+reporting `managedCodexVersion: null`. Check the process environment to confirm
+it uses the same `CODEX_HOME`. Do not confuse the SSH `app-server proxy` process
+with the server itself.
+
+**Fix.** Prepare a [complete native CLI package](../agents/codex.md#install-and-upgrade-the-native-cli)
+before stopping anything. A stale npm launcher may shadow the managed native
+binary; bootstrap also needs the complete package to create its daemon install.
+For example, to retain the observed 0.162.1 version:
+
+```sh
+CODEX_VERSION=rust-v0.162.1 bash ~/dotfiles/install/codex.sh install
+```
+
+Wait for active work to finish and disconnect the desktop's SSH connection.
+After checking its identity again, send `SIGTERM` to the exact unmanaged server
+PID and wait for it to exit. This disconnects clients; avoid broad `pkill`
+commands, deleting the socket, or fabricating a daemon PID file. Then run:
+
+```sh
+codex app-server daemon bootstrap
+codex app-server daemon version
+codex app-server daemon start
+```
+
+Expect `bootstrapped`, then `running` and `alreadyRunning`, with `backend: pid`
+and the expected managed version. Reconnect the desktop afterward. Plain
+bootstrap leaves remote control disabled; SSH access does not require enabling
+it. See the [0.162.1 daemon lifecycle contract](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/app-server-daemon/README.md).
+
 ## Codex cannot read sessions: No file descriptors available
 
 **Symptom.** Session resume reports `thread-store internal error` and `os error
