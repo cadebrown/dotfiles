@@ -141,7 +141,10 @@ _codex_runtime_valid() {
     [[ -x "$_runtime/bin/codex-code-mode-host" ]] || return 1
     [[ -x "$_runtime/codex-path/rg" ]] || return 1
     [[ "$OS" == darwin || -x "$_runtime/codex-resources/bwrap" ]] || return 1
-    [[ -x "$_runtime/codex-resources/zsh/bin/zsh" ]] || return 1
+    # Codex 0.163 removed the bundled patched zsh. Older runtimes still need it.
+    if [[ "$_expected" =~ ^0\.([0-9]+)\. ]] && (( 10#${BASH_REMATCH[1]} < 163 )); then
+        [[ -x "$_runtime/codex-resources/zsh/bin/zsh" ]] || return 1
+    fi
     [[ -f "$_runtime/codex-package.json" ]] || return 1
     jq -e --arg version "$_expected" --arg target "$_target" \
         '.layoutVersion == 1 and .version == $version and (.variant == "codex")

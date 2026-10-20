@@ -16,7 +16,7 @@ run_installer() {
     mkdir -p "$BATS_TEST_TMPDIR/installer-tmp"
     run env -u CODEX_VERSION HOME="$TEST_HOME" DF_USE_PLAT=0 REPO_ROOT="$REPO_ROOT" \
         TMPDIR="$BATS_TEST_TMPDIR/installer-tmp" \
-        CANDIDATE_STATUS="$candidate_status" DIGEST_MODE="$digest_mode" \
+        CANDIDATE_STATUS="$candidate_status" DIGEST_MODE="$digest_mode" BUNDLE_ZSH="${BUNDLE_ZSH:-0}" \
         CANDIDATE_VERSION="$version" METADATA_VERSION="$metadata_version" METADATA_TAG="$metadata_tag" REQUESTED_TAG="$requested_tag" PREEXISTING_INVALID="$preexisting_invalid" OMIT_HOST="$omit_host" bash -c '
             source "$REPO_ROOT/install/codex.sh"
             [[ -z "$REQUESTED_TAG" ]] || export CODEX_VERSION="$REQUESTED_TAG"
@@ -31,15 +31,20 @@ run_installer() {
             mkdir "$fixture/payload"
             asset="$(_codex_asset_name)"
             target="${asset#codex-package-}"; target="${target%.tar.gz}"
-            mkdir -p "$fixture/payload/bin" "$fixture/payload/codex-path" "$fixture/payload/codex-resources/zsh/bin"
-            printf "#!/bin/sh\\necho codex-cli \\$CANDIDATE_VERSION\\nexit \\$CANDIDATE_STATUS\\n" > "$fixture/payload/bin/codex"
+            mkdir -p "$fixture/payload/bin" "$fixture/payload/codex-path" "$fixture/payload/codex-resources"
+            printf "#!/bin/sh\\necho codex-cli %s\\nexit %s\\n" "$CANDIDATE_VERSION" "$CANDIDATE_STATUS" > "$fixture/payload/bin/codex"
             if [[ "$OMIT_HOST" != 1 ]]; then
                 printf "#!/bin/sh\\nexit 0\\n" > "$fixture/payload/bin/codex-code-mode-host"
             fi
-            for helper in "$fixture/payload/codex-path/rg" "$fixture/payload/codex-resources/bwrap" "$fixture/payload/codex-resources/zsh/bin/zsh"; do
+            for helper in "$fixture/payload/codex-path/rg" "$fixture/payload/codex-resources/bwrap"; do
                 printf "#!/bin/sh\\nexit 0\\n" > "$helper"
             done
-            chmod 755 "$fixture/payload/bin/codex" "$fixture/payload/codex-path/rg" "$fixture/payload/codex-resources/bwrap" "$fixture/payload/codex-resources/zsh/bin/zsh"
+            chmod 755 "$fixture/payload/bin/codex" "$fixture/payload/codex-path/rg" "$fixture/payload/codex-resources/bwrap"
+            if [[ "$BUNDLE_ZSH" == 1 ]]; then
+                mkdir -p "$fixture/payload/codex-resources/zsh/bin"
+                printf "#!/bin/sh\\nexit 0\\n" > "$fixture/payload/codex-resources/zsh/bin/zsh"
+                chmod 755 "$fixture/payload/codex-resources/zsh/bin/zsh"
+            fi
             [[ "$OMIT_HOST" == 1 ]] || chmod 755 "$fixture/payload/bin/codex-code-mode-host"
             printf "{\\\"layoutVersion\\\":1,\\\"version\\\":\\\"%s\\\",\\\"target\\\":\\\"%s\\\",\\\"variant\\\":\\\"codex\\\",\\\"entrypoint\\\":\\\"bin/codex\\\",\\\"resourcesDir\\\":\\\"codex-resources\\\",\\\"pathDir\\\":\\\"codex-path\\\"}" "$METADATA_VERSION" "$target" > "$fixture/payload/codex-package.json"
             tar -czf "$fixture/codex.tar.gz" -C "$fixture/payload" bin codex-path codex-resources codex-package.json
@@ -59,10 +64,27 @@ run_installer() {
         '
 }
 
-@test "Codex upgrade verifies the archive and atomically replaces a working binary" {
-    run_installer 0 valid
+@test "Codex 0.163 upgrade accepts the package without bundled zsh and atomically replaces a working binary" {
+    run_installer 0 valid 0.163.0
     [ "$status" -eq 0 ]
-    [[ "$output" == *"codex-cli 9.9.9"* ]]
+    [[ "$output" == *"codex-cli 0.163.0"* ]]
+    [ -L "$TEST_HOME/.local/bin/codex" ]
+    [ ! -e "$TEST_HOME/.local/lib/codex/rust-v0.163.0/codex-resources/zsh" ]
+}
+
+@test "Codex 0.162 packages still require and accept bundled zsh" {
+    BUNDLE_ZSH=1 run_installer 0 valid 0.162.1
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"codex-cli 0.162.1"* ]]
+    [ -x "$TEST_HOME/.local/lib/codex/rust-v0.162.1/codex-resources/zsh/bin/zsh" ]
+}
+
+@test "an older package missing bundled zsh leaves the existing Codex binary intact" {
+    run_installer 0 valid 0.162.1
+    [ "$status" -ne 0 ]
+    run "$TEST_HOME/.local/bin/codex" --version
+    [ "$status" -eq 0 ]
+    [ "$output" = old ]
 }
 
 @test "a candidate that fails --version leaves the existing Codex binary intact" {

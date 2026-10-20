@@ -72,6 +72,10 @@ version, and checks the code-mode host and bundled resources. It installs the
 whole runtime under `$LOCAL_PLAT/lib/codex/<release-tag>` and atomically changes
 the bin symlink. Failed checks retain the active runtime. The executable and
 `codex-code-mode-host` must stay together; a bare CLI download is insufficient.
+Codex 0.163.0 and later use the standard shell executor and omit the patched
+`zsh`; the installer requires that bundled shell only for older packages.
+See [package validation failures](../usage/troubleshooting.md#codex-upgrade-rejects-a-valid-01630-package)
+and the [0.163.0 release notes](https://github.com/openai/codex/releases/tag/rust-v0.163.0).
 An existing process keeps its current executable until restarted; upgrades do
 not interrupt tasks. GitHub API access needs `GITHUB_TOKEN` on shared networks
 where the anonymous rate limit is exhausted. Exact tags are optional; without

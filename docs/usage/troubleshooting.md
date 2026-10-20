@@ -3011,6 +3011,37 @@ results before changing a timeout. `Interrupt` and `SessionEnd` are capped at
 three seconds by Codex, and requesting a larger value also changes the effective
 trust hash. See [durable work](../agents/durable-work.md).
 
+## Codex upgrade rejects a valid 0.163.0 package
+
+**Symptom.** `install/codex.sh upgrade` downloads
+`codex-package-aarch64-apple-darwin.tar.gz`, then fails with `is incomplete or
+reports the wrong version; keeping active runtime`.
+
+**Root cause.** Codex 0.163.0 removed its bundled patched `zsh`, but the installer
+still required `codex-resources/zsh/bin/zsh`. This rejected an otherwise valid
+package before activation. The old runtime stays active. This failure is
+independent of sudo, App Store, and optional MCP authentication warnings.
+
+**Confirm.** On macOS arm64, the official 0.163.0 archive was verified on
+October 19, 2026 against its published SHA-256 digest; its manifest, CLI version,
+and code-mode host passed validation, and only the obsolete shell requirement
+failed. The [release notes](https://github.com/openai/codex/releases/tag/rust-v0.163.0)
+document the shell removal. `codex --version` shows which runtime remains active.
+
+**Fix.** With the updated installer, retry only the Codex step:
+
+```sh
+bash ~/dotfiles/install/codex.sh upgrade
+codex --version
+```
+
+The installer accepts packages without patched `zsh` starting at 0.163.0 and
+still requires it for older releases. Checksum, manifest, version, code-mode
+host, ripgrep, and Linux bubblewrap checks remain enforced. Existing sessions
+keep their current executable until restarted. See
+[native CLI installation](../agents/codex.md#install-and-upgrade-the-native-cli)
+for exact-version selection and runtime paths.
+
 ## Codex disappears after an npm upgrade on NFS
 
 **Symptom.** `codex resume` reports `command not found`; `npm install -g
