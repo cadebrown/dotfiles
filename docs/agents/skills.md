@@ -28,6 +28,34 @@ rg --files ~/.claude/skills ~/.cursor/skills ~/dotfiles/home/dot_claude/skills
 
 Do not create a broadly named skill for a one-off selector or project-local source list. A reusable skill needs a stable input/output contract.
 
+## Review a change with Ponytail
+
+`ponytail-review` checks a change and its connected callers for bugs, security,
+load, missing tests, performance, and unnecessary code. The installer declares
+only this skill in [`agent-skills.txt`](../../packages/agent-skills.txt) and
+shares it through the existing [skill tree](inventories.md#preserve-the-one-owner-rule).
+It requires the managed Node/npm setup; install missing declared skills with
+`bash install/skills-sync.sh sync`.
+
+In a fresh Codex chat, send:
+
+```text
+$ponytail-review Review my uncommitted changes.
+```
+
+Name staged changes, a branch, a PR, or files to change the scope. With no scope,
+the skill reviews uncommitted changes, or the last commit when there are none.
+Expect ranked findings with file locations, concrete failure cases, and proposed
+fixes. The review changes no code; its result only establishes the checks it
+actually performed. The agent may also select it for review requests. It does
+not install Ponytail's coding mode, other skills, or lifecycle hooks.
+
+Upstream: [review procedure](https://github.com/DietrichGebert/ponytail/blob/main/skills/ponytail-review/SKILL.md)
+and [skills-only installation](https://github.com/DietrichGebert/ponytail/blob/main/INSTALL.md#skills-cli).
+The authoritative installer and reviewed content baseline are
+[`skills-sync.sh`](../../install/skills-sync.sh) and
+[`agent-skills.lock.json`](../../packages/agent-skills.lock.json).
+
 ## Author at the correct ownership layer
 
 Use `skill-creator` for a new Codex skill. Decide ownership first:

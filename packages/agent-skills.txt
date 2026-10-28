@@ -134,6 +134,10 @@ skill-creator npx anthropics/skills skill-creator
 # session — the discovery half of this very file's workflow.
 find-skills npx vercel-labs/skills find-skills
 
+# Ponytail change review only: concrete findings across correctness, security,
+# load, tests, performance, and unnecessary code; no coding mode or hooks.
+ponytail-review npx DietrichGebert/ponytail ponytail-review
+
 # First-principles design interrogation. grill-me/grill-with-docs are small
 # explicit entrypoints; grilling and domain-modeling provide the real workflow.
 grill-me npx mattpocock/skills grill-me
