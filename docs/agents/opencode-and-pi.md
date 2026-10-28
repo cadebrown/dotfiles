@@ -14,6 +14,22 @@ OpenCode JSON is installer-rendered; Pi settings and models are chezmoi-rendered
 
 The macOS endpoint is `http://localhost:8080/v1` and must run separately. Credentials and interactive login are separate from checked-in configuration; do not use `/login` to diagnose an endpoint.
 
+Cloud pins live in [`home/.chezmoidata.toml`](../../home/.chezmoidata.toml).
+Checked against the [Anthropic model catalog](https://platform.claude.com/docs/en/models/overview)
+on 2026-10-28: OpenCode plans with Fable 5.1, reviews with Sonnet 5.5, and uses
+Haiku 5.5 for small tasks and Linux builds. Pi uses Haiku 5.5 with thinking off
+on Linux. Both retain local Qwen3.6-27B on macOS.
+
+OpenCode sync preserves existing model choices. When upgrading an existing
+configuration, deliberately update its `small_model` and `agent.plan.model` /
+`agent.review.model` values, then start a new session. A source pin change alone
+does not replace those saved choices.
+
+Refresh an old OpenCode model catalog with `opencode models --refresh`. Confirm
+the expected model IDs are present; a refresh message alone does not establish
+Anthropic authentication or generation access. See the
+[models command](https://docs.opencode.ai/docs/cli/#models).
+
 ## OpenCode scopes agents by MCP namespace
 
 The sync renders registry servers, preserves allowed runtime choices, and creates core plus `research`, `browser`, `creative`, `desktop`, `cloud`, `workspace`, `math`, and `repository` agents.

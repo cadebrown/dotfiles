@@ -1,6 +1,6 @@
 name = "extractor"
 description = "Cheap extraction from specified logs, files, or web pages into a compact evidence-backed result."
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 model_reasoning_effort = "low"
 model_verbosity = "low"
 web_search = "disabled"

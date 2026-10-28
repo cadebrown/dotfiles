@@ -285,7 +285,7 @@ def main():
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--cases", nargs="+", choices=CASES,
                    default=["coding", "research", "browser", "resume"])
-    p.add_argument("--model", default="gpt-6-astra")
+    p.add_argument("--model", default="gpt-6.1-sol")
     p.add_argument("--effort", choices=("low", "medium", "high", "xhigh", "max", "ultra"), default="xhigh")
     p.add_argument("--sandbox", choices=("read-only", "workspace-write", "danger-full-access"),
                    default="workspace-write", help="Use the same explicit tool permissions for both variants")

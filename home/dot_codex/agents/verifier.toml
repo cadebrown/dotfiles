@@ -1,6 +1,6 @@
 name = "verifier"
 description = "Independent prescribed-check and edge-case verifier that returns evidence for parent integration."
-model = "gpt-5.6-terra"
+model = "gpt-6.1-terra"
 model_reasoning_effort = "medium"
 model_verbosity = "low"
 web_search = "disabled"

@@ -146,14 +146,14 @@ alias cursor-sync='bash ~/dotfiles/install/cursor.sh sync-extensions'
 
 # Codex profile shortcuts. The default built-in permission profile removes the
 # filesystem/network sandbox and approval prompts.
-#   codex   = Sol, high reasoning, unrestricted host access
-#   codexs  = Sol, extra-high reasoning, medium verbosity
-#   codexr  = Sol, extra-high reasoning, read-only permissions
+#   codex   = GPT-6.1 Sol, extra-high reasoning, unrestricted host access
+#   codexs  = GPT-6 Astra, extra-high reasoning, medium verbosity
+#   codexr  = GPT-6 Astra, extra-high reasoning, read-only permissions
 alias codexs='codex -p deep'
 alias codexr='codex -p review'
 
 # Claude launcher — NVIDIA managed settings select Sonnet on restart, while
-# Opus remains an allowed session choice. Apply the personal Opus 5 1M / medium
+# Opus remains an allowed session choice. Apply the personal Opus 5.5 / xhigh
 # default only to sessions; explicit flags win and management commands pass
 # through untouched.
 {{ template "claude-defaults.sh" . }}

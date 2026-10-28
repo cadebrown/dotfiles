@@ -257,14 +257,14 @@ for the supported client behavior.
 
 ## Codex workbench
 
-Codex defaults to GPT-6 Astra at extra-high reasoning. Use the base task for
+Codex defaults to GPT-6.1 Sol at extra-high reasoning. Use the base task for
 normal work, then select one profile when its narrow purpose matches the job:
 
 | Command | Intended use |
 |---|---|
 | `codex -p deep` | Astra with medium verbosity for a demanding implementation or research task. |
 | `codex -p review` | Astra with read-only filesystem permissions for review and exploration. |
-| `codex -p fast` | GPT-5.6 Luna at low reasoning for quick, low-risk iteration. |
+| `codex -p fast` | GPT-6 Luna at low reasoning for quick, low-risk iteration. |
 | `codex -p context` | Astra with experimental context management. It requires a supported client and a ChatGPT Plus or Pro sign-in; it is not an API, Business, or Enterprise feature. |
 
 The base Codex configuration enables every managed MCP. Domain profiles inherit
@@ -305,10 +305,10 @@ destructive by their provider.
 
 ## Other harnesses
 
-- Claude Code defaults to Claude Fable 5 with extra-high effort,
+- Claude Code defaults to Claude Opus 5.5 with extra-high effort,
   `bypassPermissions`, and its OS sandbox disabled.
-- OpenCode uses Fable for planning, local Qwen3.6 for builds on macOS, and a
-  read-only Sonnet 5 review subagent. Its generated MCP configuration follows the
+- OpenCode uses Fable 5.1 for planning, local Qwen3.6 for builds on macOS, and a
+  read-only Sonnet 5.5 review subagent. Its generated MCP configuration follows the
   selected registry profiles; permissions are scoped per agent.
 - Cursor CLI permits every shell command, Cursor's Claude extension starts in
   bypass mode, and Codex Desktop has its own app integrations and account gates.

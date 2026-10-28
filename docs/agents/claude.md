@@ -17,14 +17,28 @@ Edit the owner. Changes in `~/.claude/plugins/` disappear at the next reconcilia
 
 The shared voice arrives through Claude’s `cade` output style. Project instructions still own project build, test, and deployment work.
 
-The user setting selects `claude-opus-5[1m]` at medium effort. On NVIDIA hosts,
-server-managed settings select Sonnet again at startup even though Opus remains
-allowed. The interactive shell launcher therefore supplies `--model
-claude-opus-5[1m] --effort medium` for session commands. Explicit model or
+The user setting selects `claude-opus-5-5` at `xhigh` effort, with 1M context
+enabled by default, with Sonnet 5.5 as the configured fallback. The effort is also stored in
+`modelSettings.claude-opus-5-5.effortLevel`: Opus 5.5 ignores the older top-level
+user `effortLevel` setting. On NVIDIA hosts, server-managed settings select
+Sonnet again at startup even though Opus remains allowed. The interactive shell
+launcher therefore supplies `--model claude-opus-5-5 --effort xhigh` for session
+commands. Explicit model or
 effort flags win independently; management commands such as `claude mcp`,
 `claude auth`, `claude plugin`, `claude doctor`, and `claude update` bypass the
 launcher defaults unchanged. Resumed sessions retain the model stored in their
 transcript.
+
+After applying the managed files, open a new shell and run:
+
+```bash
+claude
+```
+
+Expected result: a new session starts on Opus 5.5 at `xhigh`; confirm with
+`/model` and `/effort status`. Higher effort spends more tokens on reasoning.
+See [model configuration](https://code.claude.com/docs/en/model-config#adjust-effort-level)
+for model-specific effort settings and context behavior.
 
 ## Plugin and hook lifecycle
 

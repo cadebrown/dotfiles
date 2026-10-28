@@ -109,6 +109,24 @@ flowchart LR
 
 In a remote tmux pane, printf '\033]52;c;dGVzdA==\a' is a controlled write test: the expected result is local clipboard text test. It proves only that terminal path. Remote reads still require Ghostty approval, and an embedded VS Code/Cursor terminal is not Ghostty. See [Ghostty shell integration](https://ghostty.org/docs/features/shell-integration) and [tmux clipboard options](https://man.openbsd.org/tmux#set-clipboard).
 
+## Use the managed iTerm AI model
+
+[iTerm preferences](../../home/dot_iterm2/com.googlecode.iterm2.plist) select
+`gpt-6.1-sol` through the OpenAI Responses API, with a 1,050,000-token context
+limit and 128,000-token output limit. These limits match the
+[model specifications](https://developers.openai.com/api/docs/models/gpt-6.1-sol)
+checked on 2026-10-28. API access is separate from a ChatGPT subscription.
+
+After applying the preferences, inspect the selected model:
+
+```bash
+defaults read com.googlecode.iterm2 AiModel
+```
+
+Expected result: `gpt-6.1-sol`. Reload iTerm preferences before starting a new
+AI chat; existing chats keep their selected model. See
+[iTerm AI configuration](https://iterm2.com/documentation-ai-chat.html#models-and-providers).
+
 ## Operate Neovim as configuration plus plugin state
 
 [init.lua](../../home/dot_config/nvim/init.lua) deploys to $HOME/.config/nvim/init.lua. It bootstraps lazy.nvim into Neovim's data directory on first startup, then declares Telescope with leader-s-f (files), leader-s-g (live grep), leader-s-d (diagnostics), and leader-leader (buffers). Ctrl-h/j/k/l changes splits; Esc Esc exits terminal mode.

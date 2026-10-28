@@ -7,6 +7,10 @@ description: Select generated session profiles and bounded child roles.
 
 Profiles in [`home/dot_codex/`](../../home/dot_codex/) apply when a session starts; they do not retrofit its tool inventory.
 
+The managed baseline is GPT-6.1 Sol at `xhigh` reasoning. `deep`, `review`, and
+`context` retain GPT-6 Astra; `fast` uses GPT-6 Luna at low reasoning. Existing
+live model choices survive config sync.
+
 | Command | Use | Limit |
 | --- | --- | --- |
 | `codex` | ordinary implementation | existing sessions retain their inventory |
@@ -38,7 +42,11 @@ Role sources are [`home/dot_codex/agents/`](../../home/dot_codex/agents/); tool 
 | `verifier` | prescribed checks and edges |
 | `reviewer` | adversarial final review |
 
-`extractor` and `coder` use Luna/low; `explorer`, `researcher`, `patcher`, and `verifier` use Terra/medium. `reviewer`, `default`, and `worker` inherit the parent. Those are local manifests, not permanent product guarantees.
+`extractor` and `coder` use GPT-6 Luna/low; `explorer`, `researcher`, `patcher`, and `verifier` use GPT-6.1 Terra/medium. `reviewer`, `default`, and `worker` inherit the parent. Those are local manifests, not permanent product guarantees.
+
+Model pins were checked on 2026-10-28 against the
+[current Codex model catalog](https://learn.chatgpt.com/docs/models) and the
+local account's model inventory. GPT-6.1 Terra needs Codex CLI 0.159.0 or later.
 
 ## Write a brief the child can finish
 

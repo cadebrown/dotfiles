@@ -181,11 +181,11 @@ alias timestamp='date +"%Y%m%d%H%M%S"'
 alias verify-path='bash ~/dotfiles/install/verify-path.sh'
 
 # Codex profile shortcuts (default = unrestricted host access, no prompts)
-alias codexs='codex -p deep'        # Sol, extra-high reasoning
-alias codexr='codex -p review'      # Sol, read-only permissions
+alias codexs='codex -p deep'        # GPT-6 Astra, extra-high reasoning
+alias codexr='codex -p review'      # GPT-6 Astra, read-only permissions
 
 # Claude launcher — NVIDIA managed settings select Sonnet on restart, while
-# Opus remains an allowed session choice. Apply the personal Opus 5 1M / medium
+# Opus remains an allowed session choice. Apply the personal Opus 5.5 / xhigh
 # default only to sessions; explicit flags win and management commands pass
 # through untouched.
 {{ template "claude-defaults.sh" . }}

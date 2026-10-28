@@ -96,7 +96,7 @@
     {
       "id": "agent-stack",
       "title": "Codex agent stack",
-      "description": "Installs complete native Codex runtimes with atomic activation and version-aware validation of the patched shell removed in 0.163.0, retires legacy npm launcher symlinks in managed roots including scratch-backed and PLAT layouts without deleting active package files, verifies PATH resolution, and raises Linux soft descriptor limits, resolves shell host policy without a Codex function, enables all managed Codex MCPs by default with explicit narrower profiles, and configures focused roles, host-local state, SSH OAuth callback ports, deterministic Linux OAuth storage, credential-file healthchecks, connection-time GitHub credentials, verified backups, and copy-only history migration. The shared skill registry includes standalone Ponytail change review without session hooks.",
+      "description": "Installs complete native Codex runtimes with atomic activation and version-aware validation of the patched shell removed in 0.163.0, retires legacy npm launcher symlinks in managed roots including scratch-backed and PLAT layouts without deleting active package files, verifies PATH resolution, and raises Linux soft descriptor limits, resolves shell host policy without a Codex function, enables all managed Codex MCPs by default with explicit narrower profiles, and configures GPT-6.1 Sol defaults, GPT-6 Luna/GPT-6.1 Terra roles, host-local state, SSH OAuth callback ports, deterministic Linux OAuth storage, credential-file healthchecks, connection-time GitHub credentials, verified backups, and copy-only history migration. The shared skill registry includes standalone Ponytail change review without session hooks.",
       "page": "/agents/codex/",
       "sources": [
         "home/.chezmoiignore",
@@ -148,7 +148,7 @@
     {
       "id": "claude-code",
       "title": "Claude Code",
-      "description": "Configures Claude instructions, plugins, scoped hooks, and transcript status reporting. Stops before plugin changes when the marketplace inventory cannot load, preserving authentication and managed-policy diagnostics.",
+      "description": "Configures Claude instructions, plugins, scoped hooks, and transcript status reporting, with Opus 5.5 at xhigh effort for new sessions. Stops before plugin changes when the marketplace inventory cannot load, preserving authentication and managed-policy diagnostics.",
       "page": "/agents/claude/",
       "sources": [
         "home/.chezmoitemplates/claude-defaults.sh",
@@ -204,7 +204,7 @@
     {
       "id": "opencode-and-pi",
       "title": "OpenCode and Pi",
-      "description": "Configures managed provider defaults, MCP-scoped OpenCode agents, and thin local extensions.",
+      "description": "Configures local MLX defaults on macOS, Haiku 5.5 cloud defaults on Linux, Fable 5.1 planning and Sonnet 5.5 review in OpenCode, MCP-scoped agents, and thin local extensions.",
       "page": "/agents/opencode-and-pi/",
       "sources": [
         "home/dot_config/opencode/AGENTS.md.tmpl",
@@ -269,7 +269,7 @@
     {
       "id": "desktop-and-editors",
       "title": "Desktop and editors",
-      "description": "Installs and configures desktop coding tools, macOS settings, and service integrations.",
+      "description": "Installs and configures desktop coding tools, macOS settings, service integrations, and GPT-6.1 Sol for iTerm's OpenAI Responses API helper.",
       "page": "/usage/ai-workbench/",
       "sources": [
         "home/dot_aerospace.toml",

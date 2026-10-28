@@ -1,14 +1,14 @@
 # AI workbench
 
 The default Codex setup enables every MCP server in the managed registry with
-GPT-6 Astra at extra-high reasoning. Servers still need their credentials and
+GPT-6.1 Sol at extra-high reasoning. Servers still need their credentials and
 runtime prerequisites to connect. Use skills and project CLIs for the normal
 work loop, and select a smaller MCP baseline explicitly when needed.
 
 ## Start a task
 
 ```bash
-codex                         # Astra, all managed MCPs enabled
+codex                         # GPT-6.1 Sol, all managed MCPs enabled
 codex -p deep                 # demanding implementation or research
 codex -p review               # Astra, read-only exploration
 codex -p fast                 # quick Luna iteration

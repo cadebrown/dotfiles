@@ -15,11 +15,11 @@ _claude_with_defaults() {
     done
 
     if [[ "$_has_model" == 0 && "$_has_effort" == 0 ]]; then
-        command claude --model 'claude-opus-5[1m]' --effort medium "$@"
+        command claude --model claude-opus-5-5 --effort xhigh "$@"
     elif [[ "$_has_model" == 0 ]]; then
-        command claude --model 'claude-opus-5[1m]' "$@"
+        command claude --model claude-opus-5-5 "$@"
     elif [[ "$_has_effort" == 0 ]]; then
-        command claude --effort medium "$@"
+        command claude --effort xhigh "$@"
     else
         command claude "$@"
     fi

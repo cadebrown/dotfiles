@@ -1,6 +1,6 @@
 name = "patcher"
 description = "Bounded implementation with named ownership, a clear behavior contract, and meaningful checks."
-model = "gpt-5.6-terra"
+model = "gpt-6.1-terra"
 model_reasoning_effort = "medium"
 model_verbosity = "low"
 web_search = "disabled"

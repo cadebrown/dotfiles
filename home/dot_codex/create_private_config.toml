@@ -1,7 +1,7 @@
 #:schema https://developers.openai.com/codex/config-schema.json
 # The create_private_ source attributes preserve installer-owned contents and mode 0600.
 
-model = "gpt-6-astra"
+model = "gpt-6.1-sol"
 review_model = "gpt-6-astra"
 model_reasoning_effort = "xhigh"
 model_verbosity = "low"

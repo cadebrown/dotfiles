@@ -26,10 +26,10 @@ run_wrapper() {
 }
 
 assert_session_defaults() {
-    [[ "$output" == $'<call>\n<--model>\n<claude-opus-5[1m]>\n<--effort>\n<medium>'* ]]
+    [[ "$output" == $'<call>\n<--model>\n<claude-opus-5-5>\n<--effort>\n<xhigh>'* ]]
 }
 
-@test "Claude launcher adds Opus 5 1M and medium in Bash and Zsh" {
+@test "Claude launcher adds Opus 5.5 and xhigh in Bash and Zsh" {
     local shell
     for shell in bash zsh; do
         run_wrapper "$shell" -p 'hello'
@@ -49,11 +49,11 @@ assert_session_defaults() {
 
         run_wrapper "$shell" -m=haiku -p hello
         [ "$status" -eq 0 ]
-        [ "$output" = $'<call>\n<--effort>\n<medium>\n<-m=haiku>\n<-p>\n<hello>' ]
+        [ "$output" = $'<call>\n<--effort>\n<xhigh>\n<-m=haiku>\n<-p>\n<hello>' ]
 
         run_wrapper "$shell" --effort low -p hello
         [ "$status" -eq 0 ]
-        [ "$output" = $'<call>\n<--model>\n<claude-opus-5[1m]>\n<--effort>\n<low>\n<-p>\n<hello>' ]
+        [ "$output" = $'<call>\n<--model>\n<claude-opus-5-5>\n<--effort>\n<low>\n<-p>\n<hello>' ]
     done
 }
 

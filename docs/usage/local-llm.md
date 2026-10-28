@@ -179,10 +179,10 @@ configured MCP servers during startup; this is not lazy server discovery.
 ```sh
 # opencode — switch agent or model in the TUI
 /agent plan                     # plan agent runs Fable
-/model anthropic/claude-sonnet-5
+/model anthropic/claude-sonnet-5-5
 
 # pi — Ctrl+L (or /model)
-/model anthropic/claude-sonnet-5
+/model anthropic/claude-sonnet-5-5
 ```
 
 API keys come from `~/.<service>.env` files (written by `bash auth.sh`),

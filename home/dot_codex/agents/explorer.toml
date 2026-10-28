@@ -1,6 +1,6 @@
 name = "explorer"
 description = "Focused repository search and execution-path tracing with file and line evidence."
-model = "gpt-5.6-terra"
+model = "gpt-6.1-terra"
 model_reasoning_effort = "medium"
 model_verbosity = "low"
 web_search = "disabled"
