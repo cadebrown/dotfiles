@@ -82,7 +82,7 @@ Rust tools are installed via `cargo-binstall` -- pre-built binaries from GitHub 
 
 **macOS** uses Homebrew at `/opt/homebrew` with native bottles. Rust gets Homebrew's code-signed `rustup` (required on Sequoia+). System preferences are set via `defaults write`.
 
-**Linux** uses Homebrew at `$LOCAL_PLAT/brew/` -- a rootless prefix with its own glibc. The public package-manager bootstrap needs no sudo, Docker, or container; the NVIDIA overlay's default-on nv-pptx runner requires Docker (`DF_DO_NV_PPTX=0` skips it).
+**Linux** uses Homebrew at `$LOCAL_PLAT/brew/` -- a rootless prefix with its own glibc. The public package-manager bootstrap needs no sudo, Docker, or container.
 
 ### PLAT isolation
 
