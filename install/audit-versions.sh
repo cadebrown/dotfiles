@@ -82,7 +82,9 @@ record node 24 major nvm lts "$(command_version node 's/^v?([0-9.]+).*/\1/p')"
 record nvm 0.40.7 exact nvm repo-pin "$(bash -c 'NVM_DIR="$1"; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" >/dev/null 2>&1 && nvm --version' _ "$NVM_DIR" 2>/dev/null || true)"
 record npm 12 minimum npm configured-major "$(command_version npm 's/^v?([0-9.]+).*/\1/p')"
 record python 3.14 major homebrew python@3.14 "$(command_version python3 's/^Python ([0-9.]+).*/\1/p')"
-record uv 0.12 major uv self-update "$(command_version uv 's/^uv ([0-9.]+).*/\1/p')"
+# python.sh runs an unpinned `uv self update`, so this is a floor; a 0.x series
+# pin fails on every uv minor release.
+record uv 0.12.0 minimum uv self-update "$(command_version uv 's/^uv ([0-9.]+).*/\1/p')"
 record go 1.27 minimum homebrew go "$(go version 2>/dev/null | sed -nE 's/^go version go([0-9.]+).*/\1/p' || true)"
 record zig 0.16.0 minimum homebrew zig "$(zig version 2>/dev/null | sed -nE 's/^([0-9.]+).*/\1/p' || true)"
 record juliaup 1.22.3 minimum homebrew juliaup "$(command_version juliaup 's/^Juliaup ([0-9.]+).*/\1/p')"

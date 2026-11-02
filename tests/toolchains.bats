@@ -50,7 +50,7 @@ case "${0##*/}" in
     node)    printf 'v24.20.0\n' ;;
     npm)     printf '12.0.2\n' ;;
     python3) printf 'Python 3.14.7\n' ;;
-    uv)      printf 'uv 0.12.9\n' ;;
+    uv)      printf 'uv 0.13.6\n' ;;
     go)      printf 'go version go1.27.1 linux/arm64\n' ;;
     zig)     printf '%s\n' "${DF_VERSION_FIXTURE_ZIG:-0.17.0}" ;;
     juliaup) printf 'Juliaup 1.22.4\n' ;;
@@ -107,8 +107,9 @@ EOF
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '
-        [.[] | select(.tool == "rustup" or .tool == "juliaup" or .tool == "zig")]
-        | length == 3 and all(.[]; .policy == "minimum" and .status == "current")
+        [.[] | select(.tool == "rustup" or .tool == "juliaup" or .tool == "zig"
+            or .tool == "uv")]
+        | length == 4 and all(.[]; .policy == "minimum" and .status == "current")
     ' >/dev/null
 }
 

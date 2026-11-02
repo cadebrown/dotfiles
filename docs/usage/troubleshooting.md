@@ -1398,6 +1398,12 @@ brew info --json=v2 rustup juliaup | jq '.formulae[] | {name, stable: .versions.
 genuinely pinned toolchains
 remain exact.
 
+`uv` hit the same failure through the `major` policy. `install/python.sh` runs an
+unpinned `uv self update`, but the audit expected the `0.12` series, and for a
+0.x tool each minor release counts as a new major version. Once `uv` reached
+`0.13.6`, `audit-versions.sh --strict` reported it as `outdated`. It now uses a
+`0.12.0` minimum floor.
+
 Quarto follows the same ownership rule: the macOS Homebrew cask uses a minimum
 floor of `1.10.18`, so an installed `1.10.19` passes. Linux uses an exact release
 archive pin, including an explicit `DF_QUARTO_VERSION` override. An older audit
