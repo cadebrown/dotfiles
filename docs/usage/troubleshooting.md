@@ -548,6 +548,33 @@ the known-unavailable set and the Anysphere forks to use instead).
 
 ---
 
+## Cursor extension update pass fails with `Server returned 503`
+
+Symptom: `bootstrap.sh upgrade` stops in `cursor.sh` after `Updating installed
+extensions`. The log shows `Server returned 503`, then `Cursor extension update
+pass failed` and `cursor.sh failed`. A `DEP0169 url.parse()` warning prints at the
+same time, but it is unrelated: Cursor's bundled Node prints it on every CLI call.
+
+Root cause: Cursor's extension gallery (`marketplace.cursorapi.com`, Cursor's
+front end for Open VSX) was briefly unavailable. Because bootstrap stops at the
+first failed step, the outage also skips cursor.sh's extension verification, the
+My Machines worker setup, and every later bootstrap step.
+
+Confirm that the gallery responds again:
+
+```sh
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json;api-version=3.0-preview.1' \
+  -d '{"filters":[{"criteria":[{"filterType":7,"value":"ms-python.python"}],"pageNumber":1,"pageSize":1}],"flags":0}' \
+  https://marketplace.cursorapi.com/_apis/public/gallery/extensionquery
+```
+
+**Fix:** after the probe returns `200`, rerun `bootstrap.sh upgrade`. The
+repository and local extensions do not need changes.
+
+---
+
 ## Cursor reports `ENOENT` for `User/settings.json` and ignores user settings
 
 Symptom: Cursor logs or displays an error such as:
