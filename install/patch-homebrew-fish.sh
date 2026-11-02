@@ -104,21 +104,27 @@ _PATCH='                    "-DWITH_DOCS=ON",'
 _BROKEN_FIX="                    \"-DWITH_DOCS=\\#{OS.linux? ? 'OFF' : 'ON'}\","
 # v2 (correct): no \# — Ruby evaluates #{} and cmake gets "OFF" on Linux.
 _FIX="                    \"-DWITH_DOCS=#{OS.linux? ? 'OFF' : 'ON'}\","
+# v3 formula: args moved into a %W[] word list; interpolation spaces don't split words.
+_PATCH_W='      -DWITH_DOCS=ON
+'
+_FIX_W="      -DWITH_DOCS=#{OS.linux? ? 'OFF' : 'ON'}
+"
 _result=$(python3 -c "
 import sys
-path, orig, broken, fix = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+path, orig, broken, fix, orig_w, fix_w = sys.argv[1:7]
 txt = open(path).read()
-if fix in txt:      print('already')
+if fix in txt or fix_w in txt: print('already')
 elif broken in txt: open(path,'w').write(txt.replace(broken, fix, 1)); print('migrated')
 elif orig in txt:   open(path,'w').write(txt.replace(orig, fix, 1)); print('patched')
+elif orig_w in txt: open(path,'w').write(txt.replace(orig_w, fix_w, 1)); print('patched')
 else:               print('notfound')
-" "$FISH_RB" "$_PATCH" "$_BROKEN_FIX" "$_FIX")
+" "$FISH_RB" "$_PATCH" "$_BROKEN_FIX" "$_FIX" "$_PATCH_W" "$_FIX_W")
 case "$_result" in
     already)  log_okay "fish WITH_DOCS patch already applied" ;;
     migrated) log_okay "Migrated: fish patch fixed (\\# → # to enable Ruby interpolation)" ;;
     patched)  log_okay "Patched: -DWITH_DOCS=OFF on Linux (skips sphinx/Rust man page build)" ;;
     notfound) log_warn "fish patch target not found — formula may have changed; check fish.rb" ;;
 esac
-unset _PATCH _BROKEN_FIX _FIX _result
+unset _PATCH _BROKEN_FIX _FIX _PATCH_W _FIX_W _result
 
 log_okay "fish.rb patches done"
