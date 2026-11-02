@@ -550,10 +550,8 @@ else
     # See install/patch-homebrew-coreutils.sh for full details.
     [[ -f "$DF_INSTALL_DIR/patch-homebrew-coreutils.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-coreutils.sh"
 
-    # mesa: installs pyyaml from its binary wheel instead of building from source.
-    # venv.pip_install always passes --no-binary=:all:, forcing a source build;
-    # pyyaml's Cython get_requires_for_build_wheel subprocess receives SIGILL (exit -4)
-    # in the Homebrew superenv on a custom prefix.
+    # mesa: pins rusticl's bindgen to a system GCC that ships libstdc++ headers.
+    # libclang otherwise picks Ubuntu 24.04's header-less gcc-14 and fails on <cassert>.
     # See install/patch-homebrew-mesa.sh for full details.
     [[ -f "$DF_INSTALL_DIR/patch-homebrew-mesa.sh" ]] && bash "$DF_INSTALL_DIR/patch-homebrew-mesa.sh"
 

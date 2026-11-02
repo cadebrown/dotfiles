@@ -22,7 +22,7 @@ custom prefix is the source of most build lore below.
 | `patch-homebrew-m4.sh` | Bypass gnulib undeclared-builtin probe (GCC builtins make it silently succeed, configure aborts) |
 | `patch-homebrew-pkgconf.sh` | Same gnulib probe as m4; pkgconf is a critical dep (openssh, podman, fish) |
 | `patch-homebrew-cc65.sh` | linux-headers CPATH — Makefile uses $(CC) $(CFLAGS) without $(CPPFLAGS) |
-| `patch-homebrew-mesa.sh` | pyyaml binary wheel (Cython SIGILL in superenv) + bindgen `--gcc-install-dir` (rusticl bindings can't find `<cassert>`) |
+| `patch-homebrew-mesa.sh` | bindgen `--gcc-install-dir` (rusticl bindings can't find `<cassert>`) |
 | `patch-homebrew-fastfetch.sh` | Disable WSL GPU detection — directx-headers shim fails at custom prefix |
 | `patch-homebrew-fish.sh` | Disable sphinx man pages — headless nodes lack configured locale for Python/sphinx |
 | `patch-homebrew-rpm.sh` | LUA_MATH_LIBRARY cmake fix — FindLua can't find libm; glibc is keg-only |
@@ -58,7 +58,7 @@ custom prefix is the source of most build lore below.
   release and then doesn't. Fix is `--gcc-install-dir=<newest GCC that has
   /usr/include/c++/N>`; Homebrew's own GCC does **not** work as a substitute (its Cellar
   layout isn't what `--gcc-install-dir` expects). Currently hits mesa's rusticl frontend
-  (`patch-homebrew-mesa.sh` patch 2). Reproduce in one line:
+  (`patch-homebrew-mesa.sh`); still true with LLVM 23 (Nov 2026). Reproduce in one line:
   `echo '#include <llvm/ADT/DenseMapInfo.h>' | clang++ -fsyntax-only -I "$(brew --prefix llvm)/include" -x c++ -`
 - **An interrupted dependents rebuild leaves dangling sonames.** `brew upgrade <x>` moves
   a dependency and then rebuilds its dependents; kill it in between and the dependents
@@ -118,8 +118,21 @@ custom prefix is the source of most build lore below.
   real refresh broke two: `pkgconf` (2.5.1 → 3.0.4 rewrote `def install` for meson) and
   the `llvm_clang++` shim (Homebrew moved Linux super shims into `shims/linux/super/bin/`).
   Anchor on the narrowest stable line (`  def install`) with a separate idempotency
-  marker rather than whole-block matching. After any tap refresh, verify with:
-  `for f in install/patch-homebrew-*.sh; do bash "$f" 2>&1 | grep '^\[warn\]'; done`
+  marker rather than whole-block matching. Nov 2026 hit two more: fish moved its args
+  into a `%W[]` list (warn only, so it went unnoticed) and mesa reshaped its resource
+  install (fatal). After any tap refresh, verify with:
+  `for f in install/patch-homebrew-*.sh; do bash "$f" 2>&1 | grep -E '^\[(warn|fail)\]'; done`
+- **A formula with `def fetch` installs with the network cut off.** Homebrew now runs
+  `fetch` first and then `install` under a Landlock sandbox with `deny_all_network`
+  (`formula_installer.rb`, `staging_path` branch); `deny_network_access!` alone does the
+  same for `:build`. Linux Landlock is live on these hosts (`brew ruby -e 'p
+  Sandbox.available?'`); kernel 6.8 is Landlock ABI 4, which blocks TCP connect/bind
+  (enough to stop pip and curl) and warns that full denial needs ABI 10.
+  homebrew-core rolled one or both markers into ~4,500 formulae in Oct 2026. A patch that downloads during `install` (`pip install` from PyPI, `curl`)
+  therefore fails at build time, not at patch time. That is why the mesa pyyaml
+  wheel patch had to go. `patch-homebrew-systemd.sh` still downloads lxml and breaks
+  the same way once systemd gains either marker. Move such downloads into `fetch` or
+  a declared `resource`.
 - **Python dev headers come from Homebrew** — python@3.14 provides `Python.h` and
   `libpython3.14.so` at `$(brew --prefix)/opt/python@3.14/include/python3.14/`.
   CMake's `FindPython3` discovers these automatically via `brew shellenv` paths.
@@ -142,8 +155,10 @@ custom prefix is the source of most build lore below.
 - **Cython packages SIGILL in superenv (pip --no-binary)** — Homebrew's `venv.pip_install`
   always passes `--no-binary=:all:`, forcing source builds. Packages that use Cython
   (lxml, pyyaml) fail with exit -4 (SIGILL) in the superenv context. Fix: install these
-  packages with `--prefer-binary` instead. Currently patched: `systemd` (lxml), `mesa`
-  (pyyaml). See the respective `patch-homebrew-*.sh` for details.
+  packages with `--prefer-binary` instead. Currently patched: `systemd` (lxml). mesa's
+  pyyaml wheel patch was retired in Nov 2026: upstream now passes `build_isolation: false`,
+  which skips the isolated build-requirements subprocess that SIGILLed, and pyyaml falls
+  back to pure Python without Cython.
 - **cmake's FindLua can't find glibc's libm on Linux** — glibc is keg-only, so its lib
   dir is not in cmake's `find_library()` search path. FindLua requires LUA_MATH_LIBRARY
   (libm) to link liblua. The `rpm` formula is patched to pass

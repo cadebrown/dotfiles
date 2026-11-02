@@ -342,7 +342,7 @@
     {
       "id": "homebrew-patches",
       "title": "Homebrew compatibility patches",
-      "description": "Applies reviewed package-manager compatibility patches during bootstrap, including an explicit OpenSSL dependency for source-built Coreutils checksum tools and systemd/Mesa wheel patches that follow formula-owned Python and resource versions while preserving resource exclusions and bindgen settings. Formula patch scripts retain macOS system Bash 3.2 compatibility with explicit syntax and fixture coverage.",
+      "description": "Applies reviewed package-manager compatibility patches during bootstrap, including an explicit OpenSSL dependency for source-built Coreutils checksum tools and a systemd wheel patch that follows formula-owned Python and resource versions, and a Mesa bindgen toolchain fix that leaves the formula's offline Python install untouched. Formula patch scripts retain macOS system Bash 3.2 compatibility with explicit syntax and fixture coverage.",
       "page": "/usage/troubleshooting/",
       "sources": [
         "install/patch-homebrew-apache-serf.sh",

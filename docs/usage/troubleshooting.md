@@ -1165,27 +1165,39 @@ See the [Mesa source](../../install/patch-homebrew-mesa.sh),
 [systemd source](../../install/patch-homebrew-systemd.sh), and Bash's
 [heredoc reference](https://www.gnu.org/software/bash/manual/html_node/Redirections.html#Here-Documents).
 
-## Mesa PyYAML patch target not found
+## Mesa patch target not found
 
 **Symptom:** Linux bootstrap stops during Homebrew preparation with
-`mesa pyyaml patch target not found — formula changed`.
+`mesa patch target not found (pyyaml resource installation) — formula changed`.
 
-**Cause:** Mesa added `r.test?` to its Python resource filter. The old exact
-replacement only recognized the earlier filter, so it rejected the new formula.
+**Cause:** Mesa 26.2.6 reshaped its Python setup in three ways. It now installs
+resources with `build_isolation: false`. It defines a `fetch` phase. It declares
+`deny_network_access!`. The old patch replaced the resource installation with a
+PyPI wheel download, because pyyaml's isolated build-requirements subprocess
+died with SIGILL. Its anchor no longer matched. Even a matching anchor would
+have failed: Homebrew runs a formula with a `fetch` phase through `install`
+inside a Landlock sandbox that denies network access. On kernel 6.8 (Landlock ABI
+4) that blocks TCP, which is enough to stop the PyPI download.
 
-**Fix:** update the checkout and rerun the maintained patch:
+**Confirm:** inspect the formula and the sandbox:
+
+```sh
+brew cat mesa | grep -E 'build_isolation|deny_network|def fetch'
+brew ruby -e 'p Sandbox.available?'
+```
+
+**Fix:** update the checkout and rerun the patch:
 
 ```sh
 bash ~/dotfiles/install/patch-homebrew-mesa.sh
 ```
 
-Expect a successful patch report, then an already-applied report on a repeat
-run. The patch preserves the formula's test/resource exclusions and existing
-bindgen compiler workaround, selects the formula's Python expression, and uses
-the declared PyYAML version. Linux requires that version's binary wheel;
-unsupported formula or bindgen shapes fail before changing the file. This
-prepares the formula without rebuilding Mesa. `install/linux-packages.sh` calls
-it before Bundle; `DF_PATCH_BREW_MESA=0` explicitly skips it.
+The pyyaml wheel patch is retired. Without build isolation, pip builds pyyaml
+from its sdist with no extra subprocess. Without Cython it falls back to pure
+Python, which matches upstream's own build. The script now applies only the
+bindgen `--gcc-install-dir` fix, which LLVM 23 still needs. Unknown bindgen
+setups still fail before the formula is changed. `install/linux-packages.sh`
+calls the script before Bundle. `DF_PATCH_BREW_MESA=0` skips it.
 
 See the [patch source](../../install/patch-homebrew-mesa.sh) and the
 [Homebrew formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/m/mesa.rb).
