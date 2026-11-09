@@ -17,7 +17,9 @@
 #     ├── .oh-my-zsh/            ← symlinked from ~/.oh-my-zsh
 #     ├── .oh-my-zsh-custom/     ← symlinked from ~/.oh-my-zsh-custom
 #     ├── kb/                    ← symlinked from ~/kb (knowledge base, install/memory.sh)
-#     ├── .claude/               ← heavy *unmanaged* subdirs of ~/.claude (see note)
+#     ├── .rust-docs-mcp/        ← symlinked from ~/.rust-docs-mcp (crate source + rustdoc
+#     │                            JSON cache; its doctor fails below 1 GB free)
+#     ├── .claude/              ← heavy *unmanaged* subdirs of ~/.claude (see note)
 #     │   ├── projects/          ← symlinked from ~/.claude/projects (history + memory)
 #     │   ├── plugins/           ← symlinked from ~/.claude/plugins
 #     │   └── file-history/      ← symlinked from ~/.claude/file-history
@@ -202,7 +204,9 @@ log_info "Paths:   $PATHS"
 # These cache-shaped entries are the ones that actually fill a small home
 # volume. TinyTeX is absent because install/latex.sh now keeps its compiled tree
 # below LOCAL_PLAT, which is already redirected by the ~/.local entry.
-_DEFAULT_LINKS="$HOME/.local:$HOME/.cache:$HOME/.cass:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom:$HOME/kb:$HOME/.computelab:$HOME/.agent-browser:$HOME/.gradle"
+# rust-docs-mcp ignores XDG and caches under ~/.rust-docs-mcp; its `doctor`
+# (run by install/rust.sh) fails when that filesystem has under 1 GB free.
+_DEFAULT_LINKS="$HOME/.local:$HOME/.cache:$HOME/.cass:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom:$HOME/kb:$HOME/.computelab:$HOME/.agent-browser:$HOME/.gradle:$HOME/.rust-docs-mcp"
 DF_LINKS="${DF_LINKS-$_DEFAULT_LINKS}"
 unset _DEFAULT_LINKS
 

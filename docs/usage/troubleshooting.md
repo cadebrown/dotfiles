@@ -2924,7 +2924,7 @@ check) start failing on free-space thresholds.
 
 Root cause: `install/scratch.sh` only migrates a fixed, named list of
 cache-shaped directories (`DF_LINKS`, plus `DF_CLAUDE_LINKS`/`DF_CODEX_LINKS`
-one level under the chezmoi-managed `~/.claude`/`~/.codex`). Two other classes
+one level under the chezmoi-managed `~/.claude`/`~/.codex`). Three other classes
 of growth are not covered automatically:
 
 1. **Ad hoc project/output directories** created directly under `~` (build
@@ -2937,6 +2937,11 @@ of growth are not covered automatically:
    SQLite schema-upgrade snapshots) grew unnoticed under `~/.codex` for
    months because the migration list only knew about `backups/`, a
    similarly-named but different directory.
+3. **Tools that cache in their own top-level dotdir** instead of `~/.cache` —
+   e.g. `rust-docs-mcp` defaults to `~/.rust-docs-mcp/cache`, and its
+   `doctor` (run by `install/rust.sh`) fails with `Cache directory: ... only
+   688.69 MB available - at least 1GB recommended` whenever the home volume
+   has under 1 GB free, even while the cache itself is empty.
 
 **Confirm:** `du -sh --exclude=.local -- ~/.[!.]* ~/* 2>/dev/null | sort -rh | head -20`
 to find what's actually large; for a chezmoi-managed dir like `~/.claude` or
@@ -2951,7 +2956,10 @@ forward, create new project/output directories there directly rather than in
 list in `install/scratch.sh` and rerun it — Codex/Claude Code must not be
 running at the time, since `scratch.sh` refuses to migrate `~/.codex` while a
 process holds its files open (a live app-server can otherwise keep writing to
-an unlinked inode across the migration).
+an unlinked inode across the migration). For case 3, add the dotdir to
+`_DEFAULT_LINKS` in `install/scratch.sh` (after confirming `chezmoi managed`
+does not list it) and rerun `bash install/scratch.sh`; the tool's free-space
+check then measures the scratch filesystem.
 
 ## Remote Codex repeatedly warns about MCP authentication
 

@@ -37,7 +37,7 @@ Complete reference for `DF_*` variables and the tool-standard ones this repo car
 |---|---|---|
 | `DF_SCRATCH` | (unset) | Path to scratch root. Setting this enables scratch mode (symlinks heavy `$HOME` dirs). |
 | `DF_SCRATCH_LINK` | `$HOME/scratch` | The `$HOME` symlink that points at scratch. Bootstrap creates this if `DF_SCRATCH` is set. |
-| `DF_LINKS` | `~/.local:~/.cache:~/.cass:~/.vscode:~/.vscode-server:~/.cursor-server:~/.nv:~/.npm:~/.oh-my-zsh:~/.oh-my-zsh-custom:~/kb:~/.computelab:~/.agent-browser:~/.gradle` | Colon-separated top-level dirs to redirect to scratch. TinyTeX lives below `$LOCAL_PLAT`; `~/.cursor` is chezmoi-owned. |
+| `DF_LINKS` | `~/.local:~/.cache:~/.cass:~/.vscode:~/.vscode-server:~/.cursor-server:~/.nv:~/.npm:~/.oh-my-zsh:~/.oh-my-zsh-custom:~/kb:~/.computelab:~/.agent-browser:~/.gradle:~/.rust-docs-mcp` | Colon-separated top-level dirs to redirect to scratch. TinyTeX lives below `$LOCAL_PLAT`; `~/.cursor` is chezmoi-owned. |
 | `DF_CONFIG_LINKS` | `Code` | Colon-separated `~/.config` subdir names to redirect to scratch (never `~/.config` itself — chezmoi owns it). |
 | `DF_CURSOR_LINKS` | `projects:worktrees` | Colon-separated `~/.cursor` subdir names to redirect to scratch (never `~/.cursor` itself — chezmoi owns it). |
 | `DF_CLAUDE_LINKS` | `projects:plugins:file-history` | Colon-separated `~/.claude` subdir names to redirect to scratch (never `~/.claude` itself — chezmoi owns it). Drop `projects` to keep history + memory on NFS. |

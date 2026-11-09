@@ -70,7 +70,7 @@ ln -s /local/disk/$USER ~/scratch
 | `DF_CONFIG_LINKS` | `Code` | selected `~/.config` children |
 | `DF_CURSOR_LINKS` | `projects:worktrees` | selected `~/.cursor` children |
 | `DF_CLAUDE_LINKS` | installer defaults | unmanaged Claude-directory children |
-| `DF_DO_SCRATCH` | install: `1`; update/upgrade: `0` | skip scratch setup |
+| `DF_DO_SCRATCH` | install/upgrade: `1`; update: `0` | skip scratch setup |
 
 Set a links variable to an empty value to skip its group. Review the current
 defaults in [`install/scratch.sh`](../../install/scratch.sh) before overriding.
@@ -78,7 +78,7 @@ defaults in [`install/scratch.sh`](../../install/scratch.sh) before overriding.
 The shipped lists are deliberately explicit:
 
 ```text
-DF_LINKS=$HOME/.local:$HOME/.cache:$HOME/.cass:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom:$HOME/kb:$HOME/.computelab:$HOME/.agent-browser:$HOME/.gradle
+DF_LINKS=$HOME/.local:$HOME/.cache:$HOME/.cass:$HOME/.vscode:$HOME/.vscode-server:$HOME/.cursor-server:$HOME/.nv:$HOME/.npm:$HOME/.oh-my-zsh:$HOME/.oh-my-zsh-custom:$HOME/kb:$HOME/.computelab:$HOME/.agent-browser:$HOME/.gradle:$HOME/.rust-docs-mcp
 DF_CLAUDE_LINKS=projects:plugins:file-history
 ```
 
